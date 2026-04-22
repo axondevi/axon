@@ -9,11 +9,19 @@
       name="description"
       content="Axon is the universal API gateway for autonomous agents. Pay by request in USDC on Base. No subscriptions, no API keys to manage."
     />
+    <meta property="og:type" content="website" />
     <meta property="og:title" content="Axon — API gateway for AI agents" />
     <meta
       property="og:description"
       content="One endpoint. One wallet. Every paid API your agent needs."
     />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta property="og:url" content="https://axon-5zf.pages.dev/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Axon — API gateway for AI agents" />
+    <meta name="twitter:description" content="One endpoint. One wallet. Every paid API your agent needs." />
+    <meta name="twitter:image" content="/og-image.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -319,11 +327,13 @@
             you're building, we'll ship credits + direct access.
           </p>
           <form class="waitlist-form" id="waitlist-form" onsubmit="return submitWaitlist(event)">
+            <label for="waitlist-email" class="sr-only">Email address</label>
             <input
               type="email"
               id="waitlist-email"
               name="email"
               placeholder="you@startup.dev"
+              aria-label="Email address"
               required
             />
             <button type="submit" class="btn btn-primary">
