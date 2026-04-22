@@ -1,30 +1,32 @@
 /**
  * Prometheus-compatible metrics endpoint.
  *
- *   GET /metrics
+ *   GET /metrics  (Authorization: Bearer $METRICS_TOKEN)
  *
- * No auth (following Prometheus convention). Put it behind an internal
- * loadbalancer / firewall in prod. Optional METRICS_TOKEN gates it in
- * shared environments.
- *
- * Emits:
- *   axon_requests_total{api, endpoint, cache, status}
- *   axon_request_cost_usdc_total{api, endpoint, cache}
- *   axon_wallet_balance_usdc{user_id}  (top 100 by balance)
- *   axon_upstream_latency_ms_sum / _count{api, endpoint}   (histogram-ish)
- *   axon_settlements_pending_total
+ * Emits wallet balances keyed by user_id — MUST be gated. In production the
+ * config layer enforces METRICS_TOKEN is set; here we reject any request
+ * lacking the bearer even in dev if the token is configured.
  */
 import { Hono } from 'hono';
 import { and, desc, gte, sql } from 'drizzle-orm';
+import { timingSafeEqual } from 'node:crypto';
 import { db } from '~/db';
 import { requests, wallets, settlements } from '~/db/schema';
+import { env } from '~/config';
 
 const app = new Hono();
 
-const TOKEN = process.env.METRICS_TOKEN;
+function authorized(header: string | undefined): boolean {
+  const token = env.METRICS_TOKEN;
+  if (!token) return false;
+  if (!header) return false;
+  const expected = `Bearer ${token}`;
+  if (header.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+}
 
 app.get('/', async (c) => {
-  if (TOKEN && c.req.header('authorization') !== `Bearer ${TOKEN}`) {
+  if (!authorized(c.req.header('authorization'))) {
     return c.text('unauthorized', 401);
   }
 

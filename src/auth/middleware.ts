@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { eq } from 'drizzle-orm';
+import { timingSafeEqual } from 'node:crypto';
 import { db } from '~/db';
 import { users } from '~/db/schema';
 import { hashApiKey } from '~/lib/crypto';
@@ -27,8 +28,13 @@ export async function apiKeyAuth(c: Context, next: Next) {
 
 export async function adminAuth(c: Context, next: Next) {
   const header = c.req.header('x-admin-key');
-  if (!header || header !== env.ADMIN_API_KEY) {
+  if (!header || !constantTimeEqual(header, env.ADMIN_API_KEY)) {
     throw Errors.forbidden();
   }
   await next();
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }

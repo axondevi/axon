@@ -32,6 +32,22 @@ const schema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+
+  METRICS_TOKEN: z.string().optional(),
+
+  CORS_ALLOWED_ORIGINS: z
+    .string()
+    .default('https://axon-5zf.pages.dev')
+    .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean)),
+}).superRefine((data, ctx) => {
+  if (data.NODE_ENV === 'production' && !data.METRICS_TOKEN) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['METRICS_TOKEN'],
+      message:
+        'METRICS_TOKEN is required in production — /metrics exposes wallet balances.',
+    });
+  }
 });
 
 const parsed = schema.safeParse(process.env);

@@ -29,7 +29,18 @@ const app = new Hono();
 // Request ID first so all subsequent middleware + logs see it.
 app.use('*', requestId);
 app.use('*', secureHeaders());
-app.use('*', cors({ origin: '*', allowHeaders: ['x-api-key', 'content-type', 'authorization'] }));
+// CORS: lock to configured frontend origins in prod. Pre-flight + credentials
+// are restricted to known hosts so browser-side session theft is not possible.
+const allowedOrigins = env.CORS_ALLOWED_ORIGINS;
+app.use(
+  '*',
+  cors({
+    origin: (origin) => (allowedOrigins.includes(origin) ? origin : null),
+    allowHeaders: ['x-api-key', 'content-type', 'authorization'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    maxAge: 600,
+  }),
+);
 
 // Access log (structured — one JSON line per request in prod)
 app.use('*', async (c, next) => {
@@ -74,10 +85,14 @@ app.route('/v1/stats', statsRoutes);
 app.route('/metrics', metricsRoutes);
 
 // ─── x402 native (no API key, pay on-chain per call) ──
-const x402V1 = new Hono();
-x402V1.use('*', x402Middleware);
-x402V1.route('/call', callRoutes);
-app.route('/x402/v1', x402V1);
+// Only mounted when the feature flag is on. When off, hitting /x402/v1/*
+// returns a 404 via app.notFound — no fallthrough to the call engine.
+if (env.ENABLE_X402_NATIVE) {
+  const x402V1 = new Hono();
+  x402V1.use('*', x402Middleware);
+  x402V1.route('/call', callRoutes);
+  app.route('/x402/v1', x402V1);
+}
 
 // ─── Admin endpoints (header: x-admin-key) ────────────
 // MUST be mounted BEFORE the authed /v1 sub-router so that /v1/admin/*
