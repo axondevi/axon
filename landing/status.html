@@ -152,7 +152,7 @@
 
         const pulse = document.getElementById('pulse');
         pulse.classList.remove('unk', 'bad');
-        pulse.classList.add(allUp ? '' : 'bad');
+        if (!allUp) pulse.classList.add('bad');
         document.getElementById('overall-status').textContent =
           allUp ? 'All systems operational' : 'Some services are degraded';
         document.getElementById('overall-sub').textContent =
