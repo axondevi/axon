@@ -47,6 +47,9 @@
     "viem": "^2.21.0",
     "zod": "^3.23.8"
   },
+  "optionalDependencies": {
+    "@turnkey/sdk-server": "^2.0.0"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/pg": "^8.11.10",
