@@ -32,7 +32,7 @@
           <a href="#apis">APIs</a>
           <a href="#how">How it works</a>
           <a href="#pricing">Pricing</a>
-          <a href="/docs">Docs</a>
+          <a href="https://github.com/shopkaolincom-commits/axon">GitHub</a>
           <a href="#waitlist" class="btn btn-sm">Get early access</a>
         </nav>
       </div>
@@ -59,7 +59,7 @@
             <a href="#waitlist" class="btn btn-primary">
               Start free — $5 in credits
             </a>
-            <a href="/docs" class="btn btn-ghost">Read the docs →</a>
+            <a href="https://github.com/shopkaolincom-commits/axon#readme" class="btn btn-ghost">Read the docs →</a>
           </div>
 
           <div class="code-card">
@@ -313,9 +313,10 @@
             We're onboarding the first 100 builders personally. Tell us what
             you're building, we'll ship credits + direct access.
           </p>
-          <form class="waitlist-form" action="#" method="post">
+          <form class="waitlist-form" id="waitlist-form" onsubmit="return submitWaitlist(event)">
             <input
               type="email"
+              id="waitlist-email"
               name="email"
               placeholder="you@startup.dev"
               required
@@ -324,7 +325,25 @@
               Request access
             </button>
           </form>
-          <small>No spam. Unsubscribe in one click.</small>
+          <small>
+            We read every one. Or email directly:
+            <a href="mailto:shopkaolin.com@gmail.com?subject=Axon%20early%20access">
+              shopkaolin.com@gmail.com
+            </a>
+          </small>
+          <script>
+            function submitWaitlist(event) {
+              event.preventDefault();
+              const email = document.getElementById('waitlist-email').value;
+              const subject = 'Axon early access request';
+              const body = 'Email: ' + email + '\n\n' +
+                'What I\'m building:\n\n' +
+                'Which APIs I\'d most want:\n\n';
+              window.location.href = 'mailto:shopkaolin.com@gmail.com?subject=' +
+                encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+              return false;
+            }
+          </script>
         </div>
       </section>
     </main>
@@ -343,18 +362,19 @@
             <h5>Product</h5>
             <a href="#apis">APIs</a>
             <a href="#pricing">Pricing</a>
-            <a href="/docs">Docs</a>
+            <a href="/stats">Stats</a>
             <a href="/status">Status</a>
           </div>
           <div>
-            <h5>Company</h5>
-            <a href="/about">About</a>
-            <a href="/blog">Blog</a>
-            <a href="https://twitter.com/axondev">Twitter / X</a>
+            <h5>Docs</h5>
+            <a href="https://github.com/shopkaolincom-commits/axon#readme">README</a>
+            <a href="https://github.com/shopkaolincom-commits/axon/tree/main/docs">Guides</a>
+            <a href="https://github.com/shopkaolincom-commits/axon/blob/main/openapi.yaml">OpenAPI</a>
           </div>
           <div>
-            <h5>Legal</h5>
-            <a href="/terms">Terms</a>
+            <h5>Contact</h5>
+            <a href="mailto:shopkaolin.com@gmail.com">Email</a>
+            <a href="https://github.com/shopkaolincom-commits/axon/issues">GitHub Issues</a>
             <a href="/privacy">Privacy</a>
           </div>
         </div>

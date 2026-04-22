@@ -1,0 +1,9 @@
+# Cloudflare Pages _redirects
+#
+# CF Pages auto-serves matching files (index.html, stats.html, etc.) and
+# automatically redirects .html → pretty URL. We only need a catch-all
+# for 404 so unknown routes don't fall back to index.html.
+#
+# Rules are processed in order; first match wins.
+
+/*    /404.html    404

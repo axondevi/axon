@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy · Axon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .privacy-wrap { padding: 60px 0 120px; max-width: 720px; }
+      .privacy-wrap h1 { font-size: 36px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      .privacy-wrap .updated { color: var(--text-muted); font-size: 14px; margin-bottom: 40px; }
+      .privacy-wrap h2 { font-size: 20px; margin: 40px 0 12px; font-weight: 700; }
+      .privacy-wrap p, .privacy-wrap li { color: var(--text-dim); font-size: 15px; line-height: 1.65; }
+      .privacy-wrap a { color: var(--accent-2); }
+      .privacy-wrap code { font-family: 'JetBrains Mono', monospace; background: var(--bg-elev); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+      .privacy-wrap ul { padding-left: 22px; }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <nav class="nav-links">
+          <a href="/#apis">APIs</a>
+          <a href="/#pricing">Pricing</a>
+          <a href="/stats">Stats</a>
+          <a href="https://github.com/shopkaolincom-commits/axon">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container privacy-wrap">
+      <h1>Privacy</h1>
+      <p class="updated">Last updated: 2026-04-22</p>
+
+      <p>
+        Axon is early-stage. This is the honest short version of what we do
+        with your data. If anything here is unclear, email
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>.
+      </p>
+
+      <h2>What we collect</h2>
+      <ul>
+        <li>Email (when you request access or sign up)</li>
+        <li>An API key we issue you (hashed in our DB; plaintext only shown once)</li>
+        <li>Your request history: which API you called, when, how much it cost, whether it hit cache</li>
+        <li>Your wallet balance and transactions</li>
+        <li>Standard server logs (IP, user agent) for debugging, kept ≤30 days</li>
+      </ul>
+
+      <h2>What we don't collect</h2>
+      <ul>
+        <li>The contents of your API requests or responses (we proxy them, we don't store them beyond cache TTL)</li>
+        <li>Any personal info beyond email</li>
+        <li>Tracking cookies, ad IDs, or analytics that identify you across sites</li>
+      </ul>
+
+      <h2>Who sees your data</h2>
+      <ul>
+        <li>Us (the Axon team — one person currently)</li>
+        <li>Upstream API providers (OpenAI, Jina, SerpAPI, etc.) — they see whatever you send them through our proxy</li>
+        <li>Infrastructure (Render, Neon, Upstash, Cloudflare) — they host our servers and database</li>
+        <li>Nobody else. We don't sell data. We don't run ads.</li>
+      </ul>
+
+      <h2>Data retention</h2>
+      <ul>
+        <li>Request metadata: kept indefinitely for usage/billing. You can email us to delete.</li>
+        <li>Server logs: ≤30 days</li>
+        <li>Cache entries: per-API TTL (see <a href="/stats">stats</a>)</li>
+      </ul>
+
+      <h2>On-chain data</h2>
+      <p>
+        Deposits to your Axon wallet are recorded on Base (public blockchain).
+        Anyone can see transaction amounts and timestamps via a block explorer.
+        We don't link your wallet address to your email publicly.
+      </p>
+
+      <h2>Your rights</h2>
+      <p>
+        Email us to: delete your account, export your data, opt out of
+        communications. We respond within 72 hours.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>
+      </p>
+    </main>
+
+    <footer>
+      <div class="container footer-inner">
+        <div>
+          <span class="brand small"><span class="logo-dot"></span> axon</span>
+          <p>Payment rails for the agent economy.</p>
+        </div>
+        <div class="footer-links">
+          <div>
+            <h5>Product</h5>
+            <a href="/#apis">APIs</a>
+            <a href="/#pricing">Pricing</a>
+            <a href="/stats">Stats</a>
+            <a href="/status">Status</a>
+          </div>
+          <div>
+            <h5>Docs</h5>
+            <a href="https://github.com/shopkaolincom-commits/axon#readme">README</a>
+            <a href="https://github.com/shopkaolincom-commits/axon/tree/main/docs">Guides</a>
+          </div>
+          <div>
+            <h5>Contact</h5>
+            <a href="mailto:shopkaolin.com@gmail.com">Email</a>
+            <a href="https://github.com/shopkaolincom-commits/axon/issues">GitHub Issues</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
