@@ -1,0 +1,26 @@
+{
+  "name": "@axon/vercel-ai",
+  "version": "0.1.0",
+  "description": "Vercel AI SDK provider backed by Axon. Route every AI tool call through one wallet.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "bun run build"
+  },
+  "peerDependencies": {
+    "@axon/client": "^0.1.0",
+    "ai": ">=4.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "zod": "^3.23.8"
+  },
+  "license": "MIT"
+}

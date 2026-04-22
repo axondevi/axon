@@ -1,0 +1,12 @@
+{
+  "_comment": "Paste this into ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows). Replace AXON_KEY value with your own. Restart Claude Desktop.",
+  "mcpServers": {
+    "axon": {
+      "command": "npx",
+      "args": ["-y", "@axon/mcp-server"],
+      "env": {
+        "AXON_KEY": "ax_live_REPLACE_WITH_YOUR_KEY"
+      }
+    }
+  }
+}

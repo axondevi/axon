@@ -1,0 +1,11 @@
+# Bun configuration — https://bun.sh/docs/runtime/bunfig
+[install]
+auto = "fallback"
+
+[install.scopes]
+
+[run]
+silent = false
+
+# Load .env automatically (Bun does this by default; set here for clarity)
+[env]

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon Status · axon.dev</title>
+    <meta name="description" content="Live status of Axon gateway. Health, uptime, and API response times in real time." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .status-wrap { padding: 80px 0; }
+      .status-wrap h1 { font-size: clamp(32px, 5vw, 48px); letter-spacing: -0.03em; font-weight: 800; margin: 0 0 12px; }
+      .status-wrap .intro { color: var(--text-dim); font-size: 17px; margin-bottom: 40px; }
+
+      .overall {
+        display: flex; gap: 16px; align-items: center;
+        padding: 24px 28px;
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 14px; margin-bottom: 32px;
+      }
+      .pulse {
+        width: 16px; height: 16px; border-radius: 50%;
+        background: #4ade80; box-shadow: 0 0 12px #4ade80;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      .pulse.bad { background: #ff5f57; box-shadow: 0 0 12px #ff5f57; }
+      .pulse.unk { background: #9a9aa4; box-shadow: none; animation: none; }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+      .overall h2 { margin: 0; font-size: 22px; font-weight: 700; }
+      .overall p { margin: 2px 0 0; color: var(--text-muted); font-size: 14px; }
+
+      .check-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px; margin-bottom: 40px;
+      }
+      .check {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 10px; padding: 18px 20px;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .check .label { font-size: 14px; font-weight: 500; }
+      .check .value {
+        font-family: 'JetBrains Mono', monospace; font-size: 13px;
+        color: var(--text-dim);
+      }
+      .check.up    { border-color: rgba(74,222,128,0.3); }
+      .check.down  { border-color: rgba(255,95,87,0.3); }
+      .check .value.up    { color: #4ade80; }
+      .check .value.down  { color: #ff5f57; }
+
+      .foot-note { color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 24px; }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <nav class="nav-links">
+          <a href="/#apis">APIs</a>
+          <a href="/#pricing">Pricing</a>
+          <a href="/stats.html">Stats</a>
+          <a href="/status.html" style="color: var(--text)">Status</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="status-wrap">
+        <div class="container">
+          <h1>System status</h1>
+          <p class="intro">Real-time health of every piece of the gateway. Refreshes every 30 seconds.</p>
+
+          <div class="overall" id="overall">
+            <span class="pulse unk" id="pulse"></span>
+            <div>
+              <h2 id="overall-status">Checking…</h2>
+              <p id="overall-sub">Fetching health endpoints</p>
+            </div>
+          </div>
+
+          <div class="check-grid" id="checks"></div>
+
+          <p class="foot-note" id="foot">Last checked: never</p>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const BASE = window.location.host.startsWith('axon.')
+        ? `https://api.${window.location.host.replace(/^axon\./, '')}`
+        : (window.location.host.includes('pages.dev')
+            ? 'https://axon.onrender.com'  // replace with your API URL
+            : `${window.location.protocol}//${window.location.host}`);
+
+      const checks = [
+        { name: 'Gateway',       url: `${BASE}/health`,            kind: 'json', want: 'status=ok' },
+        { name: 'Database',      url: `${BASE}/health/ready`,      kind: 'json', want: 'status=ready' },
+        { name: 'Redis cache',   url: `${BASE}/health/ready`,      kind: 'json', want: 'status=ready' },
+        { name: 'Public stats',  url: `${BASE}/v1/stats/public`,   kind: 'any' },
+        { name: 'Catalog',       url: `${BASE}/v1/apis`,           kind: 'any' },
+      ];
+
+      async function check(c) {
+        try {
+          const t0 = performance.now();
+          const res = await fetch(c.url, { cache: 'no-store' });
+          const t = Math.round(performance.now() - t0);
+          if (!res.ok) return { ok: false, value: `HTTP ${res.status}` };
+          if (c.kind === 'json') {
+            const body = await res.json();
+            if (c.want) {
+              const [k, v] = c.want.split('=');
+              if (body[k] !== v) return { ok: false, value: `unexpected ${k}=${body[k]}` };
+            }
+          }
+          return { ok: true, value: `${t}ms` };
+        } catch (err) {
+          return { ok: false, value: err.message };
+        }
+      }
+
+      async function render() {
+        const grid = document.getElementById('checks');
+        grid.innerHTML = '';
+        let allUp = true;
+        for (const c of checks) {
+          const r = await check(c);
+          if (!r.ok) allUp = false;
+          grid.insertAdjacentHTML('beforeend', `
+            <div class="check ${r.ok ? 'up' : 'down'}">
+              <span class="label">${c.name}</span>
+              <span class="value ${r.ok ? 'up' : 'down'}">${r.ok ? '✓ ' : '✗ '}${r.value}</span>
+            </div>
+          `);
+        }
+
+        const pulse = document.getElementById('pulse');
+        pulse.classList.remove('unk', 'bad');
+        pulse.classList.add(allUp ? '' : 'bad');
+        document.getElementById('overall-status').textContent =
+          allUp ? 'All systems operational' : 'Some services are degraded';
+        document.getElementById('overall-sub').textContent =
+          allUp ? 'Everything is responding as expected.' : 'One or more checks failed. We are investigating.';
+        document.getElementById('foot').textContent =
+          'Last checked: ' + new Date().toLocaleString();
+      }
+
+      render();
+      setInterval(render, 30_000);
+    </script>
+  </body>
+</html>

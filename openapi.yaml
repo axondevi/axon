@@ -1,0 +1,563 @@
+openapi: 3.1.0
+info:
+  title: Axon
+  version: 0.1.0
+  summary: Universal API gateway for autonomous agents
+  description: |
+    Axon proxies calls to a catalog of paid APIs and settles payment per
+    request in USDC on Base. One endpoint, one wallet, per-request pricing,
+    automatic cache, auto-refund on upstream failures.
+
+    Two authentication modes:
+      1. **Prepaid wallet** — default. Deposit USDC, then authenticate with
+         `x-api-key`. We debit from balance per call.
+      2. **x402 native** — no API key. Responds 402 with payment
+         requirements, client pays on-chain per call. Use `/x402/v1/call/*`.
+
+    Every response carries `x-axon-cost-usdc`, `x-axon-cache`,
+    `x-axon-latency-ms`, and `x-request-id`.
+  license:
+    name: MIT
+    identifier: MIT
+  contact:
+    name: Axon
+    url: https://axon.dev
+
+servers:
+  - url: https://api.axon.dev
+    description: Production (hosted)
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Call
+    description: Call any upstream API through the gateway
+  - name: Catalog
+    description: Browse available APIs
+  - name: Wallet
+    description: USDC balance and deposits
+  - name: Usage
+    description: Your own spend / usage metrics
+  - name: Stats
+    description: Public, anonymized stats across all users
+  - name: Admin
+    description: Operator-only endpoints (require x-admin-key)
+  - name: Webhooks
+    description: Signed callbacks from on-chain activity
+
+security:
+  - apiKey: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { status: { type: string } }
+
+  /health/ready:
+    get:
+      summary: Readiness probe (checks DB + Redis)
+      security: []
+      responses:
+        '200': { description: Ready }
+        '503': { description: Not ready — downstream dep unreachable }
+
+  /v1/apis:
+    get:
+      tags: [Catalog]
+      summary: List available APIs
+      security: []
+      responses:
+        '200':
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ApiCatalogEntry' }
+                  count: { type: integer }
+
+  /v1/apis/{slug}:
+    get:
+      tags: [Catalog]
+      summary: Details and pricing for one API
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/slug'
+      responses:
+        '200': { $ref: '#/components/responses/ApiDetails' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/call/{slug}/{endpoint}:
+    parameters:
+      - $ref: '#/components/parameters/slug'
+      - $ref: '#/components/parameters/endpoint'
+    get:
+      tags: [Call]
+      summary: Proxy call (GET)
+      description: |
+        The gateway forwards query params to the upstream. Cache TTL is
+        per-endpoint (see catalog). Response includes `x-axon-*` headers.
+      responses:
+        '200': { $ref: '#/components/responses/CallSuccess' }
+        '402': { $ref: '#/components/responses/InsufficientFunds' }
+        '403': { $ref: '#/components/responses/PolicyDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/UpstreamFailed' }
+    post:
+      tags: [Call]
+      summary: Proxy call (POST with body)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { $ref: '#/components/responses/CallSuccess' }
+        '402': { $ref: '#/components/responses/InsufficientFunds' }
+        '403': { $ref: '#/components/responses/PolicyDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/UpstreamFailed' }
+
+  /v1/wallet/balance:
+    get:
+      tags: [Wallet]
+      summary: Current balance
+      responses:
+        '200':
+          description: Balance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WalletBalance' }
+
+  /v1/wallet/transactions:
+    get:
+      tags: [Wallet]
+      summary: Recent ledger entries
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        '200':
+          description: Ledger page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Transaction' }
+
+  /v1/wallet/deposit-intent:
+    post:
+      tags: [Wallet]
+      summary: Get deposit address + chain/asset info
+      responses:
+        '200':
+          description: Intent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DepositIntent' }
+
+  /v1/usage:
+    get:
+      tags: [Usage]
+      summary: Your total usage and cache hit rate
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: api
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Usage summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_requests: { type: integer }
+                  cache_hits: { type: integer }
+                  cache_hit_rate: { type: number }
+                  total_spent_usdc: { type: string }
+
+  /v1/usage/by-api:
+    get:
+      tags: [Usage]
+      summary: Usage grouped by upstream API
+      responses:
+        '200':
+          description: Usage by API
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        api_slug: { type: string }
+                        requests: { type: integer }
+                        cache_hits: { type: integer }
+                        total_spent_usdc: { type: string }
+
+  /v1/stats/public:
+    get:
+      tags: [Stats]
+      summary: Public anonymized stats
+      security: []
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 30, maximum: 90 }
+      responses:
+        '200':
+          description: Aggregated stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  window_days: { type: integer }
+                  generated_at: { type: string, format: date-time }
+                  totals:
+                    type: object
+                    properties:
+                      requests: { type: integer }
+                      cache_hit_rate: { type: number }
+                  by_api:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        api: { type: string }
+                        requests: { type: integer }
+                        cache_hit_rate: { type: number }
+                        p50_latency_ms: { type: integer }
+                        p95_latency_ms: { type: integer }
+
+  /metrics:
+    get:
+      tags: [Stats]
+      summary: Prometheus metrics
+      security: []
+      responses:
+        '200':
+          description: Prometheus text format
+          content:
+            'text/plain; version=0.0.4':
+              schema: { type: string }
+
+  /v1/admin/users:
+    post:
+      tags: [Admin]
+      summary: Create a user (returns plaintext api_key once)
+      security: [{ adminKey: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: string, format: uuid }
+                  api_key: { type: string }
+                  deposit_address: { type: string }
+                  wallet_provider: { type: string }
+                  balance_usdc: { type: string }
+                  warning: { type: string }
+
+  /v1/admin/credit:
+    post:
+      tags: [Admin]
+      summary: Credit a user's wallet (manual / reconciliation)
+      security: [{ adminKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, amount_usdc]
+              properties:
+                user_id: { type: string, format: uuid }
+                amount_usdc: { type: string }
+                onchain_tx: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /v1/admin/policy/{user_id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Admin]
+      summary: Read a user's policy
+      security: [{ adminKey: [] }]
+      responses:
+        '200':
+          description: Policy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: string }
+                  policy:
+                    oneOf:
+                      - $ref: '#/components/schemas/Policy'
+                      - { type: 'null' }
+    put:
+      tags: [Admin]
+      summary: Upsert a user's policy
+      security: [{ adminKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Policy' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Admin]
+      summary: Remove a user's policy
+      security: [{ adminKey: [] }]
+      responses:
+        '200': { description: OK }
+
+  /v1/admin/settlements:
+    get:
+      tags: [Admin]
+      summary: List settlements
+      security: [{ adminKey: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, paid, reconciled] }
+      responses:
+        '200': { description: List }
+
+  /v1/admin/settlements/run:
+    post:
+      tags: [Admin]
+      summary: Trigger a settlement run
+      security: [{ adminKey: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start: { type: string, format: date-time }
+                end: { type: string, format: date-time }
+      responses:
+        '200': { description: Results }
+
+  /v1/webhooks/alchemy:
+    post:
+      tags: [Webhooks]
+      summary: Alchemy ADDRESS_ACTIVITY callback
+      description: Signed with `x-alchemy-signature` HMAC-SHA256 of body.
+      security: []
+      responses:
+        '200': { description: Processed }
+        '403': { description: Signature invalid }
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Starts with `ax_live_`
+    adminKey:
+      type: apiKey
+      in: header
+      name: x-admin-key
+
+  parameters:
+    slug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string }
+    endpoint:
+      name: endpoint
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    CallSuccess:
+      description: Proxied upstream response
+      headers:
+        x-axon-cost-usdc:
+          schema: { type: string }
+        x-axon-cache:
+          schema: { type: string, enum: [hit, miss] }
+        x-axon-latency-ms:
+          schema: { type: integer }
+        x-axon-fallback:
+          schema: { type: string }
+          description: Present when a fallback provider served this request
+      content:
+        application/json:
+          schema: { type: object, additionalProperties: true }
+
+    InsufficientFunds:
+      description: Wallet balance insufficient
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+    PolicyDenied:
+      description: Policy rule blocked the call
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+    RateLimited:
+      description: Too many requests
+      headers:
+        retry-after:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+    UpstreamFailed:
+      description: Upstream returned non-2xx — wallet auto-refunded
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+    ApiDetails:
+      description: Full detail of one API
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              slug: { type: string }
+              provider: { type: string }
+              category: { type: string }
+              description: { type: string }
+              endpoints:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key: { type: string }
+                    method: { type: string }
+                    price_usd: { type: number }
+                    markup_pct: { type: number }
+                    cache_ttl: { type: integer }
+                    effective_price_usd: { type: number }
+                    cached_price_usd: { type: number }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+        meta: { type: object, additionalProperties: true }
+        request_id: { type: string }
+      required: [error, message]
+
+    ApiCatalogEntry:
+      type: object
+      properties:
+        slug: { type: string }
+        provider: { type: string }
+        category: { type: string }
+        description: { type: string }
+        endpoints:
+          type: array
+          items: { type: string }
+
+    WalletBalance:
+      type: object
+      properties:
+        address: { type: string }
+        balance_usdc: { type: string }
+        reserved_usdc: { type: string }
+        available_usdc: { type: string }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [deposit, debit, refund, withdrawal, bonus]
+        amount_usdc: { type: string }
+        api_slug: { type: string, nullable: true }
+        onchain_tx: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        meta: { type: object, nullable: true }
+
+    DepositIntent:
+      type: object
+      properties:
+        chain: { type: string }
+        asset: { type: string }
+        asset_address: { type: string }
+        deposit_address: { type: string }
+        note: { type: string }
+
+    Policy:
+      type: object
+      properties:
+        allow_apis:
+          type: array
+          items: { type: string }
+        deny_apis:
+          type: array
+          items: { type: string }
+        daily_budget_micro: { type: string, description: bigint as string }
+        monthly_budget_micro: { type: string }
+        max_request_cost_micro: { type: string }
+        per_api_daily_micro:
+          type: object
+          additionalProperties: { type: string }
+        exclude_cache_from_budget: { type: boolean }
+        label: { type: string }

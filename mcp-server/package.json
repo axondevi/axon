@@ -1,0 +1,27 @@
+{
+  "name": "@axon/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP (Model Context Protocol) server that exposes the Axon API catalog as tools for Claude Desktop, Claude Code, Cursor, Zed, and any MCP client.",
+  "type": "module",
+  "bin": {
+    "axon-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "bun run src/index.ts",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@axon/client": "^0.1.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "license": "MIT",
+  "keywords": ["mcp", "model-context-protocol", "ai", "agents", "axon", "claude"]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "n8n-nodes-axon",
+  "version": "0.1.0",
+  "description": "Axon node for n8n — call any API in the Axon catalog, pay per request in USDC.",
+  "keywords": ["n8n", "n8n-community-node-package", "axon", "ai", "agents", "api"],
+  "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "bun run build"
+  },
+  "files": ["dist"],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "nodes": ["dist/nodes/Axon/Axon.node.js"],
+    "credentials": ["dist/credentials/AxonApi.credentials.js"]
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "n8n-workflow": "^1.0.0",
+    "typescript": "^5.6.3"
+  },
+  "peerDependencies": {
+    "n8n-workflow": ">=1.0.0"
+  }
+}

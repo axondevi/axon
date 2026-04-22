@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon — Every paid API your AI agent needs. One endpoint. One wallet.</title>
+    <meta
+      name="description"
+      content="Axon is the universal API gateway for autonomous agents. Pay by request in USDC on Base. No subscriptions, no API keys to manage."
+    />
+    <meta property="og:title" content="Axon — API gateway for AI agents" />
+    <meta
+      property="og:description"
+      content="One endpoint. One wallet. Every paid API your agent needs."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a href="/" class="brand">
+          <span class="logo-dot"></span>
+          axon
+        </a>
+        <nav class="nav-links">
+          <a href="#apis">APIs</a>
+          <a href="#how">How it works</a>
+          <a href="#pricing">Pricing</a>
+          <a href="/docs">Docs</a>
+          <a href="#waitlist" class="btn btn-sm">Get early access</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- HERO -->
+      <section class="hero">
+        <div class="container">
+          <div class="eyebrow">
+            <span class="dot"></span>
+            Built on x402 · USDC on Base
+          </div>
+          <h1>
+            Every paid API your AI agent needs.<br />
+            <span class="gradient">One endpoint. One wallet.</span>
+          </h1>
+          <p class="sub">
+            Axon is the universal API gateway for autonomous agents. Deposit USDC
+            once, call any API, pay by request. No subscriptions. No juggling 30
+            API keys. No human in the loop.
+          </p>
+          <div class="cta-row">
+            <a href="#waitlist" class="btn btn-primary">
+              Start free — $5 in credits
+            </a>
+            <a href="/docs" class="btn btn-ghost">Read the docs →</a>
+          </div>
+
+          <div class="code-card">
+            <div class="code-head">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+              <span class="code-label">Your agent's first paid API call</span>
+            </div>
+            <pre><code><span class="c-com">// Search the web, pay $0.005 in USDC — no keys, no signup for SerpAPI</span>
+<span class="c-kw">const</span> res = <span class="c-kw">await</span> <span class="c-fn">fetch</span>(
+  <span class="c-str">'https://api.axon.dev/v1/call/serpapi/search?q=best+espresso+in+lisbon'</span>,
+  { headers: { <span class="c-str">'x-api-key'</span>: process.env.<span class="c-var">AXON_KEY</span> } }
+);
+
+<span class="c-kw">const</span> data = <span class="c-kw">await</span> res.<span class="c-fn">json</span>();
+<span class="c-com">// → { organic_results: [...], cost_usdc: "0.005500", cache: "miss" }</span></code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOGO WALL -->
+      <section class="logos" id="apis">
+        <div class="container">
+          <div class="logos-header">
+            <span class="eyebrow">12+ APIs at launch, more every week</span>
+            <h2>Your agent talks to all of them through one endpoint.</h2>
+          </div>
+          <div class="logo-grid">
+            <div class="logo-card"><strong>OpenAI</strong><span>LLM</span></div>
+            <div class="logo-card"><strong>Anthropic</strong><span>LLM</span></div>
+            <div class="logo-card"><strong>Firecrawl</strong><span>Scraping</span></div>
+            <div class="logo-card"><strong>SerpAPI</strong><span>Search</span></div>
+            <div class="logo-card"><strong>Exa</strong><span>Neural search</span></div>
+            <div class="logo-card"><strong>Tavily</strong><span>Agent search</span></div>
+            <div class="logo-card"><strong>Replicate</strong><span>Open models</span></div>
+            <div class="logo-card"><strong>ElevenLabs</strong><span>Voice</span></div>
+            <div class="logo-card"><strong>Deepgram</strong><span>Speech→Text</span></div>
+            <div class="logo-card"><strong>Apollo</strong><span>Enrichment</span></div>
+            <div class="logo-card"><strong>OpenWeather</strong><span>Weather</span></div>
+            <div class="logo-card"><strong>Stripe Issuing</strong><span>Virtual cards</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WHY -->
+      <section class="why" id="how">
+        <div class="container">
+          <h2>Built for agents, not for dashboards.</h2>
+          <div class="why-grid">
+            <div class="why-card">
+              <div class="num">01</div>
+              <h3>Zero integration hell</h3>
+              <p>
+                One API key. One base URL. One invoice. Your agent can discover
+                and call any listed API without credentials, sign-ups, or
+                webhooks per vendor.
+              </p>
+            </div>
+            <div class="why-card">
+              <div class="num">02</div>
+              <h3>Pay per request, in USDC</h3>
+              <p>
+                Deposit USDC on Base. Every call debits your wallet atomically.
+                No monthly plans. No overage surprises. Agents can budget
+                programmatically.
+              </p>
+            </div>
+            <div class="why-card">
+              <div class="num">03</div>
+              <h3>Cache-aware pricing</h3>
+              <p>
+                Cached responses are served at 50% off. Your agent pays less for
+                repeated queries — and you don't fund the upstream twice.
+              </p>
+            </div>
+            <div class="why-card">
+              <div class="num">04</div>
+              <h3>x402-native</h3>
+              <p>
+                Built on the open HTTP 402 payment standard. Works with any
+                x402-compatible client, SDK, or agent framework. No lock-in.
+              </p>
+            </div>
+            <div class="why-card">
+              <div class="num">05</div>
+              <h3>Fallback & reliability</h3>
+              <p>
+                When one provider is down, route to the next. Your agent keeps
+                working. You pay the normal price.
+              </p>
+            </div>
+            <div class="why-card">
+              <div class="num">06</div>
+              <h3>Framework-ready</h3>
+              <p>
+                Drop-in packages for LangChain, crewAI, Vercel AI SDK, and n8n.
+                20 lines of code, and your agent is buying data autonomously.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HOW IT WORKS -->
+      <section class="flow">
+        <div class="container">
+          <h2>How it works</h2>
+          <ol class="steps">
+            <li>
+              <span class="step-num">1</span>
+              <div>
+                <h4>Deposit USDC on Base</h4>
+                <p>
+                  Get a dedicated deposit address. Send USDC. Balance credits
+                  within one block confirmation.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num">2</span>
+              <div>
+                <h4>Call any API through one endpoint</h4>
+                <p>
+                  <code>POST /v1/call/{'{api}'}/{'{endpoint}'}</code>. Axon
+                  authenticates, debits your wallet, proxies the call, caches
+                  the response.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="step-num">3</span>
+              <div>
+                <h4>Get back structured response + cost header</h4>
+                <p>
+                  Every response carries <code>x-axon-cost-usdc</code> and
+                  <code>x-axon-cache</code>. Your agent sees exactly what it
+                  paid and whether the answer was cached.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- PRICING -->
+      <section class="pricing" id="pricing">
+        <div class="container">
+          <h2>Pricing scales with usage, not seats.</h2>
+          <p class="sub-muted">
+            No minimums. No annual contracts. Free $5 to get started.
+          </p>
+          <div class="price-grid">
+            <div class="price-card">
+              <h3>Free</h3>
+              <div class="price">$0</div>
+              <div class="price-note">$5 signup credit</div>
+              <ul>
+                <li>15% markup on calls</li>
+                <li>10 req / min</li>
+                <li>All public APIs</li>
+                <li>Community support</li>
+              </ul>
+              <a href="#waitlist" class="btn btn-ghost btn-full">Start free</a>
+            </div>
+            <div class="price-card featured">
+              <div class="badge">Most popular</div>
+              <h3>Pro</h3>
+              <div class="price">$49<span>/mo</span></div>
+              <div class="price-note">+ usage</div>
+              <ul>
+                <li>5% markup on calls</li>
+                <li>Unlimited requests</li>
+                <li>Usage analytics</li>
+                <li>Aggressive cache</li>
+                <li>Priority support</li>
+              </ul>
+              <a href="#waitlist" class="btn btn-primary btn-full">Get Pro</a>
+            </div>
+            <div class="price-card">
+              <h3>Team</h3>
+              <div class="price">$199<span>/mo</span></div>
+              <div class="price-note">+ usage</div>
+              <ul>
+                <li>3% markup on calls</li>
+                <li>Policy engine + budgets</li>
+                <li>Multi-user accounts</li>
+                <li>Private APIs</li>
+                <li>SLA on uptime</li>
+              </ul>
+              <a href="#waitlist" class="btn btn-ghost btn-full">Contact us</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="faq">
+        <div class="container">
+          <h2>Frequently asked</h2>
+          <div class="faq-list">
+            <details>
+              <summary>What is x402?</summary>
+              <p>
+                HTTP 402 "Payment Required" is a status code that's been in the
+                HTTP spec since 1997 but went unused. x402 is Coinbase's modern
+                revival: APIs respond with 402 + payment requirements; clients
+                pay on-chain; the call proceeds. It's the first payment protocol
+                designed for AI agents.
+              </p>
+            </details>
+            <details>
+              <summary>Do I need to hold USDC to use Axon?</summary>
+              <p>
+                For now, yes — deposits are in USDC on Base. Fiat on-ramp and
+                card-to-USDC conversion are on the roadmap.
+              </p>
+            </details>
+            <details>
+              <summary>What happens if an upstream API fails?</summary>
+              <p>
+                We refund the call automatically and surface the upstream
+                error. Your wallet is never debited for failed requests.
+              </p>
+            </details>
+            <details>
+              <summary>Can I add a private / custom API?</summary>
+              <p>
+                On Team and Enterprise plans, yes. You register a provider
+                config, we route through Axon, and it behaves like any public
+                API on the platform.
+              </p>
+            </details>
+            <details>
+              <summary>How is caching handled?</summary>
+              <p>
+                Every API defines TTLs per endpoint. Cached responses are
+                served at 50% of the list price. Your agent sees
+                <code>x-axon-cache: hit</code> on cache hits.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- WAITLIST / CTA -->
+      <section class="waitlist" id="waitlist">
+        <div class="container">
+          <h2>Join the early-access list.</h2>
+          <p>
+            We're onboarding the first 100 builders personally. Tell us what
+            you're building, we'll ship credits + direct access.
+          </p>
+          <form class="waitlist-form" action="#" method="post">
+            <input
+              type="email"
+              name="email"
+              placeholder="you@startup.dev"
+              required
+            />
+            <button type="submit" class="btn btn-primary">
+              Request access
+            </button>
+          </form>
+          <small>No spam. Unsubscribe in one click.</small>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="container footer-inner">
+        <div>
+          <span class="brand small">
+            <span class="logo-dot"></span>
+            axon
+          </span>
+          <p>Payment rails for the agent economy.</p>
+        </div>
+        <div class="footer-links">
+          <div>
+            <h5>Product</h5>
+            <a href="#apis">APIs</a>
+            <a href="#pricing">Pricing</a>
+            <a href="/docs">Docs</a>
+            <a href="/status">Status</a>
+          </div>
+          <div>
+            <h5>Company</h5>
+            <a href="/about">About</a>
+            <a href="/blog">Blog</a>
+            <a href="https://twitter.com/axondev">Twitter / X</a>
+          </div>
+          <div>
+            <h5>Legal</h5>
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

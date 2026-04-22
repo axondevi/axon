@@ -1,0 +1,26 @@
+{
+  "slug": "runway",
+  "provider": "Runway",
+  "category": "AI & ML",
+  "description": "Gen-3 video generation.",
+  "homepage": "https://docs.dev.runwayml.com",
+  "base_url": "https://api.dev.runwayml.com",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "image-to-video": {
+      "method": "POST",
+      "path": "/v1/image_to_video",
+      "price_usd": 0.5,
+      "markup_pct": 10,
+      "cache_ttl": 0,
+      "notes": "Expensive. Async — client polls the task ID."
+    },
+    "task-status": {
+      "method": "GET",
+      "path": "/v1/tasks/:id",
+      "price_usd": 0,
+      "markup_pct": 0,
+      "cache_ttl": 0
+    }
+  }
+}

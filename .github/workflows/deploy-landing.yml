@@ -1,0 +1,35 @@
+name: deploy-landing
+
+# Automatically deploy the landing page to Cloudflare Pages on every push
+# to main that touches the landing/ folder.
+#
+# Prereqs (repo secrets):
+#   CF_API_TOKEN      — Cloudflare API token with Pages:Edit permission
+#   CF_ACCOUNT_ID     — your Cloudflare account ID
+# Project name defaults to 'axon' — adjust below if taken.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'landing/**'
+      - '.github/workflows/deploy-landing.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    name: Publish to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy landing --project-name=axon

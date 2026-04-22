@@ -1,0 +1,174 @@
+{
+  "info": {
+    "_postman_id": "axon-collection-v1",
+    "name": "Axon",
+    "description": "Axon API — import into Postman or Insomnia. Set the `base_url`, `api_key`, and `admin_key` collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "api_key", "value": "ax_live_REPLACE_ME" },
+    { "key": "admin_key", "value": "REPLACE_ME" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        { "name": "GET /", "request": { "method": "GET", "url": "{{base_url}}/" } },
+        { "name": "GET /health", "request": { "method": "GET", "url": "{{base_url}}/health" } },
+        { "name": "GET /health/ready", "request": { "method": "GET", "url": "{{base_url}}/health/ready" } }
+      ]
+    },
+    {
+      "name": "Catalog (public)",
+      "item": [
+        { "name": "GET /v1/apis", "request": { "method": "GET", "url": "{{base_url}}/v1/apis" } },
+        { "name": "GET /v1/apis/:slug", "request": { "method": "GET", "url": "{{base_url}}/v1/apis/openweather" } }
+      ]
+    },
+    {
+      "name": "Call (authed)",
+      "item": [
+        {
+          "name": "GET openweather/current (Lisbon)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-api-key", "value": "{{api_key}}" }],
+            "url": "{{base_url}}/v1/call/openweather/current?lat=38.72&lon=-9.14"
+          }
+        },
+        {
+          "name": "POST openai/chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-api-key", "value": "{{api_key}}" },
+              { "key": "content-type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [{\"role\":\"user\",\"content\":\"Say hello.\"}]\n}"
+            },
+            "url": "{{base_url}}/v1/call/openai/chat"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wallet",
+      "item": [
+        {
+          "name": "GET balance",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-api-key", "value": "{{api_key}}" }],
+            "url": "{{base_url}}/v1/wallet/balance"
+          }
+        },
+        {
+          "name": "GET transactions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-api-key", "value": "{{api_key}}" }],
+            "url": "{{base_url}}/v1/wallet/transactions?limit=50"
+          }
+        },
+        {
+          "name": "POST deposit-intent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-api-key", "value": "{{api_key}}" }],
+            "url": "{{base_url}}/v1/wallet/deposit-intent"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usage",
+      "item": [
+        {
+          "name": "GET summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-api-key", "value": "{{api_key}}" }],
+            "url": "{{base_url}}/v1/usage"
+          }
+        },
+        {
+          "name": "GET by-api",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-api-key", "value": "{{api_key}}" }],
+            "url": "{{base_url}}/v1/usage/by-api"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats (public)",
+      "item": [
+        { "name": "GET /v1/stats/public", "request": { "method": "GET", "url": "{{base_url}}/v1/stats/public?days=30" } },
+        { "name": "GET /metrics (Prometheus)", "request": { "method": "GET", "url": "{{base_url}}/metrics" } }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "POST /v1/admin/users",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-admin-key", "value": "{{admin_key}}" },
+              { "key": "content-type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{ \"email\": \"alice@acme.dev\" }" },
+            "url": "{{base_url}}/v1/admin/users"
+          }
+        },
+        {
+          "name": "POST /v1/admin/credit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-admin-key", "value": "{{admin_key}}" },
+              { "key": "content-type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"user_id\": \"<uuid>\", \"amount_usdc\": \"25\" }"
+            },
+            "url": "{{base_url}}/v1/admin/credit"
+          }
+        },
+        {
+          "name": "PUT /v1/admin/policy/:user_id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "x-admin-key", "value": "{{admin_key}}" },
+              { "key": "content-type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"daily_budget_micro\": \"10000000\",\n  \"deny_apis\": [\"replicate\"]\n}"
+            },
+            "url": "{{base_url}}/v1/admin/policy/<uuid>"
+          }
+        },
+        {
+          "name": "POST /v1/admin/settlements/run",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-admin-key", "value": "{{admin_key}}" },
+              { "key": "content-type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{base_url}}/v1/admin/settlements/run"
+          }
+        }
+      ]
+    }
+  ]
+}

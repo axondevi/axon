@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon · Public Stats — Cache hit rate and latency per API</title>
+    <meta
+      name="description"
+      content="Live, anonymized performance data across every API in the Axon catalog. Cache hit rate, p50/p95 latency, request volume — updated every 5 minutes."
+    />
+    <meta property="og:title" content="Axon Public Stats — The honesty page" />
+    <meta
+      property="og:description"
+      content="Live performance data for every API routed through Axon. Cache hit rate, latency, volume. Updated every 5 minutes."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .stats-wrap { padding: 80px 0; }
+      .stats-wrap h1 { font-size: clamp(32px, 5vw, 56px); letter-spacing: -0.03em; font-weight: 800; margin: 0 0 16px; }
+      .stats-wrap .intro { color: var(--text-dim); font-size: 17px; max-width: 640px; margin-bottom: 40px; }
+      .metaline { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-muted); margin-bottom: 32px; }
+      .totals {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px; margin-bottom: 48px;
+      }
+      .totals .card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 12px; padding: 24px;
+      }
+      .totals .lbl { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+      .totals .val { font-size: 32px; font-weight: 800; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+      .totals .val .u { font-size: 14px; color: var(--text-muted); margin-left: 8px; font-family: 'Inter'; font-weight: 500; }
+      table.stats { width: 100%; border-collapse: collapse; font-size: 14px; }
+      table.stats th {
+        text-align: left; font-weight: 500; color: var(--text-muted); padding: 12px;
+        border-bottom: 1px solid var(--border); font-size: 12px;
+        text-transform: uppercase; letter-spacing: 0.05em;
+      }
+      table.stats td {
+        padding: 14px 12px; border-bottom: 1px solid var(--border);
+        font-family: 'JetBrains Mono', monospace;
+      }
+      table.stats td.label { font-family: 'Inter', sans-serif; font-weight: 500; }
+      .hit { color: #4ade80; }
+      .slow { color: #f78c6c; }
+      .dim { color: var(--text-muted); }
+      .bar { display: inline-block; width: 120px; height: 6px; background: var(--bg-elev); border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 10px; }
+      .bar > span { display: block; height: 100%; background: linear-gradient(90deg, #7c5cff, #19d5c6); }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <nav class="nav-links">
+          <a href="/#apis">APIs</a>
+          <a href="/#pricing">Pricing</a>
+          <a href="/stats.html" style="color: var(--text)">Stats</a>
+          <a href="/docs">Docs</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="stats-wrap">
+        <div class="container">
+          <h1>The honesty page.</h1>
+          <p class="intro">
+            Every API routed through Axon shows up here. Cache hit rate, p50
+            and p95 latency, request volume. Anonymized, aggregated, updated
+            every 5 minutes. If a provider is slow or unreliable, you'll know
+            before you pick it.
+          </p>
+          <div class="metaline" id="metaline">Loading live data…</div>
+
+          <div class="totals" id="totals"></div>
+
+          <table class="stats" id="table" style="display: none">
+            <thead>
+              <tr>
+                <th>API</th>
+                <th>Requests</th>
+                <th>Cache hit rate</th>
+                <th>p50 latency</th>
+                <th>p95 latency</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+
+          <div id="empty" style="display: none; padding: 60px 20px; text-align: center; color: var(--text-muted);">
+            No data yet. Check back after a few requests flow through.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const BASE = window.location.host.startsWith('api.')
+        ? `${window.location.protocol}//${window.location.host}`
+        : 'https://api.axon.dev';
+
+      async function load() {
+        try {
+          const res = await fetch(`${BASE}/v1/stats/public?days=30`);
+          const d = await res.json();
+
+          document.getElementById('metaline').textContent =
+            `last ${d.window_days} days · ${d.totals.requests.toLocaleString()} requests · generated ${new Date(d.generated_at).toLocaleString()}`;
+
+          const totalsDiv = document.getElementById('totals');
+          totalsDiv.innerHTML = `
+            <div class="card">
+              <div class="lbl">Total requests</div>
+              <div class="val">${d.totals.requests.toLocaleString()}</div>
+            </div>
+            <div class="card">
+              <div class="lbl">Cache hit rate</div>
+              <div class="val">${(d.totals.cache_hit_rate * 100).toFixed(1)}<span class="u">%</span></div>
+            </div>
+            <div class="card">
+              <div class="lbl">APIs in catalog</div>
+              <div class="val">${d.by_api.length}</div>
+            </div>
+          `;
+
+          if (d.by_api.length === 0) {
+            document.getElementById('empty').style.display = 'block';
+            return;
+          }
+
+          const tbody = document.querySelector('#table tbody');
+          const maxHit = Math.max(...d.by_api.map((a) => a.cache_hit_rate), 0.01);
+          d.by_api.forEach((a) => {
+            const hitPct = (a.cache_hit_rate * 100).toFixed(1);
+            const barPct = Math.round((a.cache_hit_rate / maxHit) * 100);
+            const slow = a.p95_latency_ms > 3000 ? ' slow' : '';
+            tbody.insertAdjacentHTML('beforeend', `
+              <tr>
+                <td class="label">${a.api}</td>
+                <td>${a.requests.toLocaleString()}</td>
+                <td><span class="bar"><span style="width:${barPct}%"></span></span><span class="${a.cache_hit_rate >= 0.3 ? 'hit' : 'dim'}">${hitPct}%</span></td>
+                <td class="${a.p50_latency_ms > 2000 ? 'slow' : ''}">${a.p50_latency_ms}ms</td>
+                <td class="${slow}">${a.p95_latency_ms}ms</td>
+              </tr>
+            `);
+          });
+          document.getElementById('table').style.display = 'table';
+        } catch (err) {
+          document.getElementById('metaline').textContent = `Could not load stats: ${err.message}`;
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>

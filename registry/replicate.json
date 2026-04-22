@@ -1,0 +1,27 @@
+{
+  "slug": "replicate",
+  "provider": "Replicate",
+  "category": "AI & ML",
+  "description": "Run any open-source model (Llama, FLUX, SDXL, Whisper, etc.) via one API.",
+  "homepage": "https://replicate.com",
+  "base_url": "https://api.replicate.com",
+  "auth": { "type": "header", "name": "authorization", "prefix": "Token " },
+  "endpoints": {
+    "predict": {
+      "method": "POST",
+      "path": "/v1/predictions",
+      "price_usd": 0.02,
+      "markup_pct": 10,
+      "cache_ttl": 0,
+      "notes": "Async prediction creation. Pricing is model-dependent — MVP flat price, migrate to model-aware metering later."
+    },
+    "status": {
+      "method": "GET",
+      "path": "/v1/predictions/:id",
+      "price_usd": 0,
+      "markup_pct": 0,
+      "cache_ttl": 0,
+      "notes": "Polling is free. MVP routing assumes client passes :id in query as `id` — wrapper substitutes."
+    }
+  }
+}

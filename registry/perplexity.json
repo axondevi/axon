@@ -1,0 +1,19 @@
+{
+  "slug": "perplexity",
+  "provider": "Perplexity",
+  "category": "Web Intelligence",
+  "description": "LLM-backed search with citations, sonar models.",
+  "homepage": "https://docs.perplexity.ai",
+  "base_url": "https://api.perplexity.ai",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "chat": {
+      "method": "POST",
+      "path": "/chat/completions",
+      "price_usd": 0.01,
+      "markup_pct": 10,
+      "cache_ttl": 0,
+      "notes": "Real-time search, output varies — no cache."
+    }
+  }
+}

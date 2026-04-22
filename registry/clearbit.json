@@ -1,0 +1,19 @@
+{
+  "slug": "clearbit",
+  "provider": "Clearbit",
+  "category": "Enrichment",
+  "description": "Company + person enrichment from domain or email.",
+  "homepage": "https://dashboard.clearbit.com/docs",
+  "base_url": "https://company.clearbit.com",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "company": {
+      "method": "GET",
+      "path": "/v2/companies/find",
+      "price_usd": 0.02,
+      "markup_pct": 15,
+      "cache_ttl": 604800,
+      "fallbacks": [{ "slug": "apollo", "endpoint": "organization-enrich" }]
+    }
+  }
+}

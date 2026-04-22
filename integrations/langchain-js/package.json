@@ -1,0 +1,27 @@
+{
+  "name": "@axon/langchain",
+  "version": "0.1.0",
+  "description": "LangChain.js tools backed by Axon — turn any paid API into an agent tool in one line.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "bun run build"
+  },
+  "peerDependencies": {
+    "@axon/client": "^0.1.0",
+    "@langchain/core": ">=0.3.0"
+  },
+  "devDependencies": {
+    "@langchain/core": "^0.3.0",
+    "typescript": "^5.6.3",
+    "zod": "^3.23.8"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "license": "MIT"
+}

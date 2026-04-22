@@ -1,0 +1,28 @@
+{
+  "slug": "tavily",
+  "provider": "Tavily",
+  "category": "Web Intelligence",
+  "description": "Search engine purpose-built for AI agents — returns LLM-ready context.",
+  "homepage": "https://tavily.com",
+  "base_url": "https://api.tavily.com",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "search": {
+      "method": "POST",
+      "path": "/search",
+      "price_usd": 0.008,
+      "markup_pct": 10,
+      "cache_ttl": 1800,
+      "cache_on_body": true,
+      "notes": "Tavily auth is via body field `api_key` — passed through as-is. We inject UPSTREAM_KEY_TAVILY via a body-merge wrapper when auth.type=none but a key is present."
+    },
+    "extract": {
+      "method": "POST",
+      "path": "/extract",
+      "price_usd": 0.005,
+      "markup_pct": 10,
+      "cache_ttl": 3600,
+      "cache_on_body": true
+    }
+  }
+}

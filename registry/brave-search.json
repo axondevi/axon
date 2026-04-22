@@ -1,0 +1,26 @@
+{
+  "slug": "brave-search",
+  "provider": "Brave Search",
+  "category": "Web Intelligence",
+  "description": "Independent web search index. Not a Google scrape.",
+  "homepage": "https://brave.com/search/api",
+  "base_url": "https://api.search.brave.com",
+  "auth": { "type": "header", "name": "x-subscription-token" },
+  "endpoints": {
+    "search": {
+      "method": "GET",
+      "path": "/res/v1/web/search",
+      "price_usd": 0.005,
+      "markup_pct": 10,
+      "cache_ttl": 3600,
+      "fallbacks": [{ "slug": "serpapi", "endpoint": "search" }]
+    },
+    "news": {
+      "method": "GET",
+      "path": "/res/v1/news/search",
+      "price_usd": 0.005,
+      "markup_pct": 10,
+      "cache_ttl": 1800
+    }
+  }
+}

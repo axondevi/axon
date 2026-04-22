@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "axon-smolagents"
+version = "0.1.0"
+description = "HuggingFace Smolagents tools backed by Axon."
+authors = [{ name = "Axon" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "axon-client>=0.1.0",
+    "smolagents>=1.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["axon_smolagents*"]

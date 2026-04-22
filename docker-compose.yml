@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: axon
+      POSTGRES_PASSWORD: axon
+      POSTGRES_DB: axon
+    ports:
+      - "5432:5432"
+    volumes:
+      - axon_pg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - axon_redis:/data
+
+volumes:
+  axon_pg:
+  axon_redis:

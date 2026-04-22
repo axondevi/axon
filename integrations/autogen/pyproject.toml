@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "axon-autogen"
+version = "0.1.0"
+description = "AutoGen tools backed by Axon — the universal API gateway for AI agents."
+authors = [{ name = "Axon" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "axon-client>=0.1.0",
+    "autogen-core>=0.4.0",
+    "pydantic>=2.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["axon_autogen*"]

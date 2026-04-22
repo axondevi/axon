@@ -1,0 +1,28 @@
+{
+  "slug": "voyage",
+  "provider": "Voyage AI",
+  "category": "AI & ML",
+  "description": "Best-in-class embeddings for retrieval, RAG, and semantic search.",
+  "homepage": "https://docs.voyageai.com",
+  "base_url": "https://api.voyageai.com",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "embeddings": {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "price_usd": 0.0015,
+      "markup_pct": 10,
+      "cache_ttl": 2592000,
+      "cache_on_body": true,
+      "notes": "30-day cache — embeddings of identical (model, input) are deterministic. Massive cache margin."
+    },
+    "rerank": {
+      "method": "POST",
+      "path": "/v1/rerank",
+      "price_usd": 0.003,
+      "markup_pct": 10,
+      "cache_ttl": 86400,
+      "cache_on_body": true
+    }
+  }
+}

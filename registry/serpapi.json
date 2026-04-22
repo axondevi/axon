@@ -1,0 +1,19 @@
+{
+  "slug": "serpapi",
+  "provider": "SerpAPI",
+  "category": "Web Intelligence",
+  "description": "Real-time Google, Bing, YouTube and Amazon search results API.",
+  "homepage": "https://serpapi.com",
+  "base_url": "https://serpapi.com",
+  "auth": { "type": "query", "name": "api_key" },
+  "endpoints": {
+    "search": {
+      "method": "GET",
+      "path": "/search",
+      "price_usd": 0.005,
+      "markup_pct": 10,
+      "cache_ttl": 3600,
+      "notes": "Same (q, engine, location) returns same SERP for ~1h — heavy cache win."
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "slug": "stability",
+  "provider": "Stability AI",
+  "category": "AI & ML",
+  "description": "Stable Diffusion / SDXL image generation and editing.",
+  "homepage": "https://platform.stability.ai",
+  "base_url": "https://api.stability.ai",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "generate-sd3": {
+      "method": "POST",
+      "path": "/v2beta/stable-image/generate/sd3",
+      "price_usd": 0.065,
+      "markup_pct": 10,
+      "cache_ttl": 0,
+      "notes": "Image gen with randomness — no cache unless caller fixes seed."
+    },
+    "upscale": {
+      "method": "POST",
+      "path": "/v2beta/stable-image/upscale/creative",
+      "price_usd": 0.25,
+      "markup_pct": 10,
+      "cache_ttl": 0
+    }
+  }
+}

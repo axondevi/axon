@@ -1,0 +1,19 @@
+{
+  "slug": "anthropic",
+  "provider": "Anthropic",
+  "category": "LLM",
+  "description": "Claude 4.x family — Opus, Sonnet, Haiku. Best-in-class reasoning and long context.",
+  "homepage": "https://console.anthropic.com",
+  "base_url": "https://api.anthropic.com",
+  "auth": { "type": "header", "name": "x-api-key" },
+  "endpoints": {
+    "messages": {
+      "method": "POST",
+      "path": "/v1/messages",
+      "price_usd": 0.012,
+      "markup_pct": 10,
+      "cache_ttl": 0,
+      "notes": "Flat MVP price. Switch to per-token metering once middleware lands."
+    }
+  }
+}

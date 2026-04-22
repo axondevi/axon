@@ -1,0 +1,79 @@
+{
+  "name": "Axon Daily News Research",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 8 }]
+        }
+      },
+      "name": "Every 8h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "apiSlug": "serpapi",
+        "endpoint": "search",
+        "method": "GET",
+        "input": "={\n  \"q\": \"AI agent news today\",\n  \"num\": 5\n}"
+      },
+      "name": "Search (Axon)",
+      "type": "n8n-nodes-axon.axon",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "credentials": { "axonApi": { "id": "1", "name": "Axon API" } }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data.organic_results",
+        "options": { "destinationFieldName": "result" }
+      },
+      "name": "Split Results",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "apiSlug": "firecrawl",
+        "endpoint": "scrape",
+        "method": "POST",
+        "input": "={\n  \"url\": \"{{ $json.result.link }}\",\n  \"formats\": [\"markdown\"]\n}"
+      },
+      "name": "Scrape (Axon)",
+      "type": "n8n-nodes-axon.axon",
+      "typeVersion": 1,
+      "position": [900, 300],
+      "credentials": { "axonApi": { "id": "1", "name": "Axon API" } }
+    },
+    {
+      "parameters": { "aggregate": "aggregateAllItemData" },
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "apiSlug": "openai",
+        "endpoint": "chat",
+        "method": "POST",
+        "input": "={\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"Summarize the following articles into 3 bullet points with source URLs.\" },\n    { \"role\": \"user\", \"content\": \"{{ JSON.stringify($json) }}\" }\n  ]\n}"
+      },
+      "name": "Summarize (Axon)",
+      "type": "n8n-nodes-axon.axon",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "credentials": { "axonApi": { "id": "1", "name": "Axon API" } }
+    }
+  ],
+  "connections": {
+    "Every 8h": { "main": [[{ "node": "Search (Axon)", "type": "main", "index": 0 }]] },
+    "Search (Axon)": { "main": [[{ "node": "Split Results", "type": "main", "index": 0 }]] },
+    "Split Results": { "main": [[{ "node": "Scrape (Axon)", "type": "main", "index": 0 }]] },
+    "Scrape (Axon)": { "main": [[{ "node": "Aggregate", "type": "main", "index": 0 }]] },
+    "Aggregate": { "main": [[{ "node": "Summarize (Axon)", "type": "main", "index": 0 }]] }
+  }
+}

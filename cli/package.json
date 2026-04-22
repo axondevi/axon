@@ -1,0 +1,25 @@
+{
+  "name": "@axon/cli",
+  "version": "0.1.0",
+  "description": "Axon command-line interface — ops tool for gateway operators.",
+  "type": "module",
+  "bin": {
+    "axon": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node --format esm && chmod +x dist/index.js",
+    "dev": "bun run src/index.ts",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@axon/client": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.3"
+  },
+  "license": "MIT",
+  "keywords": ["axon", "cli", "ops", "ai-agents"]
+}

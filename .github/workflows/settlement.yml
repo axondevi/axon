@@ -1,0 +1,35 @@
+name: daily-settlement
+
+# Runs the upstream settlement aggregator once a day. Free on GitHub
+# Actions (counts against the 2000 min/mo allowance but each run is ~5s).
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # 02:00 UTC every day
+  workflow_dispatch: {} # also triggerable manually from the Actions tab
+
+concurrency:
+  group: settlement
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Trigger settlement run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /v1/admin/settlements/run
+        env:
+          AXON_URL: ${{ secrets.AXON_URL }}
+          AXON_ADMIN_KEY: ${{ secrets.AXON_ADMIN_KEY }}
+        run: |
+          if [ -z "$AXON_URL" ] || [ -z "$AXON_ADMIN_KEY" ]; then
+            echo "::warning::AXON_URL or AXON_ADMIN_KEY not set — skipping."
+            exit 0
+          fi
+          curl --fail-with-body -sS -X POST "$AXON_URL/v1/admin/settlements/run" \
+            -H "x-admin-key: $AXON_ADMIN_KEY" \
+            -H "content-type: application/json" \
+            -d '{}' | tee /tmp/result.json
+          echo
+          echo "Settlement complete."

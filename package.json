@@ -1,0 +1,35 @@
+{
+  "name": "axon",
+  "version": "0.1.0",
+  "description": "Universal API gateway for autonomous agents. One endpoint, one wallet, every paid API.",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "seed": "bun run src/db/seed.ts",
+    "scheduler": "bun run src/scheduler.ts",
+    "settle": "RUN_ON_BOOT=true EXIT_AFTER_BOOT=true bun run src/scheduler.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "drizzle-orm": "^0.36.0",
+    "hono": "^4.6.0",
+    "ioredis": "^5.4.1",
+    "pg": "^8.13.0",
+    "viem": "^2.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.11.10",
+    "drizzle-kit": "^0.28.0",
+    "typescript": "^5.6.3"
+  }
+}

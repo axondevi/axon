@@ -1,0 +1,14 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "bun run src/index.ts"
+healthcheckPath = "/health/ready"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Defines a secondary "scheduler" service that runs the settlement cron.
+# Deploy as a separate Railway service pointing at this repo, with
+# `startCommand = "bun run scheduler"`. Share DATABASE_URL with the web svc.

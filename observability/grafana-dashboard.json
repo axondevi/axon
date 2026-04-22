@@ -1,0 +1,150 @@
+{
+  "annotations": { "list": [] },
+  "description": "Axon gateway — ops overview. Import into Grafana and select your Prometheus datasource when prompted.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "liveNow": false,
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["axon"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "hide": 0,
+        "label": "Prometheus"
+      },
+      {
+        "name": "api",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(axon_requests_total, api)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "label": "API"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Axon — Gateway Overview",
+  "uid": "axon-overview",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Requests / min (last 15m)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "sum(rate(axon_requests_total[5m])) * 60" }],
+      "fieldConfig": { "defaults": { "unit": "reqpm", "decimals": 1 } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Cache hit rate (last 15m)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{
+        "expr": "sum(rate(axon_requests_total{cache=\"hit\"}[15m])) / sum(rate(axon_requests_total[15m]))"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 1 } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "GMV last 24h (USDC)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{
+        "expr": "sum(increase(axon_request_cost_usdc_total[24h])) / 1000000"
+      }],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4 } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Pending settlements",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "axon_settlements_pending_total" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Requests per second by API",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{
+        "expr": "sum by (api) (rate(axon_requests_total{api=~\"$api\"}[5m]))",
+        "legendFormat": "{{api}}"
+      }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Error rate (4xx+5xx) by API",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{
+        "expr": "sum by (api) (rate(axon_requests_total{status=~\"4..|5..\",api=~\"$api\"}[5m]))",
+        "legendFormat": "{{api}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Average upstream latency (ms)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{
+        "expr": "sum by (api) (rate(axon_upstream_latency_ms_sum{api=~\"$api\"}[5m])) / sum by (api) (rate(axon_requests_total{api=~\"$api\",cache=\"miss\"}[5m]))",
+        "legendFormat": "{{api}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Cost accrued per minute (USDC)",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{
+        "expr": "sum by (api) (rate(axon_request_cost_usdc_total{api=~\"$api\"}[5m])) * 60 / 1000000",
+        "legendFormat": "{{api}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Top wallets by balance (USDC)",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{
+        "expr": "topk(20, axon_wallet_balance_micro / 1000000)",
+        "format": "table",
+        "instant": true
+      }]
+    }
+  ]
+}

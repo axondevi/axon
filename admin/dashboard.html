@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon · Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0a0b;
+        --bg-elev: #111114;
+        --bg-card: #16161a;
+        --border: #25252b;
+        --text: #eeeef0;
+        --text-dim: #9a9aa4;
+        --text-muted: #6a6a76;
+        --accent: #7c5cff;
+        --accent-2: #19d5c6;
+        --danger: #ff5f57;
+        --radius: 10px;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+      }
+      .container { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
+      header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(10,10,11,0.8);
+        backdrop-filter: blur(10px);
+        position: sticky; top: 0; z-index: 10;
+      }
+      .brand { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: 18px; }
+      .logo-dot { width: 12px; height: 12px; border-radius: 50%;
+        background: linear-gradient(135deg, #7c5cff, #19d5c6);
+      }
+      .key-chip {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: var(--text-muted);
+        background: var(--bg-card);
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+      }
+      .key-chip button {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; padding: 0 0 0 10px; font-size: 12px;
+      }
+      h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 24px; }
+      h2 { font-size: 18px; font-weight: 600; margin: 0 0 16px; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+      }
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+      }
+      .metric-label {
+        font-size: 13px; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.05em;
+        margin-bottom: 8px;
+      }
+      .metric-value {
+        font-size: 32px; font-weight: 700; letter-spacing: -0.02em;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .metric-value .unit { font-size: 15px; color: var(--text-muted); margin-left: 8px; font-family: 'Inter', sans-serif; }
+      .metric-sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+      .section { margin-bottom: 32px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th {
+        text-align: left; font-weight: 500;
+        color: var(--text-muted); padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+      }
+      td { padding: 12px; border-bottom: 1px solid var(--border); }
+      tr:last-child td { border-bottom: none; }
+      .mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+      .positive { color: #4ade80; }
+      .negative { color: var(--danger); }
+      .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+      }
+      .pill.hit { background: rgba(25, 213, 198, 0.1); color: var(--accent-2); border-color: rgba(25,213,198,0.3); }
+      .pill.miss { background: rgba(124, 92, 255, 0.1); color: var(--accent); border-color: rgba(124,92,255,0.3); }
+      .bar-row {
+        display: grid; grid-template-columns: 140px 1fr 110px;
+        gap: 12px; align-items: center; padding: 10px 0;
+        font-size: 14px;
+      }
+      .bar {
+        background: var(--bg-elev); height: 8px; border-radius: 4px; overflow: hidden;
+        position: relative;
+      }
+      .bar-fill {
+        position: absolute; left: 0; top: 0; bottom: 0;
+        background: linear-gradient(90deg, #7c5cff, #19d5c6);
+        border-radius: 4px;
+      }
+      .login-wrap {
+        max-width: 440px; margin: 120px auto;
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 14px; padding: 40px 32px;
+      }
+      .login-wrap h1 { margin-bottom: 8px; }
+      .login-wrap p { color: var(--text-dim); margin-bottom: 24px; font-size: 15px; }
+      input[type="text"], input[type="password"] {
+        width: 100%; padding: 12px 16px;
+        background: var(--bg-elev); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px;
+        font-family: 'JetBrains Mono', monospace; font-size: 14px;
+        margin-bottom: 12px;
+      }
+      input:focus { outline: none; border-color: var(--accent); }
+      button.primary {
+        width: 100%; padding: 12px 18px;
+        background: linear-gradient(135deg, #7c5cff, #19d5c6);
+        color: #0a0a0b; border: none; border-radius: 8px;
+        font-weight: 700; cursor: pointer; font-size: 14px;
+      }
+      .error {
+        color: var(--danger); font-size: 13px; margin-bottom: 12px;
+        padding: 10px 12px; background: rgba(255, 95, 87, 0.08);
+        border: 1px solid rgba(255, 95, 87, 0.2); border-radius: 6px;
+      }
+      .empty { color: var(--text-muted); text-align: center; padding: 40px; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const STORAGE_KEY = 'axon.apiKey';
+      const BASE_KEY = 'axon.baseUrl';
+
+      function html(parts, ...args) {
+        return parts.reduce((a, p, i) => a + p + (args[i] ?? ''), '');
+      }
+
+      function $(root, sel) { return root.querySelector(sel); }
+
+      async function api(path, opts = {}) {
+        const key = localStorage.getItem(STORAGE_KEY);
+        const base = localStorage.getItem(BASE_KEY) || 'https://api.axon.dev';
+        const res = await fetch(base + path, {
+          ...opts,
+          headers: { 'x-api-key': key, 'content-type': 'application/json', ...(opts.headers || {}) },
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || res.statusText);
+        return res.json();
+      }
+
+      function formatUsdc(s) { return Number(s).toFixed(4); }
+
+      function renderLogin(err) {
+        document.getElementById('app').innerHTML = `
+          <div class="login-wrap">
+            <h1>Axon Dashboard</h1>
+            <p>Paste your API key to get started.</p>
+            ${err ? `<div class="error">${err}</div>` : ''}
+            <input type="text" id="base" placeholder="https://api.axon.dev" />
+            <input type="password" id="key" placeholder="ax_live_..." />
+            <button class="primary" id="go">Open dashboard</button>
+          </div>
+        `;
+        document.getElementById('base').value = localStorage.getItem(BASE_KEY) || 'https://api.axon.dev';
+        document.getElementById('go').onclick = async () => {
+          const base = document.getElementById('base').value.trim();
+          const key = document.getElementById('key').value.trim();
+          if (!key) return renderLogin('API key is required');
+          localStorage.setItem(BASE_KEY, base);
+          localStorage.setItem(STORAGE_KEY, key);
+          try { await api('/v1/wallet/balance'); renderApp(); }
+          catch (e) { localStorage.removeItem(STORAGE_KEY); renderLogin(e.message); }
+        };
+      }
+
+      async function renderApp() {
+        const root = document.getElementById('app');
+        root.innerHTML = `
+          <header>
+            <div class="brand"><span class="logo-dot"></span> axon</div>
+            <div>
+              <span class="key-chip" id="keyview">ax_live_…</span>
+              <button class="key-chip" id="logout">sign out</button>
+            </div>
+          </header>
+          <div class="container">
+            <h1>Dashboard</h1>
+            <div class="grid" id="metrics">Loading…</div>
+            <div class="section">
+              <h2>Spend by API (last 30 days)</h2>
+              <div class="card" id="byapi">Loading…</div>
+            </div>
+            <div class="section">
+              <h2>Recent transactions</h2>
+              <div class="card" id="tx">Loading…</div>
+            </div>
+          </div>
+        `;
+
+        const keyShort = localStorage.getItem(STORAGE_KEY).slice(0, 16) + '…';
+        document.getElementById('keyview').textContent = keyShort;
+        document.getElementById('logout').onclick = () => {
+          localStorage.removeItem(STORAGE_KEY);
+          renderLogin();
+        };
+
+        try {
+          const [bal, usage, byApi, txs] = await Promise.all([
+            api('/v1/wallet/balance'),
+            api('/v1/usage'),
+            api('/v1/usage/by-api'),
+            api('/v1/wallet/transactions?limit=15'),
+          ]);
+
+          const hitRatePct = (usage.cache_hit_rate * 100).toFixed(1);
+
+          document.getElementById('metrics').innerHTML = `
+            <div class="card">
+              <div class="metric-label">Available balance</div>
+              <div class="metric-value">${formatUsdc(bal.available_usdc)}<span class="unit">USDC</span></div>
+              <div class="metric-sub">${bal.reserved_usdc === '0.000000' ? 'No funds reserved.' : bal.reserved_usdc + ' reserved'}</div>
+            </div>
+            <div class="card">
+              <div class="metric-label">Requests</div>
+              <div class="metric-value">${usage.total_requests}</div>
+              <div class="metric-sub">${usage.cache_hits} cache hits</div>
+            </div>
+            <div class="card">
+              <div class="metric-label">Cache hit rate</div>
+              <div class="metric-value">${hitRatePct}<span class="unit">%</span></div>
+              <div class="metric-sub">More is better — you pay 50% less on hits</div>
+            </div>
+            <div class="card">
+              <div class="metric-label">Total spent</div>
+              <div class="metric-value">${formatUsdc(usage.total_spent_usdc)}<span class="unit">USDC</span></div>
+              <div class="metric-sub">Across all APIs</div>
+            </div>
+          `;
+
+          // By-API bar chart
+          if (byApi.data.length === 0) {
+            document.getElementById('byapi').innerHTML = '<div class="empty">No usage yet — make a call to see it here.</div>';
+          } else {
+            const maxSpent = Math.max(...byApi.data.map((a) => Number(a.total_spent_usdc)));
+            document.getElementById('byapi').innerHTML = byApi.data.map((a) => {
+              const pct = (Number(a.total_spent_usdc) / maxSpent) * 100;
+              const hitRate = a.requests > 0 ? ((a.cache_hits / a.requests) * 100).toFixed(0) : 0;
+              return `
+                <div class="bar-row">
+                  <div>${a.api_slug} <span class="pill">${a.requests}×</span></div>
+                  <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+                  <div class="mono" style="text-align: right;">${formatUsdc(a.total_spent_usdc)} · ${hitRate}%</div>
+                </div>
+              `;
+            }).join('');
+          }
+
+          // Transactions
+          if (txs.data.length === 0) {
+            document.getElementById('tx').innerHTML = '<div class="empty">No transactions yet.</div>';
+          } else {
+            document.getElementById('tx').innerHTML = `
+              <table>
+                <thead><tr>
+                  <th>Type</th><th>API</th><th>Amount</th><th>When</th>
+                </tr></thead>
+                <tbody>
+                  ${txs.data.map((t) => {
+                    const amt = Number(t.amount_usdc);
+                    const cls = amt >= 0 ? 'positive' : 'negative';
+                    return `
+                      <tr>
+                        <td><span class="pill">${t.type}</span></td>
+                        <td class="mono">${t.api_slug || '—'}</td>
+                        <td class="mono ${cls}">${amt >= 0 ? '+' : ''}${formatUsdc(t.amount_usdc)}</td>
+                        <td style="color: var(--text-muted)">${new Date(t.created_at).toLocaleString()}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            `;
+          }
+        } catch (e) {
+          root.innerHTML = `<div class="container"><div class="error">${e.message}</div></div>`;
+        }
+      }
+
+      const key = localStorage.getItem(STORAGE_KEY);
+      if (key) renderApp();
+      else renderLogin();
+    </script>
+  </body>
+</html>

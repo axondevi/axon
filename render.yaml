@@ -1,0 +1,57 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploy Axon to Render's free tier in one click:
+#   render.com → New → Blueprint → connect this repo.
+#
+# Free tier notes:
+# - Web service spins down after 15min of inactivity (cold start ~2-5s).
+# - You must supply DATABASE_URL (from Neon) and REDIS_URL (from Upstash)
+#   as environment variables in the Render dashboard after the blueprint
+#   creates the service.
+
+services:
+  - type: web
+    name: axon
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health/ready
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: LOG_FORMAT
+        value: json
+      - key: LOG_LEVEL
+        value: info
+      - key: WALLET_PROVIDER
+        value: placeholder
+      - key: ENABLE_X402_NATIVE
+        value: 'false'
+      # ⚠️  Set these manually in the Render dashboard (sync: false prevents
+      # blueprint sync; you add them once at creation and they stick):
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: MASTER_ENCRYPTION_KEY
+        generateValue: true
+      - key: ADMIN_API_KEY
+        generateValue: true
+      # Upstream keys — add whichever you want enabled; unset ones just
+      # mean that API returns 500 upstream_misconfigured. Harmless.
+      - key: UPSTREAM_KEY_OPENWEATHER
+        sync: false
+      - key: UPSTREAM_KEY_SERPAPI
+        sync: false
+      - key: UPSTREAM_KEY_FIRECRAWL
+        sync: false
+      - key: UPSTREAM_KEY_EXA
+        sync: false
+      - key: UPSTREAM_KEY_OPENAI
+        sync: false
+      - key: UPSTREAM_KEY_ANTHROPIC
+        sync: false

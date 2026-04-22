@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "axon-crewai"
+version = "0.1.0"
+description = "crewAI tools backed by Axon — the universal API gateway for AI agents."
+authors = [{ name = "Axon" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "axon-client>=0.1.0",
+    "crewai>=0.80.0",
+    "pydantic>=2.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["axon_crewai*"]
