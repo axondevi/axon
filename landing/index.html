@@ -85,23 +85,27 @@
       <section class="logos" id="apis">
         <div class="container">
           <div class="logos-header">
-            <span class="eyebrow">12+ APIs at launch, more every week</span>
+            <span class="eyebrow" id="apis-eyebrow">
+              <span class="dot"></span>
+              Loading live catalog…
+            </span>
             <h2>Your agent talks to all of them through one endpoint.</h2>
+            <p class="logos-sub">Tap any API to see endpoints, pricing, and a ready-to-paste curl call.</p>
           </div>
-          <div class="logo-grid">
-            <div class="logo-card"><strong>OpenAI</strong><span>LLM</span></div>
-            <div class="logo-card"><strong>Anthropic</strong><span>LLM</span></div>
-            <div class="logo-card"><strong>Firecrawl</strong><span>Scraping</span></div>
-            <div class="logo-card"><strong>SerpAPI</strong><span>Search</span></div>
-            <div class="logo-card"><strong>Exa</strong><span>Neural search</span></div>
-            <div class="logo-card"><strong>Tavily</strong><span>Agent search</span></div>
-            <div class="logo-card"><strong>Replicate</strong><span>Open models</span></div>
-            <div class="logo-card"><strong>ElevenLabs</strong><span>Voice</span></div>
-            <div class="logo-card"><strong>Deepgram</strong><span>Speech→Text</span></div>
-            <div class="logo-card"><strong>Apollo</strong><span>Enrichment</span></div>
-            <div class="logo-card"><strong>OpenWeather</strong><span>Weather</span></div>
-            <div class="logo-card"><strong>Stripe Issuing</strong><span>Virtual cards</span></div>
+          <div class="logo-grid" id="logo-grid" role="list">
+            <div class="logo-card skeleton" aria-hidden="true"></div>
+            <div class="logo-card skeleton" aria-hidden="true"></div>
+            <div class="logo-card skeleton" aria-hidden="true"></div>
+            <div class="logo-card skeleton" aria-hidden="true"></div>
+            <div class="logo-card skeleton" aria-hidden="true"></div>
+            <div class="logo-card skeleton" aria-hidden="true"></div>
+            <div class="logo-card skeleton" aria-hidden="true"></div>
+            <div class="logo-card skeleton" aria-hidden="true"></div>
           </div>
+          <p class="logo-grid-error" id="logo-grid-error" hidden>
+            Live catalog is waking up. Meanwhile, browse the
+            <a href="https://github.com/shopkaolincom-commits/axon/tree/main/registry" target="_blank" rel="noopener">registry on GitHub →</a>
+          </p>
         </div>
       </section>
 
@@ -380,5 +384,200 @@
         </div>
       </div>
     </footer>
+
+    <!-- API detail modal -->
+    <div class="api-modal" id="api-modal" role="dialog" aria-modal="true" aria-labelledby="api-modal-title" aria-hidden="true" hidden>
+      <div class="api-modal-backdrop" data-close></div>
+      <div class="api-modal-card" role="document">
+        <button class="api-modal-close" type="button" data-close aria-label="Close">&times;</button>
+        <div class="api-modal-header">
+          <span class="api-modal-category" id="api-modal-category"></span>
+          <h3 id="api-modal-title"></h3>
+          <p class="api-modal-desc" id="api-modal-desc"></p>
+          <a class="api-modal-homepage" id="api-modal-homepage" target="_blank" rel="noopener">Provider site &rarr;</a>
+        </div>
+        <div class="api-modal-section">
+          <div class="api-modal-section-label">Endpoints</div>
+          <div class="api-modal-endpoints" id="api-modal-endpoints"></div>
+        </div>
+        <div class="api-modal-section">
+          <div class="api-modal-section-label">Example call via Axon</div>
+          <pre class="api-modal-curl"><code id="api-modal-curl"></code></pre>
+        </div>
+        <div class="api-modal-footer">
+          <a class="api-modal-registry-link" id="api-modal-registry" target="_blank" rel="noopener">Full spec on GitHub &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var API_BASE = 'https://axon-kedb.onrender.com';
+        var REGISTRY_URL = 'https://github.com/shopkaolincom-commits/axon/blob/main/registry/';
+        var grid = document.getElementById('logo-grid');
+        var eyebrow = document.getElementById('apis-eyebrow');
+        var errorEl = document.getElementById('logo-grid-error');
+        var modal = document.getElementById('api-modal');
+        var lastFocused = null;
+
+        function escapeHtml(s) {
+          return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+          });
+        }
+
+        function formatTTL(s) {
+          if (!s || s <= 0) return 'off';
+          if (s < 60) return s + 's';
+          if (s < 3600) return Math.round(s / 60) + 'min';
+          if (s < 86400) return Math.round(s / 3600) + 'h';
+          return Math.round(s / 86400) + 'd';
+        }
+
+        function formatPrice(p) {
+          if (p == null) return '$0';
+          var v = Number(p);
+          if (!isFinite(v)) return '$0';
+          if (v === 0) return 'free';
+          var fixed = v.toFixed(5).replace(/0+$/, '');
+          if (fixed.charAt(fixed.length - 1) === '.') fixed += '0';
+          return '$' + fixed;
+        }
+
+        async function fetchJson(url, attempts) {
+          attempts = attempts || 2;
+          var lastErr;
+          for (var i = 0; i < attempts; i++) {
+            try {
+              var r = await fetch(url, { headers: { accept: 'application/json' } });
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return await r.json();
+            } catch (e) {
+              lastErr = e;
+              if (i < attempts - 1) await new Promise(function (res) { setTimeout(res, 2000); });
+            }
+          }
+          throw lastErr;
+        }
+
+        async function loadCatalog() {
+          try {
+            var data = await fetchJson(API_BASE + '/v1/apis', 2);
+            renderGrid((data && data.data) || []);
+          } catch (e) {
+            showError();
+          }
+        }
+
+        function renderGrid(apis) {
+          if (!apis || !apis.length) return showError();
+          apis.sort(function (a, b) { return a.provider.localeCompare(b.provider); });
+          grid.innerHTML = '';
+          errorEl.hidden = true;
+          for (var i = 0; i < apis.length; i++) {
+            var api = apis[i];
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'logo-card logo-card-button';
+            btn.setAttribute('data-slug', api.slug);
+            btn.setAttribute('aria-label', api.provider + ' — ' + (api.category || ''));
+            btn.innerHTML =
+              '<strong>' + escapeHtml(api.provider) + '</strong>' +
+              '<span>' + escapeHtml(api.category || '') + '</span>';
+            btn.addEventListener('click', (function (slug) {
+              return function () { openModal(slug); };
+            })(api.slug));
+            grid.appendChild(btn);
+          }
+          eyebrow.innerHTML = '<span class="dot"></span>' + apis.length + ' APIs live, more every week';
+        }
+
+        function showError() {
+          grid.innerHTML = '';
+          errorEl.hidden = false;
+          eyebrow.innerHTML = '<span class="dot"></span>27+ APIs live, more every week';
+        }
+
+        async function openModal(slug) {
+          lastFocused = document.activeElement;
+          try {
+            var api = await fetchJson(API_BASE + '/v1/apis/' + encodeURIComponent(slug), 2);
+            fillModal(api);
+            showModal();
+          } catch (e) {
+            window.open(REGISTRY_URL + slug + '.json', '_blank', 'noopener');
+          }
+        }
+
+        function fillModal(a) {
+          document.getElementById('api-modal-title').textContent = a.provider || a.slug;
+          document.getElementById('api-modal-category').textContent = a.category || '';
+          document.getElementById('api-modal-desc').textContent = a.description || '';
+          var hp = document.getElementById('api-modal-homepage');
+          if (a.homepage) { hp.href = a.homepage; hp.style.display = ''; }
+          else { hp.style.display = 'none'; }
+          document.getElementById('api-modal-registry').href = REGISTRY_URL + a.slug + '.json';
+
+          var endpointsEl = document.getElementById('api-modal-endpoints');
+          endpointsEl.innerHTML = '';
+          var endpoints = Array.isArray(a.endpoints) ? a.endpoints : [];
+          if (!endpoints.length) {
+            endpointsEl.innerHTML = '<div class="endpoint-empty">No endpoints listed.</div>';
+          }
+          for (var i = 0; i < endpoints.length; i++) {
+            var ep = endpoints[i];
+            var row = document.createElement('div');
+            row.className = 'endpoint-row';
+            row.innerHTML =
+              '<span class="ep-method">' + escapeHtml(ep.method || 'POST') + '</span>' +
+              '<span class="ep-key">' + escapeHtml(ep.key) + '</span>' +
+              '<span class="ep-price">' + formatPrice(ep.effective_price_usd) + ' / call' +
+                '<span class="ep-cached"> · ' + formatPrice(ep.cached_price_usd) + ' cached</span>' +
+              '</span>' +
+              '<span class="ep-cache">cache ' + formatTTL(ep.cache_ttl) + '</span>';
+            endpointsEl.appendChild(row);
+          }
+
+          var curlEl = document.getElementById('api-modal-curl');
+          var first = endpoints[0];
+          if (first) {
+            curlEl.textContent =
+              'curl -X ' + (first.method || 'POST') + ' \\\n' +
+              '  ' + API_BASE + '/v1/call/' + a.slug + '/' + first.key + ' \\\n' +
+              '  -H "x-api-key: $AXON_KEY" \\\n' +
+              '  -H "content-type: application/json" \\\n' +
+              '  -d \'{}\'';
+          } else {
+            curlEl.textContent = '';
+          }
+        }
+
+        function showModal() {
+          modal.hidden = false;
+          modal.setAttribute('aria-hidden', 'false');
+          document.body.style.overflow = 'hidden';
+          requestAnimationFrame(function () { modal.classList.add('open'); });
+          var closeBtn = modal.querySelector('.api-modal-close');
+          if (closeBtn) closeBtn.focus();
+        }
+
+        function closeModal() {
+          modal.classList.remove('open');
+          modal.setAttribute('aria-hidden', 'true');
+          setTimeout(function () { modal.hidden = true; }, 150);
+          document.body.style.overflow = '';
+          if (lastFocused && lastFocused.focus) lastFocused.focus();
+        }
+
+        modal.addEventListener('click', function (e) {
+          if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-close')) closeModal();
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && !modal.hidden) closeModal();
+        });
+
+        loadCatalog();
+      })();
+    </script>
   </body>
 </html>
