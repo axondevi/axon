@@ -8,14 +8,14 @@ const app = new Hono();
 
 // ─── GET  /v1/admin/policy/:user_id ─────────────────
 app.get('/:user_id', adminAuth, async (c) => {
-  const userId = c.req.param('user_id');
+  const userId = c.req.param('user_id')!;
   const policy = await loadPolicy(userId);
   return c.json({ user_id: userId, policy });
 });
 
 // ─── PUT  /v1/admin/policy/:user_id ─────────────────
 app.put('/:user_id', adminAuth, async (c) => {
-  const userId = c.req.param('user_id');
+  const userId = c.req.param('user_id')!;
   const rules = (await c.req.json()) as Policy;
   validate(rules);
   await upsertPolicy(userId, rules);
@@ -24,7 +24,7 @@ app.put('/:user_id', adminAuth, async (c) => {
 
 // ─── DELETE /v1/admin/policy/:user_id ───────────────
 app.delete('/:user_id', adminAuth, async (c) => {
-  const userId = c.req.param('user_id');
+  const userId = c.req.param('user_id')!;
   await deletePolicy(userId);
   return c.json({ ok: true });
 });

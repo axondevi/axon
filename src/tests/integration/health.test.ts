@@ -6,7 +6,7 @@ describe('integration: health endpoints', () => {
     const app = await importApp();
     const res = await app.fetch(new Request('http://local/'));
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { name: string; status: string };
     expect(body.name).toBe('axon');
     expect(body.status).toBe('ok');
   });
@@ -51,7 +51,7 @@ describe('integration: auth', () => {
     const app = await importApp();
     const res = await app.fetch(new Request('http://local/v1/wallet/balance'));
     expect(res.status).toBe(401);
-    const body = await res.json();
+    const body = (await res.json()) as { error: string };
     expect(body.error).toBe('unauthorized');
   });
 
@@ -79,7 +79,7 @@ describe('integration: public catalog', () => {
     const app = await importApp();
     const res = await app.fetch(new Request('http://local/v1/apis'));
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { data: unknown[]; count: number };
     expect(Array.isArray(body.data)).toBe(true);
     expect(typeof body.count).toBe('number');
   });
@@ -88,7 +88,7 @@ describe('integration: public catalog', () => {
     const app = await importApp();
     const res = await app.fetch(new Request('http://local/v1/apis/openai'));
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { slug: string; endpoints: unknown[] };
     expect(body.slug).toBe('openai');
     expect(Array.isArray(body.endpoints)).toBe(true);
   });

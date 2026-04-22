@@ -65,7 +65,7 @@ app.post('/run', adminAuth, async (c) => {
 
 // ─── POST /v1/admin/settlements/:id/paid ──────────────
 app.post('/:id/paid', adminAuth, async (c) => {
-  const id = c.req.param('id');
+  const id = c.req.param('id')!;
   const { paid_ref } = await c.req.json<{ paid_ref: string }>();
   if (!paid_ref) throw Errors.badRequest('paid_ref is required');
   await markPaid(id, paid_ref);

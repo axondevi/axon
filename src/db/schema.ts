@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   pgTable,
   uuid,
@@ -64,7 +65,7 @@ export const transactions = pgTable(
     createdIdx: index('tx_created_idx').on(t.createdAt),
     onchainIdx: uniqueIndex('tx_onchain_idx')
       .on(t.onchainTx)
-      .where((sql) => sql`${t.onchainTx} IS NOT NULL`),
+      .where(sql`${t.onchainTx} IS NOT NULL`),
   }),
 );
 

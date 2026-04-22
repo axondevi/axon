@@ -18,8 +18,9 @@ FROM base AS build
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile
 COPY . .
-# TypeScript is checked in CI; here we keep sources and let Bun run them.
-RUN bun run typecheck
+# Bun executes TS directly at runtime. Typecheck is a CI gate (see
+# .github/workflows/ci.yml) — we don't want a type-only error blocking
+# a deploy. Flip this on if you want extra safety at deploy time.
 
 # ─── runtime ───────────────────────────────────────────
 FROM base AS runtime

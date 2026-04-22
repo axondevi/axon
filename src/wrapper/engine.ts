@@ -27,8 +27,8 @@ interface CallContext {
 }
 
 export async function handleCall(c: Context) {
-  const slug = c.req.param('slug');
-  const endpointKey = c.req.param('endpoint');
+  const slug = c.req.param('slug')!;
+  const endpointKey = c.req.param('endpoint')!;
   const x402Paid = !!c.get('axon:x402_paid');
   const user = (c.get('user') as { id: string } | undefined) ?? {
     // Synthetic user for x402-native calls. Created at boot by
