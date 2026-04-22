@@ -9,3 +9,6 @@ bun.lockb
 .idea/
 .vscode/
 coverage/
+
+# Wrangler (Cloudflare) — caches account/project metadata locally
+.wrangler/
