@@ -79,6 +79,13 @@ x402V1.use('*', x402Middleware);
 x402V1.route('/call', callRoutes);
 app.route('/x402/v1', x402V1);
 
+// ─── Admin endpoints (header: x-admin-key) ────────────
+// MUST be mounted BEFORE the authed /v1 sub-router so that /v1/admin/*
+// doesn't get caught by apiKeyAuth on /v1.
+app.route('/v1/admin', adminWalletRoutes);
+app.route('/v1/admin/policy', policyRoutes);
+app.route('/v1/admin/settlements', settlementRoutes);
+
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();
 v1.use('*', apiKeyAuth);
@@ -88,11 +95,6 @@ v1.route('/call', callRoutes);
 v1.route('/usage', usageRoutes);
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 app.route('/v1', v1);
-
-// ─── Admin endpoints (header: x-admin-key) ────────────
-app.route('/v1/admin', adminWalletRoutes);
-app.route('/v1/admin/policy', policyRoutes);
-app.route('/v1/admin/settlements', settlementRoutes);
 
 // ─── Webhooks (signature-verified, no auth middleware) ──
 app.route('/v1/webhooks', webhookRoutes);
