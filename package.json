@@ -3,6 +3,27 @@
   "version": "0.1.0",
   "description": "Universal API gateway for autonomous agents. One endpoint, one wallet, every paid API.",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shopkaolincom-commits/axon.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shopkaolincom-commits/axon/issues"
+  },
+  "homepage": "https://axon-5zf.pages.dev",
+  "keywords": [
+    "x402",
+    "ai-agents",
+    "api-gateway",
+    "usdc",
+    "base-l2",
+    "prepaid",
+    "llm-tools"
+  ],
+  "engines": {
+    "bun": ">=1.1.0"
+  },
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",

@@ -35,14 +35,15 @@ describe('integration: health endpoints', () => {
 
   it('generates a new id if incoming is malformed', async () => {
     const app = await importApp();
+    const malformed = 'has spaces and punctuation!';
     const res = await app.fetch(
       new Request('http://local/health', {
-        headers: { 'x-request-id': 'has spaces and 💩' },
+        headers: { 'x-request-id': malformed },
       }),
     );
     const id = res.headers.get('x-request-id');
     expect(id).toBeTruthy();
-    expect(id).not.toBe('has spaces and 💩');
+    expect(id).not.toBe(malformed);
   });
 });
 

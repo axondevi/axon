@@ -7,7 +7,27 @@ Unreleased changes appear at the top. When we cut a release, they move under a d
 ## [Unreleased]
 
 ### Added
-- …
+- Landing favicon (brand gradient SVG) + 1200×630 OG share image.
+- `og:type`, `og:image`, `og:url`, Twitter card meta on index/stats/status.
+- Accessible label on the waitlist email input (WCAG 2.1 A compliance).
+- `CORS_ALLOWED_ORIGINS` env var (csv) — replaces the former `origin: '*'`.
+- `METRICS_TOKEN` env var, now mandatory in production (validated at boot).
+
+### Changed
+- **Breaking (self-host):** the `/metrics` endpoint now requires `Authorization: Bearer $METRICS_TOKEN` unconditionally. Set the var before deploying.
+- **Breaking (self-host):** CORS defaults to `https://axon-5zf.pages.dev` only. Add your own frontend to `CORS_ALLOWED_ORIGINS` (csv) before deploying.
+- `/x402/v1/*` subtree is only mounted when `ENABLE_X402_NATIVE=true`. Hitting it with the flag off now returns `404` instead of falling through to the call engine with an implicit anon user.
+- `ADMIN_API_KEY` comparison uses `crypto.timingSafeEqual` (timing-safe).
+- Landing has `<meta name="robots" content="noindex, nofollow">`, `robots.txt` with `Disallow: /`, and `X-Robots-Tag` HTTP header for a pre-launch lockdown — search engines will not index the site until these are removed.
+
+### Fixed
+- `status.html` nav links no longer point at `/stats.html` and `/status.html` (Cloudflare Pages strips `.html`).
+- Dev comment (`// replace with your API URL`) removed from status page JS.
+- Integration test header value used a non-ASCII char that the `fetch` Request constructor rejects; replaced with a header value that fails the middleware regex but not HTTP parsing.
+
+### Security
+- `/metrics` was leaking top-100 wallet balances and user UUIDs to unauthenticated callers. Now gated.
+- CORS was wildcard, enabling cross-origin abuse from any website. Now locked to allow-list.
 
 ## [0.1.0] — 2026-04-21
 
@@ -49,5 +69,5 @@ Initial release. Production-ready foundation.
 - **Grafana dashboard** + alerting rules
 - **OSS hygiene**: LICENSE (MIT), CONTRIBUTING, SECURITY, CoC, issue/PR templates, Dependabot
 
-[Unreleased]: https://github.com/axondev/axon/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/axondev/axon/releases/tag/v0.1.0
+[Unreleased]: https://github.com/shopkaolincom-commits/axon/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/shopkaolincom-commits/axon/releases/tag/v0.1.0
