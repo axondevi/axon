@@ -16,7 +16,7 @@ This guide is the actual, working path. No "sign up for free trial and remember 
 | Redis | **Upstash** | 10k commands/day, 256 MB max | $0.20 per 100k after — pay-per-use |
 | Cron / worker | **GitHub Actions** (scheduled) | 2000 min/mo free | Never — 2000 min is a year of daily runs |
 | Blockchain deposit watcher | **Alchemy** | 300 CU/sec free tier | ~$49/mo at real volume |
-| Wallet custody (testnet) | **Coinbase CDP** | Free dev tier | Migrate to mainnet once you have users |
+| Wallet custody (testnet) | **Coinbase CDP** or **Turnkey** | Both free to start — Turnkey = 5k wallets free, email signup; CDP = free dev tier, needs Coinbase account | Migrate to mainnet once you have users |
 | Domain | Subdomain on any of the above | — | Buy `.dev` domain for ~$12/year when revenue covers it |
 | SSL | Included in every service above | — | Never |
 
@@ -72,7 +72,7 @@ If you don't have `gh` CLI, create the repo in the GitHub web UI and push manual
    - `REDIS_URL` — from Upstash
    - `MASTER_ENCRYPTION_KEY` — generate: `openssl rand -hex 32`
    - `ADMIN_API_KEY` — generate: `openssl rand -hex 32`
-   - `WALLET_PROVIDER=placeholder` (start with placeholder, swap to CDP later)
+   - `WALLET_PROVIDER=placeholder` (start with placeholder; swap to `cdp` or `turnkey` before accepting real USDC — see `docs/security.md` for the tradeoff)
    - `NODE_ENV=production`
    - `LOG_FORMAT=json`
 4. Deploy happens automatically from the blueprint

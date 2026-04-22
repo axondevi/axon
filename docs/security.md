@@ -13,13 +13,14 @@ Axon custodies USDC and proxies API keys. The threat model is therefore non-triv
 | Upstream API keys | Encrypted AES-256-GCM at rest in `transactions.meta` or in env vars per provider | Rotate per provider policy; re-encrypt on rotation. |
 | Alchemy webhook signing key | Env var | Rotate in Alchemy dashboard when compromised. |
 | CDP API credentials | Env vars | Coinbase allows rotation; re-upload to Railway/Fly secrets after. |
+| Turnkey API key pair (`TURNKEY_API_PUBLIC_KEY` / `…_PRIVATE_KEY`) | Env vars | Rotate in Turnkey dashboard. Losing the private key ≠ losing user funds — user custody is isolated in each sub-organization's HSM. |
 
 ## At-rest encryption
 
 - **`MASTER_ENCRYPTION_KEY`** (hashed to 32 bytes via sha256) drives AES-256-GCM via `node:crypto`.
 - Ciphertexts include a fresh 12-byte IV and a GCM auth tag — tampering is detected.
 - `encrypt()` output shape: `{iv-hex}:{tag-hex}:{data-hex}`.
-- Wallet provider backups (`serializedBackup` from CDP) are encrypted before writing to `transactions.meta.backup_enc`.
+- Wallet provider backups (`serializedBackup` from CDP or Turnkey) are encrypted before writing to `transactions.meta.backup_enc`. For Turnkey this blob is only the `subOrganizationId` + `walletId` — the actual signing keys never leave Turnkey's HSMs.
 
 ## Atomic debit guarantee
 
@@ -81,7 +82,17 @@ Currently `*` with explicit allowed headers (`x-api-key`, `content-type`, `autho
 - **Fallback routing bills at the primary's price** even if fallback is cheaper. We plan to re-price on fallback but it needs careful UX — currently a known small overcharge when fallback is used.
 - **Fixed-window rate limit** (not sliding). A burst at the window boundary can briefly exceed 2× the limit.
 - **No replay protection for the `x-api-key` header** beyond HTTPS. Leaked keys must be rotated by the user.
-- **Custodial model** means losing the CDP seed means losing USDC. Back up seeds in a second store.
+- **Custodial model** means losing the CDP seed means losing USDC. Back up seeds in a second store. (Turnkey provider is the exception: HSM-custodied, no exportable seed — recovery goes through Turnkey's root-user flow.)
+
+## Choosing a wallet provider
+
+| Provider | Security | Signup friction | Best for |
+|----------|----------|-----------------|----------|
+| `placeholder` | ❌ derived from UUID, not a real wallet | none | local dev, testnet only |
+| `cdp` (Coinbase) | Coinbase-grade custody, seed exported to you | requires Coinbase account + KYC in some regions | US/EU teams, tight integration with x402 |
+| `turnkey` | HSM-backed, per-user sub-org isolation, no exportable seed | email signup, no KYC to start | fallback when CDP signup is blocked; teams that want hardware-isolated custody |
+
+Switching providers is a one-line env change (`WALLET_PROVIDER=…`), but **wallets are not migrated** — existing users keep their original provider's address until they're re-provisioned.
 
 ## Reporting security issues
 

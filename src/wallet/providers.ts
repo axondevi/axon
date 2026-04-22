@@ -1,13 +1,15 @@
 /**
  * Pluggable wallet provider.
  *
- * Two implementations:
+ * Three implementations:
  *   - PlaceholderWalletProvider: derives deterministic address from user UUID.
  *     Use this for local dev and initial launch while you're on testnet.
  *   - CDPWalletProvider: creates a real per-user sub-wallet via Coinbase CDP.
- *     Use this before accepting real USDC on mainnet.
+ *   - TurnkeyWalletProvider: creates a per-user sub-org wallet on Turnkey
+ *     (HSM-backed, no exported seed). Good for regions where Coinbase
+ *     signup is blocked.
  *
- * Selector: env.WALLET_PROVIDER ∈ { 'placeholder' | 'cdp' }
+ * Selector: env.WALLET_PROVIDER ∈ { 'placeholder' | 'cdp' | 'turnkey' }
  */
 
 import { env } from '~/config';
@@ -55,6 +57,22 @@ class CDPWalletProviderLazy implements WalletProvider {
   }
 }
 
+// ─── Turnkey (production alternative) ─────────────────────
+// Real implementation lives in providers-turnkey.ts (lazy-loaded so the
+// @turnkey/sdk-server dependency stays optional).
+class TurnkeyWalletProviderLazy implements WalletProvider {
+  readonly name = 'turnkey';
+  private real: WalletProvider | null = null;
+
+  async createUserWallet(userId: string): Promise<DepositAddress> {
+    if (!this.real) {
+      const { TurnkeyWalletProviderReal } = await import('./providers-turnkey');
+      this.real = new TurnkeyWalletProviderReal();
+    }
+    return this.real.createUserWallet(userId);
+  }
+}
+
 // ─── Factory ──────────────────────────────────────────────
 let _provider: WalletProvider | null = null;
 
@@ -65,6 +83,9 @@ export function getWalletProvider(): WalletProvider {
   switch (kind) {
     case 'cdp':
       _provider = new CDPWalletProviderLazy();
+      break;
+    case 'turnkey':
+      _provider = new TurnkeyWalletProviderLazy();
       break;
     case 'placeholder':
     default:

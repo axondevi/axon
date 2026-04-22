@@ -23,10 +23,15 @@ const schema = z.object({
   ALCHEMY_WEBHOOK_SIGNING_KEY: z.string().optional(),
   DEPOSIT_WEBHOOK_TOKEN: z.string().optional(),
 
-  WALLET_PROVIDER: z.enum(['placeholder', 'cdp']).default('placeholder'),
+  WALLET_PROVIDER: z.enum(['placeholder', 'cdp', 'turnkey']).default('placeholder'),
   CDP_API_KEY_NAME: z.string().optional(),
   CDP_API_KEY_PRIVATE: z.string().optional(),
   CDP_NETWORK_ID: z.string().default('base-mainnet'),
+
+  TURNKEY_API_PUBLIC_KEY: z.string().optional(),
+  TURNKEY_API_PRIVATE_KEY: z.string().optional(),
+  TURNKEY_ORGANIZATION_ID: z.string().optional(),
+  TURNKEY_API_BASE_URL: z.string().default('https://api.turnkey.com'),
 
   ENABLE_X402_NATIVE: z
     .enum(['true', 'false'])
