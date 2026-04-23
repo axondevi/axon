@@ -42,4 +42,11 @@ describe('toMicro / fromMicro', () => {
     expect(fromMicro(1n)).toBe('0.000001');
     expect(fromMicro(0n)).toBe('0.000000');
   });
+
+  it('fromMicro handles negative amounts (debits)', () => {
+    expect(fromMicro(-1_000n)).toBe('-0.001000');
+    expect(fromMicro(-8_800n)).toBe('-0.008800');
+    expect(fromMicro(-1_234_567n)).toBe('-1.234567');
+    expect(fromMicro(-1n)).toBe('-0.000001');
+  });
 });

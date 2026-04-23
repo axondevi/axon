@@ -14,9 +14,11 @@ export function toMicro(usdc: number | string): bigint {
 }
 
 export function fromMicro(micro: bigint): string {
-  const int = micro / MICRO;
-  const frac = micro % MICRO;
-  return `${int.toString()}.${frac.toString().padStart(6, '0')}`;
+  const negative = micro < 0n;
+  const abs = negative ? -micro : micro;
+  const int = abs / MICRO;
+  const frac = abs % MICRO;
+  return `${negative ? '-' : ''}${int.toString()}.${frac.toString().padStart(6, '0')}`;
 }
 
 export async function getBalance(userId: string) {
