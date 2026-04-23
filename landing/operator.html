@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon · Operator</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0a0b;
+        --bg-elev: #111114;
+        --bg-card: #16161a;
+        --border: #25252b;
+        --text: #eeeef0;
+        --text-dim: #9a9aa4;
+        --text-muted: #6a6a76;
+        --accent: #7c5cff;
+        --accent-2: #19d5c6;
+        --success: #4ade80;
+        --danger: #ff5f57;
+        --radius: 10px;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg); color: var(--text); line-height: 1.5;
+      }
+      .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+      header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(10,10,11,0.8);
+      }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; text-decoration: none; color: var(--text); }
+      .logo-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      }
+      .badge {
+        font-family: 'JetBrains Mono', monospace; font-size: 11px;
+        padding: 3px 8px; border-radius: 4px; background: var(--accent);
+        color: white; text-transform: uppercase; letter-spacing: 0.05em;
+      }
+      .header-right { display: flex; gap: 12px; align-items: center; }
+      .pill {
+        font-family: 'JetBrains Mono', monospace; font-size: 12px;
+        padding: 4px 10px; border-radius: 999px; background: var(--bg-elev);
+        color: var(--text-dim); border: 1px solid var(--border);
+      }
+      button.link {
+        background: none; border: none; color: var(--text-muted);
+        cursor: pointer; font-size: 13px; padding: 4px 8px;
+      }
+      button.link:hover { color: var(--text); }
+
+      .login {
+        max-width: 440px; margin: 120px auto; padding: 40px;
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 14px;
+      }
+      .login h1 { margin: 0 0 12px; font-size: 26px; }
+      .login p { color: var(--text-dim); margin: 0 0 28px; font-size: 14px; }
+      .login input {
+        width: 100%; padding: 12px 14px; margin-bottom: 12px;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 8px; color: var(--text);
+        font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      }
+      .login input:focus { outline: none; border-color: var(--accent); }
+      .login button {
+        width: 100%; padding: 13px; border: none; border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: white; font-weight: 700; font-size: 15px; cursor: pointer;
+      }
+      .error {
+        color: var(--danger); font-size: 13px; margin-bottom: 12px;
+        padding: 8px 12px; background: rgba(255, 95, 87, 0.1);
+        border: 1px solid var(--danger); border-radius: 6px;
+      }
+
+      .hero-row {
+        display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px;
+        margin-bottom: 16px;
+      }
+      .hero-card, .metric-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 12px; padding: 22px;
+      }
+      .hero-card {
+        background: linear-gradient(135deg, rgba(124,92,255,0.12), rgba(25,213,198,0.12));
+        border-color: var(--accent);
+      }
+      .label {
+        font-size: 11px; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+      }
+      .value {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 800; letter-spacing: -0.02em;
+      }
+      .hero-card .value { font-size: 38px; }
+      .hero-card .value .u { font-size: 16px; color: var(--text-muted); margin-left: 8px; font-family: 'Inter'; font-weight: 500; }
+      .metric-card .value { font-size: 24px; }
+      .metric-card .value .u { font-size: 12px; color: var(--text-muted); margin-left: 6px; font-family: 'Inter'; font-weight: 500; }
+      .sub {
+        font-size: 12px; color: var(--text-muted); margin-top: 8px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .positive { color: var(--success); }
+      .negative { color: var(--danger); }
+
+      .split {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+        margin-bottom: 32px;
+      }
+
+      h2 { font-size: 18px; margin: 40px 0 16px; font-weight: 700; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th {
+        text-align: left; font-size: 11px; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.08em;
+        padding: 12px; border-bottom: 1px solid var(--border); font-weight: 500;
+      }
+      td {
+        padding: 14px 12px; border-bottom: 1px solid var(--border);
+        font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      }
+      td.label-col { font-family: 'Inter'; font-weight: 600; }
+      td.right { text-align: right; }
+      .bar-inline { display: inline-block; width: 80px; height: 5px; background: var(--bg-elev); border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
+      .bar-inline > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+      .metaline {
+        font-family: 'JetBrains Mono', monospace; font-size: 12px;
+        color: var(--text-muted); margin-bottom: 20px;
+      }
+      .empty {
+        padding: 40px; text-align: center;
+        color: var(--text-muted); font-size: 14px;
+      }
+
+      @media (max-width: 900px) {
+        .hero-row, .split { grid-template-columns: 1fr 1fr; }
+      }
+      @media (max-width: 600px) {
+        .hero-row, .split { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="login-view" class="login">
+      <h1>Operator sign-in</h1>
+      <p>Enter the <code>ADMIN_API_KEY</code> to view aggregate business metrics: revenue, profit, per-API margins.</p>
+      <div id="error" class="error" style="display: none"></div>
+      <input id="base" placeholder="https://axon-kedb.onrender.com" />
+      <input id="admin-key" type="password" placeholder="admin key…" />
+      <button id="signin">Open operator dashboard</button>
+    </div>
+
+    <header id="nav" style="display: none">
+      <div class="brand">
+        <span class="logo-dot"></span>
+        axon
+        <span class="badge">operator</span>
+      </div>
+      <div class="header-right">
+        <span class="pill" id="base-display"></span>
+        <button class="link" id="signout">sign out</button>
+      </div>
+    </header>
+
+    <main id="main" class="container" style="display: none">
+      <div class="metaline" id="metaline">Loading…</div>
+
+      <!-- Hero: NET PROFIT -->
+      <div class="hero-row">
+        <div class="hero-card">
+          <div class="label">Net profit (last 30 days)</div>
+          <div class="value positive" id="m-profit">—</div>
+          <div class="sub" id="m-profit-sub">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Gross revenue</div>
+          <div class="value" id="m-revenue">—</div>
+          <div class="sub">total charged to clients</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Upstream cost</div>
+          <div class="value" id="m-upstream">—</div>
+          <div class="sub">what you owe providers</div>
+        </div>
+      </div>
+
+      <!-- Secondary metrics -->
+      <div class="split">
+        <div class="metric-card">
+          <div class="label">Cache profit</div>
+          <div class="value positive" id="m-cache-profit">—</div>
+          <div class="sub">pure margin from cache hits</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Live profit</div>
+          <div class="value" id="m-live-profit">—</div>
+          <div class="sub">markup on cache-miss calls</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Requests · cache rate</div>
+          <div class="value" id="m-requests">—</div>
+          <div class="sub" id="m-cache-rate">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Active users (30d)</div>
+          <div class="value" id="m-users">—</div>
+          <div class="sub" id="m-users-sub">—</div>
+        </div>
+      </div>
+
+      <!-- Pending settlement -->
+      <h2>Pending settlement</h2>
+      <div id="pending-box"></div>
+
+      <!-- Per-API breakdown -->
+      <h2>Profit by API</h2>
+      <table id="by-api-table">
+        <thead>
+          <tr>
+            <th>API</th>
+            <th>Requests</th>
+            <th>Cache hit</th>
+            <th class="right">Gross revenue</th>
+            <th class="right">Upstream cost</th>
+            <th class="right">Net profit</th>
+            <th class="right">Margin</th>
+          </tr>
+        </thead>
+        <tbody id="by-api-body"></tbody>
+      </table>
+      <div id="by-api-empty" class="empty" style="display: none">No requests yet in the selected window.</div>
+    </main>
+
+    <script>
+      const BASE_KEY = 'axon.base';
+      const ADMIN_KEY = 'axon.admin';
+
+      function base() {
+        return localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+      }
+      function adminKey() { return localStorage.getItem(ADMIN_KEY) || ''; }
+
+      async function api(path) {
+        const res = await fetch(base() + path, {
+          headers: { 'x-admin-key': adminKey() },
+        });
+        if (!res.ok) throw new Error(`${res.status} · ${await res.text()}`);
+        return res.json();
+      }
+
+      function fmt(usdc, opts = {}) {
+        const n = Number(usdc);
+        if (!isFinite(n)) return usdc;
+        return n.toFixed(opts.decimals ?? 4);
+      }
+
+      function showLogin(err) {
+        document.getElementById('login-view').style.display = 'block';
+        document.getElementById('nav').style.display = 'none';
+        document.getElementById('main').style.display = 'none';
+        if (err) {
+          const e = document.getElementById('error');
+          e.style.display = 'block';
+          e.textContent = err;
+        }
+        document.getElementById('base').value = base();
+      }
+
+      function showDashboard() {
+        document.getElementById('login-view').style.display = 'none';
+        document.getElementById('nav').style.display = 'flex';
+        document.getElementById('main').style.display = 'block';
+        document.getElementById('base-display').textContent = base().replace(/^https?:\/\//, '');
+      }
+
+      document.getElementById('signin').addEventListener('click', async () => {
+        const newBase = document.getElementById('base').value.trim().replace(/\/$/, '');
+        const newKey = document.getElementById('admin-key').value.trim();
+        if (!newKey) return;
+        localStorage.setItem(BASE_KEY, newBase || 'https://axon-kedb.onrender.com');
+        localStorage.setItem(ADMIN_KEY, newKey);
+        try {
+          await load();
+          showDashboard();
+        } catch (e) {
+          showLogin('Invalid admin key or unreachable server: ' + e.message);
+        }
+      });
+
+      document.getElementById('signout')?.addEventListener('click', () => {
+        localStorage.removeItem(ADMIN_KEY);
+        location.reload();
+      });
+
+      async function load() {
+        const d = await api('/v1/admin/operator/stats?days=30');
+
+        document.getElementById('metaline').textContent =
+          `window: ${d.window_days} days · generated ${new Date(d.generated_at).toLocaleString()}`;
+
+        const t = d.totals;
+        document.getElementById('m-profit').textContent = `${fmt(t.net_profit_usdc)} USDC`;
+        document.getElementById('m-profit-sub').textContent = `${t.profit_margin_pct.toFixed(1)}% margin · ${t.requests} paid calls`;
+
+        document.getElementById('m-revenue').innerHTML = `${fmt(t.gross_revenue_usdc)}<span class="u">USDC</span>`;
+        document.getElementById('m-upstream').innerHTML = `${fmt(t.upstream_cost_usdc)}<span class="u">USDC</span>`;
+
+        document.getElementById('m-cache-profit').innerHTML = `${fmt(t.cache_profit_usdc)}<span class="u">USDC</span>`;
+        document.getElementById('m-live-profit').innerHTML = `${fmt(t.live_profit_usdc)}<span class="u">USDC</span>`;
+
+        document.getElementById('m-requests').textContent = t.requests.toLocaleString();
+        document.getElementById('m-cache-rate').textContent = `${(t.cache_hit_rate * 100).toFixed(1)}% cache hits`;
+
+        document.getElementById('m-users').textContent = t.active_users_in_window;
+        document.getElementById('m-users-sub').textContent = `${t.total_users_ever} total users ever`;
+
+        // Pending settlement
+        const pendingBox = document.getElementById('pending-box');
+        if (!d.pending_settlements_by_api.length) {
+          pendingBox.innerHTML = `<div class="metric-card"><div class="value positive">${fmt(t.pending_settlement_usdc)} <span style="font-size:12px;color:var(--text-muted)">USDC owed</span></div><div class="sub">No pending settlements. Settle-up run already processed.</div></div>`;
+        } else {
+          pendingBox.innerHTML = `
+            <div class="metric-card">
+              <div class="label">Total owed to upstreams</div>
+              <div class="value negative">${fmt(t.pending_settlement_usdc)} <span style="font-size:12px;color:var(--text-muted)">USDC</span></div>
+              <div class="sub">Across ${d.pending_settlements_by_api.length} provider(s): ${d.pending_settlements_by_api.map(p => `${p.api_slug} (${fmt(p.owed_usdc)})`).join(' · ')}</div>
+            </div>`;
+        }
+
+        // By-API table
+        const tbody = document.getElementById('by-api-body');
+        tbody.innerHTML = '';
+        if (d.by_api.length === 0) {
+          document.getElementById('by-api-table').style.display = 'none';
+          document.getElementById('by-api-empty').style.display = 'block';
+          return;
+        }
+        document.getElementById('by-api-table').style.display = 'table';
+        document.getElementById('by-api-empty').style.display = 'none';
+
+        const maxProfit = Math.max(...d.by_api.map(a => Number(a.net_profit_usdc)), 0.0001);
+        d.by_api.forEach(a => {
+          const profit = Number(a.net_profit_usdc);
+          const barPct = (profit / maxProfit) * 100;
+          tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td class="label-col">${a.api_slug}</td>
+              <td>${a.requests}</td>
+              <td>${(a.cache_hit_rate * 100).toFixed(0)}%</td>
+              <td class="right">${fmt(a.gross_revenue_usdc)}</td>
+              <td class="right">${fmt(a.upstream_cost_usdc)}</td>
+              <td class="right positive"><span class="bar-inline"><span style="width:${barPct}%"></span></span>${fmt(a.net_profit_usdc)}</td>
+              <td class="right">${a.profit_margin_pct.toFixed(1)}%</td>
+            </tr>
+          `);
+        });
+      }
+
+      // Auto-login if admin key saved
+      (async () => {
+        if (adminKey()) {
+          try {
+            await load();
+            showDashboard();
+          } catch (e) {
+            showLogin('Session expired: ' + e.message);
+          }
+        } else {
+          showLogin();
+        }
+      })();
+    </script>
+  </body>
+</html>

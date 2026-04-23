@@ -20,6 +20,7 @@ import usageRoutes from '~/routes/usage';
 import webhookRoutes from '~/routes/webhooks';
 import policyRoutes from '~/routes/policy';
 import settlementRoutes from '~/routes/settlement';
+import operatorRoutes from '~/routes/operator';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -100,6 +101,7 @@ if (env.ENABLE_X402_NATIVE) {
 app.route('/v1/admin', adminWalletRoutes);
 app.route('/v1/admin/policy', policyRoutes);
 app.route('/v1/admin/settlements', settlementRoutes);
+app.route('/v1/admin/operator', operatorRoutes);
 
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();
