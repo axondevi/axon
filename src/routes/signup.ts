@@ -22,7 +22,7 @@ import { redis } from '~/cache/redis';
 import { log } from '~/lib/logger';
 
 const SIGNUP_BONUS_USDC = '0.5';
-const RATE_LIMIT_PER_HOUR = 3;
+const RATE_LIMIT_PER_HOUR = 10;
 const RATE_WINDOW_SEC = 3600;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

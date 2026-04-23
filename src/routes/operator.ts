@@ -192,4 +192,25 @@ app.get('/wallets', adminAuth, async (c) => {
   });
 });
 
+// ─── POST /v1/admin/operator/reset-signup-limit ───────
+// Clear signup rate-limit for a specific IP (or all if no ip given).
+// Useful when operator is testing signup flow from their own IP.
+app.post('/reset-signup-limit', adminAuth, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { ip?: string };
+  const { redis } = await import('~/cache/redis');
+
+  if (body.ip) {
+    // Delete all buckets for this specific IP (past + current)
+    const pattern = `signup:ratelimit:${body.ip}:*`;
+    const keys = await redis.keys(pattern);
+    if (keys.length) await redis.del(...keys);
+    return c.json({ cleared: keys.length, ip: body.ip });
+  }
+
+  // Clear ALL signup rate limits
+  const keys = await redis.keys('signup:ratelimit:*');
+  if (keys.length) await redis.del(...keys);
+  return c.json({ cleared: keys.length, scope: 'all' });
+});
+
 export default app;
