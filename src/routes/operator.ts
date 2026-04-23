@@ -11,11 +11,12 @@
  *   upstream_cost = gross_revenue - net_profit
  */
 import { Hono } from 'hono';
-import { and, gte, eq, sql } from 'drizzle-orm';
+import { and, gte, eq, sql, desc } from 'drizzle-orm';
 import { db } from '~/db';
-import { requests, users, settlements } from '~/db/schema';
+import { requests, users, wallets, settlements } from '~/db/schema';
 import { adminAuth } from '~/auth/middleware';
 import { fromMicro } from '~/wallet/service';
+import { env } from '~/config';
 
 const app = new Hono();
 
@@ -135,6 +136,58 @@ app.get('/stats', adminAuth, async (c) => {
     pending_settlements_by_api: pending.map((p) => ({
       api_slug: p.api_slug,
       owed_usdc: fromMicro(BigInt(p.owed_micro)),
+    })),
+  });
+});
+
+// ─── GET /v1/admin/operator/wallets ───────────────────
+// Treasury + list of user wallets with Basescan-ready addresses
+app.get('/wallets', adminAuth, async (c) => {
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  const treasury = env.TREASURY_ADDRESS;
+  const treasuryConfigured = !!treasury && treasury.toLowerCase() !== ZERO;
+
+  // Join users + wallets to list with balance and creation date
+  const rows = await db
+    .select({
+      user_id: users.id,
+      email: users.email,
+      tier: users.tier,
+      address: wallets.address,
+      balance_micro: wallets.balanceMicro,
+      reserved_micro: wallets.reservedMicro,
+      created_at: users.createdAt,
+    })
+    .from(users)
+    .leftJoin(wallets, eq(wallets.userId, users.id))
+    .orderBy(desc(users.createdAt))
+    .limit(100);
+
+  return c.json({
+    treasury: {
+      address: treasury || ZERO,
+      configured: treasuryConfigured,
+      basescan_url: treasuryConfigured
+        ? `https://basescan.org/address/${treasury}`
+        : null,
+      note: treasuryConfigured
+        ? 'Funds sweep here when sweep function is implemented.'
+        : 'Treasury not configured. Set TREASURY_ADDRESS in Render env to a wallet you control. Without this, profit cannot be swept out.',
+    },
+    turnkey: {
+      organization_id: process.env.TURNKEY_ORGANIZATION_ID ?? null,
+      provider: env.WALLET_PROVIDER,
+      dashboard_url: 'https://app.turnkey.com',
+    },
+    user_wallets: rows.map((r) => ({
+      user_id: r.user_id,
+      email: r.email,
+      tier: r.tier,
+      address: r.address,
+      balance_usdc: r.balance_micro ? fromMicro(BigInt(r.balance_micro)) : '0.000000',
+      reserved_usdc: r.reserved_micro ? fromMicro(BigInt(r.reserved_micro)) : '0.000000',
+      basescan_url: r.address ? `https://basescan.org/address/${r.address}` : null,
+      created_at: r.created_at,
     })),
   });
 });

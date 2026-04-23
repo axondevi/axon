@@ -244,6 +244,26 @@
         <tbody id="by-api-body"></tbody>
       </table>
       <div id="by-api-empty" class="empty" style="display: none">No requests yet in the selected window.</div>
+
+      <!-- Wallets & on-chain -->
+      <h2>Wallets &amp; on-chain</h2>
+      <div id="treasury-card"></div>
+
+      <h2 style="margin-top: 32px; font-size: 16px;">User wallets <span id="user-wallet-count" style="color: var(--text-muted); font-weight: 400; font-size: 13px;"></span></h2>
+      <table id="wallets-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Tier</th>
+            <th>Address</th>
+            <th class="right">DB balance</th>
+            <th>Created</th>
+            <th class="right">On-chain</th>
+          </tr>
+        </thead>
+        <tbody id="wallets-body"></tbody>
+      </table>
+      <div id="wallets-empty" class="empty" style="display: none">No users yet.</div>
     </main>
 
     <script>
@@ -307,8 +327,16 @@
         location.reload();
       });
 
+      function shortAddr(addr) {
+        if (!addr) return '—';
+        return addr.slice(0, 8) + '…' + addr.slice(-6);
+      }
+
       async function load() {
-        const d = await api('/v1/admin/operator/stats?days=30');
+        const [d, w] = await Promise.all([
+          api('/v1/admin/operator/stats?days=30'),
+          api('/v1/admin/operator/wallets'),
+        ]);
 
         document.getElementById('metaline').textContent =
           `window: ${d.window_days} days · generated ${new Date(d.generated_at).toLocaleString()}`;
@@ -369,6 +397,60 @@
             </tr>
           `);
         });
+
+        // === Treasury & wallets section ===
+        const trCard = document.getElementById('treasury-card');
+        if (w.treasury.configured) {
+          trCard.innerHTML = `
+            <div class="metric-card">
+              <div class="label">Treasury wallet</div>
+              <div class="value" style="font-size: 18px;">${shortAddr(w.treasury.address)}</div>
+              <div class="sub">
+                <a href="${w.treasury.basescan_url}" target="_blank" rel="noopener" style="color: var(--accent-2);">View on Basescan →</a>
+                · ${w.treasury.note}
+              </div>
+            </div>`;
+        } else {
+          trCard.innerHTML = `
+            <div class="metric-card" style="border-color: var(--danger);">
+              <div class="label" style="color: var(--danger);">Treasury not configured</div>
+              <div class="value" style="font-size: 16px; color: var(--text-dim);">${shortAddr(w.treasury.address)}</div>
+              <div class="sub">${w.treasury.note}</div>
+            </div>
+            <div style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+              Turnkey parent org: <span style="font-family: 'JetBrains Mono', monospace;">${w.turnkey.organization_id ?? 'not set'}</span>
+              · Provider: <span style="font-family: 'JetBrains Mono', monospace;">${w.turnkey.provider}</span>
+              · <a href="${w.turnkey.dashboard_url}" target="_blank" rel="noopener" style="color: var(--accent-2);">Open Turnkey →</a>
+            </div>`;
+        }
+
+        const wBody = document.getElementById('wallets-body');
+        const wCount = document.getElementById('user-wallet-count');
+        wCount.textContent = `(${w.user_wallets.length})`;
+        wBody.innerHTML = '';
+        if (w.user_wallets.length === 0) {
+          document.getElementById('wallets-table').style.display = 'none';
+          document.getElementById('wallets-empty').style.display = 'block';
+        } else {
+          document.getElementById('wallets-table').style.display = 'table';
+          document.getElementById('wallets-empty').style.display = 'none';
+          w.user_wallets.forEach(u => {
+            const created = new Date(u.created_at).toLocaleDateString();
+            const addrCell = u.address
+              ? `<a href="${u.basescan_url}" target="_blank" rel="noopener" style="color: var(--accent-2); text-decoration: none;">${shortAddr(u.address)}</a>`
+              : `<span style="color: var(--text-muted);">—</span>`;
+            wBody.insertAdjacentHTML('beforeend', `
+              <tr>
+                <td class="label-col">${u.email ?? '(no email)'}</td>
+                <td><span class="pill">${u.tier}</span></td>
+                <td>${addrCell}</td>
+                <td class="right">${fmt(u.balance_usdc)}</td>
+                <td>${created}</td>
+                <td class="right">${u.basescan_url ? `<a href="${u.basescan_url}" target="_blank" rel="noopener" style="color: var(--text-muted); font-size: 12px;">view ↗</a>` : '—'}</td>
+              </tr>
+            `);
+          });
+        }
       }
 
       // Auto-login if admin key saved
