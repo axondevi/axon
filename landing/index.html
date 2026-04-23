@@ -320,47 +320,165 @@
       <!-- WAITLIST / CTA -->
       <section class="waitlist" id="waitlist">
         <div class="container">
-          <h2>Join the early-access list.</h2>
+          <h2>Start in 10 seconds.</h2>
           <p>
-            We're onboarding the first 100 builders personally. Tell us what
-            you're building, we'll ship credits + direct access.
+            Drop your email — you'll get an API key, a USDC deposit address,
+            and $0.50 in credits. Enough to run ~200 paid calls before you
+            decide to add more.
           </p>
-          <form class="waitlist-form" id="waitlist-form" onsubmit="return submitWaitlist(event)">
-            <label for="waitlist-email" class="sr-only">Email address</label>
+          <form class="waitlist-form" id="signup-form" onsubmit="return submitSignup(event)">
+            <label for="signup-email" class="sr-only">Email address</label>
             <input
               type="email"
-              id="waitlist-email"
+              id="signup-email"
               name="email"
               placeholder="you@startup.dev"
               aria-label="Email address"
               required
             />
-            <button type="submit" class="btn btn-primary">
-              Request access
+            <button type="submit" class="btn btn-primary" id="signup-btn">
+              Get my API key
             </button>
           </form>
-          <small>
-            We read every one. Or email directly:
-            <a href="mailto:shopkaolin.com@gmail.com?subject=Axon%20early%20access">
-              shopkaolin.com@gmail.com
-            </a>
+          <small id="signup-status" style="display: block; margin-top: 12px; min-height: 22px;">
+            No cards. No subscription. MIT-licensed, open source.
           </small>
-          <script>
-            function submitWaitlist(event) {
-              event.preventDefault();
-              const email = document.getElementById('waitlist-email').value;
-              const subject = 'Axon early access request';
-              const body = 'Email: ' + email + '\n\n' +
-                'What I\'m building:\n\n' +
-                'Which APIs I\'d most want:\n\n';
-              window.location.href = 'mailto:shopkaolin.com@gmail.com?subject=' +
-                encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-              return false;
-            }
-          </script>
         </div>
       </section>
+
+      <!-- SUCCESS MODAL — shown after signup -->
+      <div
+        id="success-modal"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); z-index: 1000; overflow-y: auto; padding: 40px 20px;"
+      >
+        <div
+          style="max-width: 640px; margin: 40px auto; background: #16161a; border: 1px solid #25252b; border-radius: 16px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);"
+        >
+          <h2 style="margin: 0 0 8px; font-size: 28px;">
+            You're in. <span style="color: #4ade80;">🎉</span>
+          </h2>
+          <p style="color: #9a9aa4; margin: 0 0 32px;">
+            Save these three things now. The API key will not be shown again.
+          </p>
+
+          <div style="margin-bottom: 24px;">
+            <div style="font-size: 11px; color: #6a6a76; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">
+              🔑 Your API key
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input
+                id="m-api-key"
+                readonly
+                style="flex: 1; padding: 12px; background: #0a0a0b; border: 1px solid #25252b; border-radius: 8px; color: #eeeef0; font-family: 'JetBrains Mono', monospace; font-size: 12px;"
+              />
+              <button onclick="copyField('m-api-key', this)" class="btn btn-ghost" style="flex-shrink: 0;">Copy</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 24px;">
+            <div style="font-size: 11px; color: #6a6a76; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">
+              💰 Deposit USDC here (Base L2)
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input
+                id="m-addr"
+                readonly
+                style="flex: 1; padding: 12px; background: #0a0a0b; border: 1px solid #25252b; border-radius: 8px; color: #eeeef0; font-family: 'JetBrains Mono', monospace; font-size: 12px;"
+              />
+              <button onclick="copyField('m-addr', this)" class="btn btn-ghost" style="flex-shrink: 0;">Copy</button>
+            </div>
+            <div style="font-size: 12px; color: #6a6a76; margin-top: 6px;">
+              Send USDC on Base L2 only. Other networks won't credit.
+            </div>
+          </div>
+
+          <div style="margin-bottom: 32px;">
+            <div style="font-size: 11px; color: #6a6a76; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">
+              🧪 Try your first paid call (copy-paste)
+            </div>
+            <pre style="margin: 0; padding: 12px; background: #0a0a0b; border: 1px solid #25252b; border-radius: 8px; color: #19d5c6; font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-x: auto;"><code id="m-curl"></code></pre>
+          </div>
+
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a id="m-dashboard" href="/dashboard" class="btn btn-primary">Open dashboard</a>
+            <a href="https://github.com/axondevi/axon#readme" target="_blank" class="btn btn-ghost">Read the docs</a>
+            <button onclick="closeModal()" class="btn btn-ghost" style="margin-left: auto;">I saved everything</button>
+          </div>
+        </div>
+      </div>
     </main>
+
+    <script>
+      const SIGNUP_URL = 'https://axon-kedb.onrender.com/v1/signup';
+
+      async function submitSignup(event) {
+        event.preventDefault();
+        const btn = document.getElementById('signup-btn');
+        const status = document.getElementById('signup-status');
+        const email = document.getElementById('signup-email').value.trim();
+
+        btn.disabled = true;
+        btn.textContent = 'Creating your wallet…';
+        status.style.color = '#9a9aa4';
+        status.textContent = 'Provisioning a Base L2 wallet via Turnkey…';
+
+        try {
+          const res = await fetch(SIGNUP_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json();
+
+          if (!res.ok) {
+            status.style.color = '#ff5f57';
+            status.textContent = data.message || 'Signup failed. Try again.';
+            btn.disabled = false;
+            btn.textContent = 'Get my API key';
+            return false;
+          }
+
+          // Success — populate modal and show
+          document.getElementById('m-api-key').value = data.api_key;
+          document.getElementById('m-addr').value = data.deposit_address;
+          document.getElementById('m-curl').textContent = data.next_steps.try_a_call;
+          document.getElementById('success-modal').style.display = 'block';
+          document.body.style.overflow = 'hidden';
+
+          // Also cache the API key in localStorage for /dashboard convenience
+          try {
+            localStorage.setItem('axon.apiKey', data.api_key);
+            localStorage.setItem('axon.baseUrl', 'https://axon-kedb.onrender.com');
+          } catch (_) {}
+
+          btn.textContent = 'Done';
+          status.style.color = '#4ade80';
+          status.textContent = '✓ Wallet created. See the box above.';
+        } catch (err) {
+          status.style.color = '#ff5f57';
+          status.textContent = 'Network error. Please try again.';
+          btn.disabled = false;
+          btn.textContent = 'Get my API key';
+        }
+        return false;
+      }
+
+      function copyField(id, btn) {
+        const el = document.getElementById(id);
+        el.select();
+        navigator.clipboard.writeText(el.value).then(() => {
+          const orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        });
+      }
+
+      function closeModal() {
+        if (!confirm('Did you save your API key? It will not be shown again.')) return;
+        document.getElementById('success-modal').style.display = 'none';
+        document.body.style.overflow = '';
+      }
+    </script>
 
     <footer>
       <div class="container footer-inner">
