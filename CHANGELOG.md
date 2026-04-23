@@ -69,5 +69,5 @@ Initial release. Production-ready foundation.
 - **Grafana dashboard** + alerting rules
 - **OSS hygiene**: LICENSE (MIT), CONTRIBUTING, SECURITY, CoC, issue/PR templates, Dependabot
 
-[Unreleased]: https://github.com/shopkaolincom-commits/axon/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/shopkaolincom-commits/axon/releases/tag/v0.1.0
+[Unreleased]: https://github.com/axondevi/axon/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/axondevi/axon/releases/tag/v0.1.0
