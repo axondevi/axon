@@ -40,6 +40,17 @@ app.use(
     origin: (origin) => (allowedOrigins.includes(origin) ? origin : null),
     allowHeaders: ['x-api-key', 'x-admin-key', 'content-type', 'authorization'],
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposeHeaders: [
+      'x-axon-cost-usdc',
+      'x-axon-cache',
+      'x-axon-latency-ms',
+      'x-axon-fallback',
+      'x-request-id',
+      'retry-after',
+      'x-ratelimit-limit',
+      'x-ratelimit-remaining',
+      'x-ratelimit-reset',
+    ],
     maxAge: 600,
   }),
 );
