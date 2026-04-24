@@ -1,0 +1,40 @@
+{
+  "$ref": "#/definitions/glossary",
+  "definitions": {
+    "glossary": {
+      "type": "object",
+      "properties": {
+        "term": {
+          "type": "string"
+        },
+        "shortDefinition": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "pt-BR",
+            "en"
+          ],
+          "default": "pt-BR"
+        },
+        "relatedTerms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "term",
+        "shortDefinition"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

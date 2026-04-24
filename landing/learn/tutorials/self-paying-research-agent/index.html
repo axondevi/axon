@@ -1,0 +1,171 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>Build a Self-Paying Research Agent in 20 Lines — Axon Academy</title><meta name="description" content="Ship a real autonomous research agent using Axon + Vercel AI SDK. One API key, USDC wallet, 20 lines of code."><link rel="canonical" href="https://axon-5zf.pages.dev/learn/tutorials/self-paying-research-agent"><!-- Open Graph --><meta property="og:type" content="article"><meta property="og:title" content="Build a Self-Paying Research Agent in 20 Lines — Axon Academy"><meta property="og:description" content="Ship a real autonomous research agent using Axon + Vercel AI SDK. One API key, USDC wallet, 20 lines of code."><meta property="og:url" content="https://axon-5zf.pages.dev/learn/tutorials/self-paying-research-agent"><meta property="og:image" content="https://axon-5zf.pages.dev/learn/og-default.svg"><meta property="og:site_name" content="Axon Academy"><!-- Twitter --><meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@axondevia"><meta name="twitter:title" content="Build a Self-Paying Research Agent in 20 Lines — Axon Academy"><meta name="twitter:description" content="Ship a real autonomous research agent using Axon + Vercel AI SDK. One API key, USDC wallet, 20 lines of code."><meta name="twitter:image" content="https://axon-5zf.pages.dev/learn/og-default.svg"><!-- Favicon --><link rel="icon" type="image/svg+xml" href="/learn/favicon.svg"><!-- Theme color --><meta name="theme-color" content="#0a0a0f"><!-- RSS --><link rel="alternate" type="application/rss+xml" title="Axon Academy" href="/learn/rss.xml"><link rel="stylesheet" href="/learn/_astro/_slug_.DbRyq9QG.css">
+<style>.article-header[data-astro-cid-e5itrpi2]{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border-soft)}.ah-breadcrumb[data-astro-cid-e5itrpi2]{font-size:13px;color:var(--text-muted);margin-bottom:1.5rem}.ah-breadcrumb[data-astro-cid-e5itrpi2] a[data-astro-cid-e5itrpi2]{color:var(--text-tertiary);text-decoration:none}.ah-breadcrumb[data-astro-cid-e5itrpi2] a[data-astro-cid-e5itrpi2]:hover{color:var(--text-primary);text-decoration:none}.ah-sep[data-astro-cid-e5itrpi2]{margin:0 .5rem;color:var(--text-muted)}.ah-cat[data-astro-cid-e5itrpi2]{color:var(--accent-2);font-weight:500}.ah-title[data-astro-cid-e5itrpi2]{margin:0 0 .75rem;line-height:1.15}.ah-subtitle[data-astro-cid-e5itrpi2]{font-size:1.15rem;color:var(--text-tertiary);margin:0 0 1.5rem;line-height:1.5;font-weight:400}.ah-meta[data-astro-cid-e5itrpi2]{display:flex;flex-wrap:wrap;gap:1.2rem;margin-bottom:1rem}.ah-meta-item[data-astro-cid-e5itrpi2]{font-size:13px;color:var(--text-tertiary);display:flex;align-items:center;gap:.4rem}.ah-meta-icon[data-astro-cid-e5itrpi2]{color:var(--accent-1)}.ah-updated[data-astro-cid-e5itrpi2]{color:var(--accent-2);font-weight:500}.ah-tags[data-astro-cid-e5itrpi2]{display:flex;gap:.4rem;flex-wrap:wrap}.ah-tag[data-astro-cid-e5itrpi2]{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);padding:.2em .6em;background:var(--bg-secondary);border-radius:var(--radius-sm)}.next-tutorial[data-astro-cid-hwhv5i5y]{margin:3rem 0 2rem}.nt-heading[data-astro-cid-hwhv5i5y]{font-size:1.3rem;margin-bottom:1.25rem}.nt-grid[data-astro-cid-hwhv5i5y]{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}.nt-card[data-astro-cid-hwhv5i5y]{display:flex;flex-direction:column;padding:1.25rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);text-decoration:none;color:inherit;transition:all .2s}.nt-card[data-astro-cid-hwhv5i5y]:hover{border-color:var(--accent-1);background:var(--bg-tertiary);transform:translateY(-2px);text-decoration:none}.nt-card-body[data-astro-cid-hwhv5i5y]{flex:1;margin-bottom:1rem}.nt-card-title[data-astro-cid-hwhv5i5y]{font-size:1rem;font-weight:600;color:var(--text-primary);margin:0 0 .4rem;line-height:1.3}.nt-card-desc[data-astro-cid-hwhv5i5y]{color:var(--text-tertiary);font-size:14px;margin:0;line-height:1.5}.nt-card-meta[data-astro-cid-hwhv5i5y]{display:flex;gap:.8rem;font-size:12px;color:var(--text-muted);align-items:center}.nt-arrow[data-astro-cid-hwhv5i5y]{margin-left:auto;color:var(--accent-1);font-size:18px;font-weight:700}.tutorial-wrap[data-astro-cid-ds6ctzq3]{max-width:var(--content-wide);margin:0 auto;padding:3rem 1.5rem}.tutorial-layout[data-astro-cid-ds6ctzq3]{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:3rem}.tutorial-article[data-astro-cid-ds6ctzq3]{max-width:720px;min-width:0}.tutorial-body[data-astro-cid-ds6ctzq3] h2,.tutorial-body[data-astro-cid-ds6ctzq3] h3{scroll-margin-top:80px}@media(max-width:1024px){.tutorial-layout[data-astro-cid-ds6ctzq3]{grid-template-columns:1fr}.tutorial-side[data-astro-cid-ds6ctzq3]{display:none}}
+.toc[data-astro-cid-xvrfupwn]{padding:1.25rem;background:var(--bg-secondary);border:1px solid var(--border-soft);border-radius:var(--radius-md);font-size:14px;position:sticky;top:80px}.toc-title[data-astro-cid-xvrfupwn]{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin:0 0 .75rem;font-weight:600}.toc-list[data-astro-cid-xvrfupwn]{list-style:none;padding:0;margin:0}.toc-item[data-astro-cid-xvrfupwn]{margin:.25rem 0;line-height:1.4}.toc-depth-3[data-astro-cid-xvrfupwn]{padding-left:1rem}.toc-item[data-astro-cid-xvrfupwn] a[data-astro-cid-xvrfupwn]{color:var(--text-tertiary);font-size:13px;text-decoration:none;display:block;padding:.25rem .5rem;border-radius:var(--radius-sm);border-left:2px solid transparent;transition:all .15s}.toc-item[data-astro-cid-xvrfupwn] a[data-astro-cid-xvrfupwn]:hover{color:var(--text-primary);background:var(--bg-tertiary);border-left-color:var(--accent-1);text-decoration:none}.try-on-axon[data-astro-cid-6q36ereh]{position:relative;margin:3rem 0;padding:2rem;border-radius:var(--radius-lg);background:linear-gradient(135deg,#7c5cff14,#5c8aff14);border:1px solid var(--border);overflow:hidden}.tax-glow[data-astro-cid-6q36ereh]{position:absolute;top:-50%;right:-30%;width:80%;height:200%;background:radial-gradient(circle,rgba(124,92,255,.15) 0%,transparent 60%);pointer-events:none}.tax-content[data-astro-cid-6q36ereh]{position:relative;display:flex;align-items:center;justify-content:space-between;gap:2rem;margin-bottom:1.5rem}.tax-text[data-astro-cid-6q36ereh]{flex:1}.tax-title[data-astro-cid-6q36ereh]{font-size:1.25rem;font-weight:700;margin:0 0 .4rem;color:var(--text-primary)}.tax-desc[data-astro-cid-6q36ereh]{color:var(--text-secondary);margin:0;font-size:15px}.tax-btn[data-astro-cid-6q36ereh]{white-space:nowrap}.tax-meta[data-astro-cid-6q36ereh]{position:relative;display:flex;flex-wrap:wrap;gap:.5rem}.tax-pill[data-astro-cid-6q36ereh]{font-size:12px;padding:.35em .8em;border-radius:100px;background:#ffffff0a;color:var(--text-tertiary);border:1px solid var(--border-soft)}@media(max-width:640px){.tax-content[data-astro-cid-6q36ereh]{flex-direction:column;align-items:flex-start}.tax-btn[data-astro-cid-6q36ereh]{width:100%;justify-content:center}}
+</style><style>.callout[data-astro-cid-mrmim4ef]{padding:1rem 1.25rem;margin:1.5rem 0;border-radius:var(--radius-md);border-left:3px solid;background:var(--bg-secondary)}.callout-header[data-astro-cid-mrmim4ef]{display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem}.callout-icon[data-astro-cid-mrmim4ef]{font-size:1rem;font-weight:700}.callout-label[data-astro-cid-mrmim4ef]{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}.callout-body[data-astro-cid-mrmim4ef] p:last-child{margin-bottom:0}.callout-body[data-astro-cid-mrmim4ef] p{color:var(--text-secondary);font-size:15px}.callout-body[data-astro-cid-mrmim4ef] code{font-size:.85em}
+</style></head> <body> <nav class="nav" data-astro-cid-dmqpwcec> <div class="nav-inner" data-astro-cid-dmqpwcec> <a href="/learn" class="nav-logo" data-astro-cid-dmqpwcec> <span class="nav-logo-mark" data-astro-cid-dmqpwcec>◆</span> <span class="nav-logo-text" data-astro-cid-dmqpwcec> <span class="nav-logo-brand gradient-text" data-astro-cid-dmqpwcec>Axon</span> <span class="nav-logo-sub" data-astro-cid-dmqpwcec>Academy</span> </span> </a> <div class="nav-links" data-astro-cid-dmqpwcec> <a href="/learn" class="nav-link" data-astro-cid-dmqpwcec>Início</a> <a href="/learn/playground" class="nav-link nav-link-accent" data-astro-cid-dmqpwcec>◆ Playground</a> <a href="/learn/tutorials" class="nav-link active" data-astro-cid-dmqpwcec>Tutoriais</a> <a href="/learn/guides" class="nav-link" data-astro-cid-dmqpwcec>Guias</a> <a href="/learn/recipes" class="nav-link" data-astro-cid-dmqpwcec>Recipes</a> <a href="/learn/glossary" class="nav-link" data-astro-cid-dmqpwcec>Glossário</a> </div> <div class="nav-cta" data-astro-cid-dmqpwcec> <a href="https://axon-5zf.pages.dev" class="nav-external" data-astro-cid-dmqpwcec>axon.dev ↗</a> <a href="https://axon-5zf.pages.dev#signup" class="btn btn-primary nav-signup" data-astro-cid-dmqpwcec>Get $0.50 free</a> </div> <button class="nav-mobile-toggle" id="nav-toggle" aria-label="Menu" data-astro-cid-dmqpwcec> <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-dmqpwcec> <line x1="3" y1="6" x2="21" y2="6" data-astro-cid-dmqpwcec></line> <line x1="3" y1="12" x2="21" y2="12" data-astro-cid-dmqpwcec></line> <line x1="3" y1="18" x2="21" y2="18" data-astro-cid-dmqpwcec></line> </svg> </button> </div> </nav>  <script type="module">const e=document.getElementById("nav-toggle"),t=document.querySelector(".nav");e?.addEventListener("click",()=>{t?.classList.toggle("mobile-open")});</script> <div class="key-banner" id="key-banner" hidden data-astro-cid-6aic2ibi> <div class="kb-inner" data-astro-cid-6aic2ibi> <div class="kb-status" data-astro-cid-6aic2ibi> <span class="kb-dot" data-astro-cid-6aic2ibi></span> <span class="kb-text" data-astro-cid-6aic2ibi> <span class="kb-label" data-astro-cid-6aic2ibi>Conectado ao Axon como</span> <code class="kb-key" data-astro-cid-6aic2ibi></code> </span> </div> <div class="kb-balance" data-astro-cid-6aic2ibi> <span class="kb-bal-label" data-astro-cid-6aic2ibi>Saldo:</span> <span class="kb-bal-value" data-astro-cid-6aic2ibi>—</span> <a href="https://axon-5zf.pages.dev/dashboard" class="kb-dashboard" target="_blank" data-astro-cid-6aic2ibi>
+Dashboard ↗
+</a> <button class="kb-logout" type="button" aria-label="Sair" data-astro-cid-6aic2ibi>✕</button> </div> </div> </div> <script src="/learn/axon-client.js"></script> <script>
+  (function () {
+    const banner = document.getElementById('key-banner');
+    if (!banner) return;
+
+    const client = new window.AxonClient();
+    const keyEl = banner.querySelector('.kb-key');
+    const balEl = banner.querySelector('.kb-bal-value');
+    const logoutBtn = banner.querySelector('.kb-logout');
+
+    // Local balance state — decremented on each call-success, refreshed from API
+    // only on key change, page load, or once per minute max (backup).
+    let currentBalance = null;
+    let lastFetch = 0;
+
+    function render() {
+      const key = client.getKey();
+      if (!key) {
+        banner.hidden = true;
+        return;
+      }
+      banner.hidden = false;
+      keyEl.textContent = key.slice(0, 14) + '…';
+      refreshBalance(true);
+    }
+
+    function setBalance(value) {
+      currentBalance = value;
+      balEl.textContent = `$${value.toFixed(4)}`;
+      balEl.classList.toggle('low', value < 0.01);
+    }
+
+    async function refreshBalance(force = false) {
+      // Throttle: max 1 fetch per 60s unless forced
+      const now = Date.now();
+      if (!force && now - lastFetch < 60000) return;
+      lastFetch = now;
+      try {
+        const { balanceUsdc } = await client.getBalance();
+        setBalance(balanceUsdc);
+      } catch (e) {
+        if (currentBalance === null) balEl.textContent = '—';
+      }
+    }
+
+    function onCall(e) {
+      const detail = e.detail || {};
+      const cost = parseFloat(detail.cost) || 0;
+      if (currentBalance !== null && cost > 0) {
+        setBalance(Math.max(0, currentBalance - cost));
+      }
+    }
+
+    logoutBtn?.addEventListener('click', () => {
+      if (confirm('Sair do Axon? Sua API key será removida deste browser.')) {
+        client.clearKey();
+      }
+    });
+
+    window.addEventListener('axon:key-change', render);
+    window.addEventListener('axon:call-success', onCall);
+    render();
+    // Periodic reconciliation every 2 min (way under rate limit)
+    setInterval(() => refreshBalance(), 120000);
+  })();
+</script>  <main>  <div class="tutorial-wrap" data-astro-cid-ds6ctzq3> <div class="tutorial-layout" data-astro-cid-ds6ctzq3> <article class="tutorial-article" data-astro-cid-ds6ctzq3> <header class="article-header" data-astro-cid-e5itrpi2> <div class="ah-breadcrumb" data-astro-cid-e5itrpi2> <a href="/learn" data-astro-cid-e5itrpi2>Academy</a> <span class="ah-sep" data-astro-cid-e5itrpi2>/</span> <a href="/learn/tutorials" data-astro-cid-e5itrpi2>Tutorials</a> <span class="ah-sep" data-astro-cid-e5itrpi2>/</span> <span class="ah-cat" data-astro-cid-e5itrpi2>Agents</span> </div> <h1 class="ah-title" data-astro-cid-e5itrpi2>Build a Self-Paying Research Agent in 20 Lines</h1> <p class="ah-subtitle" data-astro-cid-e5itrpi2>A working agent that searches, scrapes, and synthesizes — paying its own USDC per call. No SerpAPI signup. No Firecrawl subscription.</p> <div class="ah-meta" data-astro-cid-e5itrpi2> <span class="ah-meta-item" data-astro-cid-e5itrpi2> <span class="ah-meta-icon" data-astro-cid-e5itrpi2>⏱</span> 15 min read </span> <span class="ah-meta-item" data-astro-cid-e5itrpi2> <span class="ah-meta-icon" data-astro-cid-e5itrpi2>◆</span> Intermediate </span> <span class="ah-meta-item" data-astro-cid-e5itrpi2> <span class="ah-meta-icon" data-astro-cid-e5itrpi2>✎</span> Axon Team </span> <span class="ah-meta-item" data-astro-cid-e5itrpi2> <span class="ah-meta-icon" data-astro-cid-e5itrpi2>📅</span> Apr 22, 2026 </span> <span class="ah-meta-item ah-updated" data-astro-cid-e5itrpi2> Updated Apr 23, 2026 </span> </div> <div class="ah-tags" data-astro-cid-e5itrpi2> <span class="ah-tag" data-astro-cid-e5itrpi2>#tutorial</span><span class="ah-tag" data-astro-cid-e5itrpi2>#ai-agents</span><span class="ah-tag" data-astro-cid-e5itrpi2>#vercel-ai-sdk</span><span class="ah-tag" data-astro-cid-e5itrpi2>#x402</span><span class="ah-tag" data-astro-cid-e5itrpi2>#self-paying</span> </div> </header>  <div class="tutorial-body" data-astro-cid-ds6ctzq3>  <p>By the end of this tutorial you’ll have a research agent that:</p>
+<ul>
+<li>Searches the web via SerpAPI</li>
+<li>Scrapes top results via Firecrawl</li>
+<li>Synthesizes a cited answer via GPT-4o-mini</li>
+<li>Pays for every single call out of its own USDC wallet on Base</li>
+<li>Costs you ~<strong>$0.04 per question</strong></li>
+</ul>
+<p>No SerpAPI account. No Firecrawl subscription. No manual API key juggling.</p>
+<div class="callout" style="border-left-color: var(--accent-1)" data-astro-cid-mrmim4ef> <div class="callout-header" data-astro-cid-mrmim4ef> <span class="callout-icon" style="color: var(--accent-1)" data-astro-cid-mrmim4ef>◆</span> <span class="callout-label" style="color: var(--accent-1)" data-astro-cid-mrmim4ef>PORQUÊ</span> </div> <div class="callout-body" data-astro-cid-mrmim4ef> <p>This tutorial showcases the <strong>self-paying agent</strong> pattern that Axon was built for. Each tool call is atomically debited in USDC from the agent’s own wallet. The agent literally cannot spend more than you deposited.</p> </div> </div> 
+<h2 id="prerequisites">Prerequisites</h2>
+<pre class="astro-code github-dark-dimmed" style="background-color:#22272e;color:#adbac7;overflow-x:auto" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#F69D50">bun</span><span style="color:#96D0FF"> add</span><span style="color:#96D0FF"> @axon/client</span><span style="color:#96D0FF"> @axon/vercel-ai</span><span style="color:#96D0FF"> @ai-sdk/openai</span><span style="color:#96D0FF"> ai</span><span style="color:#96D0FF"> zod</span></span></code></pre>
+<p>You need two environment variables:</p>
+<ul>
+<li><code>AXON_KEY</code> — <a href="https://axon-5zf.pages.dev">sign up for free $0.50 credit</a> to get one</li>
+<li><code>OPENAI_API_KEY</code> — for the LLM driving the agent</li>
+</ul>
+<h2 id="the-whole-agent">The whole agent</h2>
+<pre class="astro-code github-dark-dimmed" style="background-color:#22272e;color:#adbac7;overflow-x:auto" tabindex="0" data-language="ts"><code><span class="line"><span style="color:#F47067">import</span><span style="color:#ADBAC7"> { Axon } </span><span style="color:#F47067">from</span><span style="color:#96D0FF"> &#39;@axon/client&#39;</span><span style="color:#ADBAC7">;</span></span>
+<span class="line"><span style="color:#F47067">import</span><span style="color:#ADBAC7"> { axonTool } </span><span style="color:#F47067">from</span><span style="color:#96D0FF"> &#39;@axon/vercel-ai&#39;</span><span style="color:#ADBAC7">;</span></span>
+<span class="line"><span style="color:#F47067">import</span><span style="color:#ADBAC7"> { generateText } </span><span style="color:#F47067">from</span><span style="color:#96D0FF"> &#39;ai&#39;</span><span style="color:#ADBAC7">;</span></span>
+<span class="line"><span style="color:#F47067">import</span><span style="color:#ADBAC7"> { openai } </span><span style="color:#F47067">from</span><span style="color:#96D0FF"> &#39;@ai-sdk/openai&#39;</span><span style="color:#ADBAC7">;</span></span>
+<span class="line"><span style="color:#F47067">import</span><span style="color:#ADBAC7"> { z } </span><span style="color:#F47067">from</span><span style="color:#96D0FF"> &#39;zod&#39;</span><span style="color:#ADBAC7">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F47067">const</span><span style="color:#6CB6FF"> axon</span><span style="color:#F47067"> =</span><span style="color:#F47067"> new</span><span style="color:#DCBDFB"> Axon</span><span style="color:#ADBAC7">({ apiKey: process.env.</span><span style="color:#6CB6FF">AXON_KEY</span><span style="color:#F47067">!</span><span style="color:#ADBAC7"> });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F47067">const</span><span style="color:#6CB6FF"> search</span><span style="color:#F47067"> =</span><span style="color:#DCBDFB"> axonTool</span><span style="color:#ADBAC7">(axon, </span><span style="color:#96D0FF">&#39;serpapi&#39;</span><span style="color:#ADBAC7">, </span><span style="color:#96D0FF">&#39;search&#39;</span><span style="color:#ADBAC7">, {</span></span>
+<span class="line"><span style="color:#ADBAC7">  description: </span><span style="color:#96D0FF">&#39;Search the web.&#39;</span><span style="color:#ADBAC7">,</span></span>
+<span class="line"><span style="color:#ADBAC7">  parameters: z.</span><span style="color:#DCBDFB">object</span><span style="color:#ADBAC7">({ q: z.</span><span style="color:#DCBDFB">string</span><span style="color:#ADBAC7">() }),</span></span>
+<span class="line"><span style="color:#ADBAC7">  via: </span><span style="color:#96D0FF">&#39;params&#39;</span><span style="color:#ADBAC7">,</span></span>
+<span class="line"><span style="color:#ADBAC7">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F47067">const</span><span style="color:#6CB6FF"> scrape</span><span style="color:#F47067"> =</span><span style="color:#DCBDFB"> axonTool</span><span style="color:#ADBAC7">(axon, </span><span style="color:#96D0FF">&#39;firecrawl&#39;</span><span style="color:#ADBAC7">, </span><span style="color:#96D0FF">&#39;scrape&#39;</span><span style="color:#ADBAC7">, {</span></span>
+<span class="line"><span style="color:#ADBAC7">  description: </span><span style="color:#96D0FF">&#39;Scrape a URL, return markdown.&#39;</span><span style="color:#ADBAC7">,</span></span>
+<span class="line"><span style="color:#ADBAC7">  parameters: z.</span><span style="color:#DCBDFB">object</span><span style="color:#ADBAC7">({ url: z.</span><span style="color:#DCBDFB">string</span><span style="color:#ADBAC7">().</span><span style="color:#DCBDFB">url</span><span style="color:#ADBAC7">() }),</span></span>
+<span class="line"><span style="color:#ADBAC7">  via: </span><span style="color:#96D0FF">&#39;body&#39;</span><span style="color:#ADBAC7">,</span></span>
+<span class="line"><span style="color:#ADBAC7">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F47067">const</span><span style="color:#ADBAC7"> { </span><span style="color:#6CB6FF">text</span><span style="color:#ADBAC7"> } </span><span style="color:#F47067">=</span><span style="color:#F47067"> await</span><span style="color:#DCBDFB"> generateText</span><span style="color:#ADBAC7">({</span></span>
+<span class="line"><span style="color:#ADBAC7">  model: </span><span style="color:#DCBDFB">openai</span><span style="color:#ADBAC7">(</span><span style="color:#96D0FF">&#39;gpt-4o-mini&#39;</span><span style="color:#ADBAC7">),</span></span>
+<span class="line"><span style="color:#ADBAC7">  tools: { search, scrape },</span></span>
+<span class="line"><span style="color:#ADBAC7">  maxSteps: </span><span style="color:#6CB6FF">8</span><span style="color:#ADBAC7">,</span></span>
+<span class="line"><span style="color:#ADBAC7">  system: </span><span style="color:#96D0FF">&#39;Search, scrape 2-3 top links, synthesize with source URLs.&#39;</span><span style="color:#ADBAC7">,</span></span>
+<span class="line"><span style="color:#ADBAC7">  prompt: process.argv.</span><span style="color:#DCBDFB">slice</span><span style="color:#ADBAC7">(</span><span style="color:#6CB6FF">2</span><span style="color:#ADBAC7">).</span><span style="color:#DCBDFB">join</span><span style="color:#ADBAC7">(</span><span style="color:#96D0FF">&#39; &#39;</span><span style="color:#ADBAC7">),</span></span>
+<span class="line"><span style="color:#ADBAC7">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#ADBAC7">console.</span><span style="color:#DCBDFB">log</span><span style="color:#ADBAC7">(text);</span></span></code></pre>
+<p>That’s the entire agent. Three moving parts.</p>
+<h2 id="what-just-happened">What just happened</h2>
+<p><strong>1. Axon wraps paid APIs.</strong> <code>axonTool(axon, &#39;serpapi&#39;, &#39;search&#39;, ...)</code> creates a Vercel AI SDK tool that, when called, hits Axon → SerpAPI → back. You never see a SerpAPI key. The cost is debited from your Axon wallet in USDC.</p>
+<p><strong>2. The LLM picks which tool to call and when.</strong> <code>generateText</code> with <code>tools:</code> and <code>maxSteps: 8</code> lets the LLM decide: call <code>search</code>, look at results, call <code>scrape</code> on the most promising, summarize. This is the ReAct pattern you already know from LangChain — but with no local agent loop code.</p>
+<p><strong>3. The wallet makes it autonomous.</strong> Every call debits USDC atomically. If the agent tries to spend more than you deposited, Axon returns <code>402 insufficient_funds</code> and the agent stops. You set a budget, the agent works within it.</p>
+<div class="callout" style="border-left-color: var(--success)" data-astro-cid-mrmim4ef> <div class="callout-header" data-astro-cid-mrmim4ef> <span class="callout-icon" style="color: var(--success)" data-astro-cid-mrmim4ef>✦</span> <span class="callout-label" style="color: var(--success)" data-astro-cid-mrmim4ef>DICA</span> </div> <div class="callout-body" data-astro-cid-mrmim4ef> <p>For tighter budget control, use Axon’s policy engine: <code>max_request_cost_micro</code>, <code>daily_budget_micro</code>, per-API caps. Your agent can rampage within limits you set.</p> </div> </div> 
+<h2 id="running-it">Running it</h2>
+<pre class="astro-code github-dark-dimmed" style="background-color:#22272e;color:#adbac7;overflow-x:auto" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#ADBAC7">AXON_KEY</span><span style="color:#F47067">=</span><span style="color:#96D0FF">ax_live_...</span><span style="color:#ADBAC7"> OPENAI_API_KEY</span><span style="color:#F47067">=</span><span style="color:#96D0FF">sk-...</span><span style="color:#F69D50"> \</span></span>
+<span class="line"><span style="color:#96D0FF">  bun</span><span style="color:#96D0FF"> agent.ts</span><span style="color:#96D0FF"> &quot;what are the top espresso bars in lisbon?&quot;</span></span></code></pre>
+<p>Expected output:</p>
+<pre class="astro-code github-dark-dimmed" style="background-color:#22272e;color:#adbac7;overflow-x:auto" tabindex="0" data-language="plaintext"><code><span class="line"><span>1. Copenhagen Coffee Lab — reliably excellent beans, …</span></span>
+<span class="line"><span>2. Hello, Kristof — minimalist space, high-end extraction, …</span></span>
+<span class="line"><span>3. Fábrica Coffee Roasters — single-origin specialists, …</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Sources:</span></span>
+<span class="line"><span>- https://timeout.com/lisbon/coffee-spots</span></span>
+<span class="line"><span>- https://eater.com/2025/lisbon-coffee-guide</span></span>
+<span class="line"><span>- …</span></span></code></pre>
+<h2 id="what-you-actually-paid">What you actually paid</h2>
+<p>Axon returns <code>x-axon-cost-usdc</code> on every call. Typical run:</p>
+<ul>
+<li>1× search  = $0.0055</li>
+<li>3× scrape  = $0.0165</li>
+<li>4× LLM     = $0.0080 (gpt-4o-mini is cheap)</li>
+<li><strong>Total: ~$0.03</strong></li>
+</ul>
+<p>Run the same question an hour later → SerpAPI result comes from cache at 50% off, most scrapes from cache too. Second run: <strong>~$0.015</strong>.</p>
+<p>Compare:</p>
+<ul>
+<li>SerpAPI minimum plan: $50/mo</li>
+<li>Firecrawl minimum plan: $16/mo</li>
+<li>Combined monthly minimum: <strong>$66/mo</strong></li>
+</ul>
+<p>To break even on the subscription model you’d need to run ~2,200 of these agents per month. Most indie hackers don’t.</p>
+<h2 id="safety-rails">Safety rails</h2>
+<p>Two things stop the agent from burning your wallet by default, one upgrade for paranoid builders:</p>
+<ol>
+<li><strong>Your wallet balance is the hard ceiling.</strong> An agent with a $5 wallet cannot spend $6. Full stop.</li>
+<li><strong>Every response returns <code>x-axon-cost-usdc</code>.</strong> You can log it, alert on it, write circuit breakers.</li>
+<li><strong>(Pro tier)</strong> Policy engine: <code>max_request_cost_micro</code>, <code>daily_budget_micro</code>, per-API caps.</li>
+</ol>
+<h2 id="going-further">Going further</h2>
+<ul>
+<li>Swap <code>gpt-4o-mini</code> for <code>claude-sonnet-4-6</code> via <code>@ai-sdk/anthropic</code> — Axon bills both through the same wallet</li>
+<li>Add <code>axon.call(&#39;voyage&#39;, &#39;embeddings&#39;, ...)</code> to build a RAG layer on top</li>
+<li>Cache the whole agent loop: same question in 5 minutes = 80% cache hit = ~$0.005</li>
+</ul>
+<h2 id="the-full-template">The full template</h2>
+<p>Cloneable repo at <a href="https://github.com/axondevi/axon/tree/main/templates/research-agent-ts"><code>axondevi/axon</code> → <code>templates/research-agent-ts</code></a>. Runs out of the box.</p>
+<p>If you build something on this, we’d love to see it — DM <a href="https://twitter.com/axondevia">@axondevia</a>.</p>  </div> <div class="try-on-axon" data-astro-cid-6q36ereh> <div class="tax-glow" data-astro-cid-6q36ereh></div> <div class="tax-content" data-astro-cid-6q36ereh> <div class="tax-text" data-astro-cid-6q36ereh> <h3 class="tax-title" data-astro-cid-6q36ereh>Rode isso agora no Axon</h3> <p class="tax-desc" data-astro-cid-6q36ereh>Signup em 10 segundos, $0.50 de crédito grátis. Sem cartão.</p> </div> <a href="https://axon-5zf.pages.dev#signup" class="btn btn-primary tax-btn" data-astro-cid-6q36ereh>Get $0.50 free →</a> </div> <div class="tax-meta" data-astro-cid-6q36ereh> <span class="tax-pill" data-astro-cid-6q36ereh>◆ 28 APIs</span> <span class="tax-pill" data-astro-cid-6q36ereh>⚡ USDC / Base L2</span> <span class="tax-pill" data-astro-cid-6q36ereh>🇧🇷 Dados BR</span> <span class="tax-pill" data-astro-cid-6q36ereh>🔓 MIT License</span> </div> </div>  <section class="next-tutorial" data-astro-cid-hwhv5i5y><h2 class="nt-heading" data-astro-cid-hwhv5i5y>Próximos passos</h2><div class="nt-grid" data-astro-cid-hwhv5i5y><a href="/learn/tutorials/primeiro-agente-apis-brasileiras" class="nt-card" data-astro-cid-hwhv5i5y><div class="nt-card-body" data-astro-cid-hwhv5i5y><h3 class="nt-card-title" data-astro-cid-hwhv5i5y>Criando seu Primeiro Agente de IA com APIs Brasileiras</h3><p class="nt-card-desc" data-astro-cid-hwhv5i5y>Construa um agente IA em Python que usa dados brasileiros reais (CNPJ, CEP, FIPE) através do Axon. Sem gerenciar múltiplas API keys.</p></div><div class="nt-card-meta" data-astro-cid-hwhv5i5y><span data-astro-cid-hwhv5i5y>⏱ 30 min</span><span data-astro-cid-hwhv5i5y>◆ iniciante</span><span class="nt-arrow" data-astro-cid-hwhv5i5y>→</span></div></a></div></section> </article> <aside class="tutorial-side" data-astro-cid-ds6ctzq3> <aside class="toc" data-astro-cid-xvrfupwn><h2 class="toc-title" data-astro-cid-xvrfupwn>Nesta página</h2><ul class="toc-list" data-astro-cid-xvrfupwn><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#prerequisites" data-astro-cid-xvrfupwn>Prerequisites</a></li><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#the-whole-agent" data-astro-cid-xvrfupwn>The whole agent</a></li><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#what-just-happened" data-astro-cid-xvrfupwn>What just happened</a></li><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#running-it" data-astro-cid-xvrfupwn>Running it</a></li><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#what-you-actually-paid" data-astro-cid-xvrfupwn>What you actually paid</a></li><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#safety-rails" data-astro-cid-xvrfupwn>Safety rails</a></li><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#going-further" data-astro-cid-xvrfupwn>Going further</a></li><li class="toc-item toc-depth-2" data-astro-cid-xvrfupwn><a href="#the-full-template" data-astro-cid-xvrfupwn>The full template</a></li></ul></aside> </aside> </div> </div>  </main> <footer class="footer" data-astro-cid-sz7xmlte> <div class="footer-inner" data-astro-cid-sz7xmlte> <div class="footer-brand" data-astro-cid-sz7xmlte> <div class="footer-logo" data-astro-cid-sz7xmlte> <span class="gradient-text" data-astro-cid-sz7xmlte>Axon</span> Academy
+</div> <p class="footer-tagline" data-astro-cid-sz7xmlte>
+Tutoriais práticos pra quem constrói agentes de IA de verdade.
+</p> </div> <div class="footer-cols" data-astro-cid-sz7xmlte> <div class="footer-col" data-astro-cid-sz7xmlte> <h4 data-astro-cid-sz7xmlte>Aprender</h4> <ul data-astro-cid-sz7xmlte> <li data-astro-cid-sz7xmlte><a href="/learn/tutorials" data-astro-cid-sz7xmlte>Tutoriais</a></li> <li data-astro-cid-sz7xmlte><a href="/learn/guides" data-astro-cid-sz7xmlte>Guias conceituais</a></li> <li data-astro-cid-sz7xmlte><a href="/learn/recipes" data-astro-cid-sz7xmlte>Recipes</a></li> <li data-astro-cid-sz7xmlte><a href="/learn/glossary" data-astro-cid-sz7xmlte>Glossário</a></li> </ul> </div> <div class="footer-col" data-astro-cid-sz7xmlte> <h4 data-astro-cid-sz7xmlte>Produto</h4> <ul data-astro-cid-sz7xmlte> <li data-astro-cid-sz7xmlte><a href="https://axon-5zf.pages.dev" data-astro-cid-sz7xmlte>Axon.dev</a></li> <li data-astro-cid-sz7xmlte><a href="https://axon-5zf.pages.dev/dashboard" data-astro-cid-sz7xmlte>Dashboard</a></li> <li data-astro-cid-sz7xmlte><a href="https://axon-5zf.pages.dev/stats" data-astro-cid-sz7xmlte>Stats públicas</a></li> <li data-astro-cid-sz7xmlte><a href="https://axon-5zf.pages.dev/status" data-astro-cid-sz7xmlte>Status</a></li> </ul> </div> <div class="footer-col" data-astro-cid-sz7xmlte> <h4 data-astro-cid-sz7xmlte>Comunidade</h4> <ul data-astro-cid-sz7xmlte> <li data-astro-cid-sz7xmlte><a href="https://twitter.com/axondevia" data-astro-cid-sz7xmlte>Twitter</a></li> <li data-astro-cid-sz7xmlte><a href="https://github.com/axondevi/axon" data-astro-cid-sz7xmlte>GitHub</a></li> <li data-astro-cid-sz7xmlte><a href="/learn/submit" data-astro-cid-sz7xmlte>Submit a tutorial</a></li> <li data-astro-cid-sz7xmlte><a href="mailto:hello@axon.dev" data-astro-cid-sz7xmlte>Contato</a></li> </ul> </div> </div> </div> <div class="footer-bottom" data-astro-cid-sz7xmlte> <span data-astro-cid-sz7xmlte>© 2026 Axon. MIT License.</span> <span data-astro-cid-sz7xmlte>Feito com <span style="color: var(--accent-1)" data-astro-cid-sz7xmlte>◆</span> em BR · Global</span> </div> </footer>  </body></html> 

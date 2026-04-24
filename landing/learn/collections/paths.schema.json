@@ -1,0 +1,61 @@
+{
+  "$ref": "#/definitions/paths",
+  "definitions": {
+    "paths": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "pt-BR",
+            "en"
+          ],
+          "default": "pt-BR"
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": [
+            "iniciante",
+            "intermediario",
+            "avancado"
+          ]
+        },
+        "tutorials": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "estimatedHours": {
+          "type": "number"
+        },
+        "icon": {
+          "type": "string",
+          "default": "book"
+        },
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "difficulty",
+        "tutorials",
+        "estimatedHours"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

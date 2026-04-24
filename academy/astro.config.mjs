@@ -6,6 +6,7 @@ export default defineConfig({
   site: 'https://axon-5zf.pages.dev',
   base: '/learn',
   trailingSlash: 'never',
+  outDir: '../landing/learn',
   integrations: [
     mdx(),
     sitemap(),
@@ -18,5 +19,11 @@ export default defineConfig({
   },
   build: {
     format: 'directory',
+    assets: '_astro',
+  },
+  vite: {
+    build: {
+      emptyOutDir: true,
+    },
   },
 });

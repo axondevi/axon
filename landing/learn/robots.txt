@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://axon-5zf.pages.dev/learn/sitemap-index.xml
