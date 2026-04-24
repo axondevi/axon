@@ -1,0 +1,85 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const terms = await getCollection('glossary');
+  return terms.map(term => ({
+    params: { slug: term.id.replace(/\.(md|mdx)$/, '') },
+    props: { term },
+  }));
+}
+
+const { term } = Astro.props;
+const { Content } = await render(term);
+---
+
+<BaseLayout title={`${term.data.term} — Glossário`} description={term.data.shortDefinition} lang={term.data.lang}>
+  <div class="container">
+    <div class="back">
+      <a href="/learn/glossary">← Todos os termos</a>
+    </div>
+
+    <div class="def-card">
+      <div class="def-tag">Termo</div>
+      <h1>{term.data.term}</h1>
+      <p class="def-short">{term.data.shortDefinition}</p>
+    </div>
+
+    <article class="content">
+      <Content />
+    </article>
+  </div>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  .back {
+    margin-bottom: 2rem;
+  }
+
+  .back a {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    text-decoration: none;
+  }
+
+  .back a:hover { color: var(--text-primary); text-decoration: none; }
+
+  .def-card {
+    padding: 2rem;
+    background: linear-gradient(135deg, rgba(124, 92, 255, 0.08), rgba(92, 138, 255, 0.05));
+    border: 1px solid var(--accent-1);
+    border-radius: var(--radius-lg);
+    margin-bottom: 3rem;
+  }
+
+  .def-tag {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-1);
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .def-card h1 {
+    font-family: var(--font-mono);
+    margin: 0 0 1rem 0;
+    font-size: 2rem;
+  }
+
+  .def-short {
+    color: var(--text-secondary);
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.6;
+  }
+
+  .content :global(h1) { display: none; }
+</style>

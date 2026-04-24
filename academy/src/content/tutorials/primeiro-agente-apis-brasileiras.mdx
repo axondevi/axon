@@ -1,0 +1,399 @@
+---
+title: Criando seu Primeiro Agente de IA com APIs Brasileiras
+subtitle: Um agente funcional em Python que consulta CNPJ, CEP e FIPE — com LLM interpretando os dados. 30 minutos, 40 linhas, pronto pra produção.
+description: Construa um agente IA em Python que usa dados brasileiros reais (CNPJ, CEP, FIPE) através do Axon. Sem gerenciar múltiplas API keys.
+category: brazil
+difficulty: iniciante
+lang: pt-BR
+timeMinutes: 30
+author: Axon Team
+publishedAt: 2026-04-24
+tags: [python, brasilapi, cnpj, cep, fipe, agentes, openai, langchain]
+featured: true
+relatedTutorials:
+  - self-paying-research-agent
+---
+
+import Callout from '../../components/Callout.astro';
+import TryCall from '../../components/TryCall.astro';
+
+<Callout type="dica" title="QUER SÓ TESTAR ANTES?">
+Se quer ver o Axon funcionando <strong>agora mesmo no browser</strong>, sem instalar Python,
+pula pro [Playground interativo](/learn/playground). Volta pra cá quando quiser
+construir o agente completo em Python.
+</Callout>
+
+Ao final deste tutorial, você vai ter um **agente de IA funcional em Python** que:
+
+- Consulta informações de empresas pelo CNPJ
+- Valida CEPs e retorna dados de endereço
+- Consulta informações de bancos brasileiros
+- Usa um LLM (GPT-4o-mini) pra interpretar e responder em linguagem natural
+- Roda com **uma única chave de API** (Axon) — sem precisar se cadastrar em 10 serviços
+
+**Tempo total:** 30 minutos. **Linhas de código:** ~40. **Custo pra rodar 100 perguntas:** menos de $0.05.
+
+<Callout type="porque">
+A maioria dos tutoriais de IA em português usa só APIs americanas (OpenAI, Google). Mas um agente útil pra negócio brasileiro precisa de dados **brasileiros**: CNPJ, CEP, FIPE, feriados, bancos. Este tutorial mostra como combinar LLM + dados BR sem dor de cabeça.
+</Callout>
+
+## O que você vai construir
+
+Um agente que responde perguntas como:
+
+- *"Me conta sobre a empresa com CNPJ 00.000.000/0001-91"*
+- *"Qual o endereço do CEP 01310-100?"*
+- *"Me fala sobre o banco código 237"*
+
+E retorna respostas naturais, usando dados reais e atualizados.
+
+## Pré-requisitos
+
+- **Python 3.11+** instalado
+- Conhecimento básico de Python (saber o que é função e import basta)
+- Uma conta no Axon (criamos agora, leva 10 segundos)
+- Uma chave OpenAI (ou pode usar Claude / Gemini / Ollama — veremos depois)
+
+<Callout type="dica">
+Não tem Python 3.11? Instale pelo [python.org](https://www.python.org/downloads/) (Windows/Mac) ou `brew install python@3.11` (Mac). No Windows, **marque "Add Python to PATH"** no instalador.
+</Callout>
+
+## Passo 1 — Criando a conta Axon
+
+Vai em **[axon-5zf.pages.dev](https://axon-5zf.pages.dev)**, digita seu email, e pronto. Em 10 segundos você tem:
+
+- Uma chave de API (formato `ax_live_...`)
+- $0.50 de crédito grátis pra testar
+- Uma wallet USDC na Base L2 (gerada automaticamente)
+
+Copia a chave — vamos usar em breve.
+
+## Passo 2 — Setup do ambiente Python
+
+Crie uma pasta pro projeto e configure um ambiente virtual:
+
+```bash
+mkdir agente-brasil && cd agente-brasil
+python -m venv venv
+source venv/bin/activate   # Linux/Mac
+# ou: venv\Scripts\activate   (Windows)
+```
+
+Instale as dependências:
+
+```bash
+pip install openai requests python-dotenv
+```
+
+<Callout type="porque">
+Por que `venv`? Isolamento de dependências. Se você tiver 10 projetos Python, cada um com versões diferentes do `requests`, sem `venv` vira o caos. Comece sempre criando um.
+</Callout>
+
+## Passo 3 — Configurando credenciais
+
+Crie um arquivo `.env` na pasta do projeto:
+
+```bash
+AXON_KEY=ax_live_cole_sua_chave_aqui
+OPENAI_API_KEY=sk-cole_sua_chave_openai_aqui
+AXON_URL=https://axon-kedb.onrender.com
+```
+
+<Callout type="armadilha">
+**NUNCA** commite o arquivo `.env` no Git. Adicione ao `.gitignore`:
+```bash
+echo ".env" >> .gitignore
+```
+Sua chave OpenAI pode custar muito dinheiro se vazar.
+</Callout>
+
+## Passo 4 — Criando as ferramentas (tools)
+
+Cria o arquivo `tools.py`:
+
+```python
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+AXON_KEY = os.getenv("AXON_KEY")
+AXON_URL = os.getenv("AXON_URL", "https://axon-kedb.onrender.com")
+
+def call_axon(api: str, endpoint: str, params: dict = None):
+    """Chama qualquer API através do Axon com uma única chave."""
+    url = f"{AXON_URL}/v1/call/{api}/{endpoint}"
+    headers = {"Authorization": f"Bearer {AXON_KEY}"}
+    response = requests.get(url, headers=headers, params=params or {})
+    response.raise_for_status()
+    return response.json()
+
+
+def consultar_cnpj(cnpj: str) -> dict:
+    """Consulta dados de empresa pelo CNPJ. Aceita com ou sem formatação."""
+    cnpj_limpo = cnpj.replace(".", "").replace("/", "").replace("-", "")
+    return call_axon("brasilapi", "cnpj", {"cnpj": cnpj_limpo})
+
+
+def consultar_cep(cep: str) -> dict:
+    """Consulta endereço pelo CEP."""
+    cep_limpo = cep.replace("-", "")
+    return call_axon("brasilapi", "cep", {"cep": cep_limpo})
+
+
+def consultar_bank(code: str) -> dict:
+    """Consulta banco pelo código (ex: '001' = Banco do Brasil)."""
+    return call_axon("brasilapi", "bank", {"code": code})
+```
+
+<Callout type="porque">
+Observe que **não temos chave da BrasilAPI no código**. O Axon cuida disso. Trocar pra outra API (digamos, Receita Federal paga) seria mudar só `"brasilapi"` pra `"receitaws"`. Zero retrabalho.
+</Callout>
+
+Testa rápido no terminal pra ver se funciona:
+
+```bash
+python -c "from tools import consultar_cnpj; import json; print(json.dumps(consultar_cnpj('00000000000191'), indent=2))"
+```
+
+Ou melhor — **testa aqui mesmo no browser antes de escrever o código**. Essa é a
+mesma chamada que sua função Python vai fazer, com sua chave real:
+
+<TryCall
+  api="brasilapi"
+  endpoint="cnpj"
+  title="Testa consulta CNPJ antes de codar"
+  description="Se funcionar aqui, vai funcionar no seu Python também. Mesma API, mesma chave."
+  paramStyle="query"
+  paramFields={[
+    { name: 'cnpj', label: 'CNPJ (só números)', default: '00000000000191', placeholder: '14 dígitos' },
+  ]}
+  examples={[
+    { label: 'Banco do Brasil', values: { cnpj: '00000000000191' } },
+    { label: 'Petrobras', values: { cnpj: '33000167000101' } },
+  ]}
+/>
+
+<Callout type="porque">
+Testar no browser antes de codar economiza 90% do tempo de debug. Se a API não responder como esperado aqui, você nem precisa abrir o editor.
+</Callout>
+
+## Passo 5 — Criando o agente com OpenAI function calling
+
+Cria o arquivo `agente.py`:
+
+```python
+import json
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
+from tools import consultar_cnpj, consultar_cep, consultar_bank
+
+load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_cnpj",
+            "description": "Consulta dados de empresa brasileira pelo CNPJ",
+            "parameters": {
+                "type": "object",
+                "properties": {"cnpj": {"type": "string", "description": "CNPJ com ou sem formatação"}},
+                "required": ["cnpj"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_cep",
+            "description": "Consulta endereço pelo CEP",
+            "parameters": {
+                "type": "object",
+                "properties": {"cep": {"type": "string"}},
+                "required": ["cep"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_bank",
+            "description": "Consulta banco brasileiro pelo código (ex: '237' = Bradesco, '001' = Banco do Brasil)",
+            "parameters": {
+                "type": "object",
+                "properties": {"code": {"type": "string"}},
+                "required": ["code"],
+            },
+        },
+    },
+]
+
+FUNCTION_MAP = {
+    "consultar_cnpj": consultar_cnpj,
+    "consultar_cep": consultar_cep,
+    "consultar_bank": consultar_bank,
+}
+
+
+def rodar_agente(pergunta: str) -> str:
+    messages = [
+        {
+            "role": "system",
+            "content": "Você é um assistente que responde perguntas sobre empresas brasileiras, endereços e veículos. Use as ferramentas quando necessário. Responda em português, de forma natural e concisa.",
+        },
+        {"role": "user", "content": pergunta},
+    ]
+
+    for _ in range(5):  # máximo 5 iterações pra evitar loop infinito
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            tools=TOOLS,
+        )
+
+        msg = response.choices[0].message
+        messages.append(msg.model_dump(exclude_none=True))
+
+        if not msg.tool_calls:
+            return msg.content  # LLM decidiu responder sem chamar ferramenta
+
+        for call in msg.tool_calls:
+            fn_name = call.function.name
+            fn_args = json.loads(call.function.arguments)
+            try:
+                result = FUNCTION_MAP[fn_name](**fn_args)
+            except Exception as e:
+                result = {"erro": str(e)}
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": json.dumps(result, ensure_ascii=False),
+            })
+
+    return "Não consegui responder em tempo hábil."
+
+
+if __name__ == "__main__":
+    import sys
+    pergunta = " ".join(sys.argv[1:]) or "Me conta sobre a empresa com CNPJ 00.000.000/0001-91"
+    print(rodar_agente(pergunta))
+```
+
+<Callout type="porque">
+O loop `for _ in range(5)` é uma **guardrail essencial**. Sem ele, o LLM pode entrar em loop infinito chamando ferramentas. 5 iterações cobrem 99% dos casos reais e protegem sua conta do OpenAI.
+</Callout>
+
+## Passo 6 — Rodando o agente
+
+```bash
+python agente.py "me fala sobre a empresa Banco do Brasil, CNPJ 00.000.000/0001-91"
+```
+
+Saída esperada:
+
+```
+O Banco do Brasil S.A. é uma empresa com sede em Brasília/DF, registrada sob o
+CNPJ 00.000.000/0001-91. Trata-se de uma sociedade anônima de grande porte,
+atuando principalmente no setor bancário. A empresa está ativa e possui diversos
+estabelecimentos pelo Brasil.
+```
+
+Experimenta outras perguntas:
+
+```bash
+python agente.py "qual é o endereço do CEP 01310-100?"
+python agente.py "me fala sobre o CNPJ 11.222.333/0001-81 e depois qual o CEP da sede"
+```
+
+Ou, de novo, testa a chamada CEP direto aqui antes:
+
+<TryCall
+  api="brasilapi"
+  endpoint="cep"
+  title="Consulta CEP ao vivo"
+  paramStyle="query"
+  paramFields={[
+    { name: 'cep', label: 'CEP (8 dígitos)', default: '01310100', placeholder: 'ex: 01310100' },
+  ]}
+  examples={[
+    { label: 'Av. Paulista', values: { cep: '01310100' } },
+    { label: 'Copacabana', values: { cep: '22070900' } },
+  ]}
+/>
+
+<Callout type="dica">
+Note que na segunda pergunta, o agente **encadeia chamadas**: primeiro consulta CNPJ, pega o CEP da sede, depois consulta o CEP. Tudo automático. É a mágica de function calling + LLM competente.
+</Callout>
+
+## O que acabou de acontecer, em detalhe
+
+1. **Pergunta do usuário** chega pro LLM junto com a lista de ferramentas disponíveis.
+2. **LLM decide** se precisa chamar alguma ferramenta. Se sim, retorna `tool_calls`.
+3. **Executamos a ferramenta** localmente (que bate no Axon).
+4. **Axon bate na API real** (BrasilAPI, nesse caso — 100% gratuita, zero margem de custo pra você).
+5. **Resultado volta pro LLM** como nova mensagem.
+6. **LLM gera resposta final** em linguagem natural, baseada nos dados.
+
+## Quanto custou?
+
+Axon retorna o header `x-axon-cost-usdc` em cada chamada. Pra ver:
+
+```python
+# em tools.py, adicione prints no call_axon:
+print(f"Custo: ${response.headers.get('x-axon-cost-usdc', '?')}")
+print(f"Cache: {response.headers.get('x-axon-cache', 'miss')}")
+```
+
+Custos típicos:
+
+| Operação | Custo |
+|---|---|
+| Consulta CNPJ (BrasilAPI, primeira vez) | $0.00026 |
+| Consulta CNPJ (cache hit, 50% off) | $0.00013 |
+| Consulta CEP | $0.00013 |
+| Chamada GPT-4o-mini | $0.0015 a $0.006 |
+| **Total por pergunta típica** | **~$0.003 a $0.008** |
+
+Ou seja: **$1 dá pra rodar 125-330 perguntas**. Sua conta nova no Axon com $0.50 grátis já dá pra testar bastante.
+
+## Por que Axon em vez de chamar BrasilAPI direto?
+
+Nesse tutorial você poderia substituir `call_axon` por `requests.get("https://brasilapi.com.br/...")` e funcionaria. Então por que usar Axon?
+
+Porque em produção real:
+
+1. **Você vai querer rate limiting** — BrasilAPI limita rápido. Axon tem cache agressivo que reduz chamadas ao upstream em ~50-70%.
+2. **Você vai querer mais APIs** — só a OpenAI já duplica o problema. Com 5+ APIs, gerenciar chaves vira pesadelo. Com Axon: 1 chave.
+3. **Você vai querer métricas** — Axon dá dashboard com custo, latência, cache hit rate. Grátis.
+4. **Você vai querer trocar APIs** — quer mudar de BrasilAPI paga pra Receita Federal direto? Muda um string. Sem refactor.
+
+## Próximos passos
+
+### 1. Adicionar mais ferramentas
+- `feriados` — saber se data é feriado nacional
+- `bancos` — consultar código de banco
+- `ddd` — listar cidades de um DDD
+
+Todas disponíveis no `brasilapi` do Axon. É copiar uma das funções existentes e trocar o endpoint.
+
+### 2. Deploy
+Empacota em Docker + `uvicorn` com FastAPI, joga no Render (plano gratuito). Em 15 minutos vira API pública.
+
+### 3. Interface
+Plug no Telegram Bot, WhatsApp Business API, ou site simples. O agente mesmo não muda.
+
+### 4. Memória de conversa
+Troca o loop por LangChain com `ConversationBufferMemory` e o agente passa a lembrar perguntas anteriores.
+
+## Código completo
+
+O template rodável tá em [github.com/axondevi/axon/tree/main/templates/agente-brasil-py](https://github.com/axondevi/axon). Clona, roda `pip install -r requirements.txt`, configura `.env`, e pronto.
+
+---
+
+**Se construir algo em cima disso, queremos ver.** DM pra [@axondevia](https://twitter.com/axondevia) ou email [hello@axon.dev](mailto:hello@axon.dev).

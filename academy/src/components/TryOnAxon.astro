@@ -1,0 +1,103 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+}
+
+const {
+  title = 'Rode isso agora no Axon',
+  description = 'Signup em 10 segundos, $0.50 de crédito grátis. Sem cartão.',
+  ctaText = 'Get $0.50 free →',
+  ctaUrl = 'https://axon-5zf.pages.dev#signup',
+} = Astro.props;
+---
+
+<div class="try-on-axon">
+  <div class="tax-glow"></div>
+  <div class="tax-content">
+    <div class="tax-text">
+      <h3 class="tax-title">{title}</h3>
+      <p class="tax-desc">{description}</p>
+    </div>
+    <a href={ctaUrl} class="btn btn-primary tax-btn">{ctaText}</a>
+  </div>
+  <div class="tax-meta">
+    <span class="tax-pill">◆ 28 APIs</span>
+    <span class="tax-pill">⚡ USDC / Base L2</span>
+    <span class="tax-pill">🇧🇷 Dados BR</span>
+    <span class="tax-pill">🔓 MIT License</span>
+  </div>
+</div>
+
+<style>
+  .try-on-axon {
+    position: relative;
+    margin: 3rem 0;
+    padding: 2rem;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(124, 92, 255, 0.08), rgba(92, 138, 255, 0.08));
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .tax-glow {
+    position: absolute;
+    top: -50%;
+    right: -30%;
+    width: 80%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(124, 92, 255, 0.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .tax-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .tax-text { flex: 1; }
+
+  .tax-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.4rem 0;
+    color: var(--text-primary);
+  }
+
+  .tax-desc {
+    color: var(--text-secondary);
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .tax-btn {
+    white-space: nowrap;
+  }
+
+  .tax-meta {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tax-pill {
+    font-size: 12px;
+    padding: 0.35em 0.8em;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-tertiary);
+    border: 1px solid var(--border-soft);
+  }
+
+  @media (max-width: 640px) {
+    .tax-content { flex-direction: column; align-items: flex-start; }
+    .tax-btn { width: 100%; justify-content: center; }
+  }
+</style>

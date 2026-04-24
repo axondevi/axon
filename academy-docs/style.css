@@ -1,0 +1,448 @@
+/* Axon Academy Master Document — PDF Styles */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #13131a;
+  --bg-code: #0d0d12;
+  --text-primary: #f0f0f5;
+  --text-secondary: #9c9cb3;
+  --text-muted: #6b6b85;
+  --accent-1: #7c5cff;
+  --accent-2: #5c8aff;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --border: #2a2a35;
+}
+
+@page {
+  size: A4;
+  margin: 20mm 18mm 22mm 18mm;
+
+  @bottom-center {
+    content: "Axon Academy — Documento Mestre · " counter(page) " / " counter(pages);
+    font-family: 'Inter', sans-serif;
+    font-size: 9pt;
+    color: #6b6b85;
+  }
+
+  @top-right {
+    content: "v1.0 · Abril 2026";
+    font-family: 'Inter', sans-serif;
+    font-size: 8pt;
+    color: #6b6b85;
+  }
+}
+
+@page cover {
+  margin: 0;
+
+  @bottom-center { content: none; }
+  @top-right { content: none; }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 10.5pt;
+  line-height: 1.65;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ============== COVER ============== */
+.cover {
+  page: cover;
+  height: 297mm;
+  width: 210mm;
+  background: linear-gradient(135deg, #0a0a0f 0%, #1a0d2e 50%, #0a1a2e 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 30mm 22mm;
+  page-break-after: always;
+  position: relative;
+  overflow: hidden;
+}
+
+.cover::before {
+  content: "";
+  position: absolute;
+  top: -50mm;
+  right: -50mm;
+  width: 180mm;
+  height: 180mm;
+  background: radial-gradient(circle, rgba(124, 92, 255, 0.25) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.cover::after {
+  content: "";
+  position: absolute;
+  bottom: -50mm;
+  left: -50mm;
+  width: 200mm;
+  height: 200mm;
+  background: radial-gradient(circle, rgba(92, 138, 255, 0.18) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.cover-header {
+  position: relative;
+  z-index: 1;
+}
+
+.cover-logo {
+  font-size: 22pt;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4mm;
+}
+
+.cover-eyebrow {
+  font-size: 10pt;
+  color: var(--text-secondary);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.cover-body {
+  position: relative;
+  z-index: 1;
+}
+
+.cover-title {
+  font-size: 42pt;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin: 0 0 8mm 0;
+  color: var(--text-primary);
+}
+
+.cover-subtitle {
+  font-size: 14pt;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 150mm;
+  margin: 0;
+}
+
+.cover-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: var(--text-muted);
+  font-size: 9pt;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8mm;
+}
+
+.cover-meta p {
+  margin: 2mm 0;
+}
+
+.cover-meta strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ============== TOC PAGE ============== */
+.toc-page {
+  page-break-before: always;
+  page-break-after: always;
+  padding: 10mm 0;
+}
+
+.toc-title {
+  font-size: 28pt;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 12mm;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-list li {
+  padding: 3mm 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 4mm;
+}
+
+.toc-list li::before {
+  content: counter(toc-counter, decimal-leading-zero);
+  counter-increment: toc-counter;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9pt;
+  color: var(--accent-1);
+  font-weight: 600;
+  min-width: 14mm;
+}
+
+.toc-list {
+  counter-reset: toc-counter;
+}
+
+.toc-list li strong {
+  font-size: 11pt;
+  font-weight: 600;
+  flex: 1;
+}
+
+.toc-list li span {
+  color: var(--text-muted);
+  font-size: 9pt;
+}
+
+/* ============== HEADINGS ============== */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  margin-top: 12mm;
+  margin-bottom: 4mm;
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 26pt;
+  font-weight: 800;
+  margin-top: 18mm;
+  padding-top: 6mm;
+  border-top: 3px solid;
+  border-image: linear-gradient(90deg, var(--accent-1), var(--accent-2)) 1;
+  page-break-before: always;
+  letter-spacing: -0.03em;
+}
+
+h1:first-of-type {
+  page-break-before: avoid;
+}
+
+h2 {
+  font-size: 18pt;
+  margin-top: 14mm;
+  color: var(--text-primary);
+}
+
+h3 {
+  font-size: 13pt;
+  color: var(--accent-2);
+  margin-top: 8mm;
+}
+
+h4 {
+  font-size: 11pt;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 6mm;
+}
+
+/* ============== PARAGRAPHS & TEXT ============== */
+p {
+  margin: 0 0 4mm 0;
+  color: var(--text-primary);
+  orphans: 3;
+  widows: 3;
+}
+
+strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+em {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+a {
+  color: var(--accent-2);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--accent-2);
+}
+
+/* ============== LISTS ============== */
+ul, ol {
+  margin: 3mm 0 5mm 0;
+  padding-left: 7mm;
+}
+
+li {
+  margin: 1.5mm 0;
+  color: var(--text-primary);
+}
+
+li::marker {
+  color: var(--accent-1);
+}
+
+ul li::marker {
+  content: "▸ ";
+}
+
+/* ============== CODE ============== */
+code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+  background: var(--bg-code);
+  color: #e4e4ff;
+  padding: 0.5mm 1.5mm;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-1);
+  border-radius: 4px;
+  padding: 4mm 5mm;
+  margin: 4mm 0;
+  overflow-x: auto;
+  page-break-inside: avoid;
+  font-size: 9pt;
+  line-height: 1.5;
+}
+
+pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #d4d4f5;
+  font-size: inherit;
+}
+
+/* ============== BLOCKQUOTES ============== */
+blockquote {
+  margin: 5mm 0;
+  padding: 4mm 6mm;
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--accent-1);
+  border-radius: 0 4px 4px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+  page-break-inside: avoid;
+}
+
+blockquote p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* ============== TABLES ============== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 5mm 0;
+  font-size: 9.5pt;
+  page-break-inside: avoid;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+thead {
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.15), rgba(92, 138, 255, 0.15));
+}
+
+th {
+  padding: 3mm 4mm;
+  text-align: left;
+  font-weight: 600;
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--accent-1);
+}
+
+td {
+  padding: 3mm 4mm;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: top;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* ============== HORIZONTAL RULE ============== */
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10mm 0;
+  height: 0;
+}
+
+/* ============== CALLOUTS (custom, applied via markdown patterns) ============== */
+.callout {
+  padding: 4mm 5mm;
+  margin: 4mm 0;
+  border-radius: 4px;
+  border-left: 3px solid;
+  background: var(--bg-secondary);
+  page-break-inside: avoid;
+}
+
+.callout-porque { border-color: var(--accent-1); }
+.callout-dica { border-color: var(--success); }
+.callout-acao { border-color: var(--accent-2); }
+.callout-armadilha { border-color: var(--error); }
+.callout-tradeoff { border-color: var(--warning); }
+
+/* ============== PAGE FLOW ============== */
+p, li {
+  page-break-inside: avoid;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  page-break-inside: avoid;
+}
+
+/* ============== CONTENT WRAPPER ============== */
+.content {
+  padding: 0;
+}
+
+/* Decorative gradient for first-letter of first paragraph */
+.content > h1:first-child + p::first-letter {
+  font-size: 1.5em;
+  font-weight: 600;
+  color: var(--accent-1);
+}

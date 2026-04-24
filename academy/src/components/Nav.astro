@@ -1,0 +1,198 @@
+---
+const currentPath = Astro.url.pathname;
+const isActive = (path: string) => currentPath.startsWith(path);
+---
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/learn" class="nav-logo">
+      <span class="nav-logo-mark">◆</span>
+      <span class="nav-logo-text">
+        <span class="nav-logo-brand gradient-text">Axon</span>
+        <span class="nav-logo-sub">Academy</span>
+      </span>
+    </a>
+
+    <div class="nav-links">
+      <a href="/learn" class:list={['nav-link', { active: currentPath === '/learn' || currentPath === '/learn/' }]}>Início</a>
+      <a href="/learn/playground" class:list={['nav-link nav-link-accent', { active: isActive('/learn/playground') }]}>◆ Playground</a>
+      <a href="/learn/tutorials" class:list={['nav-link', { active: isActive('/learn/tutorials') }]}>Tutoriais</a>
+      <a href="/learn/guides" class:list={['nav-link', { active: isActive('/learn/guides') }]}>Guias</a>
+      <a href="/learn/recipes" class:list={['nav-link', { active: isActive('/learn/recipes') }]}>Recipes</a>
+      <a href="/learn/glossary" class:list={['nav-link', { active: isActive('/learn/glossary') }]}>Glossário</a>
+    </div>
+
+    <div class="nav-cta">
+      <a href="https://axon-5zf.pages.dev" class="nav-external">axon.dev ↗</a>
+      <a href="https://axon-5zf.pages.dev#signup" class="btn btn-primary nav-signup">Get $0.50 free</a>
+    </div>
+
+    <button class="nav-mobile-toggle" id="nav-toggle" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<style>
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .nav-inner {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 0.9rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: var(--text-primary);
+  }
+
+  .nav-logo:hover { text-decoration: none; }
+
+  .nav-logo-mark {
+    font-size: 1.5rem;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .nav-logo-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+  }
+
+  .nav-logo-brand {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .nav-logo-sub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .nav-link {
+    padding: 0.5rem 0.9rem;
+    color: var(--text-tertiary);
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+  }
+
+  .nav-link:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    text-decoration: none;
+  }
+
+  .nav-link.active {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+  }
+
+  .nav-link-accent {
+    color: var(--accent-1) !important;
+    font-weight: 600;
+  }
+
+  .nav-link-accent:hover {
+    background: rgba(124, 92, 255, 0.1);
+  }
+
+  .nav-cta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .nav-external {
+    color: var(--text-tertiary);
+    font-size: 13px;
+  }
+
+  .nav-external:hover { color: var(--text-primary); text-decoration: none; }
+
+  .nav-signup {
+    font-size: 13px;
+    padding: 0.55em 1.1em;
+  }
+
+  .nav-mobile-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    margin-left: auto;
+  }
+
+  @media (max-width: 900px) {
+    .nav-links, .nav-cta { display: none; }
+    .nav-mobile-toggle { display: block; }
+
+    .nav.mobile-open .nav-links {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-primary);
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      gap: 0;
+    }
+
+    .nav.mobile-open .nav-cta {
+      display: flex;
+      position: absolute;
+      top: calc(100% + 200px);
+      left: 0;
+      right: 0;
+      padding: 1rem;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+  }
+</style>
+
+<script>
+  const toggle = document.getElementById('nav-toggle');
+  const nav = document.querySelector('.nav');
+  toggle?.addEventListener('click', () => {
+    nav?.classList.toggle('mobile-open');
+  });
+</script>

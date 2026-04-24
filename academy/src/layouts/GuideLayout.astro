@@ -1,0 +1,109 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+import TryOnAxon from '../components/TryOnAxon.astro';
+
+interface Props {
+  frontmatter: {
+    title: string;
+    subtitle?: string;
+    description: string;
+    timeMinutes: number;
+    author: string;
+    publishedAt: Date;
+    lang?: 'pt-BR' | 'en';
+    tags?: string[];
+  };
+  headings: Array<{ depth: number; text: string; slug: string }>;
+}
+
+const { frontmatter, headings } = Astro.props;
+
+const formatDate = (d: Date) => d.toLocaleDateString(frontmatter.lang ?? 'pt-BR', {
+  year: 'numeric', month: 'short', day: 'numeric',
+});
+---
+
+<BaseLayout title={frontmatter.title} description={frontmatter.description} lang={frontmatter.lang}>
+  <div class="guide-wrap">
+    <div class="guide-layout">
+      <article class="guide-article">
+        <div class="guide-header">
+          <div class="guide-eyebrow">Guia conceitual</div>
+          <h1 class="guide-title">{frontmatter.title}</h1>
+          {frontmatter.subtitle && <p class="guide-subtitle">{frontmatter.subtitle}</p>}
+          <div class="guide-meta">
+            <span>⏱ {frontmatter.timeMinutes} min</span>
+            <span>✎ {frontmatter.author}</span>
+            <span>📅 {formatDate(frontmatter.publishedAt)}</span>
+          </div>
+        </div>
+
+        <div class="guide-body">
+          <slot />
+        </div>
+
+        <TryOnAxon />
+      </article>
+
+      <aside class="guide-side">
+        <TableOfContents headings={headings} />
+      </aside>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .guide-wrap {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+
+  .guide-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 3rem;
+  }
+
+  .guide-article {
+    max-width: 720px;
+  }
+
+  .guide-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-2);
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .guide-title {
+    margin: 0 0 0.75rem 0;
+    line-height: 1.15;
+  }
+
+  .guide-subtitle {
+    font-size: 1.15rem;
+    color: var(--text-tertiary);
+    margin: 0 0 1.5rem 0;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .guide-meta {
+    display: flex;
+    gap: 1.2rem;
+    font-size: 13px;
+    color: var(--text-muted);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  @media (max-width: 1024px) {
+    .guide-layout { grid-template-columns: 1fr; }
+    .guide-side { display: none; }
+  }
+</style>

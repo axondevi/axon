@@ -1,0 +1,37 @@
+---
+import TutorialLayout from '../../layouts/TutorialLayout.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const tutorials = await getCollection('tutorials');
+  return tutorials.map(tutorial => ({
+    params: { slug: tutorial.id.replace(/\.(md|mdx)$/, '') },
+    props: { tutorial },
+  }));
+}
+
+const { tutorial } = Astro.props;
+const { Content, headings } = await render(tutorial);
+
+// Build next-tutorial items from relatedTutorials if present
+let nextItems: Array<{ title: string; description: string; url: string; timeMinutes?: number; difficulty?: string }> = [];
+
+if (tutorial.data.relatedTutorials && tutorial.data.relatedTutorials.length > 0) {
+  const allTutorials = await getCollection('tutorials');
+  const related = tutorial.data.relatedTutorials
+    .map(slug => allTutorials.find(t => t.id.replace(/\.(md|mdx)$/, '') === slug))
+    .filter((t): t is NonNullable<typeof t> => t !== undefined);
+
+  nextItems = related.map(t => ({
+    title: t.data.title,
+    description: t.data.description,
+    url: `/learn/tutorials/${t.id.replace(/\.(md|mdx)$/, '')}`,
+    timeMinutes: t.data.timeMinutes,
+    difficulty: t.data.difficulty,
+  }));
+}
+---
+
+<TutorialLayout frontmatter={tutorial.data} headings={headings} nextItems={nextItems}>
+  <Content />
+</TutorialLayout>

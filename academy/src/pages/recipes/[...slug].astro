@@ -1,0 +1,81 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const recipes = await getCollection('recipes');
+  return recipes.map(recipe => ({
+    params: { slug: recipe.id.replace(/\.(md|mdx)$/, '') },
+    props: { recipe },
+  }));
+}
+
+const { recipe } = Astro.props;
+const { Content } = await render(recipe);
+---
+
+<BaseLayout title={recipe.data.title} description={recipe.data.description} lang={recipe.data.lang}>
+  <div class="container">
+    <div class="back">
+      <a href="/learn/recipes">← Todos os recipes</a>
+    </div>
+
+    <article class="recipe">
+      <div class="recipe-tag">Recipe</div>
+      <div class="content">
+        <Content />
+      </div>
+      {recipe.data.stack.length > 0 && (
+        <div class="stack">
+          <span>Stack:</span>
+          {recipe.data.stack.map(s => <span class="stack-item">{s}</span>)}
+        </div>
+      )}
+    </article>
+  </div>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  .back { margin-bottom: 2rem; }
+  .back a { color: var(--text-tertiary); font-size: 14px; text-decoration: none; }
+  .back a:hover { color: var(--text-primary); text-decoration: none; }
+
+  .recipe-tag {
+    display: inline-block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-1);
+    font-weight: 600;
+    padding: 0.3em 0.8em;
+    background: var(--bg-secondary);
+    border-radius: 100px;
+    margin-bottom: 1rem;
+  }
+
+  .stack {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .stack-item {
+    font-family: var(--font-mono);
+    padding: 0.3em 0.6em;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+  }
+</style>

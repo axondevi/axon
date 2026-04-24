@@ -1,0 +1,81 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TutorialCard from '../../components/TutorialCard.astro';
+import { getCollection } from 'astro:content';
+
+const allTutorials = (await getCollection('tutorials', t => !t.data.draft))
+  .sort((a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime());
+
+const categoryLabels: Record<string, string> = {
+  agents: 'Agentes',
+  apis: 'APIs',
+  production: 'Produção',
+  brazil: 'Brasil',
+  concepts: 'Conceitos',
+  integration: 'Integrações',
+};
+---
+
+<BaseLayout
+  title="Tutoriais — Axon Academy"
+  description="Todos os tutoriais da Axon Academy: agentes, APIs, deploy, dados brasileiros e mais."
+>
+  <div class="container">
+    <header class="page-header">
+      <div class="ph-eyebrow">Axon Academy</div>
+      <h1>Tutoriais</h1>
+      <p>{allTutorials.length} tutoriais práticos com código rodável, organizados por categoria e dificuldade.</p>
+    </header>
+
+    <div class="tut-grid">
+      {allTutorials.map(t => (
+        <TutorialCard
+          title={t.data.title}
+          description={t.data.description}
+          url={`/learn/tutorials/${t.id.replace(/\.(md|mdx)$/, '')}`}
+          category={categoryLabels[t.data.category] ?? t.data.category}
+          difficulty={t.data.difficulty}
+          timeMinutes={t.data.timeMinutes}
+          lang={t.data.lang}
+          tags={t.data.tags}
+          featured={t.data.featured}
+        />
+      ))}
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+
+  .page-header {
+    margin-bottom: 3rem;
+  }
+
+  .ph-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-2);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .page-header h1 { margin: 0 0 0.75rem 0; }
+
+  .page-header p {
+    color: var(--text-tertiary);
+    font-size: 1.1rem;
+    margin: 0;
+  }
+
+  .tut-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+</style>

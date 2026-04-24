@@ -1,0 +1,437 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TutorialCard from '../components/TutorialCard.astro';
+import { getCollection } from 'astro:content';
+
+const allTutorials = await getCollection('tutorials', t => !t.data.draft);
+const featured = allTutorials.filter(t => t.data.featured).slice(0, 2);
+const recent = allTutorials
+  .sort((a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime())
+  .slice(0, 6);
+
+const guides = await getCollection('guides');
+const recipes = await getCollection('recipes');
+
+const categoryLabels: Record<string, { label: string; desc: string; icon: string; slug: string }> = {
+  agents: { label: 'Agentes', desc: 'Construindo agentes IA do zero ao deploy', icon: '◆', slug: 'agents' },
+  apis: { label: 'APIs', desc: 'Integrando e comparando provedores', icon: '⚡', slug: 'apis' },
+  production: { label: 'Produção', desc: 'Deploy, escala, custo, observabilidade', icon: '▲', slug: 'production' },
+  brazil: { label: 'Brasil', desc: 'Dados BR, PIX, LGPD em IA', icon: '🇧🇷', slug: 'brazil' },
+  concepts: { label: 'Conceitos', desc: 'x402, MCP, embeddings — o que importa', icon: '📚', slug: 'concepts' },
+  integration: { label: 'Integrações', desc: 'LangChain, CrewAI, Vercel AI SDK', icon: '⚙', slug: 'integration' },
+};
+---
+
+<BaseLayout
+  title="Axon Academy — Aprenda a construir agentes de IA de verdade"
+  description="Tutoriais práticos, guias técnicos e recipes para devs que constroem agentes de IA. Self-paying, x402, APIs brasileiras, produção real."
+>
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container-narrow">
+      <div class="hero-badge">Axon Academy · v1.0</div>
+      <h1 class="hero-title">
+        Aprenda a construir <span class="gradient-text">agentes de IA</span> de verdade.
+      </h1>
+      <p class="hero-subtitle">
+        Tutoriais práticos com código que roda, focados em <strong>self-paying agents</strong>,
+        integrações brasileiras e arquitetura de produção.
+        Zero fluff.
+      </p>
+      <div class="hero-cta">
+        <a href="/learn/playground" class="btn btn-primary">◆ Playground interativo →</a>
+        <a href="#tutoriais" class="btn btn-secondary">Ver tutoriais</a>
+      </div>
+      <div class="hero-pg-note">
+        <span>Zero instalação · Constrói um agente no browser em 60s · $0.50 grátis</span>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <strong>28</strong>
+          <span>APIs suportadas</span>
+        </div>
+        <div class="hero-stat">
+          <strong>9</strong>
+          <span>Frameworks</span>
+        </div>
+        <div class="hero-stat">
+          <strong>PT-BR</strong>
+          <span>+ English</span>
+        </div>
+        <div class="hero-stat">
+          <strong>MIT</strong>
+          <span>100% open-source</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORIES -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2 class="section-title">Trilhas por categoria</h2>
+        <p class="section-sub">Escolha por onde começar baseado no que você quer construir.</p>
+      </div>
+      <div class="cat-grid">
+        {Object.values(categoryLabels).map(cat => (
+          <a href={`/learn/tutorials?category=${cat.slug}`} class="cat-card">
+            <div class="cat-icon">{cat.icon}</div>
+            <h3>{cat.label}</h3>
+            <p>{cat.desc}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURED TUTORIALS -->
+  {featured.length > 0 && (
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <h2 class="section-title">✨ Em destaque</h2>
+        </div>
+        <div class="tut-grid">
+          {featured.map(t => (
+            <TutorialCard
+              title={t.data.title}
+              description={t.data.description}
+              url={`/learn/tutorials/${t.id.replace(/\.(md|mdx)$/, '')}`}
+              category={categoryLabels[t.data.category]?.label ?? t.data.category}
+              difficulty={t.data.difficulty}
+              timeMinutes={t.data.timeMinutes}
+              lang={t.data.lang}
+              tags={t.data.tags}
+              featured={true}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- RECENT TUTORIALS -->
+  <section class="section" id="tutoriais">
+    <div class="container">
+      <div class="section-head">
+        <h2 class="section-title">Tutoriais recentes</h2>
+        <a href="/learn/tutorials" class="section-link">Ver todos →</a>
+      </div>
+      <div class="tut-grid">
+        {recent.map(t => (
+          <TutorialCard
+            title={t.data.title}
+            description={t.data.description}
+            url={`/learn/tutorials/${t.id.replace(/\.(md|mdx)$/, '')}`}
+            category={categoryLabels[t.data.category]?.label ?? t.data.category}
+            difficulty={t.data.difficulty}
+            timeMinutes={t.data.timeMinutes}
+            lang={t.data.lang}
+            tags={t.data.tags}
+          />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- GUIDES & RECIPES TEASER -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="two-col">
+        <div class="teaser-card">
+          <div class="teaser-icon">📖</div>
+          <h3>{guides.length} Guias Conceituais</h3>
+          <p>Entenda <strong>x402</strong>, <strong>MCP</strong>, embeddings e arquitetura sem código — pra decidir melhor antes de construir.</p>
+          <a href="/learn/guides" class="btn btn-secondary">Ver guias →</a>
+        </div>
+        <div class="teaser-card">
+          <div class="teaser-icon">⚡</div>
+          <h3>{recipes.length} Recipes (Cookbook)</h3>
+          <p>Snippets curtos que resolvem problemas específicos. Copy, paste, rode. Sem teoria.</p>
+          <a href="/learn/recipes" class="btn btn-secondary">Ver recipes →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY AXON -->
+  <section class="section">
+    <div class="container-narrow">
+      <div class="section-head center">
+        <h2 class="section-title">Por que Axon Academy?</h2>
+      </div>
+      <div class="why-grid">
+        <div class="why-item">
+          <div class="why-num">01</div>
+          <h4>Código que roda</h4>
+          <p>Todo tutorial é testado em produção. Se falhar, a gente conserta.</p>
+        </div>
+        <div class="why-item">
+          <div class="why-num">02</div>
+          <h4>PT-BR + English</h4>
+          <p>Diferente da maioria: conteúdo brasileiro original, não só tradução.</p>
+        </div>
+        <div class="why-item">
+          <div class="why-num">03</div>
+          <h4>Dados reais</h4>
+          <p>Custo, latência, cache hit rate — sempre com números de produção.</p>
+        </div>
+        <div class="why-item">
+          <div class="why-num">04</div>
+          <h4>Sem sales pitch</h4>
+          <p>Ensinamos primeiro. Se Axon serve pro seu caso, boa — se não, também.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: 5rem 0 4rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: -40%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 150%;
+    background: radial-gradient(ellipse, rgba(124, 92, 255, 0.12) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .hero > * { position: relative; z-index: 1; }
+
+  .hero-badge {
+    display: inline-block;
+    padding: 0.4em 1em;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.05em;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+  }
+
+  .hero-title {
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    margin: 0 0 1.25rem 0;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .hero-subtitle {
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    color: var(--text-tertiary);
+    margin: 0 auto 2.5rem;
+    max-width: 580px;
+    line-height: 1.6;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+
+  .hero-pg-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 3rem;
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .hero-stat {
+    padding: 1rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+  }
+
+  .hero-stat strong {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 800;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-stat span {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .section {
+    padding: 4rem 0;
+  }
+
+  .section-alt {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .section-head {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .section-head.center {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .section-title {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    margin: 0;
+  }
+
+  .section-sub {
+    color: var(--text-tertiary);
+    margin: 0.5rem 0 0 0;
+    font-size: 1rem;
+  }
+
+  .section-link {
+    color: var(--accent-2);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .cat-card {
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+  }
+
+  .cat-card:hover {
+    border-color: var(--accent-1);
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
+
+  .cat-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--accent-1);
+  }
+
+  .cat-card h3 {
+    font-size: 1rem;
+    margin: 0 0 0.3rem 0;
+    color: var(--text-primary);
+  }
+
+  .cat-card p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-tertiary);
+    line-height: 1.4;
+  }
+
+  .tut-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .teaser-card {
+    padding: 2rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    text-align: center;
+  }
+
+  .teaser-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .teaser-card h3 {
+    font-size: 1.2rem;
+    margin: 0 0 0.75rem 0;
+  }
+
+  .teaser-card p {
+    color: var(--text-tertiary);
+    margin: 0 0 1.5rem 0;
+    line-height: 1.6;
+  }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  .why-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent-1);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .why-item h4 {
+    font-size: 1rem;
+    margin: 0 0 0.4rem 0;
+    color: var(--text-primary);
+  }
+
+  .why-item p {
+    color: var(--text-tertiary);
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 768px) {
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr; }
+    .why-grid { grid-template-columns: 1fr; }
+  }
+</style>

@@ -1,0 +1,130 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  url: string;
+  category: string;
+  difficulty: string;
+  timeMinutes: number;
+  lang?: string;
+  tags?: string[];
+  featured?: boolean;
+}
+
+const { title, description, url, category, difficulty, timeMinutes, lang = 'pt-BR', tags = [], featured = false } = Astro.props;
+
+const flagEmoji = lang === 'pt-BR' ? '🇧🇷' : '🌐';
+---
+
+<a href={url} class:list={['tut-card', { featured }]}>
+  {featured && <div class="tut-badge">Em destaque</div>}
+  <div class="tut-cat">
+    <span class="tut-lang">{flagEmoji}</span>
+    <span class="tut-category">{category}</span>
+  </div>
+  <h3 class="tut-title">{title}</h3>
+  <p class="tut-desc">{description}</p>
+  <div class="tut-meta">
+    <span>⏱ {timeMinutes} min</span>
+    <span>◆ {difficulty}</span>
+  </div>
+  {tags.length > 0 && (
+    <div class="tut-tags">
+      {tags.slice(0, 3).map(t => <span class="tut-tag">#{t}</span>)}
+    </div>
+  )}
+</a>
+
+<style>
+  .tut-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+    transition: all 0.2s;
+    height: 100%;
+  }
+
+  .tut-card:hover {
+    border-color: var(--accent-1);
+    background: var(--bg-tertiary);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    text-decoration: none;
+  }
+
+  .tut-card.featured {
+    background: linear-gradient(135deg, rgba(124, 92, 255, 0.08), rgba(92, 138, 255, 0.05));
+    border-color: var(--accent-1);
+  }
+
+  .tut-badge {
+    position: absolute;
+    top: -1px;
+    right: 1rem;
+    background: var(--gradient);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0.3em 0.8em;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .tut-cat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-2);
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+  }
+
+  .tut-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+    line-height: 1.25;
+  }
+
+  .tut-desc {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    margin: 0 0 auto 0;
+    line-height: 1.5;
+    padding-bottom: 1rem;
+  }
+
+  .tut-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .tut-tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+  }
+
+  .tut-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+</style>

@@ -1,0 +1,71 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import KeyBanner from '../components/KeyBanner.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  lang?: 'pt-BR' | 'en';
+  canonical?: string;
+}
+
+const {
+  title,
+  description,
+  image = '/learn/og-default.svg',
+  lang = 'pt-BR',
+  canonical,
+} = Astro.props;
+
+const siteUrl = 'https://axon-5zf.pages.dev';
+const canonicalUrl = canonical ?? new URL(Astro.url.pathname, siteUrl).href;
+const fullTitle = title.includes('Axon') ? title : `${title} — Axon Academy`;
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+  <title>{fullTitle}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonicalUrl} />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content={fullTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:image" content={new URL(image, siteUrl).href} />
+  <meta property="og:site_name" content="Axon Academy" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@axondevia" />
+  <meta name="twitter:title" content={fullTitle} />
+  <meta name="twitter:description" content={description} />
+  <meta name="twitter:image" content={new URL(image, siteUrl).href} />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/learn/favicon.svg" />
+
+  <!-- Theme color -->
+  <meta name="theme-color" content="#0a0a0f" />
+
+  <!-- RSS -->
+  <link rel="alternate" type="application/rss+xml" title="Axon Academy" href="/learn/rss.xml" />
+</head>
+<body>
+  <Nav />
+  <KeyBanner />
+  <main>
+    <slot />
+  </main>
+  <Footer />
+</body>
+</html>

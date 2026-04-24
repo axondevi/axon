@@ -1,0 +1,159 @@
+---
+interface Props {
+  title: string;
+  subtitle?: string;
+  category: string;
+  difficulty: 'iniciante' | 'intermediario' | 'avancado';
+  timeMinutes: number;
+  lang?: 'pt-BR' | 'en';
+  publishedAt: Date;
+  updatedAt?: Date;
+  author: string;
+  tags?: string[];
+}
+
+const { title, subtitle, category, difficulty, timeMinutes, lang = 'pt-BR', publishedAt, updatedAt, author, tags = [] } = Astro.props;
+
+const difficultyLabel = {
+  iniciante: lang === 'en' ? 'Beginner' : 'Iniciante',
+  intermediario: lang === 'en' ? 'Intermediate' : 'Intermediário',
+  avancado: lang === 'en' ? 'Advanced' : 'Avançado',
+}[difficulty];
+
+const categoryLabel: Record<string, string> = {
+  agents: lang === 'en' ? 'Agents' : 'Agentes',
+  apis: 'APIs',
+  production: lang === 'en' ? 'Production' : 'Produção',
+  brazil: 'Brasil',
+  concepts: lang === 'en' ? 'Concepts' : 'Conceitos',
+  integration: lang === 'en' ? 'Integrations' : 'Integrações',
+};
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' });
+
+const timeLabel = lang === 'en' ? `${timeMinutes} min read` : `${timeMinutes} min de leitura`;
+---
+
+<header class="article-header">
+  <div class="ah-breadcrumb">
+    <a href="/learn">Academy</a>
+    <span class="ah-sep">/</span>
+    <a href="/learn/tutorials">{lang === 'en' ? 'Tutorials' : 'Tutoriais'}</a>
+    <span class="ah-sep">/</span>
+    <span class="ah-cat">{categoryLabel[category] ?? category}</span>
+  </div>
+
+  <h1 class="ah-title">{title}</h1>
+  {subtitle && <p class="ah-subtitle">{subtitle}</p>}
+
+  <div class="ah-meta">
+    <span class="ah-meta-item">
+      <span class="ah-meta-icon">⏱</span>
+      {timeLabel}
+    </span>
+    <span class="ah-meta-item">
+      <span class="ah-meta-icon">◆</span>
+      {difficultyLabel}
+    </span>
+    <span class="ah-meta-item">
+      <span class="ah-meta-icon">✎</span>
+      {author}
+    </span>
+    <span class="ah-meta-item">
+      <span class="ah-meta-icon">📅</span>
+      {formatDate(publishedAt)}
+    </span>
+    {updatedAt && (
+      <span class="ah-meta-item ah-updated">
+        {lang === 'en' ? 'Updated' : 'Atualizado'} {formatDate(updatedAt)}
+      </span>
+    )}
+  </div>
+
+  {tags.length > 0 && (
+    <div class="ah-tags">
+      {tags.map(tag => <span class="ah-tag">#{tag}</span>)}
+    </div>
+  )}
+</header>
+
+<style>
+  .article-header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .ah-breadcrumb {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .ah-breadcrumb a {
+    color: var(--text-tertiary);
+    text-decoration: none;
+  }
+
+  .ah-breadcrumb a:hover { color: var(--text-primary); text-decoration: none; }
+
+  .ah-sep {
+    margin: 0 0.5rem;
+    color: var(--text-muted);
+  }
+
+  .ah-cat { color: var(--accent-2); font-weight: 500; }
+
+  .ah-title {
+    margin: 0 0 0.75rem 0;
+    line-height: 1.15;
+  }
+
+  .ah-subtitle {
+    font-size: 1.15rem;
+    color: var(--text-tertiary);
+    margin: 0 0 1.5rem 0;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  .ah-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+    margin-bottom: 1rem;
+  }
+
+  .ah-meta-item {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .ah-meta-icon {
+    color: var(--accent-1);
+  }
+
+  .ah-updated {
+    color: var(--accent-2);
+    font-weight: 500;
+  }
+
+  .ah-tags {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .ah-tag {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 0.2em 0.6em;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+  }
+</style>

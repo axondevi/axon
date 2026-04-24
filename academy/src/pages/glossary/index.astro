@@ -1,0 +1,99 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const allTerms = (await getCollection('glossary'))
+  .sort((a, b) => a.data.term.localeCompare(b.data.term));
+---
+
+<BaseLayout
+  title="Glossário — Axon Academy"
+  description="Definições curtas e precisas de termos em agentes de IA: x402, MCP, embeddings, RAG e mais."
+>
+  <div class="container">
+    <header class="page-header">
+      <div class="ph-eyebrow">Axon Academy</div>
+      <h1>Glossário</h1>
+      <p>Definições curtas de termos em agentes de IA. Quando você precisar recordar rápido.</p>
+    </header>
+
+    {allTerms.length === 0 ? (
+      <div class="empty"><p>Glossário em construção. Volte logo!</p></div>
+    ) : (
+      <div class="glossary">
+        {allTerms.map(t => (
+          <a href={`/learn/glossary/${t.id.replace(/\.(md|mdx)$/, '')}`} class="glossary-item">
+            <strong>{t.data.term}</strong>
+            <span>{t.data.shortDefinition}</span>
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+
+  .page-header { margin-bottom: 3rem; }
+  .ph-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-2);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .page-header h1 { margin: 0 0 0.75rem 0; }
+  .page-header p { color: var(--text-tertiary); font-size: 1.1rem; margin: 0; }
+
+  .empty {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    color: var(--text-tertiary);
+  }
+
+  .glossary { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .glossary-item {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.15s;
+    align-items: center;
+  }
+
+  .glossary-item:hover {
+    border-color: var(--accent-1);
+    text-decoration: none;
+    transform: translateX(3px);
+  }
+
+  .glossary-item strong {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--accent-2);
+  }
+
+  .glossary-item span {
+    font-size: 14px;
+    color: var(--text-tertiary);
+  }
+
+  @media (max-width: 640px) {
+    .glossary-item { grid-template-columns: 1fr; gap: 0.4rem; }
+  }
+</style>

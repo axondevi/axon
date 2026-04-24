@@ -1,0 +1,144 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <span class="gradient-text">Axon</span> Academy
+      </div>
+      <p class="footer-tagline">
+        Tutoriais práticos pra quem constrói agentes de IA de verdade.
+      </p>
+    </div>
+
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h4>Aprender</h4>
+        <ul>
+          <li><a href="/learn/tutorials">Tutoriais</a></li>
+          <li><a href="/learn/guides">Guias conceituais</a></li>
+          <li><a href="/learn/recipes">Recipes</a></li>
+          <li><a href="/learn/glossary">Glossário</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Produto</h4>
+        <ul>
+          <li><a href="https://axon-5zf.pages.dev">Axon.dev</a></li>
+          <li><a href="https://axon-5zf.pages.dev/dashboard">Dashboard</a></li>
+          <li><a href="https://axon-5zf.pages.dev/stats">Stats públicas</a></li>
+          <li><a href="https://axon-5zf.pages.dev/status">Status</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Comunidade</h4>
+        <ul>
+          <li><a href="https://twitter.com/axondevia">Twitter</a></li>
+          <li><a href="https://github.com/axondevi/axon">GitHub</a></li>
+          <li><a href="/learn/submit">Submit a tutorial</a></li>
+          <li><a href="mailto:hello@axon.dev">Contato</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <span>© {year} Axon. MIT License.</span>
+    <span>Feito com <span style="color: var(--accent-1)">◆</span> em BR · Global</span>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    margin-top: 6rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
+  }
+
+  .footer-inner {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 3rem 1.5rem 2rem;
+    display: grid;
+    grid-template-columns: 1.5fr 2fr;
+    gap: 3rem;
+  }
+
+  .footer-logo {
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+
+  .footer-tagline {
+    color: var(--text-tertiary);
+    font-size: 15px;
+    max-width: 280px;
+    margin: 0;
+  }
+
+  .footer-cols {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  .footer-col h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin: 0 0 0.8rem 0;
+    font-weight: 600;
+  }
+
+  .footer-col ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .footer-col li {
+    margin: 0.4rem 0;
+  }
+
+  .footer-col a {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    transition: color 0.15s;
+  }
+
+  .footer-col a:hover {
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  .footer-bottom {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  @media (max-width: 768px) {
+    .footer-inner {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    .footer-cols {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .footer-bottom {
+      flex-direction: column;
+      gap: 0.5rem;
+      text-align: center;
+    }
+  }
+</style>

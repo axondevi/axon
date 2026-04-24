@@ -1,0 +1,89 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Submit a tutorial — Axon Academy"
+  description="Contribute a tutorial, guide, or recipe. Get credit + $20 Axon USDC."
+>
+  <div class="container">
+    <header class="ph">
+      <div class="ph-eyebrow">Contribuir</div>
+      <h1>Envie seu tutorial</h1>
+      <p class="ph-lead">
+        A Academy cresce com ajuda da comunidade. Se você construiu algo interessante
+        com Axon — tutorial, recipe, integração, case de uso — queremos publicar.
+      </p>
+    </header>
+
+    <section class="card">
+      <h2>O que aceitamos</h2>
+      <ul>
+        <li><strong>Tutoriais:</strong> passo-a-passo com código rodável (Python, Node, Go)</li>
+        <li><strong>Recipes:</strong> snippet curto (10-30 linhas) resolvendo um problema</li>
+        <li><strong>Guias:</strong> artigos conceituais sobre agentes, APIs, arquitetura</li>
+        <li><strong>Traduções:</strong> PT-BR ↔ EN de conteúdo existente</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Como enviar</h2>
+      <ol>
+        <li>Fork do repo: <a href="https://github.com/axondevi/axon">github.com/axondevi/axon</a></li>
+        <li>Crie seu arquivo em <code>academy/src/content/tutorials/nome-do-tutorial.mdx</code> (ou <code>guides/</code>, <code>recipes/</code>)</li>
+        <li>Siga o template em <a href="https://github.com/axondevi/axon/blob/main/academy/README.md">academy/README.md</a></li>
+        <li>Abra um Pull Request</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Recompensa</h2>
+      <ul>
+        <li>Byline com seu nome + link pro seu site</li>
+        <li><strong>$20 em créditos Axon USDC</strong> por PR aceito</li>
+        <li>Compartilhamento no Twitter <a href="https://twitter.com/axondevia">@axondevia</a></li>
+        <li>Destaque em "Agent of the Week" se for projeto original</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Dúvidas ou propostas?</h2>
+      <p>
+        Abre uma <a href="https://github.com/axondevi/axon/issues/new">issue no GitHub</a>
+        descrevendo o tema — a gente responde se faz sentido antes de você escrever tudo.
+      </p>
+      <p>
+        Ou manda DM pra <a href="https://twitter.com/axondevia">@axondevia</a>.
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .container { max-width: 720px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+  .ph { margin-bottom: 3rem; text-align: center; }
+  .ph-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-2);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  .ph h1 { margin: 0 0 1rem 0; }
+  .ph-lead { font-size: 1.1rem; color: var(--text-tertiary); max-width: 540px; margin: 0 auto; }
+
+  .card {
+    padding: 1.5rem 1.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+  }
+
+  .card h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+  }
+</style>

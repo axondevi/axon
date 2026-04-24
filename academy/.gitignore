@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.astro/
+.DS_Store
+*.log
+.env
+.env.local
+.vscode/
+.idea/
+
+# Test artifacts (local only — E2E reports, screenshots, temp logs)
+test-artifacts/*.log
+test-artifacts/*.json
+test-artifacts/*.png
+test-artifacts/NEW_MASTER_KEY.txt

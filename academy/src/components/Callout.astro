@@ -1,0 +1,72 @@
+---
+interface Props {
+  type: 'porque' | 'dica' | 'acao' | 'armadilha' | 'tradeoff' | 'info' | 'warning';
+  title?: string;
+}
+
+const { type, title } = Astro.props;
+
+const meta = {
+  porque: { label: 'PORQUÊ', icon: '◆', color: 'var(--accent-1)' },
+  dica: { label: 'DICA', icon: '✦', color: 'var(--success)' },
+  acao: { label: 'AÇÃO SUA', icon: '▶', color: 'var(--accent-2)' },
+  armadilha: { label: 'ARMADILHA', icon: '⚠', color: 'var(--error)' },
+  tradeoff: { label: 'TRADEOFF', icon: '⇄', color: 'var(--warning)' },
+  info: { label: 'INFO', icon: 'i', color: 'var(--accent-2)' },
+  warning: { label: 'ATENÇÃO', icon: '⚠', color: 'var(--warning)' },
+};
+
+const current = meta[type];
+---
+
+<div class="callout" style={`border-left-color: ${current.color}`}>
+  <div class="callout-header">
+    <span class="callout-icon" style={`color: ${current.color}`}>{current.icon}</span>
+    <span class="callout-label" style={`color: ${current.color}`}>{title ?? current.label}</span>
+  </div>
+  <div class="callout-body">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .callout {
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    border-radius: var(--radius-md);
+    border-left: 3px solid;
+    background: var(--bg-secondary);
+  }
+
+  .callout-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .callout-icon {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .callout-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .callout-body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .callout-body :global(p) {
+    color: var(--text-secondary);
+    font-size: 15px;
+  }
+
+  .callout-body :global(code) {
+    font-size: 0.85em;
+  }
+</style>

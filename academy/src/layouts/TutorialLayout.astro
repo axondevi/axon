@@ -1,0 +1,100 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import ArticleHeader from '../components/ArticleHeader.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+import NextTutorial from '../components/NextTutorial.astro';
+import TryOnAxon from '../components/TryOnAxon.astro';
+
+interface Props {
+  frontmatter: {
+    title: string;
+    subtitle?: string;
+    description: string;
+    category: string;
+    difficulty: 'iniciante' | 'intermediario' | 'avancado';
+    timeMinutes: number;
+    author: string;
+    publishedAt: Date;
+    updatedAt?: Date;
+    lang?: 'pt-BR' | 'en';
+    tags?: string[];
+  };
+  headings: Array<{ depth: number; text: string; slug: string }>;
+  nextItems?: Array<{ title: string; description: string; url: string; timeMinutes?: number; difficulty?: string }>;
+}
+
+const { frontmatter, headings, nextItems = [] } = Astro.props;
+---
+
+<BaseLayout
+  title={frontmatter.title}
+  description={frontmatter.description}
+  lang={frontmatter.lang}
+>
+  <div class="tutorial-wrap">
+    <div class="tutorial-layout">
+      <article class="tutorial-article">
+        <ArticleHeader
+          title={frontmatter.title}
+          subtitle={frontmatter.subtitle}
+          category={frontmatter.category}
+          difficulty={frontmatter.difficulty}
+          timeMinutes={frontmatter.timeMinutes}
+          lang={frontmatter.lang}
+          publishedAt={frontmatter.publishedAt}
+          updatedAt={frontmatter.updatedAt}
+          author={frontmatter.author}
+          tags={frontmatter.tags}
+        />
+
+        <div class="tutorial-body">
+          <slot />
+        </div>
+
+        <TryOnAxon />
+
+        {nextItems.length > 0 && <NextTutorial items={nextItems} />}
+      </article>
+
+      <aside class="tutorial-side">
+        <TableOfContents headings={headings} />
+      </aside>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .tutorial-wrap {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+
+  .tutorial-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 3rem;
+  }
+
+  .tutorial-article {
+    max-width: 720px;
+    min-width: 0;
+  }
+
+  .tutorial-body :global(h2) {
+    scroll-margin-top: 80px;
+  }
+
+  .tutorial-body :global(h3) {
+    scroll-margin-top: 80px;
+  }
+
+  @media (max-width: 1024px) {
+    .tutorial-layout {
+      grid-template-columns: 1fr;
+    }
+    .tutorial-side {
+      display: none;
+    }
+  }
+</style>

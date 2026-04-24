@@ -1,0 +1,296 @@
+/* ===== Axon Academy — Global Styles ===== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Colors — mirror landing Axon */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #13131a;
+  --bg-tertiary: #1a1a24;
+  --bg-code: #0d0d12;
+  --bg-card: rgba(255, 255, 255, 0.02);
+  --bg-card-hover: rgba(255, 255, 255, 0.04);
+
+  --text-primary: #f0f0f5;
+  --text-secondary: #c9c9d9;
+  --text-tertiary: #9c9cb3;
+  --text-muted: #6b6b85;
+
+  --accent-1: #7c5cff;
+  --accent-2: #5c8aff;
+  --gradient: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+
+  --border: #2a2a35;
+  --border-soft: rgba(255, 255, 255, 0.06);
+
+  /* Typography */
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* Sizing */
+  --content-width: 680px;
+  --content-wide: 1100px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--accent-1);
+  color: #fff;
+}
+
+html {
+  background: var(--bg-primary);
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 17px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.6em 0;
+  color: var(--text-primary);
+}
+
+h1 { font-size: clamp(2rem, 4.5vw, 3rem); font-weight: 800; letter-spacing: -0.03em; }
+h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin-top: 2.5em; }
+h3 { font-size: 1.35rem; margin-top: 2em; color: var(--accent-2); }
+h4 { font-size: 1.1rem; margin-top: 1.8em; color: var(--text-secondary); }
+
+/* Paragraphs */
+p {
+  margin: 0 0 1.2em 0;
+  color: var(--text-secondary);
+}
+
+/* Links */
+a {
+  color: var(--accent-2);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: var(--accent-1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Inline code */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-code);
+  color: #e4e4ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* Code blocks — Shiki outputs <pre class="astro-code"> */
+pre {
+  background: var(--bg-code) !important;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-1);
+  border-radius: var(--radius-md);
+  padding: 1.2em 1.4em;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  position: relative;
+}
+
+pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Blockquote */
+blockquote {
+  margin: 1.5em 0;
+  padding: 1em 1.5em;
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--accent-1);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+blockquote p:last-child { margin-bottom: 0; }
+
+/* Lists */
+ul, ol {
+  margin: 1em 0 1.5em 0;
+  padding-left: 1.5em;
+}
+
+li {
+  margin: 0.4em 0;
+  color: var(--text-secondary);
+}
+
+li::marker {
+  color: var(--accent-1);
+}
+
+/* Horizontal rule */
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 3em 0;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: 15px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+thead {
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.12), rgba(92, 138, 255, 0.12));
+}
+
+th, td {
+  padding: 0.8em 1em;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+tr:last-child td { border-bottom: none; }
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+/* Strong and em */
+strong { color: var(--text-primary); font-weight: 600; }
+
+/* Container */
+.container {
+  max-width: var(--content-wide);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.container-narrow {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.75em 1.5em;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-body);
+}
+
+.btn-primary {
+  background: var(--gradient);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  text-decoration: none;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 92, 255, 0.25);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-1);
+  text-decoration: none;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  body { font-size: 16px; }
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+  pre { font-size: 13px; padding: 1em; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

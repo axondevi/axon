@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0f"/>
+      <stop offset="50%" style="stop-color:#1a0d2e"/>
+      <stop offset="100%" style="stop-color:#0a1a2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c5cff"/>
+      <stop offset="100%" style="stop-color:#5c8aff"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="70%" cy="30%" r="50%">
+      <stop offset="0%" style="stop-color:#7c5cff;stop-opacity:0.25"/>
+      <stop offset="100%" style="stop-color:#7c5cff;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="900" cy="150" r="300" fill="url(#glow)"/>
+
+  <!-- Logo mark -->
+  <path d="M 100 90 L 145 180 L 125 180 L 100 130 L 75 180 L 55 180 Z" fill="url(#accent)"/>
+
+  <!-- Brand -->
+  <text x="170" y="165" font-family="Inter, sans-serif" font-size="48" font-weight="800" fill="#f0f0f5" letter-spacing="-2">
+    Axon <tspan font-weight="400" fill="#9c9cb3">Academy</tspan>
+  </text>
+
+  <!-- Main title -->
+  <text x="100" y="340" font-family="Inter, sans-serif" font-size="72" font-weight="800" fill="#f0f0f5" letter-spacing="-3">
+    Aprenda a construir
+  </text>
+  <text x="100" y="430" font-family="Inter, sans-serif" font-size="72" font-weight="800" fill="url(#accent)" letter-spacing="-3">
+    agentes de IA de verdade.
+  </text>
+
+  <!-- Subtitle -->
+  <text x="100" y="500" font-family="Inter, sans-serif" font-size="24" fill="#c9c9d9">
+    Tutoriais, guias e recipes pra devs.
+  </text>
+
+  <!-- Pills -->
+  <rect x="100" y="540" width="150" height="40" rx="20" fill="#13131a" stroke="#2a2a35"/>
+  <text x="175" y="565" text-anchor="middle" font-family="Inter, sans-serif" font-size="15" fill="#c9c9d9">◆ 28 APIs</text>
+
+  <rect x="260" y="540" width="150" height="40" rx="20" fill="#13131a" stroke="#2a2a35"/>
+  <text x="335" y="565" text-anchor="middle" font-family="Inter, sans-serif" font-size="15" fill="#c9c9d9">⚡ x402 / USDC</text>
+
+  <rect x="420" y="540" width="150" height="40" rx="20" fill="#13131a" stroke="#2a2a35"/>
+  <text x="495" y="565" text-anchor="middle" font-family="Inter, sans-serif" font-size="15" fill="#c9c9d9">🇧🇷 Dados BR</text>
+</svg>

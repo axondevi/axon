@@ -1,0 +1,23 @@
+{
+  "name": "@axon/academy",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Axon Academy — tutorials, guides, and recipes for AI agent builders",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^4.0.0",
+    "@astrojs/sitemap": "^3.2.0",
+    "astro": "^5.0.0",
+    "shiki": "^1.24.0"
+  },
+  "devDependencies": {
+    "puppeteer": "^23.11.1"
+  }
+}

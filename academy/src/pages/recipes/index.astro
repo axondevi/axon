@@ -1,0 +1,115 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const allRecipes = (await getCollection('recipes'))
+  .sort((a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime());
+---
+
+<BaseLayout
+  title="Recipes — Axon Academy Cookbook"
+  description="Snippets curtos de código pra resolver problemas específicos. Copy, paste, rode."
+>
+  <div class="container">
+    <header class="page-header">
+      <div class="ph-eyebrow">Cookbook</div>
+      <h1>Recipes</h1>
+      <p>Snippets curtos que resolvem um problema específico. Sem teoria.</p>
+    </header>
+
+    {allRecipes.length === 0 ? (
+      <div class="empty">
+        <p>Ainda não publicamos recipes. Volte logo!</p>
+      </div>
+    ) : (
+      <div class="recipe-grid">
+        {allRecipes.map(r => (
+          <a href={`/learn/recipes/${r.id.replace(/\.(md|mdx)$/, '')}`} class="recipe-card">
+            <h3>{r.data.title}</h3>
+            <p>{r.data.description}</p>
+            {r.data.stack.length > 0 && (
+              <div class="recipe-stack">
+                {r.data.stack.map(s => <span class="recipe-stack-item">{s}</span>)}
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+
+  .page-header { margin-bottom: 3rem; }
+  .ph-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-2);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .page-header h1 { margin: 0 0 0.75rem 0; }
+  .page-header p { color: var(--text-tertiary); font-size: 1.1rem; margin: 0; }
+
+  .empty {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    color: var(--text-tertiary);
+  }
+
+  .recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+
+  .recipe-card {
+    padding: 1.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+  }
+
+  .recipe-card:hover {
+    border-color: var(--accent-1);
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
+
+  .recipe-card h3 {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+  }
+
+  .recipe-card p {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    margin: 0 0 0.75rem 0;
+    line-height: 1.5;
+  }
+
+  .recipe-stack { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .recipe-stack-item {
+    font-size: 11px;
+    padding: 0.2em 0.6em;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+  }
+</style>

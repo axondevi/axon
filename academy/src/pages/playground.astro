@@ -1,0 +1,389 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TryCall from '../components/TryCall.astro';
+---
+
+<BaseLayout
+  title="Playground — Axon Academy"
+  description="Construa seu primeiro agente de IA no browser, usando seus $0.50 grátis. Zero instalação, respostas reais, custo real."
+>
+  <div class="container">
+    <!-- HERO -->
+    <div class="pg-hero">
+      <div class="pg-badge">◆ INTERATIVO · AO VIVO</div>
+      <h1 class="pg-title">
+        Construa seu primeiro agente <span class="gradient-text">no browser</span>.
+      </h1>
+      <p class="pg-sub">
+        Zero instalação. Zero Python. Zero setup. Email + 60 segundos =
+        seu primeiro agente rodando com <strong>$0.50 USDC grátis</strong>.
+      </p>
+      <div class="pg-stats">
+        <div class="pg-stat">
+          <div class="pg-stat-num">60s</div>
+          <div class="pg-stat-lbl">até primeira chamada</div>
+        </div>
+        <div class="pg-stat">
+          <div class="pg-stat-num">$0.50</div>
+          <div class="pg-stat-lbl">crédito USDC grátis</div>
+        </div>
+        <div class="pg-stat">
+          <div class="pg-stat-num">28</div>
+          <div class="pg-stat-lbl">APIs disponíveis</div>
+        </div>
+        <div class="pg-stat">
+          <div class="pg-stat-num">0</div>
+          <div class="pg-stat-lbl">cartão de crédito</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 1: Signup + CNPJ -->
+    <section class="pg-step">
+      <div class="pg-step-num">1</div>
+      <div class="pg-step-body">
+        <h2>Consultar uma empresa brasileira pelo CNPJ</h2>
+        <p>
+          Sua primeira chamada de API real. Você vai consultar dados oficiais
+          de uma empresa usando o <strong>BrasilAPI</strong> via Axon.
+          Se ainda não tem chave, pede email e você ganha $0.50 pra testar.
+        </p>
+
+        <TryCall
+          api="brasilapi"
+          endpoint="cnpj"
+          title="Consultar CNPJ"
+          description="Digite um CNPJ (só números, sem pontuação) e clique rodar. Resposta real do governo brasileiro."
+          paramStyle="query"
+          paramFields={[
+            { name: 'cnpj', label: 'CNPJ', default: '00000000000191', placeholder: '14 dígitos, ex: 00000000000191' },
+          ]}
+          examples={[
+            { label: 'Banco do Brasil', values: { cnpj: '00000000000191' } },
+            { label: 'Petrobras', values: { cnpj: '33000167000101' } },
+            { label: 'Vale', values: { cnpj: '33592510000154' } },
+          ]}
+        />
+
+        <div class="pg-learn">
+          <strong>O que acabou de acontecer:</strong> seu browser → Axon → BrasilAPI → volta pra você.
+          O Axon validou sua key, cacheou a resposta, debitou USDC do seu saldo (menos de $0.001), e
+          ainda te devolveu headers com custo exato e latência.
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: CEP -->
+    <section class="pg-step">
+      <div class="pg-step-num">2</div>
+      <div class="pg-step-body">
+        <h2>Consultar um endereço pelo CEP</h2>
+        <p>
+          Mesma Axon key, API diferente. Sua chave funciona pra <strong>28 APIs
+          distintas</strong> — você não precisou criar conta em nenhuma delas.
+        </p>
+
+        <TryCall
+          api="brasilapi"
+          endpoint="cep"
+          title="Consultar CEP"
+          description="Digite um CEP (8 dígitos, com ou sem hífen). Retorna rua, bairro, cidade, UF."
+          paramStyle="query"
+          paramFields={[
+            { name: 'cep', label: 'CEP', default: '01310100', placeholder: 'ex: 01310100' },
+          ]}
+          examples={[
+            { label: 'Av. Paulista', values: { cep: '01310100' } },
+            { label: 'Copacabana', values: { cep: '22070900' } },
+            { label: 'Pelourinho', values: { cep: '40026010' } },
+          ]}
+        />
+
+        <div class="pg-learn">
+          <strong>Repara:</strong> no canto superior seu saldo está sendo atualizado em tempo real.
+          Cada chamada debitou micro-centavos. E na segunda vez que você rodar o mesmo CEP,
+          a resposta vem do cache ao <strong>50% do preço</strong>.
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: OpenWeather -->
+    <section class="pg-step">
+      <div class="pg-step-num">3</div>
+      <div class="pg-step-body">
+        <h2>Consultar clima com uma API global</h2>
+        <p>
+          Pra mostrar que não é só API brasileira: <strong>OpenWeather</strong>.
+          Mesma chave. Sem cadastro separado. Sem plano mensal de $0-50.
+        </p>
+
+        <TryCall
+          api="openweather"
+          endpoint="current"
+          title="Consultar clima"
+          method="GET"
+          paramStyle="query"
+          description="Qual cidade? Retorna temperatura, clima, umidade — do OpenWeatherMap."
+          paramFields={[
+            { name: 'q', label: 'Cidade', default: 'Sao Paulo,BR', placeholder: 'ex: London,UK' },
+            { name: 'units', label: 'Unidade', default: 'metric', placeholder: 'metric | imperial' },
+          ]}
+          examples={[
+            { label: 'São Paulo', values: { q: 'Sao Paulo,BR', units: 'metric' } },
+            { label: 'Lisboa', values: { q: 'Lisbon,PT', units: 'metric' } },
+            { label: 'Tóquio', values: { q: 'Tokyo,JP', units: 'metric' } },
+          ]}
+        />
+
+        <div class="pg-learn">
+          <strong>Nova API, mesma chave.</strong> Isso é o ponto do Axon. Quando você
+          tá construindo um agente real, ele pode precisar de 5, 10, 15 APIs. Sem
+          Axon = 15 cadastros. Com Axon = 1.
+        </div>
+      </div>
+    </section>
+
+    <!-- WHAT YOU DID -->
+    <section class="pg-done">
+      <h2>Você acabou de construir um agente.</h2>
+      <p>
+        Três APIs diferentes. Uma chave. Um saldo. Respostas reais. Custo mínimo.
+        Em código, isso é um agente de IA que consulta empresa, localização e clima
+        — útil pra dezenas de casos de uso (cadastro automático, lead enrichment,
+        assistente de atendimento).
+      </p>
+
+      <div class="pg-next-grid">
+        <a href="/learn/tutorials/primeiro-agente-apis-brasileiras" class="pg-next-card">
+          <div class="pg-next-icon">📘</div>
+          <h3>Tutorial completo em Python</h3>
+          <p>Transforma isso num agente Python com LLM (GPT-4o-mini) que interpreta as respostas.</p>
+        </a>
+        <a href="/learn/tutorials/self-paying-research-agent" class="pg-next-card">
+          <div class="pg-next-icon">🌐</div>
+          <h3>Self-Paying Research Agent (EN)</h3>
+          <p>Vercel AI SDK + tool use. Agente que busca na web, scraped, sintetiza.</p>
+        </a>
+        <a href="https://axon-5zf.pages.dev/dashboard" class="pg-next-card" target="_blank">
+          <div class="pg-next-icon">📊</div>
+          <h3>Dashboard completo ↗</h3>
+          <p>Veja todos os requests, custos, cache hits do seu agente em tempo real.</p>
+        </a>
+        <a href="/learn/guides" class="pg-next-card">
+          <div class="pg-next-icon">📖</div>
+          <h3>Guias Conceituais</h3>
+          <p>Entenda x402, MCP, cache semântico e arquitetura de agentes.</p>
+        </a>
+      </div>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: var(--content-wide);
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* Hero */
+  .pg-hero {
+    text-align: center;
+    padding: 3rem 0 4rem;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 4rem;
+    position: relative;
+  }
+
+  .pg-hero::before {
+    content: "";
+    position: absolute;
+    top: -40%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;
+    height: 140%;
+    background: radial-gradient(ellipse, rgba(124, 92, 255, 0.15) 0%, transparent 60%);
+    z-index: -1;
+  }
+
+  .pg-badge {
+    display: inline-block;
+    padding: 0.4em 1em;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-1);
+    border-radius: 100px;
+    font-size: 11px;
+    color: var(--accent-1);
+    letter-spacing: 0.12em;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+  }
+
+  .pg-title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    margin: 0 0 1.25rem 0;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .pg-sub {
+    font-size: 1.1rem;
+    color: var(--text-tertiary);
+    max-width: 640px;
+    margin: 0 auto 3rem;
+    line-height: 1.6;
+  }
+
+  .pg-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .pg-stat {
+    padding: 1.25rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .pg-stat-num {
+    font-size: 1.75rem;
+    font-weight: 800;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+
+  .pg-stat-lbl {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Steps */
+  .pg-step {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 1.5rem;
+    margin-bottom: 4rem;
+    align-items: flex-start;
+  }
+
+  .pg-step-num {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--gradient);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    position: sticky;
+    top: 80px;
+    box-shadow: 0 4px 16px rgba(124, 92, 255, 0.3);
+  }
+
+  .pg-step-body h2 {
+    font-size: 1.5rem;
+    margin: 0 0 0.75rem 0;
+  }
+
+  .pg-step-body > p {
+    color: var(--text-tertiary);
+    margin: 0 0 1.5rem 0;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .pg-learn {
+    padding: 1rem 1.25rem;
+    background: rgba(34, 197, 94, 0.05);
+    border-left: 3px solid var(--success);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-top: 1rem;
+  }
+
+  /* Done section */
+  .pg-done {
+    margin-top: 5rem;
+    padding: 3rem 2rem;
+    background: linear-gradient(135deg, rgba(124, 92, 255, 0.08), rgba(92, 138, 255, 0.05));
+    border: 1px solid var(--accent-1);
+    border-radius: var(--radius-lg);
+    text-align: center;
+  }
+
+  .pg-done h2 {
+    font-size: 2rem;
+    margin: 0 0 1rem 0;
+  }
+
+  .pg-done > p {
+    max-width: 560px;
+    margin: 0 auto 2.5rem;
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+
+  .pg-next-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    text-align: left;
+  }
+
+  .pg-next-card {
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+  }
+
+  .pg-next-card:hover {
+    border-color: var(--accent-1);
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
+
+  .pg-next-icon {
+    font-size: 1.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .pg-next-card h3 {
+    font-size: 1rem;
+    margin: 0 0 0.4rem 0;
+  }
+
+  .pg-next-card p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+  }
+
+  @media (max-width: 768px) {
+    .pg-stats { grid-template-columns: repeat(2, 1fr); }
+    .pg-step { grid-template-columns: 44px 1fr; gap: 1rem; }
+    .pg-step-num { width: 40px; height: 40px; font-size: 1.1rem; }
+    .pg-done { padding: 2rem 1.25rem; }
+  }
+</style>
