@@ -1658,6 +1658,68 @@
         return Array.from(IMAGE_CACHE.values());
       }
 
+      // ============================================================
+      // Conversation persistence (localStorage). Survives F5; cleared
+      // explicitly via the reset button. System prompt is NOT saved
+      // — we always boot the user into the latest version of it.
+      // ============================================================
+      const CONVO_KEY = 'axon.convo.v1';
+      const MAX_PERSISTED_MESSAGES = 100;
+      let _saveConvoTimer = null;
+
+      function saveConversation() {
+        if (!agentSession || !Array.isArray(agentSession.messages)) return;
+        // Drop the leading system message + any empty assistant placeholder
+        const persistable = agentSession.messages
+          .slice(1)
+          .filter((m) => {
+            if (m.role === 'assistant' && !m.content && !(m.tool_calls && m.tool_calls.length)) return false;
+            return true;
+          })
+          .slice(-MAX_PERSISTED_MESSAGES);
+
+        const payload = JSON.stringify({
+          messages: persistable,
+          spend: agentSession.spend || 0,
+          cacheSaved: agentSession.cacheSaved || 0,
+          updatedAt: Date.now(),
+        });
+
+        try {
+          localStorage.setItem(CONVO_KEY, payload);
+        } catch {
+          // Quota exceeded — keep only the second half and retry
+          try {
+            const half = persistable.slice(Math.floor(persistable.length / 2));
+            localStorage.setItem(CONVO_KEY, JSON.stringify({
+              messages: half, spend: agentSession.spend || 0, cacheSaved: agentSession.cacheSaved || 0, updatedAt: Date.now(),
+            }));
+          } catch {
+            try { localStorage.removeItem(CONVO_KEY); } catch {}
+          }
+        }
+      }
+
+      // Debounce: every push schedules at most one save per 500ms
+      function scheduleSaveConversation() {
+        if (_saveConvoTimer) clearTimeout(_saveConvoTimer);
+        _saveConvoTimer = setTimeout(() => { _saveConvoTimer = null; saveConversation(); }, 500);
+      }
+
+      function loadConversation() {
+        try {
+          const raw = localStorage.getItem(CONVO_KEY);
+          if (!raw) return null;
+          const j = JSON.parse(raw);
+          if (!j || !Array.isArray(j.messages)) return null;
+          return j;
+        } catch { return null; }
+      }
+
+      function clearConversation() {
+        try { localStorage.removeItem(CONVO_KEY); } catch {}
+      }
+
       // Toggle expand/collapse on a transaction row, fills detail panel on first open
       function toggleTxDetail(idx) {
         const row = document.getElementById('tx-row-' + idx);
@@ -2072,6 +2134,7 @@
         if (stopBtn) stopBtn.hidden = false;
 
         agentSession.messages.push({ role: 'user', content: userText });
+        scheduleSaveConversation();
         renderAgentChat();
 
         try {
@@ -2172,15 +2235,36 @@
           agentSession.abortController = null;
           if (runBtn) { runBtn.disabled = false; runBtn.textContent = 'Run'; }
           if (stopBtn) stopBtn.hidden = true;
+          // Persist final state of the turn (debounced will fire ~500ms later)
+          scheduleSaveConversation();
+          // Also flush immediately so a fast page-close still keeps the turn
+          if (_saveConvoTimer) { clearTimeout(_saveConvoTimer); _saveConvoTimer = null; saveConversation(); }
         }
       }
 
-      function initAgentChat() {
+      async function initAgentChat() {
         if (localStorage.getItem(AGENT_CAP_ACK_KEY) !== '1') {
           showFirstRunModal();
         }
         resetAgentSession();
-        restoreGallery();
+        // Wait for image cache to populate so persisted @img:<id> refs in chat
+        // history resolve to data URLs on first render
+        await restoreGallery();
+        // Re-attach images to current session in case they came in after reset
+        for (const it of getCachedImages()) {
+          agentSession.images[it.id] = it.dataUrl;
+        }
+        // Restore prior conversation if any
+        const saved = loadConversation();
+        if (saved && saved.messages && saved.messages.length) {
+          agentSession.messages = [agentSession.messages[0], ...saved.messages];
+          agentSession.spend = Number(saved.spend) || 0;
+          agentSession.cacheSaved = Number(saved.cacheSaved) || 0;
+          renderAgentChat();
+          renderAgentFooter();
+          showToast(`${saved.messages.filter(m => m.role !== 'tool').length} messages restored`, 'info');
+        }
+
         document.getElementById('agent-run').onclick = () => {
           const input = document.getElementById('agent-input');
           const text = input.value.trim();
@@ -2196,7 +2280,9 @@
             agentSession.abortController.abort();
           }
           clearGallery();
+          clearConversation();
           resetAgentSession();
+          showToast('Session reset', 'info');
         };
         const input = document.getElementById('agent-input');
         if (input) {
