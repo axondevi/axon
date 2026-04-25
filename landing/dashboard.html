@@ -2198,6 +2198,50 @@
         document.getElementById('agent-first-run-cancel').onclick = () => modal.remove();
       }
 
+      // Sliding context window — keeps system prompt + most recent budget of
+      // tokens, dropping older user/assistant/tool turns. Approx by chars/4
+      // since we don't have a tokenizer in the browser. Tool/assistant pairs
+      // are kept together so we don't orphan a tool result without its call.
+      // Llama 3.3 70B context is 32K tokens; we cap at ~22K (~88K chars) of
+      // history to leave headroom for tool definitions + completion.
+      const CTX_CHAR_BUDGET = 88000;
+
+      function trimContextWindow(messages) {
+        if (!messages || messages.length <= 2) return messages;
+        const sys = messages[0] && messages[0].role === 'system' ? messages[0] : null;
+        const rest = sys ? messages.slice(1) : messages;
+        const sysChars = sys ? (typeof sys.content === 'string' ? sys.content.length : 0) : 0;
+
+        // Walk from the END backwards, including messages until budget exhausted.
+        // If a tool message is included, its preceding assistant (with the
+        // matching tool_call) must also be included — otherwise the API rejects.
+        let charBudget = CTX_CHAR_BUDGET - sysChars;
+        const keep = [];
+        for (let i = rest.length - 1; i >= 0; i--) {
+          const m = rest[i];
+          const len = (typeof m.content === 'string' ? m.content.length : 0) +
+            (m.tool_calls ? JSON.stringify(m.tool_calls).length : 0);
+          if (len > charBudget && keep.length > 0) break;
+          keep.push(m);
+          charBudget -= len;
+        }
+        keep.reverse();
+
+        // Sanity: drop any leading tool message whose tool_call isn't in keep
+        const callIdsInKeep = new Set();
+        for (const m of keep) {
+          if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+            for (const tc of m.tool_calls) callIdsInKeep.add(tc.id);
+          }
+        }
+        const cleaned = keep.filter((m) => {
+          if (m.role !== 'tool') return true;
+          return callIdsInKeep.has(m.tool_call_id);
+        });
+
+        return sys ? [sys, ...cleaned] : cleaned;
+      }
+
       // Streaming chat completion against Groq via Axon. Calls onPartial each time
       // the accumulated message changes so the UI can render text + tool calls
       // as they arrive. Returns the same shape as the old non-streaming version
@@ -2229,9 +2273,20 @@
           // On error the body is JSON, not SSE
           const text = await res.text().catch(() => '');
           let parsed = null; try { parsed = JSON.parse(text); } catch {}
-          const msg = (parsed && (parsed.message || parsed.error || (parsed.error && parsed.error.message))) || (`groq/chat ${res.status}`);
+          // Groq nests messages under .error.{message,code,type}; gateway sometimes uses .message
+          let msg = '';
+          if (parsed) {
+            if (typeof parsed.message === 'string') msg = parsed.message;
+            else if (parsed.error && typeof parsed.error.message === 'string') msg = parsed.error.message;
+            else if (typeof parsed.error === 'string') msg = parsed.error;
+            else if (parsed.error && typeof parsed.error === 'object') {
+              try { msg = JSON.stringify(parsed.error); } catch { msg = ''; }
+            }
+          }
+          if (!msg) msg = text.slice(0, 300) || `groq/chat ${res.status}`;
           const err = new Error(msg);
           err.status = res.status; err.cost = cost; err.cache = cache; err.latency = latency;
+          err.code = parsed && (parsed.code || (parsed.error && parsed.error.code)) || null;
           // surface failed_generation if present (helps debug Llama tool_use_failed)
           if (parsed && parsed.failed_generation) err.failedGeneration = parsed.failed_generation;
           throw err;
@@ -2405,8 +2460,13 @@
               requestAnimationFrame(() => { scheduled = false; renderAgentChat(); });
             };
 
+            // Sliding context window — keep system prompt + last MAX_CTX msgs.
+            // Llama 3.3 70B has 32K context; with persisted convos + tool results
+            // it's easy to overflow. Drop oldest non-system messages when too long.
+            const trimmed = trimContextWindow(agentSession.messages.slice(0, -1));
+
             const { body, cost } = await callGroq(
-              agentSession.messages.slice(0, -1),
+              trimmed,
               AGENT_TOOLS,
               agentSession.abortController.signal,
               (partial) => {
@@ -2480,14 +2540,26 @@
           if (err.name === 'AbortError') {
             agentSession.messages.push({ role: 'assistant', content: '(interrupted)' });
           } else {
-            agentSession.messages.push({ role: 'assistant', content: '(error: ' + err.message + ')' });
+            // Friendlier message for the most common cases
+            let display = err.message || String(err);
+            if (err.code === 'context_length_exceeded' || /context.*length|too\s*large|tokens/i.test(display)) {
+              display = 'Context window exceeded. Click reset to start a fresh conversation.';
+            }
+            agentSession.messages.push({ role: 'assistant', content: '(error: ' + display + ')' });
+            showToast(display, 'error');
           }
-          renderAgentChat();
+          // Drop the placeholder message that never got filled
+          const last = agentSession.messages[agentSession.messages.length - 2];
+          if (last && last.role === 'assistant' && !last.content && !last.tool_calls) {
+            agentSession.messages.splice(agentSession.messages.length - 2, 1);
+          }
         } finally {
           agentSession.running = false;
           agentSession.abortController = null;
           if (runBtn) { runBtn.disabled = false; runBtn.textContent = 'Run'; }
           if (stopBtn) stopBtn.hidden = true;
+          // Re-render AFTER running=false so the typing indicator goes away
+          renderAgentChat();
           // Persist final state of the turn (debounced will fire ~500ms later)
           scheduleSaveConversation();
           // Also flush immediately so a fast page-close still keeps the turn
