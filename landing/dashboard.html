@@ -1354,12 +1354,69 @@
         return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
       }
 
-      // Append a generated image to the strip above chat. Survives until session reset.
-      function addToGallery(id, dataUrl, prompt) {
+      // Persisted gallery — images survive page refresh up to MAX_GALLERY items.
+      // Each image is ~2MB base64 so we cap aggressively to fit localStorage quota.
+      const GALLERY_KEY = 'axon.gallery.v1';
+      const MAX_GALLERY = 8;
+
+      function loadGalleryFromStorage() {
+        try {
+          const raw = localStorage.getItem(GALLERY_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed.items) ? parsed.items : [];
+        } catch { return []; }
+      }
+
+      function saveGalleryToStorage(items) {
+        // Keep dropping the oldest until it fits — data URLs blow past quota fast
+        let trimmed = items.slice(-MAX_GALLERY);
+        while (trimmed.length) {
+          try {
+            localStorage.setItem(GALLERY_KEY, JSON.stringify({ items: trimmed }));
+            return trimmed;
+          } catch (e) {
+            if (trimmed.length === 1) {
+              // Even one image doesn't fit — give up gracefully
+              try { localStorage.removeItem(GALLERY_KEY); } catch {}
+              return [];
+            }
+            trimmed = trimmed.slice(1);
+          }
+        }
+        return [];
+      }
+
+      // Append a generated image to the strip above chat. Persisted across refresh.
+      function addToGallery(id, dataUrl, prompt, opts) {
+        opts = opts || {};
         const strip = document.getElementById('gallery-strip');
         if (!strip) return;
+
+        // Persist (unless we're restoring from storage)
+        if (!opts.skipPersist) {
+          // Also keep the dataUrl reachable from agent's @img:<id> references after a reload
+          if (!agentSession) {
+            agentSession = { images: {} };
+          }
+          if (!agentSession.images) agentSession.images = {};
+          agentSession.images[id] = dataUrl;
+
+          const items = loadGalleryFromStorage();
+          items.push({ id, dataUrl, prompt: prompt || '', createdAt: Date.now() });
+          const persisted = saveGalleryToStorage(items);
+          // If older items got evicted from storage, clean their tiles too
+          if (persisted.length < items.length) {
+            const keep = new Set(persisted.map(x => x.id));
+            strip.querySelectorAll('.gallery-tile').forEach(t => {
+              if (!keep.has(t.dataset.id)) t.remove();
+            });
+          }
+        }
+
         const tile = document.createElement('div');
         tile.className = 'gallery-tile';
+        tile.dataset.id = id;
         tile.title = prompt || id;
         tile.innerHTML = `
           <img src="${dataUrl}" alt="${escapeHtml(prompt || '')}" />
@@ -1388,12 +1445,21 @@
         strip.scrollTo({ left: strip.scrollWidth, behavior: 'smooth' });
       }
 
+      function restoreGallery() {
+        const items = loadGalleryFromStorage();
+        if (!items.length) return;
+        for (const it of items) {
+          addToGallery(it.id, it.dataUrl, it.prompt, { skipPersist: true });
+        }
+      }
+
       function clearGallery() {
         const strip = document.getElementById('gallery-strip');
         if (!strip) return;
         // Keep the label, drop everything else
         strip.querySelectorAll('.gallery-tile').forEach(t => t.remove());
         strip.hidden = true;
+        try { localStorage.removeItem(GALLERY_KEY); } catch {}
       }
 
       // Toggle expand/collapse on a transaction row, fills detail panel on first open
@@ -1469,7 +1535,11 @@
           running: false,
           abortController: null,
         };
-        clearGallery();
+        // Re-attach persisted images to the in-memory map so chat history
+        // markdown that references @img:<id> can still resolve to data URLs
+        for (const it of loadGalleryFromStorage()) {
+          agentSession.images[it.id] = it.dataUrl;
+        }
         renderAgentChat();
         renderAgentBrain();
         renderAgentFooter();
@@ -1808,6 +1878,7 @@
           showFirstRunModal();
         }
         resetAgentSession();
+        restoreGallery();
         document.getElementById('agent-run').onclick = () => {
           const input = document.getElementById('agent-input');
           const text = input.value.trim();
@@ -1822,6 +1893,7 @@
           if (agentSession.running && agentSession.abortController) {
             agentSession.abortController.abort();
           }
+          clearGallery();
           resetAgentSession();
         };
         const input = document.getElementById('agent-input');
