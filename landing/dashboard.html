@@ -366,6 +366,7 @@
       .stat.cost      { background: rgba(124,92,255,0.12); color: #b59aff; }
       .stat.cache-hit { background: rgba(25,213,198,0.12); color: var(--accent-2); }
       .stat.cache-miss{ background: rgba(154,154,164,0.1); color: var(--text-dim); }
+      .stat.cache-local{ background: rgba(251,191,36,0.12); color: #fbbf24; }
       .stat.latency   { background: rgba(154,154,164,0.1); color: var(--text-dim); }
       .stat.err       { background: rgba(255,95,87,0.15); color: var(--danger); }
       .stat.pending {
@@ -579,6 +580,8 @@
                     <button class="chip" data-tpl="Compare ponto a ponto: ">📊 Comparar</button>
                     <button class="chip" data-tpl="Escreva código JavaScript completo, com comentários, que: ">💻 Código</button>
                     <button class="chip" data-tpl="Extraia o conteúdo principal dessa URL e resuma em bullets: ">🌐 Extrair URL</button>
+                    <button class="chip" data-tpl="Calcule passo-a-passo e mostre o resultado: ">🧮 Calcular</button>
+                    <button class="chip" data-tpl="Escreva e execute JavaScript que: ">⚙️ Executar JS</button>
                   </div>
                   <div class="agent-input-bar">
                     <textarea id="agent-input" placeholder="Fala com o agente — ele pesquisa, compara, escreve, programa. Tenta: &quot;Pesquise sobre o protocolo x402 e escreva um resumo em markdown com bullets e um exemplo de código.&quot;" rows="3"></textarea>
@@ -770,7 +773,7 @@
       const AGENT_MODEL = 'llama-3.3-70b-versatile';
       const SOFT_CAP = 0.50;
       const HARD_CAP = 2.00;
-      const MAX_TOOL_CALLS_PER_TURN = 10;
+      const MAX_TOOL_CALLS_PER_TURN = 15;
       const TOOL_TIMEOUT_MS = 15000;
       const AGENT_CAP_ACK_KEY = 'axon.agentCapAck';
 
@@ -877,6 +880,101 @@
           },
           _axon: { api: 'firecrawl', endpoint: 'scrape', method: 'POST', paramStyle: 'body',
             paramMap: (a) => ({ url: a.url, formats: ['markdown'], onlyMainContent: true }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'exa_search',
+            description: 'Neural/semantic web search via Exa — better than keyword search for finding high-quality, topically relevant pages (esp. technical + recent). Alternative to search_web when Tavily underperforms.',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string' },
+                num_results: { type: 'integer', default: 5 }
+              },
+              required: ['query']
+            }
+          },
+          _axon: { api: 'exa', endpoint: 'search', method: 'POST', paramStyle: 'body',
+            paramMap: (a) => ({ query: a.query, numResults: a.num_results || 5, type: 'auto' }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'brasilapi_holidays',
+            description: 'List Brazilian national holidays for a given year. Returns [{date, name, type}].',
+            parameters: {
+              type: 'object',
+              properties: { year: { type: 'integer', description: 'Year, e.g. 2026' } },
+              required: ['year']
+            }
+          },
+          _axon: { api: 'brasilapi', endpoint: 'holidays', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({ ano: String(a.year) }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'brasilapi_rates',
+            description: 'Current Brazilian financial indicators: Selic, CDI, IPCA (no params).',
+            parameters: { type: 'object', properties: {} }
+          },
+          _axon: { api: 'brasilapi', endpoint: 'rates', method: 'GET', paramStyle: 'query',
+            paramMap: () => ({}) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'brasilapi_ddd',
+            description: 'Lookup Brazilian telephone area code (DDD). Returns the state and cities served.',
+            parameters: {
+              type: 'object',
+              properties: { ddd: { type: 'string', description: '2-digit DDD, e.g. "11" for São Paulo' } },
+              required: ['ddd']
+            }
+          },
+          _axon: { api: 'brasilapi', endpoint: 'ddd', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({ ddd: String(a.ddd).replace(/\D/g, '') }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'run_js',
+            description: 'Execute JavaScript in an isolated Web Worker sandbox (5s timeout, no fetch, no DOM). The last expression is returned. Use for math, parsing, data transforms, algorithm validation, quick prototypes. Return values are stringified.',
+            parameters: {
+              type: 'object',
+              properties: {
+                code: { type: 'string', description: 'JavaScript code; the last expression is the result. Top-level await is supported.' }
+              },
+              required: ['code']
+            }
+          },
+          _local: async (a) => await runJsSandbox(a.code)
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'calculate',
+            description: 'Evaluate a math expression exactly. Supports + - * / % ( ) and decimals. For arithmetic you are uncertain about, use this instead of guessing.',
+            parameters: {
+              type: 'object',
+              properties: { expression: { type: 'string', description: 'e.g. "1754 * 0.15" or "(23.7 + 18.4) / 2"' } },
+              required: ['expression']
+            }
+          },
+          _local: (a) => calculateExpr(a.expression)
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'get_datetime',
+            description: 'Get the current date and time. Optionally pass an IANA timezone (e.g. "America/Sao_Paulo", "Europe/London", "UTC") to localize.',
+            parameters: {
+              type: 'object',
+              properties: { timezone: { type: 'string', description: 'IANA timezone, e.g. "America/Sao_Paulo"' } }
+            }
+          },
+          _local: (a) => getDatetimeInfo(a.timezone)
         }
       ];
 
@@ -893,23 +991,111 @@
         "- Be multi-step: if answering well needs 3 tool calls, make them. Don't short-cut a real request.",
         "- If a user asks to 'create', 'write', 'analyze', 'compare', or 'explain', DELIVER the artifact — don't just describe what you would do.",
         "",
-        "## Tools available",
+        "## Tools available (14)",
+        "DATA / LOOKUP:",
         "- lookup_cnpj: Brazilian company registry by CNPJ",
         "- lookup_cep: Brazilian postal code lookup",
         "- current_weather: weather for a city (temperature in Kelvin)",
         "- lookup_ip: geolocation + ISP for an IP",
-        "- search_web: web search (Tavily) — returns titles, URLs, snippets",
-        "- scrape_url: fetch any URL's main content as clean markdown (Firecrawl)",
+        "- brasilapi_holidays: list Brazilian national holidays for a year",
+        "- brasilapi_rates: current Selic, CDI, IPCA",
+        "- brasilapi_ddd: Brazilian phone area code → state + cities",
+        "SEARCH / SCRAPE:",
+        "- search_web: Tavily web search — good for news, broad queries",
+        "- exa_search: Exa neural search — better for technical/semantic queries",
+        "- scrape_url: fetch any URL as clean markdown (Firecrawl)",
+        "LOCAL (zero cost, instant, run in the user's browser):",
+        "- calculate: exact math eval (+ - * / % parens) — USE THIS instead of doing arithmetic in your head",
+        "- get_datetime: current date/time in any IANA timezone",
+        "- run_js: execute JS in a 5s Web Worker sandbox (no fetch, no DOM). Use for data transforms, algorithms, testing logic, parsing.",
+        "AI:",
         "- embed_text: 1024-dim embedding (Voyage AI)",
         "",
         "## Economics (the user pays)",
-        "Each tool call costs the user $0.0003 - $0.01 from their own Axon wallet. Be efficient — don't make calls you won't use.",
+        "API tool calls cost $0.0003 - $0.01 from the user's Axon wallet. Local tools (calculate / get_datetime / run_js) are FREE — use them liberally.",
         "Never call the same tool with the same arguments twice in one turn.",
         "",
         "Current date: " + new Date().toISOString().slice(0,10) + "."
       ].join("\n");
 
       let agentSession = null;
+
+      // --- Local tool helpers (run in the user's browser, $0 cost) ---
+      function calculateExpr(expr) {
+        const e = String(expr).trim();
+        // Only allow digits, whitespace, basic math ops, parens, dot, comma, %, and 'e'/'E' for scientific notation
+        if (!/^[-+*/().,%\d\seE]+$/.test(e)) {
+          throw new Error('Expression has disallowed characters. Only numbers and + - * / % ( ) are allowed.');
+        }
+        try {
+          const val = Function('"use strict"; return (' + e.replace(/,/g, '.') + ')')();
+          if (typeof val !== 'number' || !isFinite(val)) throw new Error('Not a finite number');
+          return { expression: expr, value: val };
+        } catch (err) {
+          throw new Error('Invalid math: ' + err.message);
+        }
+      }
+
+      function getDatetimeInfo(timezone) {
+        const now = new Date();
+        const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        try {
+          const fmt = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            dateStyle: 'full',
+            timeStyle: 'long',
+            hour12: false,
+          });
+          return {
+            iso_utc: now.toISOString(),
+            local: fmt.format(now),
+            timezone: tz,
+            timestamp_ms: now.getTime(),
+            day_of_week: now.toLocaleDateString('en-US', { weekday: 'long', timeZone: tz }),
+          };
+        } catch (e) {
+          throw new Error('Invalid timezone: "' + tz + '". Use IANA format like "America/Sao_Paulo".');
+        }
+      }
+
+      async function runJsSandbox(code) {
+        const workerCode = [
+          'self.fetch = undefined;',
+          'self.XMLHttpRequest = undefined;',
+          'self.importScripts = undefined;',
+          'self.onmessage = async (e) => {',
+          '  try {',
+          '    const fn = new Function("return (async () => { " + e.data + "\\n })()");',
+          '    const result = await fn();',
+          '    let serialized;',
+          '    try { serialized = JSON.stringify(result, null, 2); if (serialized === undefined) serialized = String(result); }',
+          '    catch (_) { serialized = String(result); }',
+          '    self.postMessage({ ok: true, result: serialized });',
+          '  } catch (err) {',
+          '    self.postMessage({ ok: false, error: err && err.message ? err.message : String(err) });',
+          '  }',
+          '};',
+        ].join('\n');
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const url = URL.createObjectURL(blob);
+        const worker = new Worker(url);
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            worker.terminate(); URL.revokeObjectURL(url);
+            reject(new Error('JS execution timeout (5s)'));
+          }, 5000);
+          worker.onmessage = (ev) => {
+            clearTimeout(timer); URL.revokeObjectURL(url); worker.terminate();
+            if (ev.data.ok) resolve({ code: code, result: ev.data.result });
+            else reject(new Error(ev.data.error));
+          };
+          worker.onerror = (ev) => {
+            clearTimeout(timer); URL.revokeObjectURL(url); worker.terminate();
+            reject(new Error(ev.message || 'worker error'));
+          };
+          worker.postMessage(code);
+        });
+      }
 
       function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -987,8 +1173,11 @@
             stats = `<span class="stat err">${escapeHtml((e.error || 'failed').slice(0, 60))}</span>`;
           } else {
             const costStr = (e.cost || 0).toFixed(6);
-            const cacheCls = e.cache === 'hit' ? 'cache-hit' : 'cache-miss';
-            stats = `<span class="stat cost">$${costStr}</span>` +
+            let cacheCls = 'cache-miss';
+            if (e.cache === 'hit') cacheCls = 'cache-hit';
+            else if (e.cache === 'local') cacheCls = 'cache-local';
+            const costOrLocal = e.cache === 'local' ? '<span class="stat cost">local</span>' : `<span class="stat cost">$${costStr}</span>`;
+            stats = costOrLocal +
               `<span class="stat ${cacheCls}">${e.cache || 'miss'}</span>` +
               `<span class="stat latency">${e.latency || 0}ms</span>`;
           }
@@ -1086,6 +1275,22 @@
       async function executeTool(name, args) {
         const tool = AGENT_TOOLS.find((t) => t.function.name === name);
         if (!tool) throw new Error('Unknown tool: ' + name);
+
+        // Local tools run in the browser — no Axon cost, no network
+        if (tool._local) {
+          const t0 = Date.now();
+          try {
+            const body = await Promise.resolve(tool._local(args));
+            return { body, cost: 0, cache: 'local', latency: Date.now() - t0 };
+          } catch (err) {
+            err.cost = 0;
+            err.cache = 'local';
+            err.latency = Date.now() - t0;
+            err.status = 'local-error';
+            throw err;
+          }
+        }
+
         const { api, endpoint, method, paramStyle, paramMap } = tool._axon;
         const k = localStorage.getItem(STORAGE_KEY);
         const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
