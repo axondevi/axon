@@ -1,0 +1,43 @@
+{
+  "slug": "mistral",
+  "provider": "Mistral AI",
+  "category": "LLM",
+  "description": "European frontier LLMs — Mistral Large, Small, Codestral. Strong multilingual (PT/ES/FR/DE) and code generation.",
+  "homepage": "https://mistral.ai",
+  "base_url": "https://api.mistral.ai",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "chat": {
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "price_usd": 0.002,
+      "markup_pct": 15,
+      "cache_ttl": 0,
+      "notes": "Pass `model` in body — e.g. mistral-large-latest, mistral-small-latest, codestral-latest. Tool use supported on large/small."
+    },
+    "fim": {
+      "method": "POST",
+      "path": "/v1/fim/completions",
+      "price_usd": 0.001,
+      "markup_pct": 15,
+      "cache_ttl": 0,
+      "notes": "Fill-in-the-middle code completion (Codestral). Pass `prompt` and optional `suffix` for IDE-style autocomplete."
+    },
+    "embed": {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "price_usd": 0.0001,
+      "markup_pct": 15,
+      "cache_ttl": 86400,
+      "notes": "1024-dim embeddings (mistral-embed). Multilingual."
+    },
+    "models": {
+      "method": "GET",
+      "path": "/v1/models",
+      "price_usd": 0,
+      "markup_pct": 0,
+      "cache_ttl": 3600,
+      "notes": "List available Mistral models."
+    }
+  }
+}

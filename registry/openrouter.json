@@ -1,0 +1,43 @@
+{
+  "slug": "openrouter",
+  "provider": "OpenRouter",
+  "category": "LLM",
+  "description": "Unified gateway to 100+ LLMs (Claude, GPT-4, Gemini, Llama, Mistral, DeepSeek, Qwen) via one OpenAI-compatible endpoint.",
+  "homepage": "https://openrouter.ai",
+  "base_url": "https://openrouter.ai",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "chat": {
+      "method": "POST",
+      "path": "/api/v1/chat/completions",
+      "price_usd": 0.005,
+      "markup_pct": 10,
+      "cache_ttl": 0,
+      "notes": "OpenAI-compatible. Pass `model` in body (e.g. anthropic/claude-3.5-sonnet, openai/gpt-4o, meta-llama/llama-3.3-70b-instruct). Real cost varies per model — placeholder flat fee until per-token reconciliation lands."
+    },
+    "completions": {
+      "method": "POST",
+      "path": "/api/v1/completions",
+      "price_usd": 0.005,
+      "markup_pct": 10,
+      "cache_ttl": 0,
+      "notes": "Legacy text completions for non-chat models."
+    },
+    "models": {
+      "method": "GET",
+      "path": "/api/v1/models",
+      "price_usd": 0,
+      "markup_pct": 0,
+      "cache_ttl": 3600,
+      "notes": "List all 100+ available models with pricing and context length."
+    },
+    "credits": {
+      "method": "GET",
+      "path": "/api/v1/credits",
+      "price_usd": 0,
+      "markup_pct": 0,
+      "cache_ttl": 0,
+      "notes": "OpenRouter account credit balance (operator-side, not Axon balance)."
+    }
+  }
+}

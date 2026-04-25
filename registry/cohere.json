@@ -1,0 +1,43 @@
+{
+  "slug": "cohere",
+  "provider": "Cohere",
+  "category": "LLM",
+  "description": "Command R+ chat, multilingual embeddings, and best-in-class rerank for RAG pipelines.",
+  "homepage": "https://cohere.com",
+  "base_url": "https://api.cohere.com",
+  "auth": { "type": "bearer" },
+  "endpoints": {
+    "chat": {
+      "method": "POST",
+      "path": "/v2/chat",
+      "price_usd": 0.003,
+      "markup_pct": 15,
+      "cache_ttl": 0,
+      "notes": "Command R / Command R+ chat with tool use and multi-turn. Pass `model` (command-r-plus, command-r). Supports connectors and structured outputs."
+    },
+    "rerank": {
+      "method": "POST",
+      "path": "/v2/rerank",
+      "price_usd": 0.002,
+      "markup_pct": 15,
+      "cache_ttl": 86400,
+      "notes": "The killer endpoint for RAG: pass a query and N candidate documents (search results), get them re-ordered by semantic relevance with scores. Use after search_web/exa_search to keep top 3-5. Multilingual (rerank-v3.5)."
+    },
+    "embed": {
+      "method": "POST",
+      "path": "/v2/embed",
+      "price_usd": 0.0001,
+      "markup_pct": 15,
+      "cache_ttl": 86400,
+      "notes": "Multilingual embeddings (embed-multilingual-v3, 1024-dim). Strong on PT/ES/FR/DE — better than English-first models for non-English content."
+    },
+    "models": {
+      "method": "GET",
+      "path": "/v1/models",
+      "price_usd": 0,
+      "markup_pct": 0,
+      "cache_ttl": 3600,
+      "notes": "List available Cohere models."
+    }
+  }
+}
