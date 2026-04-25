@@ -1333,6 +1333,27 @@
         {
           type: 'function',
           function: {
+            name: 'crypto_price',
+            description: 'Get current crypto prices via CoinGecko. Pass coin ids (lowercase, e.g. "bitcoin,ethereum,solana") and target currencies (e.g. "usd,brl"). Returns { coin: { currency: price } }. Free Demo tier (30 req/min, 10k credits/mo). Requires the operator to have set UPSTREAM_KEY_COINGECKO.',
+            parameters: {
+              type: 'object',
+              properties: {
+                ids: { type: 'string', description: 'CoinGecko ids, comma-separated (bitcoin, ethereum, solana, usd-coin, base, …)' },
+                vs_currencies: { type: 'string', default: 'usd,brl', description: 'Target currencies, comma-separated' }
+              },
+              required: ['ids']
+            }
+          },
+          _axon: { api: 'coingecko', endpoint: 'simple-price', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({
+              ids: String(a.ids || '').toLowerCase(),
+              vs_currencies: String(a.vs_currencies || 'usd,brl').toLowerCase(),
+              include_24hr_change: 'true',
+            }) }
+        },
+        {
+          type: 'function',
+          function: {
             name: 'search_arxiv',
             description: 'Search arXiv (2.4M+ scientific papers — physics, math, CS, bio, econ, stats). Returns parsed entries with title, authors, abstract, PDF link. Use for any "what does the research say about X" question. Allow ~3s between calls.',
             parameters: {
@@ -1422,7 +1443,7 @@
         "- Be multi-step: if answering well needs 3 tool calls, make them. Don't short-cut a real request.",
         "- If a user asks to 'create', 'write', 'analyze', 'compare', or 'explain', DELIVER the artifact — don't just describe what you would do.",
         "",
-        "## Tools available (22)",
+        "## Tools available (23)",
         "DATA / LOOKUP:",
         "- lookup_cnpj: Brazilian company registry by CNPJ",
         "- lookup_cep: Brazilian postal code lookup",
@@ -1435,6 +1456,7 @@
         "- brasilapi_ddd: Brazilian phone area code → state + cities",
         "FINANCE:",
         "- convert_currency: FX conversion via ECB rates (Frankfurter, free)",
+        "- crypto_price: current crypto prices + 24h change (CoinGecko)",
         "SEARCH / SCRAPE:",
         "- search_web: Tavily web search — good for news, broad queries",
         "- exa_search: Exa neural search — better for technical/semantic queries",
