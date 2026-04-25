@@ -13,7 +13,15 @@
       "price_usd": 0.065,
       "markup_pct": 10,
       "cache_ttl": 0,
-      "notes": "Image gen with randomness — no cache unless caller fixes seed."
+      "notes": "Image gen with randomness — no cache unless caller fixes seed. Requires multipart/form-data (not JSON); only usable via direct browser upload."
+    },
+    "generate-xl": {
+      "method": "POST",
+      "path": "/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
+      "price_usd": 0.012,
+      "markup_pct": 15,
+      "cache_ttl": 0,
+      "notes": "Classic SDXL v1 endpoint — accepts JSON body { text_prompts: [{text,weight}], cfg_scale, width, height, samples, steps }. Returns { artifacts: [{base64, seed, finishReason}] }. 30 steps at 1024x1024 ≈ $0.012/image. Primary image-gen tool for the agent."
     },
     "upscale": {
       "method": "POST",
