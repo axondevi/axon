@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Privacy · Axon</title>
+    <title>Privacy Policy · Axon</title>
+    <meta name="description" content="Privacy Policy for Axon — x402 API gateway for AI agents." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,14 +14,19 @@
     />
     <link rel="stylesheet" href="styles.css" />
     <style>
-      .privacy-wrap { padding: 60px 0 120px; max-width: 720px; }
-      .privacy-wrap h1 { font-size: 36px; letter-spacing: -0.02em; margin: 0 0 8px; }
-      .privacy-wrap .updated { color: var(--text-muted); font-size: 14px; margin-bottom: 40px; }
-      .privacy-wrap h2 { font-size: 20px; margin: 40px 0 12px; font-weight: 700; }
-      .privacy-wrap p, .privacy-wrap li { color: var(--text-dim); font-size: 15px; line-height: 1.65; }
-      .privacy-wrap a { color: var(--accent-2); }
-      .privacy-wrap code { font-family: 'JetBrains Mono', monospace; background: var(--bg-elev); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-      .privacy-wrap ul { padding-left: 22px; }
+      .legal-wrap { padding: 60px 0 120px; max-width: 760px; }
+      .legal-wrap h1 { font-size: 36px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      .legal-wrap .meta { color: var(--text-muted); font-size: 14px; margin-bottom: 40px; }
+      .legal-wrap h2 { font-size: 20px; margin: 36px 0 12px; font-weight: 700; }
+      .legal-wrap p, .legal-wrap li { color: var(--text-dim); font-size: 15px; line-height: 1.7; }
+      .legal-wrap a { color: var(--accent-2); }
+      .legal-wrap code { font-family: 'JetBrains Mono', monospace; background: var(--bg-elev); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+      .legal-wrap ul { padding-left: 22px; }
+      .legal-wrap strong { color: var(--text); }
+      .legal-wrap .toc { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 40px; }
+      .legal-wrap .toc h3 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 12px; font-weight: 600; }
+      .legal-wrap .toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; font-size: 14px; }
+      .legal-wrap .toc li { margin: 4px 0; }
     </style>
   </head>
   <body>
@@ -36,63 +42,227 @@
       </div>
     </header>
 
-    <main class="container privacy-wrap">
-      <h1>Privacy</h1>
-      <p class="updated">Last updated: 2026-04-22</p>
+    <main class="container legal-wrap">
+      <h1>Privacy Policy</h1>
+      <p class="meta">Effective date: 2026-04-24 · Version 1.0</p>
 
+      <div class="toc">
+        <h3>Contents</h3>
+        <ol>
+          <li><a href="#s1">Scope</a></li>
+          <li><a href="#s2">Controller</a></li>
+          <li><a href="#s3">Data We Collect</a></li>
+          <li><a href="#s4">Data We Do Not Collect</a></li>
+          <li><a href="#s5">Purposes &amp; Legal Bases</a></li>
+          <li><a href="#s6">Sharing &amp; Sub-Processors</a></li>
+          <li><a href="#s7">On-Chain Data</a></li>
+          <li><a href="#s8">International Transfers</a></li>
+          <li><a href="#s9">Retention</a></li>
+          <li><a href="#s10">Security</a></li>
+          <li><a href="#s11">Your Rights</a></li>
+          <li><a href="#s12">Children</a></li>
+          <li><a href="#s13">Cookies</a></li>
+          <li><a href="#s14">Changes</a></li>
+          <li><a href="#s15">Contact</a></li>
+        </ol>
+      </div>
+
+      <h2 id="s1">1. Scope</h2>
       <p>
-        Axon is early-stage. This is the honest short version of what we do
-        with your data. If anything here is unclear, email
+        This Privacy Policy describes how personal data are collected, used,
+        shared, and protected when you use the Axon service, including the
+        websites at <a href="https://axon-5zf.pages.dev">axon-5zf.pages.dev</a>
+        and <a href="https://axon-kedb.onrender.com">axon-kedb.onrender.com</a>
+        and associated APIs (collectively, the "Service"). This Policy should
+        be read together with our <a href="/terms">Terms of Service</a>.
+      </p>
+
+      <h2 id="s2">2. Controller</h2>
+      <p>
+        The data controller is the natural person operating Axon under the
+        trade name "Axon", domiciled in Brazil (the "Operator"). All privacy
+        inquiries, subject-access requests, and data-deletion requests should
+        be directed to
         <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>.
       </p>
 
-      <h2>What we collect</h2>
+      <h2 id="s3">3. Data We Collect</h2>
       <ul>
-        <li>Email (when you request access or sign up)</li>
-        <li>An API key we issue you (hashed in our DB; plaintext only shown once)</li>
-        <li>Your request history: which API you called, when, how much it cost, whether it hit cache</li>
-        <li>Your wallet balance and transactions</li>
-        <li>Standard server logs (IP, user agent) for debugging, kept ≤30 days</li>
+        <li><strong>Account data</strong> — the email address you provide at
+        signup and a hashed representation of your API key.</li>
+        <li><strong>Transaction metadata</strong> — per-request records
+        containing: the Upstream Provider and endpoint called, timestamp,
+        latency, cost in USDC, cache-hit status, and response status code. We
+        do not retain the content of requests or responses beyond cache
+        time-to-live (see Section 9).</li>
+        <li><strong>Wallet data</strong> — the on-chain address generated for
+        you on the Base L2 network and associated balance records.</li>
+        <li><strong>Technical logs</strong> — standard server logs containing
+        IP address, user-agent string, and request path, retained for
+        operational debugging for no longer than thirty (30) days.</li>
+        <li><strong>Communications</strong> — messages you send to us and any
+        attachments.</li>
       </ul>
 
-      <h2>What we don't collect</h2>
+      <h2 id="s4">4. Data We Do Not Collect</h2>
       <ul>
-        <li>The contents of your API requests or responses (we proxy them, we don't store them beyond cache TTL)</li>
-        <li>Any personal info beyond email</li>
-        <li>Tracking cookies, ad IDs, or analytics that identify you across sites</li>
+        <li>The body of your API requests or responses, beyond what is
+        retained in cache under a cryptographic hash key as described in
+        Section 9;</li>
+        <li>Payment-card information or fiat bank-account details (we do not
+        handle fiat);</li>
+        <li>Third-party advertising identifiers or cross-site tracking data;</li>
+        <li>Biometric data, precise geolocation, or any special category of
+        personal data as defined under applicable law.</li>
       </ul>
 
-      <h2>Who sees your data</h2>
+      <h2 id="s5">5. Purposes and Legal Bases for Processing</h2>
+      <p>We process the categories in Section 3 to:</p>
       <ul>
-        <li>Us (the Axon team — one person currently)</li>
-        <li>Upstream API providers (OpenAI, Jina, SerpAPI, etc.) — they see whatever you send them through our proxy</li>
-        <li>Infrastructure (Render, Neon, Upstash, Cloudflare) — they host our servers and database</li>
-        <li>Nobody else. We don't sell data. We don't run ads.</li>
+        <li>Provide, maintain, and secure the Service and authenticate your
+        requests (legal basis: performance of contract);</li>
+        <li>Calculate billing and maintain accurate balance records (contract);</li>
+        <li>Detect, prevent, and investigate abuse, fraud, and security
+        incidents (legitimate interests; legal obligation);</li>
+        <li>Comply with applicable law, including Brazilian Lei Geral de
+        Proteção de Dados (LGPD, Law 13,709/2018), and respond to lawful
+        requests from authorities (legal obligation);</li>
+        <li>Communicate operational changes, incidents, and legal updates
+        affecting your use of the Service (legitimate interests).</li>
       </ul>
 
-      <h2>Data retention</h2>
-      <ul>
-        <li>Request metadata: kept indefinitely for usage/billing. You can email us to delete.</li>
-        <li>Server logs: ≤30 days</li>
-        <li>Cache entries: per-API TTL (see <a href="/stats">stats</a>)</li>
-      </ul>
-
-      <h2>On-chain data</h2>
+      <h2 id="s6">6. Sharing and Sub-Processors</h2>
       <p>
-        Deposits to your Axon wallet are recorded on Base (public blockchain).
-        Anyone can see transaction amounts and timestamps via a block explorer.
-        We don't link your wallet address to your email publicly.
+        We do not sell personal data and we do not share it except as
+        described below:
+      </p>
+      <ul>
+        <li><strong>Upstream Providers</strong> (e.g., OpenAI, Anthropic, Jina,
+        SerpAPI) receive whatever data you elect to transmit through the
+        Service to their endpoints; their terms and privacy policies govern
+        their further processing.</li>
+        <li><strong>Infrastructure sub-processors.</strong> We engage the
+        following providers to host and operate the Service:
+          <ul>
+            <li>Render, Inc. (application hosting);</li>
+            <li>Neon Inc. (managed PostgreSQL);</li>
+            <li>Upstash, Inc. (managed Redis);</li>
+            <li>Cloudflare, Inc. (static content delivery and DNS);</li>
+            <li>Turnkey Platform, Inc. (key-management infrastructure for
+            wallet creation).</li>
+          </ul>
+        </li>
+        <li><strong>Legal compliance.</strong> We may disclose data where
+        required to comply with a valid legal process, to enforce these
+        Terms, or to protect the rights, property, or safety of any person.</li>
+        <li><strong>Business transfer.</strong> In the event of merger,
+        acquisition, or sale of substantially all assets, User data may be
+        transferred to the successor entity under equivalent protections.</li>
+      </ul>
+
+      <h2 id="s7">7. On-Chain Data</h2>
+      <p>
+        Deposits, withdrawals, and settlement transactions conducted on the
+        Base L2 network are, by the nature of public blockchains, permanently
+        recorded and publicly observable via block explorers. While the
+        Service does not publicly associate wallet addresses with email
+        addresses, any counterparty or observer who knows your wallet address
+        can view its on-chain activity.
       </p>
 
-      <h2>Your rights</h2>
+      <h2 id="s8">8. International Transfers</h2>
       <p>
-        Email us to: delete your account, export your data, opt out of
-        communications. We respond within 72 hours.
+        The sub-processors listed in Section 6 operate data centers outside
+        Brazil, including in the United States and the European Union. Where
+        such transfers occur, they are performed under adequate safeguards as
+        required by applicable data-protection law, including LGPD Article
+        33 (adequacy, standard contractual clauses, or specific consent) and,
+        where relevant, Article 46 of the EU GDPR.
       </p>
 
-      <h2>Contact</h2>
+      <h2 id="s9">9. Retention</h2>
+      <ul>
+        <li><strong>Transaction metadata:</strong> retained for the life of
+        the account and, after account closure, for up to five (5) years for
+        accounting and legal-compliance purposes, unless earlier deletion is
+        requested and legally permissible.</li>
+        <li><strong>Technical logs:</strong> up to thirty (30) days.</li>
+        <li><strong>Cache entries:</strong> per-endpoint time-to-live, as
+        published in the public <a href="/stats">stats</a> endpoint and
+        documentation.</li>
+        <li><strong>Account email and hashed API key:</strong> retained until
+        account closure plus any legally required retention period.</li>
+      </ul>
+
+      <h2 id="s10">10. Security</h2>
       <p>
-        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>
+        We apply reasonable technical and organisational measures to protect
+        personal data against unauthorised access, alteration, disclosure, or
+        destruction. These include transport encryption (TLS 1.2+), at-rest
+        encryption of credential material, isolated key-management via the
+        Turnkey infrastructure, hashing of API keys, access controls, and
+        audit logging. No system can be guaranteed to be fully secure; in the
+        event of a data breach we will notify affected Users and competent
+        authorities where required by law.
+      </p>
+
+      <h2 id="s11">11. Your Rights</h2>
+      <p>
+        Subject to applicable law (LGPD in Brazil, GDPR in the European
+        Economic Area, and equivalent frameworks elsewhere), you may have the
+        right to:
+      </p>
+      <ul>
+        <li>confirm that we process data concerning you, and access that data;</li>
+        <li>rectify inaccurate or incomplete data;</li>
+        <li>request deletion (subject to retention obligations);</li>
+        <li>request portability of data you provided;</li>
+        <li>restrict or object to certain processing;</li>
+        <li>withdraw consent where processing is based on consent, without
+        affecting prior lawful processing;</li>
+        <li>lodge a complaint with a supervisory authority — in Brazil, the
+        Autoridade Nacional de Proteção de Dados (ANPD).</li>
+      </ul>
+      <p>
+        To exercise any of these rights, contact
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>. We will
+        respond within the period required by applicable law (typically
+        fifteen (15) days under LGPD, thirty (30) days under GDPR).
+      </p>
+
+      <h2 id="s12">12. Children</h2>
+      <p>
+        The Service is not directed to individuals under eighteen (18) years
+        of age. We do not knowingly collect data from such individuals. If
+        you believe a minor has provided data to us, contact us and we will
+        delete it.
+      </p>
+
+      <h2 id="s13">13. Cookies and Similar Technologies</h2>
+      <p>
+        The Service's websites use only strictly necessary storage, such as
+        browser <code>localStorage</code> to cache your API key for dashboard
+        convenience and standard session cookies set by our infrastructure
+        providers. We do not set advertising, analytics, or cross-site
+        tracking cookies.
+      </p>
+
+      <h2 id="s14">14. Changes to this Policy</h2>
+      <p>
+        We may update this Policy from time to time. Updated versions take
+        effect on their publication date, reflected in the "Effective date"
+        above. Material changes affecting your rights will be announced by
+        email to registered Users at least fifteen (15) days before taking
+        effect. Your continued use of the Service after the effective date
+        constitutes acceptance.
+      </p>
+
+      <h2 id="s15">15. Contact</h2>
+      <p>
+        All privacy inquiries, requests to exercise data-subject rights, and
+        incident notifications:
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>. See also
+        our <a href="/terms">Terms of Service</a>.
       </p>
     </main>
 
@@ -116,9 +286,10 @@
             <a href="https://github.com/axondevi/axon/tree/main/docs">Guides</a>
           </div>
           <div>
-            <h5>Contact</h5>
-            <a href="mailto:shopkaolin.com@gmail.com">Email</a>
-            <a href="https://github.com/axondevi/axon/issues">GitHub Issues</a>
+            <h5>Legal</h5>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="mailto:shopkaolin.com@gmail.com">Contact</a>
           </div>
         </div>
       </div>

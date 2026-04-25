@@ -12,3 +12,6 @@ coverage/
 
 # Wrangler (Cloudflare) — caches account/project metadata locally
 .wrangler/
+
+# Academy test artifacts — contains credentials + local E2E test output
+academy/test-artifacts/

@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terms of Service · Axon</title>
+    <meta name="description" content="Terms of Service for Axon — x402 API gateway for AI agents." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .legal-wrap { padding: 60px 0 120px; max-width: 760px; }
+      .legal-wrap h1 { font-size: 36px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      .legal-wrap .meta { color: var(--text-muted); font-size: 14px; margin-bottom: 40px; }
+      .legal-wrap h2 { font-size: 20px; margin: 36px 0 12px; font-weight: 700; }
+      .legal-wrap p, .legal-wrap li { color: var(--text-dim); font-size: 15px; line-height: 1.7; }
+      .legal-wrap a { color: var(--accent-2); }
+      .legal-wrap code { font-family: 'JetBrains Mono', monospace; background: var(--bg-elev); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+      .legal-wrap ul { padding-left: 22px; }
+      .legal-wrap strong { color: var(--text); }
+      .legal-wrap .toc { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 40px; }
+      .legal-wrap .toc h3 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 12px; font-weight: 600; }
+      .legal-wrap .toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; font-size: 14px; }
+      .legal-wrap .toc li { margin: 4px 0; }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav-inner">
+        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <nav class="nav-links">
+          <a href="/#apis">APIs</a>
+          <a href="/#pricing">Pricing</a>
+          <a href="/stats">Stats</a>
+          <a href="https://github.com/axondevi/axon">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container legal-wrap">
+      <h1>Terms of Service</h1>
+      <p class="meta">Effective date: 2026-04-24 · Version 1.0</p>
+
+      <div class="toc">
+        <h3>Contents</h3>
+        <ol>
+          <li><a href="#s1">Acceptance</a></li>
+          <li><a href="#s2">Operator</a></li>
+          <li><a href="#s3">The Service</a></li>
+          <li><a href="#s4">Eligibility</a></li>
+          <li><a href="#s5">Accounts &amp; API Keys</a></li>
+          <li><a href="#s6">Deposits &amp; Balance</a></li>
+          <li><a href="#s7">Pricing &amp; Fees</a></li>
+          <li><a href="#s8">Third-Party Providers</a></li>
+          <li><a href="#s9">Acceptable Use</a></li>
+          <li><a href="#s10">Crypto &amp; Wallet Risks</a></li>
+          <li><a href="#s11">No Fiat Custody</a></li>
+          <li><a href="#s12">Intellectual Property</a></li>
+          <li><a href="#s13">Service Availability</a></li>
+          <li><a href="#s14">Disclaimers</a></li>
+          <li><a href="#s15">Limitation of Liability</a></li>
+          <li><a href="#s16">Indemnification</a></li>
+          <li><a href="#s17">Termination</a></li>
+          <li><a href="#s18">Modifications</a></li>
+          <li><a href="#s19">Governing Law &amp; Disputes</a></li>
+          <li><a href="#s20">General Provisions</a></li>
+          <li><a href="#s21">Contact</a></li>
+        </ol>
+      </div>
+
+      <h2 id="s1">1. Acceptance of these Terms</h2>
+      <p>
+        These Terms of Service ("Terms") constitute a binding agreement between
+        you ("User", "you") and the operator of Axon (as identified in Section
+        2) governing your access to and use of the Axon service, including the
+        websites at <a href="https://axon-5zf.pages.dev">axon-5zf.pages.dev</a>
+        and <a href="https://axon-kedb.onrender.com">axon-kedb.onrender.com</a>,
+        associated APIs, SDKs, and documentation (collectively, the "Service").
+        By creating an account, depositing funds, or otherwise using the
+        Service, you agree to be bound by these Terms and by our
+        <a href="/privacy">Privacy Policy</a>. If you do not agree, you must
+        not use the Service.
+      </p>
+
+      <h2 id="s2">2. Operator</h2>
+      <p>
+        The Service is operated by an independent natural person domiciled in
+        Brazil (the "Operator"), publishing under the trade name "Axon". The
+        Operator maintains the open-source codebase at
+        <a href="https://github.com/axondevi/axon">github.com/axondevi/axon</a>
+        under the MIT License. For all notices, requests, and legal
+        correspondence, contact
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>.
+      </p>
+
+      <h2 id="s3">3. The Service</h2>
+      <p>
+        Axon provides a hosted API gateway that relays requests from Users to
+        selected third-party APIs (the "Upstream Providers"). Users pay for
+        each request in USD Coin ("USDC") on the Base L2 network, drawing from
+        a prepaid balance associated with their account. The Service supports
+        payment under the x402 protocol (Internet-native HTTP 402 payments) and
+        a prepaid wallet mode. Detailed specifications are in the public
+        repository referenced in Section 2.
+      </p>
+
+      <h2 id="s4">4. Eligibility</h2>
+      <p>To use the Service, you represent and warrant that:</p>
+      <ul>
+        <li>You are at least eighteen (18) years of age and have full legal
+        capacity to enter into a binding contract under applicable law;</li>
+        <li>You are not a resident of, or located in, any jurisdiction subject
+        to comprehensive sanctions imposed by the United States, the European
+        Union, the United Kingdom, or the United Nations;</li>
+        <li>You are not included on any sanctions or prohibited-parties list
+        maintained by the foregoing bodies, nor owned or controlled by a person
+        so listed;</li>
+        <li>You are not prohibited by applicable law from purchasing, holding,
+        or transferring cryptocurrencies; and</li>
+        <li>You will comply with all laws applicable to your use of the
+        Service, including reporting and tax obligations arising from digital-
+        asset transactions.</li>
+      </ul>
+
+      <h2 id="s5">5. Accounts and API Keys</h2>
+      <ul>
+        <li><strong>Issuance.</strong> Upon registration you are issued an API
+        key, which is displayed once. The key is stored by the Operator only in
+        hashed form; the plaintext value cannot be recovered.</li>
+        <li><strong>Security.</strong> You are solely responsible for
+        safeguarding your API key. Any request authenticated with your key is
+        deemed authorized by you. Do not embed keys in public repositories,
+        client-side code, or any system you do not control.</li>
+        <li><strong>Rotation and recovery.</strong> You may request rotation or
+        account recovery by contacting the Operator. Recovery requires proof of
+        control over the email associated with your account. Lost keys
+        unaccompanied by such proof will result in permanent loss of access to
+        any unspent balance.</li>
+        <li><strong>One account per person.</strong> You may not maintain
+        multiple accounts for the purpose of evading rate limits, promotional
+        credits, or sanctions in Section 9.</li>
+      </ul>
+
+      <h2 id="s6">6. Deposits and Balance</h2>
+      <ul>
+        <li><strong>Supported asset and network.</strong> The Service accepts
+        deposits only in USDC on the Base L2 network. Deposits of any other
+        asset or on any other network are not supported and may result in
+        permanent loss of funds, for which the Operator accepts no
+        responsibility.</li>
+        <li><strong>Crediting.</strong> Confirmed deposits are normally
+        credited to your internal balance within two (2) minutes. If a
+        confirmed on-chain deposit is not reflected in your balance within one
+        (1) hour, notify the Operator at
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>.</li>
+        <li><strong>Refunds.</strong> Upstream call costs and Service fees are
+        non-refundable once an Upstream Provider has returned a successful
+        (2xx) response. Failed calls (4xx/5xx responses from the Upstream
+        Provider, or Service-level failures) are automatically refunded to your
+        balance.</li>
+        <li><strong>Balance withdrawal.</strong> You may request the return of
+        unspent balance, subject to the mechanism available at the time of
+        request as published in the repository and dashboard. Withdrawal
+        functionality may be limited during the Service's current preview
+        period; current status is disclosed on the Service's status page and
+        README.</li>
+      </ul>
+
+      <h2 id="s7">7. Pricing and Fees</h2>
+      <p>
+        Per-request pricing is published in the public API catalog and returned
+        in the <code>x-axon-cost-usdc</code> response header for each call.
+        Prices comprise the Upstream Provider cost and an Axon markup. Cached
+        responses are priced at fifty percent (50%) of the live-call price.
+        Prices may be changed at any time; changes take effect upon publication
+        in the catalog and are not retroactive.
+      </p>
+
+      <h2 id="s8">8. Third-Party Providers</h2>
+      <p>
+        The Service relays requests to Upstream Providers, each of whom
+        imposes its own terms, acceptable-use policies, and rate limits. By
+        using the Service to call a given Upstream Provider, you acknowledge
+        that you are also subject to that provider's terms. The Operator is
+        not a party to your relationship with Upstream Providers, does not
+        guarantee their availability, and disclaims all liability for their
+        acts, omissions, and pricing changes. If an Upstream Provider
+        suspends or terminates service for your use case, the Operator has no
+        obligation to refund costs of calls already completed.
+      </p>
+
+      <h2 id="s9">9. Acceptable Use</h2>
+      <p>You shall not use the Service to:</p>
+      <ul>
+        <li>violate any applicable law or regulation, including anti-money-
+        laundering, sanctions, or export-control laws;</li>
+        <li>produce, transmit, store, or distribute child sexual abuse
+        material, non-consensual intimate imagery, or content that sexualizes
+        or endangers minors;</li>
+        <li>engage in fraud, phishing, identity theft, or unauthorized access
+        to any system;</li>
+        <li>circumvent, disable, or reverse-engineer any security, rate-
+        limiting, or access-control mechanism of the Service or of any
+        Upstream Provider;</li>
+        <li>interfere with or disrupt the Service's integrity, performance, or
+        availability, including through denial-of-service techniques;</li>
+        <li>breach an Upstream Provider's terms of service or content
+        policies; or</li>
+        <li>resell, redistribute, or offer access to the Service in a manner
+        that materially replicates its core functionality without the
+        Operator's prior written consent.</li>
+      </ul>
+      <p>
+        The Operator may suspend or terminate accounts that violate this
+        section. Where the violation involves illegal content or activity, the
+        Operator may report to competent authorities, preserve evidence as
+        required by law, and forfeit any remaining balance as damages.
+      </p>
+
+      <h2 id="s10">10. Crypto and Wallet Risks</h2>
+      <p>You acknowledge and accept the following risks:</p>
+      <ul>
+        <li><strong>Asset risk.</strong> USDC is a stablecoin issued by Circle
+        Internet Financial; its value and redeemability depend on Circle's
+        solvency, regulatory standing, and technical operation. The Operator
+        is not Circle and makes no representation as to USDC's peg.</li>
+        <li><strong>Chain risk.</strong> Base is a Layer-2 network operated by
+        third parties. Chain-level incidents (sequencer halts, reorgs,
+        exploits, software defects) may affect transaction finality and access
+        to funds.</li>
+        <li><strong>Irreversibility.</strong> On-chain transactions are
+        irreversible. Sending USDC to an incorrect address, on an unsupported
+        network, or as the wrong token will result in permanent loss.</li>
+        <li><strong>Not investment advice.</strong> Nothing on the Service
+        constitutes investment, legal, tax, or financial advice. The Operator
+        is not a broker-dealer, money-services business, exchange, or
+        investment adviser under any jurisdiction's law.</li>
+      </ul>
+
+      <h2 id="s11">11. No Fiat Custody</h2>
+      <p>
+        The Operator does not solicit, receive, hold, transmit, or convert
+        fiat currency on behalf of Users. Any conversion of fiat into USDC
+        occurs through a User's own relationship with a third-party exchange
+        or on-ramp provider. Affiliate or referral links to such providers,
+        where displayed on the Service, are for User convenience; the third
+        party is solely responsible for the associated transaction and its
+        terms.
+      </p>
+
+      <h2 id="s12">12. Intellectual Property</h2>
+      <p>
+        The source code of the Service is made available under the MIT License
+        at the repository identified in Section 2. The "Axon" name, the
+        associated logos, the content of this website, and other brand
+        elements remain the exclusive property of the Operator; no license to
+        those elements is granted by these Terms. You retain all rights in the
+        content you transmit through the Service; the Service merely relays
+        such content to Upstream Providers. You grant the Operator a limited
+        license to process that content solely to deliver the Service
+        (including caching at the metadata level as disclosed in the Privacy
+        Policy).
+      </p>
+
+      <h2 id="s13">13. Service Availability</h2>
+      <p>
+        The Service is offered on a commercially reasonable best-effort basis.
+        The Operator does not warrant uninterrupted or error-free operation
+        and may schedule maintenance, impose rate limits, or temporarily
+        suspend the Service in response to operational, security, or upstream
+        conditions. The public status endpoint at
+        <a href="/status">/status</a> reflects current conditions.
+      </p>
+
+      <h2 id="s14">14. Disclaimers</h2>
+      <p>
+        <strong>The Service is provided "AS IS" and "AS AVAILABLE", without
+        warranties of any kind, express or implied,</strong> including the
+        implied warranties of merchantability, fitness for a particular
+        purpose, title, and non-infringement. The Operator does not warrant
+        that the Service will meet your requirements, be secure, or produce
+        any particular result.
+      </p>
+
+      <h2 id="s15">15. Limitation of Liability</h2>
+      <p>
+        To the maximum extent permitted by law, the Operator's aggregate
+        liability to you arising out of or relating to the Service, whether in
+        contract, tort, strict liability, or any other theory, <strong>shall
+        not exceed the greater of (i) one hundred United States dollars
+        (USD 100) or (ii) the total fees actually paid by you to the Operator
+        (exclusive of Upstream Provider costs) in the thirty (30) days
+        preceding the event giving rise to the claim.</strong> The Operator
+        shall not be liable for any indirect, incidental, special,
+        consequential, exemplary, or punitive damages, including lost profits,
+        lost data, loss of goodwill, or chain-level losses, even if advised of
+        the possibility of such damages. This section survives termination.
+      </p>
+
+      <h2 id="s16">16. Indemnification</h2>
+      <p>
+        You agree to defend, indemnify, and hold harmless the Operator from
+        and against any third-party claim, damage, loss, liability, cost, or
+        expense (including reasonable attorneys' fees) arising out of or
+        relating to (a) your use of the Service in breach of these Terms or
+        any law, (b) your violation of an Upstream Provider's terms, or (c)
+        your infringement of any third-party right.
+      </p>
+
+      <h2 id="s17">17. Termination</h2>
+      <p>
+        You may terminate your account at any time by ceasing to use the
+        Service and, where applicable, requesting withdrawal of unspent
+        balance. The Operator may suspend or terminate accounts for breach of
+        these Terms, for protection of the Service or third parties, or as
+        required by law. On termination, Sections 10, 11, 14, 15, 16, 19, 20,
+        and 21 shall survive.
+      </p>
+
+      <h2 id="s18">18. Modifications</h2>
+      <p>
+        The Operator may amend these Terms from time to time. Amendments take
+        effect on the later of (i) publication of the updated Terms on this
+        page, bearing a new Effective Date, or (ii) fourteen (14) days after
+        email notice to registered Users where the amendment is material.
+        Continued use after the effective date constitutes acceptance. If you
+        do not accept an amendment, you must cease use and may request
+        withdrawal of unspent balance.
+      </p>
+
+      <h2 id="s19">19. Governing Law and Dispute Resolution</h2>
+      <p>
+        These Terms are governed by the laws of the Federative Republic of
+        Brazil, without regard to conflict-of-laws principles. Before filing
+        suit, the parties shall attempt in good faith to resolve any dispute
+        informally by written notice to
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>, followed by
+        a thirty (30)-day negotiation period. If a dispute remains unresolved,
+        exclusive jurisdiction is vested in the civil courts of the Comarca da
+        Capital of São Paulo, State of São Paulo, Brazil, and the parties
+        expressly waive any other venue, however privileged.
+      </p>
+
+      <h2 id="s20">20. General Provisions</h2>
+      <ul>
+        <li><strong>Entire agreement.</strong> These Terms, together with the
+        Privacy Policy, constitute the entire agreement between you and the
+        Operator regarding the Service and supersede all prior understandings.</li>
+        <li><strong>Severability.</strong> If any provision is held
+        unenforceable, the remaining provisions shall remain in full force and
+        the unenforceable provision shall be modified to the minimum extent
+        necessary to render it enforceable.</li>
+        <li><strong>No waiver.</strong> Failure to enforce any provision is
+        not a waiver of future enforcement of that or any other provision.</li>
+        <li><strong>Assignment.</strong> You may not assign or transfer these
+        Terms without the Operator's prior written consent. The Operator may
+        assign these Terms in connection with a merger, acquisition, or
+        transfer of substantially all assets.</li>
+        <li><strong>Notices.</strong> Notices to the Operator shall be sent to
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>. Notices to
+        you may be sent to the email address associated with your account.</li>
+        <li><strong>Force majeure.</strong> Neither party is liable for
+        failure or delay resulting from causes beyond its reasonable control,
+        including acts of God, war, cyber-attack, blockchain failure,
+        governmental action, or internet outage.</li>
+        <li><strong>Relationship.</strong> These Terms do not create any
+        agency, partnership, joint venture, or employment relationship
+        between the parties.</li>
+        <li><strong>Language.</strong> These Terms are executed in English.
+        Any translation is provided for convenience; in case of conflict, the
+        English version controls.</li>
+      </ul>
+
+      <h2 id="s21">21. Contact</h2>
+      <p>
+        Questions, complaints, legal notices, and withdrawal requests:
+        <a href="mailto:shopkaolin.com@gmail.com">shopkaolin.com@gmail.com</a>.
+        See also the <a href="/privacy">Privacy Policy</a> and the public
+        repository at
+        <a href="https://github.com/axondevi/axon">github.com/axondevi/axon</a>.
+      </p>
+    </main>
+
+    <footer>
+      <div class="container footer-inner">
+        <div>
+          <span class="brand small"><span class="logo-dot"></span> axon</span>
+          <p>Payment rails for the agent economy.</p>
+        </div>
+        <div class="footer-links">
+          <div>
+            <h5>Product</h5>
+            <a href="/#apis">APIs</a>
+            <a href="/#pricing">Pricing</a>
+            <a href="/stats">Stats</a>
+            <a href="/status">Status</a>
+          </div>
+          <div>
+            <h5>Docs</h5>
+            <a href="https://github.com/axondevi/axon#readme">README</a>
+            <a href="https://github.com/axondevi/axon/tree/main/docs">Guides</a>
+          </div>
+          <div>
+            <h5>Legal</h5>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="mailto:shopkaolin.com@gmail.com">Contact</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
