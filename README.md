@@ -1,5 +1,6 @@
 # Axon
 
+[![SafeSkill 20/100](https://img.shields.io/badge/SafeSkill-20%2F100_Blocked-red)](https://safeskill.dev/scan/axondevi-axon)
 > **Universal API gateway for autonomous agents.**
 > One endpoint. One USDC wallet. Every paid API your agent needs.
 
