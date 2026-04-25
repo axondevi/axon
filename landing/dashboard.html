@@ -10,7 +10,6 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
     <style>
       :root {
         --bg: #0a0a0b;
@@ -163,14 +162,11 @@
         padding: 24px 28px;
         margin-bottom: 24px;
       }
-      .deposit-hero canvas, .deposit-hero .qr-placeholder {
+      .deposit-hero .qr-img {
+        display: block;
         width: 150px; height: 150px;
         background: #fff; border-radius: 8px;
         padding: 8px; box-sizing: content-box;
-      }
-      .deposit-hero .qr-placeholder {
-        display: flex; align-items: center; justify-content: center;
-        color: #6a6a76; font-size: 11px;
       }
       .deposit-info { min-width: 0; }
       .deposit-info .label {
@@ -397,10 +393,11 @@
 
           // ---- Deposit hero ----
           const depositAddr = bal.address;
+          const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(depositAddr);
           document.getElementById('deposit-hero-wrap').innerHTML = `
             <div class="deposit-hero">
               <div>
-                <canvas id="qr-canvas" width="150" height="150"></canvas>
+                <img class="qr-img" src="${qrUrl}" width="150" height="150" alt="QR code for ${depositAddr}" loading="lazy" />
               </div>
               <div class="deposit-info">
                 <div class="label">Your deposit address</div>
@@ -414,18 +411,6 @@
             </div>
           `;
           document.getElementById('copy-addr').onclick = (e) => copyToClipboard(depositAddr, e.target);
-
-          // Render QR — the lib is loaded with defer, may race with this render. Try with retry.
-          const drawQR = () => {
-            if (typeof QRCode === 'undefined') { setTimeout(drawQR, 100); return; }
-            QRCode.toCanvas(
-              document.getElementById('qr-canvas'),
-              depositAddr,
-              { width: 150, margin: 1, color: { dark: '#0a0a0b', light: '#ffffff' } },
-              (err) => { if (err) console.error(err); }
-            );
-          };
-          drawQR();
 
           // ---- Metrics ----
           const hitRatePct = (usage.cache_hit_rate * 100).toFixed(1);
