@@ -1,0 +1,43 @@
+{
+  "slug": "frankfurter",
+  "provider": "Frankfurter",
+  "category": "Finance & Markets",
+  "description": "Free FX rate API backed by the European Central Bank reference rates. No API key required. ~30 currencies, daily updates, full history back to 1999.",
+  "homepage": "https://frankfurter.dev",
+  "base_url": "https://api.frankfurter.dev",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "latest": {
+      "method": "GET",
+      "path": "/v1/latest",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 3600,
+      "notes": "Most recent rates. Optional: ?base=USD&symbols=BRL,EUR. Returns { amount, base, date, rates: {...} }."
+    },
+    "historical": {
+      "method": "GET",
+      "path": "/v1/:date",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "Rate on a specific date. :date in YYYY-MM-DD. Same query params as /latest."
+    },
+    "timeseries": {
+      "method": "GET",
+      "path": "/v1/:start..:end",
+      "price_usd": 0.0002,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "Daily rates between two dates. Path :start..:end (e.g. /v1/2024-01-01..2024-12-31). Hard-cap is one year per call upstream."
+    },
+    "currencies": {
+      "method": "GET",
+      "path": "/v1/currencies",
+      "price_usd": 0,
+      "markup_pct": 0,
+      "cache_ttl": 86400,
+      "notes": "List supported currency codes and their full names."
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "slug": "arxiv",
+  "provider": "arXiv",
+  "category": "Knowledge & Research",
+  "description": "Cornell's e-print archive of 2.4M+ scientific papers (physics, math, CS, bio, econ, stat). Free public API, no key. Returns Atom XML — agents should parse with their XML tooling.",
+  "homepage": "https://info.arxiv.org/help/api/index.html",
+  "base_url": "http://export.arxiv.org",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "search": {
+      "method": "GET",
+      "path": "/api/query",
+      "price_usd": 0.0001,
+      "markup_pct": 25,
+      "cache_ttl": 3600,
+      "notes": "Search papers. Required: ?search_query=. Examples: search_query=all:llm  | ti:%22tool+use%22+AND+cat:cs.AI  | au:hinton. Optional: start, max_results (max 2000 per call). Returns Atom 1.0 XML. Be polite — arXiv asks for ~3s between calls; cache_ttl honors that."
+    },
+    "by-id": {
+      "method": "GET",
+      "path": "/api/query",
+      "price_usd": 0.0001,
+      "markup_pct": 25,
+      "cache_ttl": 86400,
+      "notes": "Look up specific papers by their arXiv id. Required: ?id_list=2401.12345,2402.67890. Same Atom XML response."
+    }
+  }
+}

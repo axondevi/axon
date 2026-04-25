@@ -1,0 +1,67 @@
+{
+  "slug": "rest-countries",
+  "provider": "REST Countries",
+  "category": "Geography & Reference",
+  "description": "Free world country data — population, capital, currencies, languages, flags, borders, area, timezones, calling codes. No API key. Open-source community-maintained.",
+  "homepage": "https://restcountries.com",
+  "base_url": "https://restcountries.com",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "by-name": {
+      "method": "GET",
+      "path": "/v3.1/name/:name",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "Search by country name (partial match). Add ?fullText=true for exact, ?fields=name,capital,population to limit response."
+    },
+    "by-code": {
+      "method": "GET",
+      "path": "/v3.1/alpha/:code",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": ":code is ISO 2-letter (BR), 3-letter (BRA), or numeric (076)."
+    },
+    "by-region": {
+      "method": "GET",
+      "path": "/v3.1/region/:region",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "All countries in a region (Africa, Americas, Asia, Europe, Oceania)."
+    },
+    "by-capital": {
+      "method": "GET",
+      "path": "/v3.1/capital/:capital",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "Find country whose capital matches."
+    },
+    "by-currency": {
+      "method": "GET",
+      "path": "/v3.1/currency/:currency",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "Countries using a given currency code (BRL, USD, EUR)."
+    },
+    "by-language": {
+      "method": "GET",
+      "path": "/v3.1/lang/:language",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "Countries that speak a language (portuguese, english, mandarin)."
+    },
+    "all": {
+      "method": "GET",
+      "path": "/v3.1/all",
+      "price_usd": 0.0002,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "All 250 countries. REQUIRED: ?fields=name,population,... — calling /all without fields returns 400."
+    }
+  }
+}
