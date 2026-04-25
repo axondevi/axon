@@ -172,6 +172,7 @@
         display: flex; align-items: center; justify-content: center;
         color: #6a6a76; font-size: 11px;
       }
+      .deposit-info { min-width: 0; }
       .deposit-info .label {
         font-size: 12px; color: var(--text-muted);
         text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;
@@ -184,18 +185,38 @@
         font-size: 11px; font-weight: 600;
         letter-spacing: 0.04em; text-transform: uppercase;
         margin-bottom: 12px;
+        white-space: nowrap;
       }
       .deposit-info .addr {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 15px; color: var(--text);
-        word-break: break-all;
+        font-size: 14px; color: var(--text);
         background: var(--bg-elev);
         border: 1px solid var(--border);
         padding: 10px 14px; border-radius: 6px;
         margin-bottom: 10px;
         display: flex; align-items: center; gap: 10px;
+        min-width: 0;
       }
-      .deposit-info .addr code { flex: 1; }
+      .deposit-info .addr code {
+        flex: 1; min-width: 0;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        /* subtle scroll hint: show via faded edges */
+        mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent);
+        -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent);
+      }
+      .deposit-info .copy-btn { flex-shrink: 0; }
+      @media (max-width: 640px) {
+        .deposit-hero {
+          grid-template-columns: 1fr;
+          gap: 16px;
+          padding: 20px;
+          text-align: center;
+        }
+        .deposit-hero > div:first-child { display: flex; justify-content: center; }
+        .deposit-info { text-align: left; }
+      }
       .deposit-info .warning {
         font-size: 12px; color: #ff7a6f;
         display: flex; align-items: center; gap: 6px;
@@ -220,13 +241,25 @@
         font-family: 'JetBrains Mono', monospace;
         font-size: 13px; line-height: 1.6;
         color: var(--text-dim);
-        white-space: pre-wrap; word-break: break-all;
         position: relative;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: pre;
       }
       .try-call-code .tok { color: var(--text); }
       .try-call-code .str { color: var(--accent-2); }
       .try-call-code .flag { color: #fbbf24; }
-      .try-call-code .copy-btn { position: absolute; top: 12px; right: 12px; }
+      .try-call-code .copy-btn {
+        position: sticky;
+        float: right;
+        top: 0;
+      }
+      @media (max-width: 640px) {
+        .try-call-code { font-size: 11px; padding: 12px 14px; }
+      }
+
+      /* Responsive table wrap */
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
       /* Transaction type styling */
       .tx-type {
@@ -474,6 +507,7 @@
             document.getElementById('tx').innerHTML = '<div class="empty">No transactions yet.</div>';
           } else {
             document.getElementById('tx').innerHTML = `
+              <div class="table-wrap">
               <table>
                 <thead><tr>
                   <th>Type</th><th>Detail</th><th>Amount</th><th>When</th>
@@ -508,6 +542,7 @@
                   }).join('')}
                 </tbody>
               </table>
+              </div>
             `;
           }
         } catch (e) {
