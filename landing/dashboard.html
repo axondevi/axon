@@ -329,6 +329,109 @@
       .gallery-tile:hover .dl-btn { opacity: 1; }
       .gallery-tile .dl-btn:hover { background: var(--accent); }
 
+      /* Tile fade-in when generated or restored */
+      @keyframes tile-pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+      .gallery-tile { animation: tile-pop 180ms ease-out; }
+
+      /* ===== Lightbox modal for full-size images ===== */
+      .lightbox {
+        position: fixed; inset: 0; z-index: 2000;
+        background: rgba(8, 8, 12, 0.88);
+        display: none; align-items: center; justify-content: center;
+        padding: 24px;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+      .lightbox[data-open="1"] { display: flex; animation: fade-in 160ms ease-out; }
+      .lightbox img {
+        max-width: 100%; max-height: calc(100vh - 96px);
+        border-radius: 8px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        animation: tile-pop 200ms ease-out;
+      }
+      .lightbox-meta {
+        position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+        background: rgba(20,20,28,0.9); border: 1px solid var(--border);
+        padding: 8px 14px; border-radius: 8px;
+        font-size: 12px; color: var(--text-dim);
+        max-width: calc(100% - 48px); display: flex; gap: 12px; align-items: center;
+      }
+      .lightbox-meta .lb-prompt {
+        max-width: 60vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        font-style: italic;
+      }
+      .lightbox-meta .lb-action {
+        background: transparent; border: 1px solid var(--border); color: var(--text);
+        padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+      }
+      .lightbox-meta .lb-action:hover { background: var(--accent); border-color: var(--accent); }
+      .lightbox-close {
+        position: absolute; top: 16px; right: 18px;
+        background: transparent; border: 0; color: var(--text-muted);
+        font-size: 28px; line-height: 1; cursor: pointer; padding: 4px 10px;
+      }
+      .lightbox-close:hover { color: var(--text); }
+      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+      /* ===== Toasts (bottom-right ephemeral feedback) ===== */
+      .toast-container {
+        position: fixed; bottom: 16px; right: 16px; z-index: 2500;
+        display: flex; flex-direction: column-reverse; gap: 8px;
+        pointer-events: none;
+      }
+      .toast {
+        background: rgba(20,20,28,0.96); border: 1px solid var(--border);
+        color: var(--text); padding: 10px 14px; border-radius: 6px;
+        font-size: 13px; max-width: 320px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        animation: toast-in 200ms ease-out;
+        pointer-events: auto;
+      }
+      .toast.success { border-left: 3px solid #4ade80; }
+      .toast.error   { border-left: 3px solid #f87171; }
+      .toast.info    { border-left: 3px solid var(--accent); }
+      .toast.leaving { animation: toast-out 200ms ease-in forwards; }
+      @keyframes toast-in  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes toast-out { to { opacity: 0; transform: translateY(8px); } }
+
+      /* ===== Code-block copy button (revealed on hover) ===== */
+      .md pre { position: relative; }
+      .md pre .code-copy {
+        position: absolute; top: 6px; right: 6px;
+        background: rgba(20,20,28,0.85); color: var(--text-muted);
+        border: 1px solid var(--border); border-radius: 4px;
+        padding: 3px 8px; font-size: 10px; cursor: pointer;
+        opacity: 0; transition: opacity 120ms ease, color 120ms ease;
+        text-transform: uppercase; letter-spacing: 0.06em;
+      }
+      .md pre:hover .code-copy { opacity: 1; }
+      .md pre .code-copy:hover { color: var(--text); border-color: var(--accent); }
+      .md pre .code-copy.ok { color: #4ade80; border-color: #4ade80; }
+
+      /* ===== Typing indicator (animated dots while agent thinks) ===== */
+      .typing-indicator {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 6px 0; font-size: 13px; color: var(--text-muted);
+      }
+      .typing-indicator .dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--text-muted); animation: typing 1.2s infinite ease-in-out;
+      }
+      .typing-indicator .dot:nth-child(2) { animation-delay: 0.15s; }
+      .typing-indicator .dot:nth-child(3) { animation-delay: 0.30s; }
+      @keyframes typing { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+
+      /* ===== Message fade-in ===== */
+      @keyframes msg-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      .agent-messages .msg { animation: msg-in 180ms ease-out; }
+
+      /* ===== Run button: subtle pulse while running ===== */
+      .agent-btn.run.is-running {
+        background: rgba(124,92,255,0.18) !important;
+        color: var(--text-muted) !important;
+        cursor: not-allowed;
+      }
+
       /* --- Agent chat --- */
       .agent-wrap {
         display: grid;
@@ -1469,11 +1572,7 @@
         `;
         tile.addEventListener('click', (e) => {
           if (e.target.closest('.dl-btn')) return;
-          fetch(dataUrl).then(r => r.blob()).then(b => {
-            const url = URL.createObjectURL(b);
-            window.open(url, '_blank', 'noopener');
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-          });
+          openLightbox(id);
         });
         tile.querySelector('.dl-btn').addEventListener('click', (e) => {
           e.stopPropagation();
@@ -1481,6 +1580,7 @@
           a.href = dataUrl;
           a.download = `axon-${id}.png`;
           document.body.appendChild(a); a.click(); a.remove();
+          showToast('Image downloaded', 'success');
         });
         return tile;
       }
@@ -1662,7 +1762,10 @@
           (m.role === 'user' && m.content) ||
           (m.role === 'assistant' && m.content && typeof m.content === 'string')
         );
-        if (visible.length === 0) {
+        const typingHtml = agentSession.running
+          ? '<div class="msg msg-assistant typing-msg"><div class="msg-role" translate="no">agent</div><div class="msg-content"><div class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div></div>'
+          : '';
+        if (visible.length === 0 && !agentSession.running) {
           el.innerHTML = '<div class="empty" style="font-size:13px;padding:32px 8px;color:var(--text-muted);">Start a conversation — pick a template below or type freely.</div>';
           return;
         }
@@ -1682,8 +1785,13 @@
               <div class="msg-content md">${renderMarkdown(m.content)}</div>
             </div>
           `;
-        }).join('');
+        }).join('') + typingHtml;
+        attachCodeCopyButtons(el);
         el.scrollTop = el.scrollHeight;
+
+        // Sync run-button visual state with session.running
+        const runBtn = document.getElementById('agent-run');
+        if (runBtn) runBtn.classList.toggle('is-running', !!agentSession.running);
       }
 
       function renderAgentBrain() {
@@ -2011,6 +2119,118 @@
             // Move cursor to end
             input.setSelectionRange(input.value.length, input.value.length);
           });
+        });
+      }
+
+      // ==========================================================
+      // Lightbox + toast bootstrap (idempotent)
+      // ==========================================================
+      function ensureLightbox() {
+        if (document.getElementById('lightbox')) return;
+        const lb = document.createElement('div');
+        lb.id = 'lightbox';
+        lb.className = 'lightbox';
+        lb.innerHTML = `
+          <button class="lightbox-close" aria-label="Close">×</button>
+          <img alt="" />
+          <div class="lightbox-meta">
+            <span class="lb-prompt"></span>
+            <button class="lb-action" data-act="download">Download</button>
+            <button class="lb-action" data-act="copy">Copy URL</button>
+          </div>
+        `;
+        document.body.appendChild(lb);
+
+        const close = () => { lb.dataset.open = '0'; lb.removeAttribute('data-current-id'); };
+        lb.addEventListener('click', (e) => {
+          if (e.target === lb || e.target.classList.contains('lightbox-close')) close();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && lb.dataset.open === '1') close();
+        });
+        lb.querySelector('[data-act="download"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = lb.dataset.currentId;
+          const item = id && IMAGE_CACHE.get(id);
+          if (!item) return;
+          const a = document.createElement('a');
+          a.href = item.dataUrl; a.download = `axon-${id}.png`;
+          document.body.appendChild(a); a.click(); a.remove();
+          showToast('Image downloaded', 'success');
+        });
+        lb.querySelector('[data-act="copy"]').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const id = lb.dataset.currentId;
+          const item = id && IMAGE_CACHE.get(id);
+          if (!item) return;
+          try {
+            const blob = await fetch(item.dataUrl).then(r => r.blob());
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            showToast('Image copied to clipboard', 'success');
+          } catch {
+            showToast('Could not copy — your browser may block this', 'error');
+          }
+        });
+      }
+
+      function openLightbox(id) {
+        ensureLightbox();
+        const lb = document.getElementById('lightbox');
+        const item = IMAGE_CACHE.get(id);
+        if (!item) return;
+        lb.querySelector('img').src = item.dataUrl;
+        lb.querySelector('img').alt = item.prompt || '';
+        lb.querySelector('.lb-prompt').textContent = item.prompt || '(no prompt recorded)';
+        lb.dataset.currentId = id;
+        lb.dataset.open = '1';
+      }
+
+      function ensureToastContainer() {
+        let c = document.getElementById('toast-container');
+        if (!c) {
+          c = document.createElement('div');
+          c.id = 'toast-container';
+          c.className = 'toast-container';
+          document.body.appendChild(c);
+        }
+        return c;
+      }
+
+      function showToast(message, kind) {
+        const c = ensureToastContainer();
+        const t = document.createElement('div');
+        t.className = 'toast ' + (kind || 'info');
+        t.textContent = message;
+        c.appendChild(t);
+        setTimeout(() => {
+          t.classList.add('leaving');
+          t.addEventListener('animationend', () => t.remove(), { once: true });
+        }, 2400);
+      }
+
+      // Wire copy buttons onto every <pre><code> rendered by markdown.
+      // Idempotent — skips blocks that already have a button.
+      function attachCodeCopyButtons(root) {
+        root = root || document;
+        root.querySelectorAll('.md pre').forEach((pre) => {
+          if (pre.querySelector('.code-copy')) return;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'code-copy';
+          btn.textContent = 'copy';
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+            try {
+              await navigator.clipboard.writeText(text);
+              btn.textContent = 'copied';
+              btn.classList.add('ok');
+              setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('ok'); }, 1200);
+            } catch {
+              showToast('Copy failed', 'error');
+            }
+          });
+          pre.appendChild(btn);
         });
       }
 
