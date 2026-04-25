@@ -269,6 +269,138 @@
       .tx-type.refund  { background: rgba(56,189,248,0.12);  color: #38bdf8; }
       .tx-type.bonus   { background: rgba(251,191,36,0.12);  color: #fbbf24; }
       .tx-meta { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+      /* --- Agent chat --- */
+      .agent-wrap {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 16px;
+      }
+      @media (max-width: 900px) {
+        .agent-wrap { grid-template-columns: 1fr; }
+      }
+      .agent-chat, .agent-brain {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px 18px;
+        display: flex; flex-direction: column;
+        min-height: 480px;
+      }
+      .agent-header {
+        font-size: 12px; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.08em;
+        margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+      }
+      .agent-header .reset-btn {
+        background: none; border: 1px solid var(--border);
+        color: var(--text-dim); font-size: 11px;
+        padding: 4px 10px; border-radius: 4px;
+        cursor: pointer; letter-spacing: 0.04em;
+      }
+      .agent-header .reset-btn:hover { border-color: var(--accent); color: var(--text); }
+      .agent-messages {
+        flex: 1; overflow-y: auto;
+        max-height: 50vh;
+        padding-right: 4px;
+        margin-bottom: 12px;
+      }
+      .msg { margin-bottom: 14px; }
+      .msg-role {
+        font-size: 11px; text-transform: uppercase;
+        letter-spacing: 0.08em; margin-bottom: 4px;
+        color: var(--text-muted);
+      }
+      .msg-user .msg-role { color: var(--accent-2); }
+      .msg-assistant .msg-role { color: var(--accent); }
+      .msg-content {
+        font-size: 14px; line-height: 1.6; color: var(--text-dim);
+        white-space: pre-wrap; word-wrap: break-word;
+      }
+      .msg-assistant .msg-content { color: var(--text); }
+      .agent-input-bar { display: flex; gap: 8px; align-items: flex-end; }
+      .agent-input-bar textarea {
+        flex: 1;
+        background: var(--bg-elev); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 10px 12px; font-family: 'Inter', sans-serif;
+        font-size: 14px; resize: vertical;
+        min-height: 44px; max-height: 160px; line-height: 1.4;
+      }
+      .agent-input-bar textarea:focus { outline: none; border-color: var(--accent); }
+      .agent-btn {
+        padding: 10px 16px; border-radius: 8px; border: none;
+        font-weight: 700; cursor: pointer; font-size: 13px;
+        font-family: 'Inter', sans-serif; letter-spacing: 0.02em;
+        white-space: nowrap;
+      }
+      .agent-btn.run { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; }
+      .agent-btn.run:disabled { opacity: 0.5; cursor: not-allowed; }
+      .agent-btn.stop { background: var(--danger); color: #fff; }
+      .agent-brain .brain-events {
+        flex: 1; overflow-y: auto;
+        max-height: 50vh;
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      .brain-event {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 6px; padding: 10px 12px; font-size: 12px;
+      }
+      .brain-event.pending { border-color: rgba(124,92,255,0.5); }
+      .brain-event.error   { border-color: rgba(255,95,87,0.5); }
+      .brain-event .tool-name {
+        font-family: 'JetBrains Mono', monospace; font-weight: 600;
+        color: var(--text); font-size: 12px; margin-bottom: 4px;
+      }
+      .brain-event .tool-args {
+        font-family: 'JetBrains Mono', monospace; font-size: 11px;
+        color: var(--text-dim); word-break: break-all; margin-bottom: 6px;
+        max-height: 60px; overflow: hidden;
+      }
+      .brain-event .tool-stats { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+      .stat {
+        padding: 2px 6px; border-radius: 3px;
+        font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      }
+      .stat.cost      { background: rgba(124,92,255,0.12); color: #b59aff; }
+      .stat.cache-hit { background: rgba(25,213,198,0.12); color: var(--accent-2); }
+      .stat.cache-miss{ background: rgba(154,154,164,0.1); color: var(--text-dim); }
+      .stat.latency   { background: rgba(154,154,164,0.1); color: var(--text-dim); }
+      .stat.err       { background: rgba(255,95,87,0.15); color: var(--danger); }
+      .stat.pending {
+        background: rgba(124,92,255,0.12); color: #b59aff;
+        animation: pulse 1s ease-in-out infinite;
+      }
+      @keyframes pulse { 0%,100%{opacity:0.5;} 50%{opacity:1;} }
+      .session-footer {
+        margin-top: 12px; padding: 10px 14px;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 6px;
+        display: flex; gap: 10px; flex-wrap: wrap;
+        font-size: 12px; color: var(--text-muted);
+      }
+      .session-footer strong { color: var(--text); font-family: 'JetBrains Mono', monospace; }
+      .session-footer .divider { color: var(--border); }
+
+      /* Modal */
+      .modal-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.75);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000; padding: 20px;
+      }
+      .modal-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 12px; padding: 28px 32px;
+        max-width: 480px; width: 100%;
+      }
+      .modal-card h3 { margin: 0 0 12px; font-size: 20px; }
+      .modal-card p { color: var(--text-dim); font-size: 14px; line-height: 1.6; margin: 0 0 10px; }
+      .modal-card ul { color: var(--text-dim); font-size: 14px; line-height: 1.7; margin: 0 0 12px; padding-left: 20px; }
+      .modal-card .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+      .modal-card .btn-m { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
+      .modal-card .btn-m.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; }
+      .modal-card .btn-m.secondary { background: var(--bg-elev); color: var(--text-dim); border: 1px solid var(--border); }
     </style>
   </head>
   <body>
@@ -366,6 +498,28 @@
             <div class="section">
               <h2>Spend by API (last 30 days)</h2>
               <div class="card" id="byapi">Loading…</div>
+            </div>
+            <div class="section">
+              <h2>Chat with an agent</h2>
+              <div class="agent-wrap">
+                <div class="agent-chat">
+                  <div class="agent-header">
+                    <span>Conversation</span>
+                    <button class="reset-btn" id="agent-reset">Reset session</button>
+                  </div>
+                  <div class="agent-messages" id="agent-messages"></div>
+                  <div class="agent-input-bar">
+                    <textarea id="agent-input" placeholder="Ask anything — try: &quot;Who is CNPJ 00.000.000/0001-91 and what's the weather in its home city?&quot;" rows="2"></textarea>
+                    <button class="agent-btn run" id="agent-run">Run</button>
+                    <button class="agent-btn stop" id="agent-stop" hidden>Stop</button>
+                  </div>
+                  <div class="session-footer" id="agent-footer"></div>
+                </div>
+                <div class="agent-brain">
+                  <div class="agent-header"><span>🧠 Agent brain</span></div>
+                  <div class="brain-events" id="brain-events"></div>
+                </div>
+              </div>
             </div>
             <div class="section">
               <h2>Recent transactions</h2>
@@ -530,10 +684,451 @@
               </div>
             `;
           }
+
+          // ---- Agent chat ----
+          initAgentChat();
         } catch (e) {
           root.innerHTML = `<div class="container"><div class="error">${e.message}</div></div>`;
         }
       }
+
+      // ==========================================================
+      // AGENT CHAT — Phase 2, per docs/agent-chat-spec.md
+      // ==========================================================
+      const AGENT_MODEL = 'llama-3.3-70b-versatile';
+      const SOFT_CAP = 0.50;
+      const HARD_CAP = 2.00;
+      const MAX_TOOL_CALLS_PER_TURN = 10;
+      const TOOL_TIMEOUT_MS = 15000;
+      const AGENT_CAP_ACK_KEY = 'axon.agentCapAck';
+
+      const AGENT_TOOLS = [
+        {
+          type: 'function',
+          function: {
+            name: 'lookup_cnpj',
+            description: 'Look up a Brazilian company by CNPJ (corporate tax ID). Returns legal name, address, status, shareholders.',
+            parameters: {
+              type: 'object',
+              properties: { cnpj: { type: 'string', description: '14-digit CNPJ, no punctuation or spaces' } },
+              required: ['cnpj']
+            }
+          },
+          _axon: { api: 'brasilapi', endpoint: 'cnpj', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({ cnpj: String(a.cnpj).replace(/\D/g, '') }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'lookup_cep',
+            description: 'Look up a Brazilian postal code (CEP). Returns street, neighborhood, city, state.',
+            parameters: {
+              type: 'object',
+              properties: { cep: { type: 'string', description: 'CEP, 8 digits, no dash' } },
+              required: ['cep']
+            }
+          },
+          _axon: { api: 'brasilapi', endpoint: 'cep', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({ cep: String(a.cep).replace(/\D/g, '') }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'current_weather',
+            description: 'Get current weather for a city (temperature in Kelvin, conditions, humidity, wind).',
+            parameters: {
+              type: 'object',
+              properties: { q: { type: 'string', description: 'City name, optionally with country code (e.g. "São Paulo, BR")' } },
+              required: ['q']
+            }
+          },
+          _axon: { api: 'openweather', endpoint: 'current', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({ q: a.q }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'lookup_ip',
+            description: 'Look up geolocation and ISP/owner of an IPv4 or IPv6 address.',
+            parameters: {
+              type: 'object',
+              properties: { ip: { type: 'string' } },
+              required: ['ip']
+            }
+          },
+          _axon: { api: 'ipinfo', endpoint: 'lookup', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({ ip: a.ip }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'search_web',
+            description: 'Search the web via Tavily. Returns a list of results with titles, URLs, and snippets.',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string' },
+                max_results: { type: 'integer', default: 3 }
+              },
+              required: ['query']
+            }
+          },
+          _axon: { api: 'tavily', endpoint: 'search', method: 'POST', paramStyle: 'body',
+            paramMap: (a) => ({ query: a.query, max_results: a.max_results || 3, search_depth: 'basic' }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'embed_text',
+            description: 'Generate a 1024-dim embedding vector for a short text (Voyage AI voyage-3-lite).',
+            parameters: {
+              type: 'object',
+              properties: { input: { type: 'string' } },
+              required: ['input']
+            }
+          },
+          _axon: { api: 'voyage', endpoint: 'embeddings', method: 'POST', paramStyle: 'body',
+            paramMap: (a) => ({ input: a.input, model: 'voyage-3-lite' }) }
+        }
+      ];
+
+      const AGENT_SYSTEM_PROMPT = [
+        "You are an assistant running inside the Axon dashboard — an API gateway for AI agents.",
+        "You have access to a small set of tools powered by Axon: CNPJ lookup, CEP lookup, weather, web search, IP info, embeddings.",
+        "",
+        "When answering, prefer using tools to ground your answer in fresh data. Be concise. Show numbers. Acknowledge when a tool fails.",
+        "",
+        "You are running on the user's own wallet. Each tool call costs them $0.0003 - $0.01. Do not call more tools than needed.",
+        "Never call the same tool with the same arguments twice in one turn.",
+        "Current date: " + new Date().toISOString().slice(0,10) + "."
+      ].join("\n");
+
+      let agentSession = null;
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+      }
+
+      function resetAgentSession() {
+        agentSession = {
+          messages: [{ role: 'system', content: AGENT_SYSTEM_PROMPT }],
+          events: [],
+          spend: 0,
+          cacheSaved: 0,
+          running: false,
+          abortController: null,
+        };
+        renderAgentChat();
+        renderAgentBrain();
+        renderAgentFooter();
+      }
+
+      function renderAgentChat() {
+        const el = document.getElementById('agent-messages');
+        if (!el) return;
+        const visible = agentSession.messages.filter((m) =>
+          (m.role === 'user' && m.content) ||
+          (m.role === 'assistant' && m.content && typeof m.content === 'string')
+        );
+        if (visible.length === 0) {
+          el.innerHTML = '<div class="empty" style="font-size:13px;padding:24px 8px;">Ask the agent anything. It will decide which tools to call. Everything streams into the brain panel on the right.</div>';
+          return;
+        }
+        el.innerHTML = visible.map((m) => `
+          <div class="msg msg-${m.role}">
+            <div class="msg-role">${m.role === 'user' ? 'you' : 'agent'}</div>
+            <div class="msg-content">${escapeHtml(m.content)}</div>
+          </div>
+        `).join('');
+        el.scrollTop = el.scrollHeight;
+      }
+
+      function renderAgentBrain() {
+        const el = document.getElementById('brain-events');
+        if (!el) return;
+        if (agentSession.events.length === 0) {
+          el.innerHTML = '<div class="empty" style="font-size:12px;padding:20px 8px;">Tool calls will stream here as the agent thinks.</div>';
+          return;
+        }
+        el.innerHTML = agentSession.events.map((e) => {
+          const cls = e.status === 'pending' ? 'pending' : e.status === 'error' ? 'error' : 'done';
+          const argsStr = JSON.stringify(e.args);
+          const argsDisplay = argsStr.length > 100 ? argsStr.slice(0, 100) + '…' : argsStr;
+          let stats = '';
+          if (e.status === 'pending') {
+            stats = '<span class="stat pending">running…</span>';
+          } else if (e.status === 'error') {
+            stats = `<span class="stat err">${escapeHtml((e.error || 'failed').slice(0, 60))}</span>`;
+          } else {
+            const costStr = (e.cost || 0).toFixed(6);
+            const cacheCls = e.cache === 'hit' ? 'cache-hit' : 'cache-miss';
+            stats = `<span class="stat cost">$${costStr}</span>` +
+              `<span class="stat ${cacheCls}">${e.cache || 'miss'}</span>` +
+              `<span class="stat latency">${e.latency || 0}ms</span>`;
+          }
+          return `
+            <div class="brain-event ${cls}">
+              <div class="tool-name">${escapeHtml(e.tool)}</div>
+              <div class="tool-args">${escapeHtml(argsDisplay)}</div>
+              <div class="tool-stats">${stats}</div>
+            </div>
+          `;
+        }).join('');
+        el.scrollTop = el.scrollHeight;
+      }
+
+      function renderAgentFooter() {
+        const el = document.getElementById('agent-footer');
+        if (!el) return;
+        const calls = agentSession.events.length;
+        el.innerHTML = `
+          <div>Calls: <strong>${calls}</strong></div>
+          <span class="divider">·</span>
+          <div>Spent: <strong>$${agentSession.spend.toFixed(6)}</strong></div>
+          <span class="divider">·</span>
+          <div>Cache saved: <strong>$${agentSession.cacheSaved.toFixed(6)}</strong></div>
+          <span class="divider">·</span>
+          <div>Cap: <strong>$${SOFT_CAP.toFixed(2)}</strong> / <strong>$${HARD_CAP.toFixed(2)}</strong></div>
+        `;
+      }
+
+      function showFirstRunModal() {
+        if (document.getElementById('agent-first-run')) return;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'agent-first-run';
+        modal.innerHTML = `
+          <div class="modal-card">
+            <h3>Chat with an agent</h3>
+            <p>This chat runs on your Axon wallet. Each message costs about <strong>$0.001-$0.01</strong> depending on which tools the agent decides to call.</p>
+            <p><strong>Safety caps:</strong></p>
+            <ul>
+              <li><strong>$${SOFT_CAP.toFixed(2)}</strong> soft cap per session — you confirm to continue past it</li>
+              <li><strong>$${HARD_CAP.toFixed(2)}</strong> hard cap per session — stops automatically</li>
+              <li>Max <strong>${MAX_TOOL_CALLS_PER_TURN} tool calls</strong> per message</li>
+              <li>Page refresh resets the session</li>
+            </ul>
+            <p>Tools available: CNPJ lookup, CEP lookup, weather, web search, IP info, embeddings.</p>
+            <div class="modal-actions">
+              <button class="btn-m secondary" id="agent-first-run-cancel">Not now</button>
+              <button class="btn-m primary" id="agent-first-run-ok">Got it</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+        document.getElementById('agent-first-run-ok').onclick = () => {
+          localStorage.setItem(AGENT_CAP_ACK_KEY, '1');
+          modal.remove();
+          const ti = document.getElementById('agent-input');
+          if (ti) ti.focus();
+        };
+        document.getElementById('agent-first-run-cancel').onclick = () => modal.remove();
+      }
+
+      async function callGroq(messages, tools, signal) {
+        const k = localStorage.getItem(STORAGE_KEY);
+        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const res = await fetch(b + '/v1/call/groq/chat', {
+          method: 'POST',
+          signal,
+          headers: {
+            'Authorization': 'Bearer ' + k,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: AGENT_MODEL,
+            messages,
+            tools,
+            tool_choice: 'auto',
+            max_tokens: 1024,
+            temperature: 0.2,
+          }),
+        });
+        const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
+        const cache = res.headers.get('x-axon-cache') || 'miss';
+        const latency = parseInt(res.headers.get('x-axon-latency-ms') || '0', 10);
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          const err = new Error(errBody.message || `groq/chat ${res.status}`);
+          err.status = res.status; err.cost = cost; err.cache = cache; err.latency = latency;
+          throw err;
+        }
+        const body = await res.json();
+        return { body, cost, cache, latency };
+      }
+
+      async function executeTool(name, args) {
+        const tool = AGENT_TOOLS.find((t) => t.function.name === name);
+        if (!tool) throw new Error('Unknown tool: ' + name);
+        const { api, endpoint, method, paramStyle, paramMap } = tool._axon;
+        const k = localStorage.getItem(STORAGE_KEY);
+        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const params = paramMap(args);
+        let url = `${b}/v1/call/${api}/${endpoint}`;
+        const init = { method, headers: { 'Authorization': 'Bearer ' + k } };
+        if (paramStyle === 'query') {
+          const qs = new URLSearchParams();
+          for (const [kk, vv] of Object.entries(params)) {
+            if (vv !== undefined && vv !== null) qs.set(kk, String(vv));
+          }
+          url += '?' + qs.toString();
+        } else {
+          init.headers['content-type'] = 'application/json';
+          init.body = JSON.stringify(params);
+        }
+        const controller = new AbortController();
+        init.signal = controller.signal;
+        const timer = setTimeout(() => controller.abort(), TOOL_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(url, init);
+        } finally {
+          clearTimeout(timer);
+        }
+        const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
+        const cache = res.headers.get('x-axon-cache') || 'miss';
+        const latency = parseInt(res.headers.get('x-axon-latency-ms') || '0', 10);
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          const err = new Error(errBody.message || `${api}/${endpoint} ${res.status}`);
+          err.status = res.status; err.cost = cost; err.cache = cache; err.latency = latency;
+          throw err;
+        }
+        const body = await res.json();
+        return { body, cost, cache, latency };
+      }
+
+      async function runAgentTurn(userText) {
+        if (agentSession.running) return;
+
+        if (agentSession.spend >= HARD_CAP) {
+          alert('Session hard cap of $' + HARD_CAP.toFixed(2) + ' reached. Click Reset session to start over.');
+          return;
+        }
+        if (agentSession.spend >= SOFT_CAP) {
+          const ok = confirm(`This session has already spent $${agentSession.spend.toFixed(4)}. Continue? (Hard cap $${HARD_CAP.toFixed(2)})`);
+          if (!ok) return;
+        }
+
+        agentSession.running = true;
+        agentSession.abortController = new AbortController();
+        const runBtn = document.getElementById('agent-run');
+        const stopBtn = document.getElementById('agent-stop');
+        if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Running…'; }
+        if (stopBtn) stopBtn.hidden = false;
+
+        agentSession.messages.push({ role: 'user', content: userText });
+        renderAgentChat();
+
+        try {
+          for (let iter = 0; iter < MAX_TOOL_CALLS_PER_TURN; iter++) {
+            const { body, cost } = await callGroq(agentSession.messages, AGENT_TOOLS, agentSession.abortController.signal);
+            agentSession.spend += cost;
+            renderAgentFooter();
+
+            const choice = body.choices && body.choices[0];
+            if (!choice) throw new Error('No response from model');
+            const msg = choice.message || {};
+            agentSession.messages.push(msg);
+
+            const toolCalls = msg.tool_calls || [];
+            if (toolCalls.length === 0) {
+              renderAgentChat();
+              break;
+            }
+
+            for (const tc of toolCalls) {
+              let argsObj;
+              try { argsObj = JSON.parse(tc.function.arguments || '{}'); }
+              catch (_) { argsObj = {}; }
+              const ev = { id: tc.id, tool: tc.function.name, args: argsObj, status: 'pending' };
+              agentSession.events.push(ev);
+              renderAgentBrain();
+
+              try {
+                const out = await executeTool(tc.function.name, argsObj);
+                ev.status = 'done';
+                ev.cost = out.cost; ev.cache = out.cache; ev.latency = out.latency;
+                ev.result = out.body;
+                agentSession.spend += out.cost;
+                if (out.cache === 'hit') {
+                  // User paid 50% of live price; savings ≈ cost (they'd have paid ~2x without cache)
+                  agentSession.cacheSaved += out.cost;
+                }
+                agentSession.messages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: JSON.stringify(out.body).slice(0, 8000),
+                });
+              } catch (err) {
+                ev.status = 'error';
+                ev.error = err.message;
+                ev.cost = err.cost || 0; ev.latency = err.latency || 0;
+                agentSession.spend += (err.cost || 0);
+                agentSession.messages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: JSON.stringify({ error: err.message, status: err.status }),
+                });
+              }
+              renderAgentBrain();
+              renderAgentFooter();
+
+              if (agentSession.spend >= HARD_CAP) {
+                agentSession.messages.push({ role: 'assistant', content: '(hard cap reached mid-turn — stopping)' });
+                renderAgentChat();
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') {
+            agentSession.messages.push({ role: 'assistant', content: '(interrupted)' });
+          } else {
+            agentSession.messages.push({ role: 'assistant', content: '(error: ' + err.message + ')' });
+          }
+          renderAgentChat();
+        } finally {
+          agentSession.running = false;
+          agentSession.abortController = null;
+          if (runBtn) { runBtn.disabled = false; runBtn.textContent = 'Run'; }
+          if (stopBtn) stopBtn.hidden = true;
+        }
+      }
+
+      function initAgentChat() {
+        if (localStorage.getItem(AGENT_CAP_ACK_KEY) !== '1') {
+          showFirstRunModal();
+        }
+        resetAgentSession();
+        document.getElementById('agent-run').onclick = () => {
+          const input = document.getElementById('agent-input');
+          const text = input.value.trim();
+          if (!text) return;
+          input.value = '';
+          runAgentTurn(text);
+        };
+        document.getElementById('agent-stop').onclick = () => {
+          if (agentSession.abortController) agentSession.abortController.abort();
+        };
+        document.getElementById('agent-reset').onclick = () => {
+          if (agentSession.running && agentSession.abortController) {
+            agentSession.abortController.abort();
+          }
+          resetAgentSession();
+        };
+        const input = document.getElementById('agent-input');
+        if (input) {
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              document.getElementById('agent-run').click();
+            }
+          });
+        }
+      }
+
+      // ==========================================================
 
       const key = localStorage.getItem(STORAGE_KEY);
       if (key) renderApp();
