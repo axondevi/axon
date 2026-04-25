@@ -271,6 +271,31 @@
       .tx-type.bonus   { background: rgba(251,191,36,0.12);  color: #fbbf24; }
       .tx-meta { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
 
+      /* Clickable transaction rows + expand panel */
+      tr.tx-row { cursor: pointer; transition: background 120ms ease; }
+      tr.tx-row:hover { background: rgba(255,255,255,0.025); }
+      tr.tx-row.is-open { background: rgba(124,92,255,0.06); }
+      tr.tx-row .tx-chevron {
+        display: inline-block; width: 10px; color: var(--text-muted);
+        font-size: 10px; transition: transform 120ms ease; margin-right: 4px;
+      }
+      tr.tx-row.is-open .tx-chevron { transform: rotate(90deg); color: var(--accent); }
+      tr.tx-detail-row > td {
+        background: rgba(255,255,255,0.02);
+        padding: 14px 18px 18px;
+        border-top: 1px dashed rgba(255,255,255,0.06);
+      }
+      .tx-detail-grid {
+        display: grid; grid-template-columns: 150px minmax(0, 1fr);
+        gap: 6px 18px; font-size: 12px;
+      }
+      .tx-detail-grid .k { color: var(--text-muted); }
+      .tx-detail-grid .v { word-break: break-all; }
+      @media (max-width: 640px) {
+        .tx-detail-grid { grid-template-columns: 1fr; gap: 2px 0; }
+        .tx-detail-grid .k { margin-top: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+      }
+
       /* --- Agent chat --- */
       .agent-wrap {
         display: grid;
@@ -824,7 +849,7 @@
                   <th>Type</th><th>Detail</th><th>Amount</th><th>When</th>
                 </tr></thead>
                 <tbody>
-                  ${recentTxs.map((t) => {
+                  ${recentTxs.map((t, idx) => {
                     const amt = Number(t.amount_usdc);
                     const cls = amt >= 0 ? 'positive' : 'negative';
                     let detail = '';
@@ -843,11 +868,14 @@
                       detail = `<div class="mono">${t.api_slug || t.type}</div>`;
                     }
                     return `
-                      <tr>
-                        <td><span class="tx-type ${t.type}">${t.type}</span></td>
+                      <tr class="tx-row" id="tx-row-${idx}" onclick="toggleTxDetail(${idx})" title="Click to view details">
+                        <td><span class="tx-chevron">▸</span><span class="tx-type ${t.type}">${t.type}</span></td>
                         <td>${detail}</td>
                         <td class="mono ${cls}">${amt >= 0 ? '+' : ''}${formatUsdc(t.amount_usdc)}</td>
                         <td style="color: var(--text-muted)" title="${new Date(t.created_at).toLocaleString()}">${relativeTime(t.created_at)}</td>
+                      </tr>
+                      <tr class="tx-detail-row" id="tx-detail-${idx}" style="display: none">
+                        <td colspan="4">${renderTxDetail(t)}</td>
                       </tr>
                     `;
                   }).join('')}
@@ -1287,6 +1315,69 @@
 
       function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+      }
+
+      // Toggle expand/collapse on a transaction row, fills detail panel on first open
+      function toggleTxDetail(idx) {
+        const row = document.getElementById('tx-row-' + idx);
+        const detail = document.getElementById('tx-detail-' + idx);
+        if (!row || !detail) return;
+        const open = detail.style.display !== 'none';
+        detail.style.display = open ? 'none' : 'table-row';
+        row.classList.toggle('is-open', !open);
+      }
+
+      // Build the detail panel for one transaction — surfaces every field we have
+      function renderTxDetail(t) {
+        const rows = [];
+        const created = new Date(t.created_at);
+        const amount = Number(t.amount_usdc || 0);
+        const sign = amount >= 0 ? '+' : '';
+        rows.push(['Type', t.type || '—']);
+        rows.push(['Amount', `${sign}${formatUsdc(t.amount_usdc)} USDC`]);
+        rows.push(['When', `${created.toLocaleString()} (${relativeTime(t.created_at)})`]);
+        rows.push(['Timestamp (UTC)', created.toISOString()]);
+
+        if (t.api_slug) rows.push(['API', t.api_slug]);
+        const endpoint = t.meta && t.meta.endpoint;
+        if (endpoint) rows.push(['Endpoint', endpoint]);
+        if (t.meta && typeof t.meta.cached === 'boolean') {
+          rows.push(['Cache hit', t.meta.cached ? 'yes — 50% discount applied' : 'no — live upstream']);
+        }
+        if (t.meta && t.meta.upstream_status) rows.push(['Upstream HTTP status', String(t.meta.upstream_status)]);
+        if (t.meta && t.meta.latency_ms !== undefined) rows.push(['Latency', `${t.meta.latency_ms} ms`]);
+        if (t.meta && t.meta.markup_micro !== undefined) {
+          rows.push(['Operator markup', `${formatUsdc(String(t.meta.markup_micro))} USDC`]);
+        }
+        if (t.meta && t.meta.upstream_micro !== undefined) {
+          rows.push(['Upstream cost', `${formatUsdc(String(t.meta.upstream_micro))} USDC`]);
+        }
+        if (t.meta && t.meta.reason) rows.push(['Reason', String(t.meta.reason).replace(/_/g, ' ')]);
+        if (t.meta && t.meta.event) rows.push(['Event', String(t.meta.event).replace(/_/g, ' ')]);
+        if (t.meta && t.meta.error) rows.push(['Error', String(t.meta.error)]);
+        if (t.meta && t.meta.fallback_used) rows.push(['Fallback used', String(t.meta.fallback_used)]);
+        if (t.request_id) rows.push(['Request ID', t.request_id]);
+        if (t.id) rows.push(['Transaction ID', t.id]);
+        if (t.onchain_tx) rows.push(['On-chain tx', t.onchain_tx]);
+
+        // Surface anything else in meta we didn't explicitly map
+        if (t.meta && typeof t.meta === 'object') {
+          const known = new Set(['endpoint','cached','upstream_status','latency_ms','markup_micro','upstream_micro','reason','event','error','fallback_used']);
+          for (const [k, v] of Object.entries(t.meta)) {
+            if (known.has(k) || v === null || v === undefined || v === '') continue;
+            const display = (typeof v === 'object') ? JSON.stringify(v) : String(v);
+            rows.push([k.replace(/_/g, ' '), display]);
+          }
+        }
+
+        return `
+          <div class="tx-detail-grid">
+            ${rows.map(([k, v]) => `
+              <div class="k">${escapeHtml(k)}</div>
+              <div class="v mono">${escapeHtml(v)}</div>
+            `).join('')}
+          </div>
+        `;
       }
 
       function resetAgentSession() {
