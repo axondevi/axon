@@ -1883,7 +1883,11 @@
         document.getElementById('agent-first-run-cancel').onclick = () => modal.remove();
       }
 
-      async function callGroq(messages, tools, signal) {
+      // Streaming chat completion against Groq via Axon. Calls onPartial each time
+      // the accumulated message changes so the UI can render text + tool calls
+      // as they arrive. Returns the same shape as the old non-streaming version
+      // so the rest of the agent loop is unchanged.
+      async function callGroq(messages, tools, signal, onPartial) {
         const k = localStorage.getItem(STORAGE_KEY);
         const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
         const res = await fetch(b + '/v1/call/groq/chat', {
@@ -1900,19 +1904,89 @@
             tool_choice: 'auto',
             max_tokens: 4096,
             temperature: 0.3,
+            stream: true,
           }),
         });
         const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
         const cache = res.headers.get('x-axon-cache') || 'miss';
         const latency = parseInt(res.headers.get('x-axon-latency-ms') || '0', 10);
         if (!res.ok) {
-          const errBody = await res.json().catch(() => ({}));
-          const err = new Error(errBody.message || `groq/chat ${res.status}`);
+          // On error the body is JSON, not SSE
+          const text = await res.text().catch(() => '');
+          let parsed = null; try { parsed = JSON.parse(text); } catch {}
+          const msg = (parsed && (parsed.message || parsed.error || (parsed.error && parsed.error.message))) || (`groq/chat ${res.status}`);
+          const err = new Error(msg);
           err.status = res.status; err.cost = cost; err.cache = cache; err.latency = latency;
+          // surface failed_generation if present (helps debug Llama tool_use_failed)
+          if (parsed && parsed.failed_generation) err.failedGeneration = parsed.failed_generation;
           throw err;
         }
-        const body = await res.json();
-        return { body, cost, cache, latency };
+
+        const message = { role: 'assistant', content: '' };
+        const tcsByIdx = {};
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        const emitPartial = () => {
+          if (!onPartial) return;
+          const indices = Object.keys(tcsByIdx).map(Number).sort((a, b) => a - b);
+          const tcs = indices.map(i => tcsByIdx[i]);
+          // Provide a snapshot — caller may render synchronously
+          onPartial({
+            content: message.content,
+            tool_calls: tcs.length ? tcs : undefined,
+          });
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let nlIdx;
+          while ((nlIdx = buf.indexOf('\n\n')) !== -1) {
+            const event = buf.slice(0, nlIdx);
+            buf = buf.slice(nlIdx + 2);
+            if (!event.trim()) continue;
+            for (const line of event.split('\n')) {
+              if (!line.startsWith('data:')) continue;
+              const data = line.slice(5).trim();
+              if (!data || data === '[DONE]') continue;
+              let j;
+              try { j = JSON.parse(data); } catch { continue; }
+              const choice = j.choices && j.choices[0];
+              if (!choice) continue;
+              const delta = choice.delta || {};
+              if (typeof delta.content === 'string' && delta.content) {
+                message.content += delta.content;
+              }
+              if (Array.isArray(delta.tool_calls)) {
+                for (const dtc of delta.tool_calls) {
+                  const idx = dtc.index;
+                  if (idx == null) continue;
+                  if (!tcsByIdx[idx]) {
+                    tcsByIdx[idx] = { id: dtc.id || '', type: 'function', function: { name: '', arguments: '' } };
+                  }
+                  const acc = tcsByIdx[idx];
+                  if (dtc.id) acc.id = dtc.id;
+                  if (dtc.function) {
+                    if (dtc.function.name) acc.function.name = dtc.function.name;
+                    if (typeof dtc.function.arguments === 'string') acc.function.arguments += dtc.function.arguments;
+                  }
+                }
+              }
+            }
+            emitPartial();
+          }
+        }
+
+        // Finalize tool_calls in index order
+        const indices = Object.keys(tcsByIdx).map(Number).sort((a, b) => a - b);
+        const finalTcs = indices.map(i => tcsByIdx[i]);
+        if (finalTcs.length) message.tool_calls = finalTcs;
+        if (!message.content) delete message.content;
+
+        return { body: { choices: [{ message }] }, cost, cache, latency };
       }
 
       async function executeTool(name, args) {
@@ -2002,14 +2076,38 @@
 
         try {
           for (let iter = 0; iter < MAX_TOOL_CALLS_PER_TURN; iter++) {
-            const { body, cost } = await callGroq(agentSession.messages, AGENT_TOOLS, agentSession.abortController.signal);
+            // Live placeholder — updated character-by-character as the stream arrives.
+            // Sits in the messages array so renderAgentChat naturally picks it up.
+            const streamingMsg = { role: 'assistant', content: '' };
+            agentSession.messages.push(streamingMsg);
+
+            // rAF coalescing — re-render on next animation frame instead of every chunk
+            let scheduled = false;
+            const scheduleRender = () => {
+              if (scheduled) return;
+              scheduled = true;
+              requestAnimationFrame(() => { scheduled = false; renderAgentChat(); });
+            };
+
+            const { body, cost } = await callGroq(
+              agentSession.messages.slice(0, -1),
+              AGENT_TOOLS,
+              agentSession.abortController.signal,
+              (partial) => {
+                if (typeof partial.content === 'string') streamingMsg.content = partial.content;
+                if (partial.tool_calls) streamingMsg.tool_calls = partial.tool_calls;
+                else delete streamingMsg.tool_calls;
+                scheduleRender();
+              },
+            );
             agentSession.spend += cost;
             renderAgentFooter();
 
             const choice = body.choices && body.choices[0];
             if (!choice) throw new Error('No response from model');
             const msg = choice.message || {};
-            agentSession.messages.push(msg);
+            // Replace placeholder with the canonical message
+            agentSession.messages[agentSession.messages.length - 1] = msg;
 
             const toolCalls = msg.tool_calls || [];
             if (toolCalls.length === 0) {
