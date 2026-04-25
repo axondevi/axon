@@ -294,12 +294,13 @@
         margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
       }
       .agent-header .reset-btn {
-        background: none; border: 1px solid var(--border);
-        color: var(--text-dim); font-size: 11px;
-        padding: 4px 10px; border-radius: 4px;
-        cursor: pointer; letter-spacing: 0.04em;
+        background: none; border: none;
+        color: var(--text-muted); font-size: 11px;
+        padding: 2px 4px; border-radius: 3px;
+        cursor: pointer; letter-spacing: 0.06em;
+        text-transform: lowercase;
       }
-      .agent-header .reset-btn:hover { border-color: var(--accent); color: var(--text); }
+      .agent-header .reset-btn:hover { color: var(--text-dim); }
       .agent-messages {
         flex: 1; overflow-y: auto;
         max-height: 50vh;
@@ -319,25 +320,57 @@
         white-space: pre-wrap; word-wrap: break-word;
       }
       .msg-assistant .msg-content { color: var(--text); }
-      .agent-input-bar { display: flex; gap: 8px; align-items: flex-end; }
+      .agent-input-bar {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
       .agent-input-bar textarea {
-        flex: 1;
+        width: 100%;
         background: var(--bg-elev); color: var(--text);
         border: 1px solid var(--border); border-radius: 8px;
-        padding: 10px 12px; font-family: 'Inter', sans-serif;
+        padding: 11px 14px; font-family: 'Inter', sans-serif;
         font-size: 14px; resize: vertical;
-        min-height: 44px; max-height: 160px; line-height: 1.4;
+        min-height: 88px; max-height: 280px; line-height: 1.5;
       }
-      .agent-input-bar textarea:focus { outline: none; border-color: var(--accent); }
+      .agent-input-bar textarea:focus {
+        outline: none; border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(124,92,255,0.12);
+      }
+      .agent-input-bar textarea::placeholder { color: var(--text-muted); }
+      .agent-action-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .agent-action-row .hint {
+        font-size: 11px; color: var(--text-muted);
+        letter-spacing: 0.04em;
+      }
+      .agent-action-row .kbd {
+        font-family: 'JetBrains Mono', monospace;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        padding: 1px 5px; border-radius: 3px; font-size: 10.5px;
+        color: var(--text-dim);
+      }
       .agent-btn {
-        padding: 10px 16px; border-radius: 8px; border: none;
-        font-weight: 700; cursor: pointer; font-size: 13px;
-        font-family: 'Inter', sans-serif; letter-spacing: 0.02em;
+        padding: 9px 20px; border-radius: 7px; border: 1px solid transparent;
+        font-weight: 600; cursor: pointer; font-size: 13px;
+        font-family: 'Inter', sans-serif; letter-spacing: 0.01em;
         white-space: nowrap;
       }
-      .agent-btn.run { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; }
-      .agent-btn.run:disabled { opacity: 0.5; cursor: not-allowed; }
-      .agent-btn.stop { background: var(--danger); color: #fff; }
+      .agent-btn.run {
+        background: var(--accent); color: #fff;
+        border-color: var(--accent);
+      }
+      .agent-btn.run:hover:not(:disabled) { background: #6b4ff0; border-color: #6b4ff0; }
+      .agent-btn.run:disabled { opacity: 0.55; cursor: not-allowed; }
+      .agent-btn.stop {
+        background: transparent; color: var(--danger);
+        border-color: rgba(255,95,87,0.4);
+      }
+      .agent-btn.stop:hover { background: rgba(255,95,87,0.08); }
       .agent-brain .brain-events {
         flex: 1; overflow-y: auto;
         max-height: 50vh;
@@ -404,20 +437,44 @@
       .modal-card .btn-m.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; }
       .modal-card .btn-m.secondary { background: var(--bg-elev); color: var(--text-dim); border: 1px solid var(--border); }
 
-      /* Quick-start chips */
+      /* Quick-start suggestions — inline, understated */
       .quick-chips {
-        display: flex; gap: 6px; flex-wrap: wrap;
-        margin-bottom: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0;
+        margin: 6px 2px 10px;
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.9;
+      }
+      .quick-chips .qc-label {
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-right: 10px;
+        font-size: 11px;
       }
       .chip {
-        background: var(--bg-elev); border: 1px solid var(--border);
-        color: var(--text-dim); font-size: 12px;
-        padding: 5px 10px; border-radius: 999px;
-        cursor: pointer; font-family: 'Inter', sans-serif;
-        transition: all 0.15s;
-        white-space: nowrap;
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        font-size: 12.5px;
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        transition: color 0.12s;
       }
-      .chip:hover { border-color: var(--accent); color: var(--text); }
+      .chip:hover { color: var(--accent-2); }
+      .chip:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+      .chip + .chip::before {
+        content: '·';
+        margin: 0 8px;
+        color: var(--border);
+        pointer-events: none;
+      }
 
       /* Markdown render inside assistant message */
       .msg-content.md { white-space: normal; }
@@ -566,32 +623,38 @@
               <div class="card" id="byapi">Loading…</div>
             </div>
             <div class="section">
-              <h2>Chat with an agent</h2>
+              <h2 translate="no">Agent</h2>
               <div class="agent-wrap">
                 <div class="agent-chat">
                   <div class="agent-header">
-                    <span>Conversation</span>
-                    <button class="reset-btn" id="agent-reset">Reset session</button>
+                    <span translate="no">Agent</span>
+                    <button class="reset-btn" id="agent-reset" translate="no">reset</button>
                   </div>
                   <div class="agent-messages" id="agent-messages"></div>
-                  <div class="quick-chips" id="quick-chips">
-                    <button class="chip" data-tpl="Pesquise e escreva um resumo em markdown sobre: ">🔍 Pesquisar</button>
-                    <button class="chip" data-tpl="Escreva um artigo curto em markdown com 3 parágrafos sobre: ">✍️ Escrever</button>
-                    <button class="chip" data-tpl="Compare ponto a ponto: ">📊 Comparar</button>
-                    <button class="chip" data-tpl="Escreva código JavaScript completo, com comentários, que: ">💻 Código</button>
-                    <button class="chip" data-tpl="Extraia o conteúdo principal dessa URL e resuma em bullets: ">🌐 Extrair URL</button>
-                    <button class="chip" data-tpl="Calcule passo-a-passo e mostre o resultado: ">🧮 Calcular</button>
-                    <button class="chip" data-tpl="Escreva e execute JavaScript que: ">⚙️ Executar JS</button>
+                  <div class="quick-chips" id="quick-chips" translate="no">
+                    <span class="qc-label">Try</span>
+                    <button class="chip" data-tpl="Research and summarize in markdown: ">Research</button>
+                    <button class="chip" data-tpl="Write a short 3-paragraph article in markdown about: ">Write</button>
+                    <button class="chip" data-tpl="Compare side-by-side in a markdown table: ">Compare</button>
+                    <button class="chip" data-tpl="Write complete JavaScript code, with comments, that: ">Code</button>
+                    <button class="chip" data-tpl="Extract the main content from this URL and summarize in bullets: ">Extract URL</button>
+                    <button class="chip" data-tpl="Calculate step by step and show the result: ">Calculate</button>
+                    <button class="chip" data-tpl="Write and execute JavaScript that: ">Run JS</button>
                   </div>
                   <div class="agent-input-bar">
-                    <textarea id="agent-input" placeholder="Fala com o agente — ele pesquisa, compara, escreve, programa. Tenta: &quot;Pesquise sobre o protocolo x402 e escreva um resumo em markdown com bullets e um exemplo de código.&quot;" rows="3"></textarea>
-                    <button class="agent-btn run" id="agent-run">Run</button>
-                    <button class="agent-btn stop" id="agent-stop" hidden>Stop</button>
+                    <textarea id="agent-input" placeholder="What do you want the agent to build?" rows="3"></textarea>
+                    <div class="agent-action-row">
+                      <span class="hint"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> to run</span>
+                      <div>
+                        <button class="agent-btn stop" id="agent-stop" hidden translate="no">Stop</button>
+                        <button class="agent-btn run" id="agent-run" translate="no">Run</button>
+                      </div>
+                    </div>
                   </div>
                   <div class="session-footer" id="agent-footer"></div>
                 </div>
                 <div class="agent-brain">
-                  <div class="agent-header"><span>🧠 Agent brain</span></div>
+                  <div class="agent-header"><span translate="no">Brain</span></div>
                   <div class="brain-events" id="brain-events"></div>
                 </div>
               </div>
@@ -1132,14 +1195,14 @@
           (m.role === 'assistant' && m.content && typeof m.content === 'string')
         );
         if (visible.length === 0) {
-          el.innerHTML = '<div class="empty" style="font-size:13px;padding:24px 8px;">Fala com o agente — ele pesquisa, compara, escreve e programa. Clica em um chip acima pra começar, ou digita livre.</div>';
+          el.innerHTML = '<div class="empty" style="font-size:13px;padding:32px 8px;color:var(--text-muted);">Start a conversation — pick a template below or type freely.</div>';
           return;
         }
         el.innerHTML = visible.map((m) => {
           if (m.role === 'user') {
             return `
               <div class="msg msg-user">
-                <div class="msg-role">you</div>
+                <div class="msg-role" translate="no">you</div>
                 <div class="msg-content">${escapeHtml(m.content)}</div>
               </div>
             `;
@@ -1147,7 +1210,7 @@
           // assistant — render markdown
           return `
             <div class="msg msg-assistant">
-              <div class="msg-role">agent</div>
+              <div class="msg-role" translate="no">agent</div>
               <div class="msg-content md">${renderMarkdown(m.content)}</div>
             </div>
           `;
@@ -1159,7 +1222,7 @@
         const el = document.getElementById('brain-events');
         if (!el) return;
         if (agentSession.events.length === 0) {
-          el.innerHTML = '<div class="empty" style="font-size:12px;padding:20px 8px;">Tool calls will stream here as the agent thinks.</div>';
+          el.innerHTML = '<div class="empty" style="font-size:12px;padding:24px 8px;color:var(--text-muted);">Tool calls will stream here.</div>';
           return;
         }
         el.innerHTML = agentSession.events.map((e) => {
@@ -1197,13 +1260,13 @@
         if (!el) return;
         const calls = agentSession.events.length;
         el.innerHTML = `
-          <div>Calls: <strong>${calls}</strong></div>
+          <div translate="no">Calls <strong>${calls}</strong></div>
           <span class="divider">·</span>
-          <div>Spent: <strong>$${agentSession.spend.toFixed(6)}</strong></div>
+          <div translate="no">Spent <strong>$${agentSession.spend.toFixed(4)}</strong></div>
           <span class="divider">·</span>
-          <div>Cache saved: <strong>$${agentSession.cacheSaved.toFixed(6)}</strong></div>
+          <div translate="no">Cache saved <strong>$${agentSession.cacheSaved.toFixed(4)}</strong></div>
           <span class="divider">·</span>
-          <div>Cap: <strong>$${SOFT_CAP.toFixed(2)}</strong> / <strong>$${HARD_CAP.toFixed(2)}</strong></div>
+          <div translate="no">Limit <strong>$${SOFT_CAP.toFixed(2)}</strong> / <strong>$${HARD_CAP.toFixed(2)}</strong></div>
         `;
       }
 
