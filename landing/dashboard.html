@@ -1354,66 +1354,111 @@
         return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
       }
 
-      // Persisted gallery — images survive page refresh up to MAX_GALLERY items.
-      // Each image is ~2MB base64 so we cap aggressively to fit localStorage quota.
-      const GALLERY_KEY = 'axon.gallery.v1';
-      const MAX_GALLERY = 8;
+      // ============================================================
+      // Persisted gallery — IndexedDB-backed, holds hundreds of images.
+      // ============================================================
+      // IDB lets us blow past the ~5-10MB localStorage cap (each image is
+      // ~2MB base64, so localStorage capped us at 3-5 images). With IDB
+      // we comfortably keep 50+ recent images and only evict for UI hygiene.
+      const IDB_NAME = 'axon-gallery';
+      const IDB_STORE = 'images';
+      const IDB_VERSION = 1;
+      const MAX_GALLERY = 50;          // soft cap, eviction kicks in past this
+      const LEGACY_LS_KEY = 'axon.gallery.v1';
 
-      function loadGalleryFromStorage() {
-        try {
-          const raw = localStorage.getItem(GALLERY_KEY);
-          if (!raw) return [];
-          const parsed = JSON.parse(raw);
-          return Array.isArray(parsed.items) ? parsed.items : [];
-        } catch { return []; }
-      }
+      // In-memory mirror so synchronous code paths (resetAgentSession) keep working
+      const IMAGE_CACHE = new Map();   // id -> { id, dataUrl, prompt, createdAt }
+      let _idbReady = null;            // Promise<IDBDatabase | null>
 
-      function saveGalleryToStorage(items) {
-        // Keep dropping the oldest until it fits — data URLs blow past quota fast
-        let trimmed = items.slice(-MAX_GALLERY);
-        while (trimmed.length) {
-          try {
-            localStorage.setItem(GALLERY_KEY, JSON.stringify({ items: trimmed }));
-            return trimmed;
-          } catch (e) {
-            if (trimmed.length === 1) {
-              // Even one image doesn't fit — give up gracefully
-              try { localStorage.removeItem(GALLERY_KEY); } catch {}
-              return [];
+      function openImageDB() {
+        if (_idbReady) return _idbReady;
+        _idbReady = new Promise((resolve) => {
+          if (typeof indexedDB === 'undefined') { resolve(null); return; }
+          let req;
+          try { req = indexedDB.open(IDB_NAME, IDB_VERSION); }
+          catch { resolve(null); return; }
+          req.onerror = () => resolve(null);
+          req.onblocked = () => resolve(null);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) {
+              const s = db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+              s.createIndex('createdAt', 'createdAt');
             }
-            trimmed = trimmed.slice(1);
-          }
-        }
-        return [];
+          };
+          req.onsuccess = () => resolve(req.result);
+        });
+        return _idbReady;
       }
 
-      // Append a generated image to the strip above chat. Persisted across refresh.
-      function addToGallery(id, dataUrl, prompt, opts) {
-        opts = opts || {};
-        const strip = document.getElementById('gallery-strip');
-        if (!strip) return;
+      async function idbPut(item) {
+        const db = await openImageDB();
+        if (!db) return false;
+        return new Promise((resolve) => {
+          try {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).put(item);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+            tx.onabort = () => resolve(false);
+          } catch { resolve(false); }
+        });
+      }
 
-        // Persist (unless we're restoring from storage)
-        if (!opts.skipPersist) {
-          // Also keep the dataUrl reachable from agent's @img:<id> references after a reload
-          if (!agentSession) {
-            agentSession = { images: {} };
-          }
-          if (!agentSession.images) agentSession.images = {};
-          agentSession.images[id] = dataUrl;
+      async function idbGetAll() {
+        const db = await openImageDB();
+        if (!db) return [];
+        return new Promise((resolve) => {
+          try {
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const req = tx.objectStore(IDB_STORE).getAll();
+            req.onsuccess = () => {
+              const items = (req.result || []).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+              resolve(items);
+            };
+            req.onerror = () => resolve([]);
+          } catch { resolve([]); }
+        });
+      }
 
-          const items = loadGalleryFromStorage();
-          items.push({ id, dataUrl, prompt: prompt || '', createdAt: Date.now() });
-          const persisted = saveGalleryToStorage(items);
-          // If older items got evicted from storage, clean their tiles too
-          if (persisted.length < items.length) {
-            const keep = new Set(persisted.map(x => x.id));
-            strip.querySelectorAll('.gallery-tile').forEach(t => {
-              if (!keep.has(t.dataset.id)) t.remove();
-            });
-          }
+      async function idbDelete(id) {
+        const db = await openImageDB();
+        if (!db) return;
+        try {
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).delete(id);
+        } catch {}
+      }
+
+      async function idbClear() {
+        const db = await openImageDB();
+        if (!db) return;
+        try {
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).clear();
+        } catch {}
+      }
+
+      // One-shot migration: copy any legacy localStorage items into IDB, then drop the key.
+      async function migrateLegacyGallery() {
+        let legacy;
+        try {
+          const raw = localStorage.getItem(LEGACY_LS_KEY);
+          if (!raw) return;
+          legacy = JSON.parse(raw);
+        } catch { legacy = null; }
+        if (!legacy || !Array.isArray(legacy.items)) {
+          try { localStorage.removeItem(LEGACY_LS_KEY); } catch {}
+          return;
         }
+        for (const it of legacy.items) {
+          if (it && it.id && it.dataUrl) await idbPut(it);
+        }
+        try { localStorage.removeItem(LEGACY_LS_KEY); } catch {}
+      }
 
+      // Build a tile element for an image and wire up its handlers
+      function buildGalleryTile(id, dataUrl, prompt) {
         const tile = document.createElement('div');
         tile.className = 'gallery-tile';
         tile.dataset.id = id;
@@ -1424,42 +1469,93 @@
         `;
         tile.addEventListener('click', (e) => {
           if (e.target.closest('.dl-btn')) return;
-          // Open full-size in a new tab via blob URL (handles huge data URLs)
           fetch(dataUrl).then(r => r.blob()).then(b => {
             const url = URL.createObjectURL(b);
             window.open(url, '_blank', 'noopener');
             setTimeout(() => URL.revokeObjectURL(url), 60000);
           });
         });
-        const dl = tile.querySelector('.dl-btn');
-        dl.addEventListener('click', (e) => {
+        tile.querySelector('.dl-btn').addEventListener('click', (e) => {
           e.stopPropagation();
           const a = document.createElement('a');
           a.href = dataUrl;
           a.download = `axon-${id}.png`;
           document.body.appendChild(a); a.click(); a.remove();
         });
-        strip.appendChild(tile);
-        strip.hidden = false;
-        // Auto-scroll the strip to show the newest tile
-        strip.scrollTo({ left: strip.scrollWidth, behavior: 'smooth' });
+        return tile;
       }
 
-      function restoreGallery() {
-        const items = loadGalleryFromStorage();
-        if (!items.length) return;
-        for (const it of items) {
-          addToGallery(it.id, it.dataUrl, it.prompt, { skipPersist: true });
+      // Append a generated image to the strip and persist it. Persistence is async
+      // (fire-and-forget) so callers stay synchronous; cache + DOM update immediately.
+      function addToGallery(id, dataUrl, prompt, opts) {
+        opts = opts || {};
+        const strip = document.getElementById('gallery-strip');
+        if (!strip) return;
+
+        // Sync: cache + DOM
+        const item = { id, dataUrl, prompt: prompt || '', createdAt: Date.now() };
+        IMAGE_CACHE.set(id, item);
+        if (!opts.skipPersist) {
+          if (!agentSession) agentSession = { images: {} };
+          if (!agentSession.images) agentSession.images = {};
+          agentSession.images[id] = dataUrl;
         }
+        strip.appendChild(buildGalleryTile(id, dataUrl, prompt));
+        strip.hidden = false;
+        strip.scrollTo({ left: strip.scrollWidth, behavior: 'smooth' });
+
+        // Async: persist + evict if over soft cap
+        if (!opts.skipPersist) {
+          (async () => {
+            await idbPut(item);
+            if (IMAGE_CACHE.size > MAX_GALLERY) {
+              const all = Array.from(IMAGE_CACHE.values()).sort((a, b) => a.createdAt - b.createdAt);
+              const drop = all.slice(0, all.length - MAX_GALLERY);
+              for (const d of drop) {
+                IMAGE_CACHE.delete(d.id);
+                await idbDelete(d.id);
+                const tile = strip.querySelector(`.gallery-tile[data-id="${d.id}"]`);
+                if (tile) tile.remove();
+              }
+            }
+          })();
+        }
+      }
+
+      async function restoreGallery() {
+        await migrateLegacyGallery();
+        const items = await idbGetAll();
+        if (!items.length) return;
+        IMAGE_CACHE.clear();
+        for (const it of items) IMAGE_CACHE.set(it.id, it);
+        // Re-attach to in-memory agent session so chat markdown can resolve @img:<id>
+        if (agentSession) {
+          if (!agentSession.images) agentSession.images = {};
+          for (const it of items) agentSession.images[it.id] = it.dataUrl;
+        }
+        const strip = document.getElementById('gallery-strip');
+        if (!strip) return;
+        for (const it of items) {
+          strip.appendChild(buildGalleryTile(it.id, it.dataUrl, it.prompt));
+        }
+        strip.hidden = false;
       }
 
       function clearGallery() {
         const strip = document.getElementById('gallery-strip');
-        if (!strip) return;
-        // Keep the label, drop everything else
-        strip.querySelectorAll('.gallery-tile').forEach(t => t.remove());
-        strip.hidden = true;
-        try { localStorage.removeItem(GALLERY_KEY); } catch {}
+        IMAGE_CACHE.clear();
+        if (strip) {
+          strip.querySelectorAll('.gallery-tile').forEach(t => t.remove());
+          strip.hidden = true;
+        }
+        // Async wipe — fire-and-forget
+        idbClear();
+        try { localStorage.removeItem(LEGACY_LS_KEY); } catch {}
+      }
+
+      // Synchronous accessor so resetAgentSession can stitch images back to session
+      function getCachedImages() {
+        return Array.from(IMAGE_CACHE.values());
       }
 
       // Toggle expand/collapse on a transaction row, fills detail panel on first open
@@ -1537,7 +1633,7 @@
         };
         // Re-attach persisted images to the in-memory map so chat history
         // markdown that references @img:<id> can still resolve to data URLs
-        for (const it of loadGalleryFromStorage()) {
+        for (const it of getCachedImages()) {
           agentSession.images[it.id] = it.dataUrl;
         }
         renderAgentChat();
