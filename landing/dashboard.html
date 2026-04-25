@@ -245,7 +245,10 @@
             <div class="card">
               <div class="metric-label">Available balance</div>
               <div class="metric-value">${formatUsdc(bal.available_usdc)}<span class="unit">USDC</span></div>
-              <div class="metric-sub">${bal.reserved_usdc === '0.000000' ? 'No funds reserved.' : bal.reserved_usdc + ' reserved'}</div>
+              <div class="metric-sub">
+                ${bal.reserved_usdc === '0.000000' ? 'No funds reserved.' : bal.reserved_usdc + ' reserved'}
+                · <a href="/buy-usdc" style="color: var(--accent-2); text-decoration: none;">Top up →</a>
+              </div>
             </div>
             <div class="card">
               <div class="metric-label">Requests</div>
