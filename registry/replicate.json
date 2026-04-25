@@ -22,6 +22,14 @@
       "markup_pct": 0,
       "cache_ttl": 0,
       "notes": "Polling is free. MVP routing assumes client passes :id in query as `id` — wrapper substitutes."
+    },
+    "flux-schnell": {
+      "method": "POST",
+      "path": "/v1/models/black-forest-labs/flux-schnell/predictions",
+      "price_usd": 0.003,
+      "markup_pct": 15,
+      "cache_ttl": 0,
+      "notes": "FLUX schnell — fast high-quality image gen ($0.003/img). Async: returns prediction id, client polls /v1/predictions/:id until status=succeeded."
     }
   }
 }
