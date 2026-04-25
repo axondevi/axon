@@ -10,6 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js" defer></script>
     <style>
       :root {
         --bg: #0a0a0b;
@@ -401,6 +402,70 @@
       .modal-card .btn-m { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
       .modal-card .btn-m.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; }
       .modal-card .btn-m.secondary { background: var(--bg-elev); color: var(--text-dim); border: 1px solid var(--border); }
+
+      /* Quick-start chips */
+      .quick-chips {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .chip {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        color: var(--text-dim); font-size: 12px;
+        padding: 5px 10px; border-radius: 999px;
+        cursor: pointer; font-family: 'Inter', sans-serif;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .chip:hover { border-color: var(--accent); color: var(--text); }
+
+      /* Markdown render inside assistant message */
+      .msg-content.md { white-space: normal; }
+      .msg-content.md p { margin: 0 0 10px 0; }
+      .msg-content.md p:last-child { margin-bottom: 0; }
+      .msg-content.md h1, .msg-content.md h2, .msg-content.md h3, .msg-content.md h4 {
+        margin: 14px 0 6px 0; color: var(--text); font-weight: 700;
+        letter-spacing: -0.01em; line-height: 1.3;
+      }
+      .msg-content.md h1 { font-size: 18px; }
+      .msg-content.md h2 { font-size: 16px; }
+      .msg-content.md h3 { font-size: 15px; }
+      .msg-content.md h4 { font-size: 14px; color: var(--accent-2); }
+      .msg-content.md strong { color: var(--text); font-weight: 600; }
+      .msg-content.md em { color: var(--text); font-style: italic; }
+      .msg-content.md ul, .msg-content.md ol { padding-left: 22px; margin: 0 0 10px 0; }
+      .msg-content.md li { margin: 3px 0; }
+      .msg-content.md code {
+        font-family: 'JetBrains Mono', monospace;
+        background: var(--bg-elev); color: #e4e4ff;
+        padding: 1px 5px; border-radius: 3px;
+        border: 1px solid var(--border);
+        font-size: 12.5px;
+      }
+      .msg-content.md pre {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 6px;
+        padding: 12px 14px;
+        margin: 10px 0;
+        overflow-x: auto;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12.5px; line-height: 1.55;
+      }
+      .msg-content.md pre code {
+        background: transparent; border: none; padding: 0;
+        color: var(--text); font-size: 12.5px;
+      }
+      .msg-content.md a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
+      .msg-content.md a:hover { color: var(--text); }
+      .msg-content.md blockquote {
+        border-left: 3px solid var(--border);
+        padding-left: 12px; margin: 10px 0;
+        color: var(--text-dim); font-style: italic;
+      }
+      .msg-content.md hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+      .msg-content.md table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+      .msg-content.md th, .msg-content.md td { border: 1px solid var(--border); padding: 6px 10px; }
+      .msg-content.md th { background: var(--bg-elev); color: var(--text); font-weight: 600; }
     </style>
   </head>
   <body>
@@ -508,8 +573,15 @@
                     <button class="reset-btn" id="agent-reset">Reset session</button>
                   </div>
                   <div class="agent-messages" id="agent-messages"></div>
+                  <div class="quick-chips" id="quick-chips">
+                    <button class="chip" data-tpl="Pesquise e escreva um resumo em markdown sobre: ">🔍 Pesquisar</button>
+                    <button class="chip" data-tpl="Escreva um artigo curto em markdown com 3 parágrafos sobre: ">✍️ Escrever</button>
+                    <button class="chip" data-tpl="Compare ponto a ponto: ">📊 Comparar</button>
+                    <button class="chip" data-tpl="Escreva código JavaScript completo, com comentários, que: ">💻 Código</button>
+                    <button class="chip" data-tpl="Extraia o conteúdo principal dessa URL e resuma em bullets: ">🌐 Extrair URL</button>
+                  </div>
                   <div class="agent-input-bar">
-                    <textarea id="agent-input" placeholder="Ask anything — try: &quot;Who is CNPJ 00.000.000/0001-91 and what's the weather in its home city?&quot;" rows="2"></textarea>
+                    <textarea id="agent-input" placeholder="Fala com o agente — ele pesquisa, compara, escreve, programa. Tenta: &quot;Pesquise sobre o protocolo x402 e escreva um resumo em markdown com bullets e um exemplo de código.&quot;" rows="3"></textarea>
                     <button class="agent-btn run" id="agent-run">Run</button>
                     <button class="agent-btn stop" id="agent-stop" hidden>Stop</button>
                   </div>
@@ -789,17 +861,51 @@
           },
           _axon: { api: 'voyage', endpoint: 'embeddings', method: 'POST', paramStyle: 'body',
             paramMap: (a) => ({ input: a.input, model: 'voyage-3-lite' }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'scrape_url',
+            description: 'Fetch the main content of any web page as clean markdown (Firecrawl). Use this to read articles, docs, company websites, or any URL the user mentions. Use the returned markdown to write summaries, comparisons, or analyses.',
+            parameters: {
+              type: 'object',
+              properties: {
+                url: { type: 'string', description: 'Full URL including https://' }
+              },
+              required: ['url']
+            }
+          },
+          _axon: { api: 'firecrawl', endpoint: 'scrape', method: 'POST', paramStyle: 'body',
+            paramMap: (a) => ({ url: a.url, formats: ['markdown'], onlyMainContent: true }) }
         }
       ];
 
       const AGENT_SYSTEM_PROMPT = [
-        "You are an assistant running inside the Axon dashboard — an API gateway for AI agents.",
-        "You have access to a small set of tools powered by Axon: CNPJ lookup, CEP lookup, weather, web search, IP info, embeddings.",
+        "You are an agent inside the Axon dashboard — an API gateway for AI agents. You don't just answer: you BUILD useful outputs.",
         "",
-        "When answering, prefer using tools to ground your answer in fresh data. Be concise. Show numbers. Acknowledge when a tool fails.",
+        "## How to respond",
+        "- When the user asks a question, use tools to gather fresh data, then synthesize a **structured, well-formatted Markdown response**.",
+        "- Use headings (## / ###), bullet lists, bold, italic, code blocks with language (```js, ```python, ```bash). Tables when data is comparative.",
+        "- For research: run search_web, then scrape_url on 1-3 of the best results, then write a well-organized summary with links as sources.",
+        "- For writing: structure your output (intro / main points / conclusion). Aim for useful depth, not wall-of-text.",
+        "- For code: write complete, runnable snippets with brief inline comments. Put them in fenced code blocks with the language tag.",
+        "- For comparison: use a markdown table.",
+        "- Be multi-step: if answering well needs 3 tool calls, make them. Don't short-cut a real request.",
+        "- If a user asks to 'create', 'write', 'analyze', 'compare', or 'explain', DELIVER the artifact — don't just describe what you would do.",
         "",
-        "You are running on the user's own wallet. Each tool call costs them $0.0003 - $0.01. Do not call more tools than needed.",
+        "## Tools available",
+        "- lookup_cnpj: Brazilian company registry by CNPJ",
+        "- lookup_cep: Brazilian postal code lookup",
+        "- current_weather: weather for a city (temperature in Kelvin)",
+        "- lookup_ip: geolocation + ISP for an IP",
+        "- search_web: web search (Tavily) — returns titles, URLs, snippets",
+        "- scrape_url: fetch any URL's main content as clean markdown (Firecrawl)",
+        "- embed_text: 1024-dim embedding (Voyage AI)",
+        "",
+        "## Economics (the user pays)",
+        "Each tool call costs the user $0.0003 - $0.01 from their own Axon wallet. Be efficient — don't make calls you won't use.",
         "Never call the same tool with the same arguments twice in one turn.",
+        "",
         "Current date: " + new Date().toISOString().slice(0,10) + "."
       ].join("\n");
 
@@ -823,6 +929,15 @@
         renderAgentFooter();
       }
 
+      function renderMarkdown(text) {
+        if (typeof window.marked === 'undefined') return escapeHtml(text);
+        try {
+          return window.marked.parse(text, { breaks: true, gfm: true });
+        } catch (_) {
+          return escapeHtml(text);
+        }
+      }
+
       function renderAgentChat() {
         const el = document.getElementById('agent-messages');
         if (!el) return;
@@ -831,15 +946,26 @@
           (m.role === 'assistant' && m.content && typeof m.content === 'string')
         );
         if (visible.length === 0) {
-          el.innerHTML = '<div class="empty" style="font-size:13px;padding:24px 8px;">Ask the agent anything. It will decide which tools to call. Everything streams into the brain panel on the right.</div>';
+          el.innerHTML = '<div class="empty" style="font-size:13px;padding:24px 8px;">Fala com o agente — ele pesquisa, compara, escreve e programa. Clica em um chip acima pra começar, ou digita livre.</div>';
           return;
         }
-        el.innerHTML = visible.map((m) => `
-          <div class="msg msg-${m.role}">
-            <div class="msg-role">${m.role === 'user' ? 'you' : 'agent'}</div>
-            <div class="msg-content">${escapeHtml(m.content)}</div>
-          </div>
-        `).join('');
+        el.innerHTML = visible.map((m) => {
+          if (m.role === 'user') {
+            return `
+              <div class="msg msg-user">
+                <div class="msg-role">you</div>
+                <div class="msg-content">${escapeHtml(m.content)}</div>
+              </div>
+            `;
+          }
+          // assistant — render markdown
+          return `
+            <div class="msg msg-assistant">
+              <div class="msg-role">agent</div>
+              <div class="msg-content md">${renderMarkdown(m.content)}</div>
+            </div>
+          `;
+        }).join('');
         el.scrollTop = el.scrollHeight;
       }
 
@@ -940,8 +1066,8 @@
             messages,
             tools,
             tool_choice: 'auto',
-            max_tokens: 1024,
-            temperature: 0.2,
+            max_tokens: 4096,
+            temperature: 0.3,
           }),
         });
         const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
@@ -1126,6 +1252,17 @@
             }
           });
         }
+        // Quick-start chips: pre-fill textarea with template and focus
+        document.querySelectorAll('#quick-chips .chip').forEach((chip) => {
+          chip.addEventListener('click', () => {
+            if (!input) return;
+            const tpl = chip.getAttribute('data-tpl') || '';
+            input.value = tpl;
+            input.focus();
+            // Move cursor to end
+            input.setSelectionRange(input.value.length, input.value.length);
+          });
+        });
       }
 
       // ==========================================================
