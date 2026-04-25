@@ -673,6 +673,7 @@
                     <button class="chip" data-tpl="Extract the main content from this URL and summarize in bullets: ">Extract URL</button>
                     <button class="chip" data-tpl="Calculate step by step and show the result: ">Calculate</button>
                     <button class="chip" data-tpl="Write and execute JavaScript that: ">Run JS</button>
+                    <button class="chip" data-tpl="Generate an image of: ">Image</button>
                   </div>
                   <div class="agent-input-bar">
                     <textarea id="agent-input" placeholder="What do you want the agent to build?" rows="3"></textarea>
@@ -1071,6 +1072,22 @@
             }
           },
           _local: (a) => getDatetimeInfo(a.timezone)
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'generate_image',
+            description: 'Generate a 1024x1024 image from a text prompt using Stable Diffusion XL. Pass a DETAILED prompt in English with style, subject, lighting, mood, quality keywords — richer prompts produce much better images. Takes ~4-8 seconds and costs ~$0.014. Returns a reference string like "@img:abc123" which you MUST embed in your markdown response as ![description](@img:abc123) for the user to see the image.',
+            parameters: {
+              type: 'object',
+              properties: {
+                prompt: { type: 'string', description: 'Detailed English prompt. Example: "a cyberpunk cat with neon purple lights, rain, cinematic lighting, digital art, highly detailed, 4k"' },
+                negative_prompt: { type: 'string', description: 'What to avoid (optional). Example: "blurry, low quality, extra limbs"' }
+              },
+              required: ['prompt']
+            }
+          },
+          _custom: async (args) => await generateImageTool(args)
         }
       ];
 
@@ -1104,8 +1121,10 @@
         "- calculate: exact math eval (+ - * / % parens) — USE THIS instead of doing arithmetic in your head",
         "- get_datetime: current date/time in any IANA timezone",
         "- run_js: execute JS in a 5s Web Worker sandbox (no fetch, no DOM). Use for data transforms, algorithms, testing logic, parsing.",
+        "CREATE:",
+        "- generate_image: 1024x1024 image from a detailed English prompt (Stable Diffusion XL, ~$0.014, ~6s). ALWAYS embed the returned ref in your reply as ![description](@img:xxx) so the user sees it.",
         "AI:",
-        "- embed_text: 1024-dim embedding (Voyage AI)",
+        "- embed_text: 512-dim embedding (Voyage AI)",
         "",
         "## Economics (the user pays)",
         "API tool calls cost $0.0003 - $0.01 from the user's Axon wallet. Local tools (calculate / get_datetime / run_js) are FREE — use them liberally.",
@@ -1152,6 +1171,74 @@
         } catch (e) {
           throw new Error('Invalid timezone: "' + tz + '". Use IANA format like "America/Sao_Paulo".');
         }
+      }
+
+      // --- generate_image: Stability SDXL with placeholder system ---
+      // Base64 images are huge (~2MB), so we never put the data URL in
+      // the LLM message history. We store it under a short id and let
+      // the agent reference it as @img:<id> which we expand at render.
+      async function generateImageTool(args) {
+        const k = localStorage.getItem(STORAGE_KEY);
+        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const t0 = Date.now();
+        const textPrompts = [{ text: args.prompt, weight: 1 }];
+        if (args.negative_prompt) {
+          textPrompts.push({ text: args.negative_prompt, weight: -1 });
+        }
+        const body = {
+          text_prompts: textPrompts,
+          cfg_scale: 7,
+          width: 1024,
+          height: 1024,
+          samples: 1,
+          steps: 30,
+        };
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 45000);
+        let res;
+        try {
+          res = await fetch(b + '/v1/call/stability/generate-xl', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + k,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
+        const cache = res.headers.get('x-axon-cache') || 'miss';
+        const latency = parseInt(res.headers.get('x-axon-latency-ms') || '0', 10);
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          const err = new Error(errBody.message || errBody.detail || ('stability ' + res.status));
+          err.cost = cost; err.cache = cache; err.latency = latency; err.status = res.status;
+          throw err;
+        }
+        const data = await res.json();
+        const artifact = (data.artifacts && data.artifacts[0]) || {};
+        if (!artifact.base64) throw new Error('no image returned');
+        const shortId = 'img' + Math.random().toString(36).slice(2, 10);
+        const dataUrl = 'data:image/png;base64,' + artifact.base64;
+        if (!agentSession.images) agentSession.images = {};
+        agentSession.images[shortId] = dataUrl;
+        return {
+          body: {
+            status: 'generated',
+            ref: '@img:' + shortId,
+            seed: artifact.seed,
+            size: '1024x1024',
+            note: 'Image shown to user. Reference it in your reply as ![short description](@img:' + shortId + ').'
+          },
+          cost,
+          cache,
+          latency: Date.now() - t0,
+          _imageUrl: dataUrl,
+        };
       }
 
       async function runJsSandbox(code) {
@@ -1201,6 +1288,7 @@
         agentSession = {
           messages: [{ role: 'system', content: AGENT_SYSTEM_PROMPT }],
           events: [],
+          images: {},
           spend: 0,
           cacheSaved: 0,
           running: false,
@@ -1212,11 +1300,16 @@
       }
 
       function renderMarkdown(text) {
-        if (typeof window.marked === 'undefined') return escapeHtml(text);
+        // Resolve @img:<id> placeholders to actual data URLs stored in session
+        let t = String(text);
+        if (agentSession && agentSession.images) {
+          t = t.replace(/@img:([a-zA-Z0-9]+)/g, (m, id) => agentSession.images[id] || m);
+        }
+        if (typeof window.marked === 'undefined') return escapeHtml(t);
         try {
-          return window.marked.parse(text, { breaks: true, gfm: true });
+          return window.marked.parse(t, { breaks: true, gfm: true });
         } catch (_) {
-          return escapeHtml(text);
+          return escapeHtml(t);
         }
       }
 
@@ -1277,11 +1370,15 @@
               `<span class="stat ${cacheCls}">${e.cache || 'miss'}</span>` +
               `<span class="stat latency">${e.latency || 0}ms</span>`;
           }
+          const thumb = e.imageUrl
+            ? `<img src="${e.imageUrl}" alt="generated" style="display:block;max-width:100%;margin-top:8px;border-radius:4px;" loading="lazy" />`
+            : '';
           return `
             <div class="brain-event ${cls}">
               <div class="tool-name">${escapeHtml(e.tool)}</div>
               <div class="tool-args">${escapeHtml(argsDisplay)}</div>
               <div class="tool-stats">${stats}</div>
+              ${thumb}
             </div>
           `;
         }).join('');
@@ -1387,6 +1484,12 @@
           }
         }
 
+        // Custom tools handle their own dispatch (possibly multi-step).
+        // They must return { body, cost, cache, latency, [_imageUrl] }.
+        if (tool._custom) {
+          return await tool._custom(args);
+        }
+
         const { api, endpoint, method, paramStyle, paramMap } = tool._axon;
         const k = localStorage.getItem(STORAGE_KEY);
         const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
@@ -1477,6 +1580,7 @@
                 ev.status = 'done';
                 ev.cost = out.cost; ev.cache = out.cache; ev.latency = out.latency;
                 ev.result = out.body;
+                if (out._imageUrl) ev.imageUrl = out._imageUrl;
                 agentSession.spend += out.cost;
                 if (out.cache === 'hit') {
                   // User paid 50% of live price; savings ≈ cost (they'd have paid ~2x without cache)
