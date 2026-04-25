@@ -274,11 +274,11 @@
       /* --- Agent chat --- */
       .agent-wrap {
         display: grid;
-        grid-template-columns: 1fr 360px;
+        grid-template-columns: minmax(0, 1fr) 360px;
         gap: 16px;
       }
       @media (max-width: 900px) {
-        .agent-wrap { grid-template-columns: 1fr; }
+        .agent-wrap { grid-template-columns: minmax(0, 1fr); }
       }
       .agent-chat, .agent-brain {
         background: var(--bg-card);
@@ -287,6 +287,10 @@
         padding: 16px 18px;
         display: flex; flex-direction: column;
         min-height: 480px;
+        /* Prevent grid/flex children from blowing out on narrow screens */
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
       }
       .agent-header {
         font-size: 12px; color: var(--text-muted);
@@ -302,10 +306,13 @@
       }
       .agent-header .reset-btn:hover { color: var(--text-dim); }
       .agent-messages {
-        flex: 1; overflow-y: auto;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
         max-height: 50vh;
         padding-right: 4px;
         margin-bottom: 12px;
+        min-width: 0; max-width: 100%;
       }
       .msg { margin-bottom: 14px; }
       .msg-role {
@@ -317,7 +324,10 @@
       .msg-assistant .msg-role { color: var(--accent); }
       .msg-content {
         font-size: 14px; line-height: 1.6; color: var(--text-dim);
-        white-space: pre-wrap; word-wrap: break-word;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        min-width: 0; max-width: 100%;
       }
       .msg-assistant .msg-content { color: var(--text); }
       .agent-input-bar {
@@ -372,10 +382,14 @@
       }
       .agent-btn.stop:hover { background: rgba(255,95,87,0.08); }
       .agent-brain .brain-events {
-        flex: 1; overflow-y: auto;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
         max-height: 50vh;
         display: flex; flex-direction: column; gap: 8px;
+        min-width: 0; max-width: 100%;
       }
+      .brain-event { min-width: 0; max-width: 100%; overflow: hidden; }
       .brain-event {
         background: var(--bg-elev); border: 1px solid var(--border);
         border-radius: 6px; padding: 10px 12px; font-size: 12px;
@@ -498,6 +512,7 @@
         padding: 1px 5px; border-radius: 3px;
         border: 1px solid var(--border);
         font-size: 12.5px;
+        word-break: break-all;
       }
       .msg-content.md pre {
         background: var(--bg-elev); border: 1px solid var(--border);
@@ -506,14 +521,20 @@
         padding: 12px 14px;
         margin: 10px 0;
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
         font-family: 'JetBrains Mono', monospace;
         font-size: 12.5px; line-height: 1.55;
+        max-width: 100%;
       }
       .msg-content.md pre code {
         background: transparent; border: none; padding: 0;
         color: var(--text); font-size: 12.5px;
+        word-break: normal; white-space: pre;
       }
-      .msg-content.md a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
+      .msg-content.md a {
+        color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px;
+        overflow-wrap: anywhere; word-break: break-all;
+      }
       .msg-content.md a:hover { color: var(--text); }
       .msg-content.md blockquote {
         border-left: 3px solid var(--border);
@@ -521,9 +542,21 @@
         color: var(--text-dim); font-style: italic;
       }
       .msg-content.md hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
-      .msg-content.md table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+      /* Tables: wrap so they horizontally scroll on narrow screens instead of
+         pushing the page wider than viewport */
+      .msg-content.md table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 13px;
+        white-space: nowrap;
+      }
       .msg-content.md th, .msg-content.md td { border: 1px solid var(--border); padding: 6px 10px; }
       .msg-content.md th { background: var(--bg-elev); color: var(--text); font-weight: 600; }
+      .msg-content.md img { max-width: 100%; height: auto; border-radius: 6px; }
     </style>
   </head>
   <body>
