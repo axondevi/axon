@@ -835,8 +835,10 @@
                     <button class="chip" data-tpl="Compare side-by-side in a markdown table: ">Compare</button>
                     <button class="chip" data-tpl="Write complete JavaScript code, with comments, that: ">Code</button>
                     <button class="chip" data-tpl="Extract the main content from this URL and summarize in bullets: ">Extract URL</button>
-                    <button class="chip" data-tpl="Calculate step by step and show the result: ">Calculate</button>
-                    <button class="chip" data-tpl="Write and execute JavaScript that: ">Run JS</button>
+                    <button class="chip" data-tpl="Use Wikipedia + arXiv to give me a researched answer about: ">Wiki+arXiv</button>
+                    <button class="chip" data-tpl="What does Hacker News think about: ">HN take</button>
+                    <button class="chip" data-tpl="Get the weather forecast for the next 3 days in: ">Weather</button>
+                    <button class="chip" data-tpl="Convert these amounts and show as a markdown table: ">FX</button>
                     <button class="chip" data-tpl="Generate an image of: ">Image</button>
                   </div>
                   <div class="agent-input-bar">
@@ -1203,6 +1205,150 @@
         {
           type: 'function',
           function: {
+            name: 'weather_forecast',
+            description: 'Detailed weather forecast (current + hourly + daily up to 7 days) for any lat/lon. Free Open-Meteo data, often more accurate than commercial weather APIs (blends DWD/NOAA/MeteoFrance). Use this for "weather tomorrow", "will it rain this weekend", "temperature trend". For a quick-and-dirty city snapshot use current_weather instead.',
+            parameters: {
+              type: 'object',
+              properties: {
+                latitude: { type: 'number', description: 'Decimal degrees, e.g. -23.5505 for São Paulo' },
+                longitude: { type: 'number', description: 'Decimal degrees, e.g. -46.6333 for São Paulo' },
+                forecast_days: { type: 'integer', default: 3, description: '1-7' }
+              },
+              required: ['latitude', 'longitude']
+            }
+          },
+          _axon: { api: 'open-meteo', endpoint: 'forecast', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({
+              latitude: a.latitude,
+              longitude: a.longitude,
+              current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m',
+              daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code',
+              forecast_days: a.forecast_days || 3,
+              timezone: 'auto',
+            }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'convert_currency',
+            description: 'Convert between currencies using ECB-backed reference rates (Frankfurter). Free, no key. Returns amount, source, target, and rate. Supports ~30 major currencies (USD, BRL, EUR, GBP, JPY, CHF, CAD, AUD, CNY, etc).',
+            parameters: {
+              type: 'object',
+              properties: {
+                amount: { type: 'number', description: 'Amount to convert' },
+                from: { type: 'string', description: 'Source currency (3-letter ISO, e.g. USD)' },
+                to: { type: 'string', description: 'Target currency (3-letter ISO, e.g. BRL). Multiple comma-separated codes also accepted.' }
+              },
+              required: ['amount', 'from', 'to']
+            }
+          },
+          _axon: { api: 'frankfurter', endpoint: 'latest', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({
+              amount: a.amount,
+              base: String(a.from || '').toUpperCase(),
+              symbols: String(a.to || '').toUpperCase(),
+            }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'lookup_country',
+            description: 'Look up world country data — population, capital, currencies, languages, flags, borders, area, timezones, calling codes. REST Countries (free, no key).',
+            parameters: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Country name (English, partial match OK). Use ISO codes via separate ?code lookup.' }
+              },
+              required: ['name']
+            }
+          },
+          _axon: { api: 'rest-countries', endpoint: 'by-name', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({
+              name: a.name,
+              fields: 'name,capital,population,area,currencies,languages,region,subregion,timezones,borders,flag,idd,latlng',
+            }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'wikipedia_summary',
+            description: 'Get the lead-paragraph summary of a Wikipedia article. Use for fast factual lookups (people, places, events, concepts). Pass the page title as it appears in the URL after /wiki/ — underscores stay, spaces are fine too.',
+            parameters: {
+              type: 'object',
+              properties: {
+                title: { type: 'string', description: 'Page title, e.g. "Albert Einstein" or "x402_(payment_protocol)"' }
+              },
+              required: ['title']
+            }
+          },
+          _axon: { api: 'wikipedia', endpoint: 'summary', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({ title: String(a.title || '').replace(/ /g, '_') }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'wikipedia_search',
+            description: 'Full-text search Wikipedia. Returns up to 10 hits with snippets. Use when you do not know the exact page title — then call wikipedia_summary on the best hit.',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string' },
+                limit: { type: 'integer', default: 5 }
+              },
+              required: ['query']
+            }
+          },
+          _axon: { api: 'wikipedia', endpoint: 'search', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({
+              action: 'query',
+              list: 'search',
+              srsearch: a.query,
+              srlimit: a.limit || 5,
+              format: 'json',
+              origin: '*',
+            }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'search_hn',
+            description: 'Search Hacker News (entire history) via Algolia. Returns stories ranked by relevance. Useful for finding what the dev community thinks about a topic, framework, company, or event. Filter by tags=story for top-level posts only.',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string' },
+                tags: { type: 'string', default: 'story', description: 'story | comment | poll | ask_hn | show_hn | front_page' },
+                hitsPerPage: { type: 'integer', default: 5 }
+              },
+              required: ['query']
+            }
+          },
+          _axon: { api: 'hackernews', endpoint: 'search', method: 'GET', paramStyle: 'query',
+            paramMap: (a) => ({
+              query: a.query,
+              tags: a.tags || 'story',
+              hitsPerPage: a.hitsPerPage || 5,
+            }) }
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'search_arxiv',
+            description: 'Search arXiv (2.4M+ scientific papers — physics, math, CS, bio, econ, stats). Returns parsed entries with title, authors, abstract, PDF link. Use for any "what does the research say about X" question. Allow ~3s between calls.',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string', description: 'Search terms — supports field prefixes: "ti:" title, "au:" author, "abs:" abstract, "cat:" category. Example: "ti:LLM AND cat:cs.AI"' },
+                max_results: { type: 'integer', default: 5 }
+              },
+              required: ['query']
+            }
+          },
+          _custom: async (args) => await searchArxivTool(args)
+        },
+        {
+          type: 'function',
+          function: {
             name: 'run_js',
             description: 'Execute JavaScript in an isolated Web Worker sandbox (5s timeout, no fetch, no DOM). The last expression is returned. Use for math, parsing, data transforms, algorithm validation, quick prototypes. Return values are stringified.',
             parameters: {
@@ -1276,19 +1422,28 @@
         "- Be multi-step: if answering well needs 3 tool calls, make them. Don't short-cut a real request.",
         "- If a user asks to 'create', 'write', 'analyze', 'compare', or 'explain', DELIVER the artifact — don't just describe what you would do.",
         "",
-        "## Tools available (14)",
+        "## Tools available (22)",
         "DATA / LOOKUP:",
         "- lookup_cnpj: Brazilian company registry by CNPJ",
         "- lookup_cep: Brazilian postal code lookup",
-        "- current_weather: weather for a city (temperature in Kelvin)",
+        "- current_weather: quick city weather snapshot (OpenWeather)",
+        "- weather_forecast: detailed multi-day forecast by lat/lon (Open-Meteo, free, very accurate)",
         "- lookup_ip: geolocation + ISP for an IP",
-        "- brasilapi_holidays: list Brazilian national holidays for a year",
+        "- lookup_country: world country data — population, capital, currencies, languages, flags",
+        "- brasilapi_holidays: Brazilian national holidays for a year",
         "- brasilapi_rates: current Selic, CDI, IPCA",
         "- brasilapi_ddd: Brazilian phone area code → state + cities",
+        "FINANCE:",
+        "- convert_currency: FX conversion via ECB rates (Frankfurter, free)",
         "SEARCH / SCRAPE:",
         "- search_web: Tavily web search — good for news, broad queries",
         "- exa_search: Exa neural search — better for technical/semantic queries",
         "- scrape_url: fetch any URL as clean markdown (Firecrawl)",
+        "- search_hn: Hacker News search — what the dev community thinks",
+        "KNOWLEDGE:",
+        "- wikipedia_summary: lead-paragraph summary of any Wikipedia article",
+        "- wikipedia_search: full-text search Wikipedia (find page first, then summary)",
+        "- search_arxiv: search 2.4M scientific papers (physics, math, CS, bio, econ)",
         "LOCAL (zero cost, instant, run in the user's browser):",
         "- calculate: exact math eval (+ - * / % parens) — USE THIS instead of doing arithmetic in your head",
         "- get_datetime: current date/time in any IANA timezone",
@@ -1343,6 +1498,82 @@
         } catch (e) {
           throw new Error('Invalid timezone: "' + tz + '". Use IANA format like "America/Sao_Paulo".');
         }
+      }
+
+      // --- search_arxiv: arXiv returns Atom XML, so we parse client-side ---
+      async function searchArxivTool(args) {
+        const k = localStorage.getItem(STORAGE_KEY);
+        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const t0 = Date.now();
+        const params = new URLSearchParams({
+          search_query: args.query,
+          max_results: String(args.max_results || 5),
+          sortBy: 'relevance',
+          sortOrder: 'descending',
+        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TOOL_TIMEOUT_MS);
+        let res;
+        try {
+          res = await fetch(`${b}/v1/call/arxiv/search?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + k },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
+        const cache = res.headers.get('x-axon-cache') || 'miss';
+        const latency = parseInt(res.headers.get('x-axon-latency-ms') || '0', 10);
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          const err = new Error('arxiv ' + res.status + ' ' + text.slice(0, 200));
+          err.cost = cost; err.cache = cache; err.latency = latency; err.status = res.status;
+          throw err;
+        }
+        const xml = await res.text();
+        let entries = [];
+        try {
+          const doc = new DOMParser().parseFromString(xml, 'application/xml');
+          if (doc.querySelector('parsererror')) throw new Error('xml parse error');
+          entries = Array.from(doc.getElementsByTagName('entry')).map((e) => {
+            const get = (sel) => {
+              const node = e.getElementsByTagName(sel)[0];
+              return node ? node.textContent.trim().replace(/\s+/g, ' ') : '';
+            };
+            const authors = Array.from(e.getElementsByTagName('author')).map((a) => {
+              const n = a.getElementsByTagName('name')[0];
+              return n ? n.textContent.trim() : '';
+            }).filter(Boolean);
+            let pdfUrl = '';
+            for (const link of Array.from(e.getElementsByTagName('link'))) {
+              if (link.getAttribute('type') === 'application/pdf') {
+                pdfUrl = link.getAttribute('href') || '';
+                break;
+              }
+            }
+            return {
+              title: get('title'),
+              authors,
+              published: get('published'),
+              updated: get('updated'),
+              summary: get('summary').slice(0, 800),
+              arxiv_url: get('id'),
+              pdf_url: pdfUrl,
+            };
+          });
+        } catch (parseErr) {
+          // Fall back: include raw XML head for the agent to interpret
+          return {
+            body: { error: 'xml-parse-failed', raw: xml.slice(0, 2000) },
+            cost, cache, latency,
+          };
+        }
+        return {
+          body: { query: args.query, count: entries.length, entries },
+          cost, cache, latency,
+        };
       }
 
       // --- generate_image: Stability SDXL with placeholder system ---
