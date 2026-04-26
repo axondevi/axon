@@ -76,6 +76,55 @@ async function publicShape(a: typeof agents.$inferSelect) {
   };
 }
 
+// Public discovery feed — drives /explore. Lists public agents with
+// derived popularity (call count over last 30d) + the same metadata
+// the runner needs so cards can be rendered without a second fetch.
+publicRoutes.get('/explore', async (c) => {
+  const category = c.req.query('category');  // optional filter (matches template id substring)
+  const language = c.req.query('language');  // 'pt' | 'en' | 'es' | undefined
+  const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '50', 10), 1), 100);
+
+  // Pull public agents + 30d call count from requests
+  const rows = await db.execute(sql`
+    SELECT
+      a.id, a.slug, a.name, a.description, a.primary_color,
+      a.template, a.ui_language, a.welcome_message,
+      a.allowed_tools, a.pay_mode, a.created_at,
+      COALESCE(r.cnt, 0)::bigint AS calls_30d
+    FROM agents a
+    LEFT JOIN (
+      SELECT agent_id, COUNT(*) AS cnt
+      FROM requests
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+        AND agent_id IS NOT NULL
+      GROUP BY agent_id
+    ) r ON r.agent_id = a.id
+    WHERE a.public = true
+      ${category ? sql`AND a.template ILIKE ${'%' + category + '%'}` : sql``}
+      ${language ? sql`AND (a.ui_language = ${language} OR a.ui_language = 'auto')` : sql``}
+    ORDER BY calls_30d DESC, a.created_at DESC
+    LIMIT ${limit}
+  `);
+  const data = ((rows as any).rows ?? (rows as any) ?? []) as any[];
+
+  return c.json({
+    data: data.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      description: r.description,
+      primary_color: r.primary_color,
+      template: r.template,
+      ui_language: r.ui_language,
+      tool_count: Array.isArray(r.allowed_tools) ? r.allowed_tools.length : 0,
+      pay_mode: r.pay_mode,
+      free_to_chat: r.pay_mode === 'owner',
+      calls_30d: Number(r.calls_30d || 0),
+      created_at: r.created_at,
+    })),
+    count: data.length,
+  });
+});
+
 publicRoutes.get('/by-slug/:slug', async (c) => {
   const slug = c.req.param('slug');
   const [a] = await db.select().from(agents).where(eq(agents.slug, slug)).limit(1);

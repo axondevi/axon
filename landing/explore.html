@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Explore agents · Axon</title>
+    <meta name="description" content="Browse and chat with AI agents built on Axon — e-commerce assistants, research agents, fiscal advisors, content creators, and more." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .explore-wrap { padding: 40px 0 100px; max-width: 1200px; }
+      .explore-hero { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
+      .explore-hero h1 { font-size: 36px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      .explore-hero p { color: var(--text-dim); font-size: 15px; margin: 0; max-width: 580px; line-height: 1.6; }
+
+      .filter-row {
+        display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        padding: 14px 16px;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 24px;
+      }
+      .filter-row label {
+        font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+        color: var(--text-muted); margin-right: 4px;
+      }
+      .chip-btn {
+        background: transparent; border: 1px solid var(--border);
+        color: var(--text-dim); padding: 6px 12px; border-radius: 16px;
+        font-size: 12px; cursor: pointer; transition: all 100ms ease;
+      }
+      .chip-btn:hover { color: var(--text); border-color: var(--accent); }
+      .chip-btn.active { background: var(--accent); color: #0a0a0b; border-color: var(--accent); }
+
+      .ag-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 14px;
+      }
+      .ag-card {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 12px; padding: 22px;
+        cursor: pointer; text-decoration: none;
+        color: inherit;
+        position: relative; overflow: hidden;
+        transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+        display: flex; flex-direction: column;
+      }
+      .ag-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: var(--ac, var(--accent));
+      }
+      .ag-card:hover { transform: translateY(-2px); border-color: var(--ac, var(--accent)); box-shadow: 0 12px 32px rgba(0,0,0,0.18); }
+      .ag-card .ag-emoji { font-size: 22px; line-height: 1; margin-bottom: 8px; display: block; }
+      .ag-card h3 { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+      .ag-card .ag-cat {
+        display: inline-block; font-size: 10px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        color: var(--text-muted); margin-bottom: 10px;
+      }
+      .ag-card .ag-desc { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0 0 14px; flex: 1; }
+      .ag-card .ag-meta {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 11px; color: var(--text-muted);
+        padding-top: 12px; border-top: 1px solid var(--border);
+      }
+      .ag-card .free-badge {
+        background: rgba(74, 222, 128, 0.18); color: #4ade80;
+        padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 0.06em;
+      }
+      .ag-card .calls-pill {
+        background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px;
+      }
+
+      .empty-state {
+        background: var(--bg-elev); border: 1px dashed var(--border);
+        border-radius: 12px; padding: 56px 24px; text-align: center;
+      }
+      .empty-state h3 { font-size: 18px; margin: 0 0 8px; }
+      .empty-state p { color: var(--text-muted); font-size: 14px; line-height: 1.6; margin: 0 0 20px; }
+      .empty-state a {
+        display: inline-block;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #0a0a0b; padding: 10px 20px; border-radius: 6px;
+        text-decoration: none; font-weight: 600; font-size: 13px;
+      }
+
+      .build-cta {
+        margin-top: 48px;
+        background: linear-gradient(135deg, rgba(124,92,255,0.08), rgba(0,200,255,0.04));
+        border: 1px solid rgba(124,92,255,0.25);
+        border-radius: 12px;
+        padding: 28px 32px;
+        display: flex; justify-content: space-between; align-items: center; gap: 24px;
+        flex-wrap: wrap;
+      }
+      .build-cta h3 { margin: 0 0 6px; font-size: 18px; }
+      .build-cta p { margin: 0; color: var(--text-dim); font-size: 14px; }
+      .build-cta a {
+        background: var(--accent); color: #0a0a0b;
+        padding: 12px 24px; border-radius: 6px;
+        text-decoration: none; font-weight: 700; font-size: 14px;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <nav>
+          <a href="/explore" aria-current="page">Explore</a>
+          <a href="/build">Build</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/upgrade">Plans</a>
+          <a href="/learn/">Docs</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container explore-wrap">
+      <div class="explore-hero">
+        <div>
+          <h1>Explore agents</h1>
+          <p>Public AI agents built on Axon. Each one runs on USDC — chat for free if the owner is paying, or connect your own wallet for tighter control.</p>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <label>Category</label>
+        <button class="chip-btn active" data-cat="">All</button>
+        <button class="chip-btn" data-cat="ecommerce">🛒 E-commerce</button>
+        <button class="chip-btn" data-cat="market-research">📊 Research</button>
+        <button class="chip-btn" data-cat="legal-fiscal">⚖️ Legal/Fiscal</button>
+        <button class="chip-btn" data-cat="research-analyst">🔬 Academic</button>
+        <button class="chip-btn" data-cat="content">🎨 Content</button>
+        <button class="chip-btn" data-cat="real-estate">🏠 Real estate</button>
+        <button class="chip-btn" data-cat="crypto">💰 Crypto</button>
+      </div>
+
+      <div class="ag-grid" id="grid">Loading…</div>
+
+      <div class="build-cta">
+        <div>
+          <h3>Want one for your business?</h3>
+          <p>Build a custom agent in 5 minutes from a vertical template — your branding, your tools, your wallet.</p>
+        </div>
+        <a href="/build">Build your own →</a>
+      </div>
+    </main>
+
+    <script>
+      const BASE_KEY = 'axon.baseUrl';
+      const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+
+      // Map template id → emoji + category label (mirror of templates.ts metadata)
+      const TPL_META = {
+        'ecommerce-br':       { emoji: '🛒', cat: 'E-commerce' },
+        'market-research-br': { emoji: '📊', cat: 'Research' },
+        'legal-fiscal-br':    { emoji: '⚖️', cat: 'Legal/Fiscal' },
+        'research-analyst':   { emoji: '🔬', cat: 'Academic' },
+        'content-creator':    { emoji: '🎨', cat: 'Content' },
+        'real-estate-br':     { emoji: '🏠', cat: 'Real estate' },
+        'crypto-finance':     { emoji: '💰', cat: 'Crypto' },
+      };
+
+      let currentCat = '';
+
+      async function load() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '<p style="color:var(--text-muted);grid-column:1/-1;text-align:center;padding:32px;">Loading…</p>';
+        const qs = currentCat ? `?category=${encodeURIComponent(currentCat)}` : '';
+        try {
+          const res = await fetch(`${BASE}/v1/agents/explore${qs}`);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const d = await res.json();
+          if (!d.data || d.data.length === 0) {
+            grid.innerHTML = `
+              <div class="empty-state" style="grid-column:1/-1">
+                <h3>No agents here yet</h3>
+                <p>Be the first — pick a template at <strong>/build</strong> and your agent will show up here once it's public.</p>
+                <a href="/build">Build the first one →</a>
+              </div>`;
+            return;
+          }
+          grid.innerHTML = d.data.map(a => renderCard(a)).join('');
+          grid.querySelectorAll('.ag-card').forEach(card => {
+            card.addEventListener('click', () => {
+              window.location.href = '/agent/' + card.dataset.slug;
+            });
+          });
+        } catch (e) {
+          grid.innerHTML = `<p style="color:#f87171;grid-column:1/-1;text-align:center;padding:32px;">Could not load agents: ${escape(e.message)}</p>`;
+        }
+      }
+
+      function renderCard(a) {
+        const meta = TPL_META[a.template] || { emoji: '🤖', cat: 'Custom' };
+        const calls = a.calls_30d > 0
+          ? `<span class="calls-pill">${a.calls_30d.toLocaleString()} calls / 30d</span>`
+          : '<span class="calls-pill" style="color:var(--text-muted);">new</span>';
+        const free = a.free_to_chat ? '<span class="free-badge">free to chat</span>' : '<span class="calls-pill">bring your wallet</span>';
+        return `
+          <a class="ag-card" style="--ac:${a.primary_color}" data-slug="${escape(a.slug)}" href="/agent/${escape(a.slug)}">
+            <span class="ag-emoji">${meta.emoji}</span>
+            <span class="ag-cat">${meta.cat}</span>
+            <h3>${escape(a.name)}</h3>
+            <p class="ag-desc">${escape(a.description || 'No description provided.')}</p>
+            <div class="ag-meta">
+              ${calls}
+              ${free}
+            </div>
+          </a>
+        `;
+      }
+
+      function escape(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+      }
+
+      document.querySelectorAll('.chip-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentCat = btn.dataset.cat;
+          load();
+        });
+      });
+
+      load();
+    </script>
+  </body>
+</html>
