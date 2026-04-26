@@ -226,3 +226,47 @@ Calcule retorno comparativo (BTC vs CDI por exemplo) sempre que pedido. Mostre e
 export function getTemplate(id: string): AgentTemplate | undefined {
   return AGENT_TEMPLATES.find((t) => t.id === id);
 }
+
+/**
+ * Server-side mapping of tool name → backing (api, endpoint) on Axon.
+ * Mirrors the TOOL_DEFS in landing/dashboard.html and landing/agent-runner.html.
+ * Used by the agent-run route to validate that an upstream call is one
+ * the agent's owner actually allow-listed.
+ */
+export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
+  lookup_cnpj:        { api: 'brasilapi', endpoint: 'cnpj' },
+  lookup_cep:         { api: 'brasilapi', endpoint: 'cep' },
+  current_weather:    { api: 'openweather', endpoint: 'current' },
+  weather_forecast:   { api: 'open-meteo', endpoint: 'forecast' },
+  lookup_ip:          { api: 'ipinfo', endpoint: 'lookup' },
+  lookup_country:     { api: 'rest-countries', endpoint: 'by-name' },
+  brasilapi_holidays: { api: 'brasilapi', endpoint: 'holidays' },
+  brasilapi_rates:    { api: 'brasilapi', endpoint: 'rates' },
+  brasilapi_ddd:      { api: 'brasilapi', endpoint: 'ddd' },
+  convert_currency:   { api: 'frankfurter', endpoint: 'latest' },
+  crypto_price:       { api: 'coingecko', endpoint: 'simple-price' },
+  search_web:         { api: 'tavily', endpoint: 'search' },
+  exa_search:         { api: 'exa', endpoint: 'search' },
+  scrape_url:         { api: 'firecrawl', endpoint: 'scrape' },
+  search_hn:          { api: 'hackernews', endpoint: 'search' },
+  wikipedia_summary:  { api: 'wikipedia', endpoint: 'summary' },
+  wikipedia_search:   { api: 'wikipedia', endpoint: 'search' },
+  search_arxiv:       { api: 'arxiv', endpoint: 'search' },
+  embed_text:         { api: 'voyage', endpoint: 'embeddings' },
+  generate_image:     { api: 'stability', endpoint: 'generate-xl' },
+};
+
+/** Returns true if `(api, endpoint)` is the backing pair of a tool in `allowed`. */
+export function isToolAllowed(
+  allowed: string[] | unknown,
+  api: string,
+  endpoint: string,
+): boolean {
+  if (!Array.isArray(allowed)) return false;
+  if (allowed.includes('*')) return true;
+  for (const name of allowed) {
+    const m = TOOL_TO_AXON[name as string];
+    if (m && m.api === api && m.endpoint === endpoint) return true;
+  }
+  return false;
+}

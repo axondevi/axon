@@ -32,6 +32,7 @@ import { users, agents } from '~/db/schema';
 import { redis } from '~/cache/redis';
 import { Errors } from '~/lib/errors';
 import { handleCall } from '~/wrapper/engine';
+import { isToolAllowed } from '~/agents/templates';
 
 const app = new Hono();
 
@@ -67,23 +68,12 @@ app.post('/:slug/:api/:endpoint', async (c) => {
     throw Errors.forbidden();
   }
 
-  // Whitelist: LLM dispatch is always allowed; tool dispatch must be in allowed_tools
-  // (We compare against tool *names* — the runner already maps tool names to
-  // {api, endpoint}, so a name being absent means the agent shouldn't be able
-  // to invoke that backing API/endpoint either.)
+  // Whitelist: LLM dispatch is always allowed; tool dispatch must be backed by
+  // a tool in agent.allowed_tools (mapped via TOOL_TO_AXON in agents/templates).
   if (!LLM_PASSTHROUGH.has(api)) {
-    const allowed = Array.isArray(agent.allowedTools) ? agent.allowedTools as string[] : [];
-    // Tool names map roughly to their (api, endpoint) — we approximate by
-    // checking that *any* allowed tool's underlying api/endpoint matches.
-    // For now, accept if either:
-    //   - the {api}/{endpoint} pair appears as a registered tool name, or
-    //   - the api slug appears in allowed_tools (looser).
-    // This avoids needing the full client-side TOOL_DEFS map server-side.
-    const ok = allowed.some((name) => {
-      const n = name.toLowerCase();
-      return n.includes(api) || n === `${api}_${endpoint}`;
-    });
-    if (!ok && !allowed.includes('*')) throw Errors.forbidden();
+    if (!isToolAllowed(agent.allowedTools, api, endpoint)) {
+      throw Errors.forbidden();
+    }
   }
 
   // Per-IP rate limit (cheap abuse mitigation)
