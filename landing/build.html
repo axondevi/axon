@@ -267,7 +267,29 @@
           <p>Pick a template, customize the prompt and tools, share the URL. Each call is paid from your Axon wallet — no extra hosting, no infra.</p>
         </div>
         <div class="actions">
+          <button class="ar-btn" id="how-it-works" style="background:rgba(124,92,255,0.12);border-color:rgba(124,92,255,0.5);">How it works</button>
           <button class="ar-btn primary" id="new-blank">+ Blank agent</button>
+        </div>
+      </div>
+
+      <div id="value-panel" style="background:linear-gradient(135deg,rgba(124,92,255,0.06),rgba(0,200,255,0.03));border:1px solid rgba(124,92,255,0.25);border-radius:12px;padding:20px 24px;margin:0 0 28px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;align-items:start;">
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:6px;">Zero config</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.5;">Cliente nunca cria conta em OpenAI/Tavily/Wikipedia. Templates já vêm prontos.</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:6px;">Uma cobrança</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.5;">40 APIs por trás, 1 wallet USDC na frente. Axon abstrai tudo — cliente paga em um lugar só.</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:6px;">4 canais</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.5;">Mesmo agente em web, embed, HTTP API e WhatsApp. Cliente escolhe onde plugar.</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:6px;">Cap protegido</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.5;">Daily budget evita runaway. Webhook avisa quando esgotar. Você dorme tranquilo.</div>
+          </div>
         </div>
       </div>
 
@@ -1192,6 +1214,92 @@
         } finally {
           btn.disabled = false; btn.textContent = 'Save agent';
         }
+      });
+
+      document.getElementById('how-it-works').addEventListener('click', () => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
+        wrap.innerHTML = `
+          <div style="background:var(--bg);padding:32px 36px;border-radius:14px;max-width:760px;width:100%;max-height:88vh;overflow-y:auto;">
+            <h2 style="margin:0 0 10px;font-size:24px;letter-spacing:-0.01em;">Como o Axon Agent funciona</h2>
+            <p style="color:var(--text-dim);font-size:14px;margin:0 0 24px;line-height:1.6;">
+              Você vende a INTELIGÊNCIA. Axon faz toda a infra — APIs, billing, custódia, observabilidade.
+            </p>
+
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <div style="display:flex;gap:14px;align-items:start;">
+                <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--accent);color:#0a0a0b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">1</div>
+                <div>
+                  <div style="font-weight:600;font-size:15px;margin-bottom:4px;">Cliente cria 1 conta Axon</div>
+                  <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">Email + bônus de \$0.50. Tem um wallet USDC na hora. Sem cartão, sem CPF, sem bureaucracia.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:14px;align-items:start;">
+                <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--accent);color:#0a0a0b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">2</div>
+                <div>
+                  <div style="font-weight:600;font-size:15px;margin-bottom:4px;">Cliente escolhe 1 template</div>
+                  <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">7 templates prontos (e-commerce, jurídico, research, conteúdo, etc.). Vem com prompt + tools certos pra cada nicho. Customizar é opcional.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:14px;align-items:start;">
+                <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--accent);color:#0a0a0b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">3</div>
+                <div>
+                  <div style="font-weight:600;font-size:15px;margin-bottom:4px;">Cliente conecta 1 canal</div>
+                  <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">Link, embed, HTTP API ou WhatsApp via Evolution. Mesmo agente em todos. Conexão em 30 segundos — paste-and-go.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:14px;align-items:start;">
+                <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--accent);color:#0a0a0b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">4</div>
+                <div>
+                  <div style="font-weight:600;font-size:15px;margin-bottom:4px;">Cada call usa REAL APIs</div>
+                  <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">Agente busca CEP no BrasilAPI, valida CNPJ, scrape concorrência via Firecrawl, pergunta pra Wikipedia, busca paper no arXiv, gera imagem na Stability. Tudo orquestrado pelo Llama 3.3.</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:14px;align-items:start;">
+                <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--accent);color:#0a0a0b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">5</div>
+                <div>
+                  <div style="font-weight:600;font-size:15px;margin-bottom:4px;">1 cobrança no wallet do cliente</div>
+                  <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">Cliente NUNCA cria conta em OpenAI, Tavily, Stability, BrasilAPI, etc. Axon orquestra os 40 upstreams, cobra tudo do wallet USDC dele em uma só linha. <code style="background:var(--bg-elev);padding:2px 5px;border-radius:3px;font-size:11px;">subscription_charge -\$20.00</code> ou <code style="background:var(--bg-elev);padding:2px 5px;border-radius:3px;font-size:11px;">debit -\$0.0021 brasilapi/cnpj</code>.</div>
+                </div>
+              </div>
+            </div>
+
+            <hr style="border:0;border-top:1px solid var(--border);margin:24px 0;">
+
+            <h3 style="margin:0 0 10px;font-size:16px;">Custos típicos por chamada</h3>
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+              <thead>
+                <tr style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;text-align:left;">
+                  <th style="padding:6px 0;">Tipo de chamada</th>
+                  <th style="padding:6px 0;text-align:right;">Custo médio</th>
+                  <th style="padding:6px 0;text-align:right;">Margem operador</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-top:1px solid var(--border);"><td style="padding:7px 0;">CEP / CNPJ / weather</td><td style="padding:7px 0;text-align:right;font-family:JetBrains Mono,monospace;">\$0.0002 - \$0.001</td><td style="padding:7px 0;text-align:right;color:#4ade80;">~30%</td></tr>
+                <tr style="border-top:1px solid var(--border);"><td style="padding:7px 0;">LLM chat (Groq)</td><td style="padding:7px 0;text-align:right;font-family:JetBrains Mono,monospace;">\$0.0005 - \$0.002</td><td style="padding:7px 0;text-align:right;color:#4ade80;">~15%</td></tr>
+                <tr style="border-top:1px solid var(--border);"><td style="padding:7px 0;">Web search (Tavily)</td><td style="padding:7px 0;text-align:right;font-family:JetBrains Mono,monospace;">\$0.005 - \$0.02</td><td style="padding:7px 0;text-align:right;color:#4ade80;">~15%</td></tr>
+                <tr style="border-top:1px solid var(--border);"><td style="padding:7px 0;">Image gen (Stability)</td><td style="padding:7px 0;text-align:right;font-family:JetBrains Mono,monospace;">\$0.014 / img</td><td style="padding:7px 0;text-align:right;color:#4ade80;">~15%</td></tr>
+                <tr style="border-top:1px solid var(--border);"><td style="padding:7px 0;">Cache hit (qualquer)</td><td style="padding:7px 0;text-align:right;font-family:JetBrains Mono,monospace;">50% off</td><td style="padding:7px 0;text-align:right;color:#4ade80;">100%</td></tr>
+              </tbody>
+            </table>
+
+            <p style="color:var(--text-muted);font-size:12px;margin:18px 0 0;line-height:1.5;">
+              <strong style="color:var(--text);">Resumo:</strong> conversa típica de e-commerce custa <strong style="color:var(--text);">~\$0.005-0.02</strong> ao agente.
+              Cobrando R\$199/mês de um cliente com ~1.500 conversas/mês = <strong style="color:var(--text);">~\$15 em custos = R\$77 / R\$199 em margem ≈ 60%</strong>.
+            </p>
+
+            <div style="display:flex;justify-content:flex-end;margin-top:24px;">
+              <button onclick="this.closest('div[style*=fixed]').remove()" style="background:var(--accent);color:#0a0a0b;border:0;padding:10px 22px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">Got it</button>
+            </div>
+          </div>
+        `;
+        wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+        document.body.appendChild(wrap);
       });
 
       document.getElementById('new-blank').addEventListener('click', () => {
