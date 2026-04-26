@@ -623,6 +623,7 @@
                 <button class="ar-btn" onclick="window.open('/agent/${escape(a.slug)}','_blank')">Open ↗</button>
                 <button class="ar-btn" onclick="showAnalytics('${a.id}','${escape(a.name)}','${escape(a.primary_color)}')">Stats</button>
                 <button class="ar-btn" onclick="showLogs('${a.id}','${escape(a.name)}')">Logs</button>
+                <button class="ar-btn" onclick="showWhatsapp('${a.id}','${escape(a.name)}','${escape(a.primary_color)}')" style="background:rgba(37,211,102,0.12); border-color:rgba(37,211,102,0.4); color:#25d366;">WhatsApp</button>
                 <button class="ar-btn" onclick="showEmbed('${escape(a.slug)}','${escape(a.primary_color)}')">Embed</button>
                 <button class="ar-btn" onclick="editAgent('${a.id}')">Edit</button>
                 <button class="ar-btn danger" onclick="deleteAgent('${a.id}','${escape(a.name)}')">Delete</button>
@@ -873,6 +874,126 @@
           card.innerHTML = html;
         } catch (e) {
           wrap.firstChild.innerHTML = '<h3 style="margin:0 0 8px;">Could not load logs</h3><p style="color:#f87171;font-size:13px;">' + escape(e.message) + '</p>';
+        }
+      };
+
+      window.showWhatsapp = async function(agentId, name, color) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
+        wrap.innerHTML = '<div id="wa-card" style="background:var(--bg);padding:28px;border-radius:14px;max-width:660px;width:100%;max-height:88vh;overflow-y:auto;"><h3 style="margin:0;font-size:20px;display:flex;align-items:center;gap:8px;"><span style="color:#25d366;">●</span> Loading…</h3></div>';
+        wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+        document.body.appendChild(wrap);
+        const card = document.getElementById('wa-card');
+
+        let current = null;
+        try {
+          current = await api('/v1/agents/' + agentId + '/whatsapp');
+        } catch (e) {
+          card.innerHTML = '<p style="color:#f87171">' + escape(e.message) + '</p>';
+          return;
+        }
+
+        const renderConnected = (conn) => `
+          <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;margin:0 0 4px;">
+            <h3 style="margin:0;font-size:20px;display:flex;align-items:center;gap:8px;"><span style="color:#25d366;font-size:14px;">●</span> WhatsApp connected</h3>
+            <span style="background:rgba(74,222,128,0.18);color:#4ade80;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">${escape(conn.status||'connected')}</span>
+          </div>
+          <p style="color:var(--text-muted);font-size:13px;margin:6px 0 22px;">Mensagens chegando no seu Evolution serão respondidas pelo agente <strong>${escape(name)}</strong>.</p>
+
+          <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:4px;">Evolution instance</div>
+            <div style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text);">${escape(conn.instance_url)}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">name: <code>${escape(conn.instance_name)}</code></div>
+          </div>
+
+          <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:18px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:6px;">Webhook (já registrado na sua instância)</div>
+            <div style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--text-dim);word-break:break-all;">${escape(conn.webhook_url)}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Last event: ${conn.last_event_at ? new Date(conn.last_event_at).toLocaleString() : '— ainda não chegou nada'}</div>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="wa-test" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:5px;font-size:12px;cursor:pointer;">Reconnect</button>
+            <button id="wa-disconnect" style="background:transparent;border:1px solid #f87171;color:#f87171;padding:8px 14px;border-radius:5px;font-size:12px;cursor:pointer;">Disconnect</button>
+            <button onclick="this.closest('#wa-card').parentElement.remove()" style="background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:5px;font-size:12px;cursor:pointer;">Close</button>
+          </div>
+        `;
+
+        const renderForm = () => `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 4px;">
+            <h3 style="margin:0;font-size:20px;display:flex;align-items:center;gap:8px;"><span style="color:#25d366;font-size:14px;">●</span> Connect WhatsApp via Evolution</h3>
+          </div>
+          <p style="color:var(--text-muted);font-size:13px;margin:6px 0 22px;line-height:1.5;">
+            Você traz sua própria instância Evolution (auto-hospedada ou de um provedor). Axon registra um webhook nela — e cada mensagem que chegar no seu WhatsApp será respondida pelo agente <strong>${escape(name)}</strong> em segundos.
+          </p>
+
+          <div class="field" style="margin-bottom:14px;">
+            <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:6px;">Evolution base URL</label>
+            <input id="wa-url" type="text" placeholder="https://evo.minhaempresa.com" style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:6px;font-size:13px;font-family:JetBrains Mono,monospace;" />
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">URL completa do servidor Evolution. Sem barra no fim.</div>
+          </div>
+          <div class="field" style="margin-bottom:14px;">
+            <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:6px;">Instance name</label>
+            <input id="wa-name" type="text" placeholder="loja-xyz" style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:6px;font-size:13px;font-family:JetBrains Mono,monospace;" />
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Nome da instância configurada no Evolution.</div>
+          </div>
+          <div class="field" style="margin-bottom:18px;">
+            <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:6px;">API key</label>
+            <input id="wa-key" type="password" placeholder="••••••••••••••••" style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:6px;font-size:13px;font-family:JetBrains Mono,monospace;" />
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Salva criptografada no Axon. Nunca é exposta de novo após o save.</div>
+          </div>
+
+          <p id="wa-err" style="color:#f87171;font-size:12px;margin:0 0 12px;display:none;"></p>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="this.closest('#wa-card').parentElement.remove()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:9px 16px;border-radius:5px;font-size:13px;cursor:pointer;">Cancel</button>
+            <button id="wa-connect" style="background:#25d366;color:#0a0a0b;border:0;padding:9px 18px;border-radius:5px;font-weight:700;font-size:13px;cursor:pointer;">Connect</button>
+          </div>
+        `;
+
+        if (current.connected) {
+          card.innerHTML = renderConnected(current);
+          document.getElementById('wa-disconnect').addEventListener('click', async () => {
+            if (!confirm('Disconnect WhatsApp from this agent? Mensagens param de ser respondidas.')) return;
+            await api('/v1/agents/' + agentId + '/whatsapp', { method: 'DELETE' });
+            showToast('WhatsApp disconnected', 'success');
+            wrap.remove();
+            loadMyAgents();
+          });
+          document.getElementById('wa-test').addEventListener('click', () => {
+            card.innerHTML = renderForm();
+            wireForm();
+          });
+        } else {
+          card.innerHTML = renderForm();
+          wireForm();
+        }
+
+        function wireForm() {
+          document.getElementById('wa-connect').addEventListener('click', async () => {
+            const url = document.getElementById('wa-url').value.trim();
+            const inst = document.getElementById('wa-name').value.trim();
+            const key = document.getElementById('wa-key').value.trim();
+            const err = document.getElementById('wa-err');
+            if (!url || !inst || !key) {
+              err.textContent = 'Preencha todos os campos.'; err.style.display = ''; return;
+            }
+            const btn = document.getElementById('wa-connect');
+            btn.disabled = true; btn.textContent = 'Conectando…';
+            try {
+              const r = await api('/v1/agents/' + agentId + '/whatsapp', {
+                method: 'POST',
+                body: JSON.stringify({ instance_url: url, instance_name: inst, api_key: key }),
+              });
+              showToast('WhatsApp conectado!', 'success');
+              wrap.remove();
+              loadMyAgents();
+            } catch (e) {
+              err.textContent = e.message;
+              err.style.display = '';
+              btn.disabled = false; btn.textContent = 'Connect';
+            }
+          });
         }
       };
 

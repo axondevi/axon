@@ -278,3 +278,33 @@ export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 export type Agent = typeof agents.$inferSelect;
 export type AgentMessage = typeof agentMessages.$inferSelect;
+
+// ─── WhatsApp connections (Evolution API integration) ────
+// One row per agent ↔ Evolution-instance pairing. The agent owner
+// brings their own Evolution server (self-hosted or managed) — Axon
+// just registers a webhook on it and answers incoming messages.
+export const whatsappConnections = pgTable(
+  'whatsapp_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    instanceUrl: text('instance_url').notNull(),       // https://evo.example.com (no trailing slash)
+    instanceName: text('instance_name').notNull(),      // identifier inside that Evolution server
+    apiKey: text('api_key').notNull(),                  // ENCRYPTED at rest (see crypto.ts)
+    webhookSecret: text('webhook_secret').notNull(),    // randomly generated, used in /v1/webhooks/whatsapp/:secret
+    status: text('status').notNull().default('connected'), // 'connected' | 'disabled' | 'error'
+    lastEventAt: timestamp('last_event_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    agentIdx: index('wa_agent_idx').on(t.agentId),
+    secretIdx: uniqueIndex('wa_secret_idx').on(t.webhookSecret),
+  }),
+);
+export type WhatsappConnection = typeof whatsappConnections.$inferSelect;

@@ -25,6 +25,7 @@ import signupRoutes from '~/routes/signup';
 import subscriptionRoutes, { publicRoutes as subscriptionPublicRoutes } from '~/routes/subscription';
 import agentsRoutes, { publicRoutes as agentsPublicRoutes } from '~/routes/agents';
 import agentRunRoutes from '~/routes/agent-run';
+import { ownerWhatsapp, publicWebhook as whatsappPublicWebhook } from '~/routes/whatsapp';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -134,11 +135,13 @@ v1.route('/call', callRoutes);
 v1.route('/usage', usageRoutes);
 v1.route('/subscription', subscriptionRoutes);
 v1.route('/agents', agentsRoutes);
+v1.route('/agents', ownerWhatsapp);  // adds /v1/agents/:id/whatsapp under same auth
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 app.route('/v1', v1);
 
 // ─── Webhooks (signature-verified, no auth middleware) ──
 app.route('/v1/webhooks', webhookRoutes);
+app.route('/v1/webhooks/whatsapp', whatsappPublicWebhook);
 
 // ─── Error handler ────────────────────────────────────
 app.onError((err, c) => {
