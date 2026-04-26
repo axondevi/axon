@@ -761,6 +761,51 @@
 
       function formatUsdc(s) { return Number(s).toFixed(4); }
 
+      // Render the user's owned agents card on dashboard
+      function renderMyAgents(agents) {
+        const el = document.getElementById('my-agents-card');
+        if (!el) return;
+        if (!agents || agents.length === 0) {
+          el.innerHTML = `
+            <div style="text-align:center;padding:32px 16px;">
+              <div style="font-size:14px;color:var(--text-dim);margin-bottom:6px;">Você ainda não tem agentes.</div>
+              <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Pegue um template pronto e tenha um chatbot rodando em 5 minutos.</div>
+              <a href="/build" style="display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#0a0a0b;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;">Criar agente →</a>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:14px;">Ou veja agentes prontos em <a href="/explore" style="color:var(--accent-2);">/explore</a></div>
+            </div>
+          `;
+          return;
+        }
+        const formatChannels = (a) => {
+          const ch = [];
+          ch.push('<a href="/agent/' + escapeAttr(a.slug) + '" target="_blank" title="Abrir no navegador" style="color:var(--text-dim);text-decoration:none;font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg);border:1px solid var(--border);">Web</a>');
+          if (a.pay_mode === 'owner') {
+            ch.push('<span title="HTTP API ativa" style="color:#4ade80;font-size:11px;padding:2px 6px;border-radius:3px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);">API</span>');
+            ch.push('<span title="Embed ready" style="color:var(--accent);font-size:11px;padding:2px 6px;border-radius:3px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);">Embed</span>');
+          }
+          return ch.join(' ');
+        };
+        el.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${agents.map(a => `
+              <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:12px 14px;background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;">
+                <span style="width:10px;height:10px;border-radius:50%;background:${escapeAttr(a.primary_color)};flex:0 0 auto;"></span>
+                <div style="min-width:0;">
+                  <div style="font-weight:600;font-size:14px;margin:0 0 3px;">${escapeHtml(a.name)}</div>
+                  <div style="font-size:11px;color:var(--text-muted);font-family:JetBrains Mono,monospace;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">/agent/${escapeHtml(a.slug)} · ${a.tool_count} tools · ${a.pay_mode === 'owner' ? 'owner-paid' : 'visitor-paid'}</div>
+                  <div style="display:flex;gap:5px;">${formatChannels(a)}</div>
+                </div>
+                <a href="/build" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:6px 12px;border-radius:5px;font-size:12px;text-decoration:none;white-space:nowrap;">Manage →</a>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function escapeAttr(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+      }
+
       function renderLogin(err) {
         document.getElementById('app').innerHTML = `
           <div class="login-wrap">
@@ -814,6 +859,11 @@
         root.innerHTML = `
           <header>
             <div class="brand"><span class="logo-dot"></span> axon</div>
+            <nav style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <a href="/build" style="color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;border-radius:5px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);">+ Build agent</a>
+              <a href="/explore" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Explore</a>
+              <a href="/upgrade" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Plans</a>
+            </nav>
             <div style="display:flex; gap:8px; align-items:center;">
               <span class="tier-badge" id="tier-badge" title="Click to manage subscription" style="display:none">free</span>
               <span class="key-chip" id="keyview">ax_live_…</span>
@@ -824,6 +874,13 @@
             <h1>Dashboard</h1>
             <div id="deposit-hero-wrap"></div>
             <div class="grid" id="metrics">Loading…</div>
+            <div class="section">
+              <h2 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                <span>Your agents</span>
+                <a href="/build" style="font-size:13px;font-weight:600;color:#0a0a0b;background:linear-gradient(135deg,var(--accent),var(--accent-2));padding:8px 16px;border-radius:6px;text-decoration:none;">+ New agent</a>
+              </h2>
+              <div id="my-agents-card" class="card">Loading…</div>
+            </div>
             <div class="section">
               <h2>Try a call</h2>
               <div class="card" id="trycall">Loading…</div>
@@ -892,13 +949,17 @@
         };
 
         try {
-          const [bal, usage, byApi, txs, sub] = await Promise.all([
+          const [bal, usage, byApi, txs, sub, myAgents] = await Promise.all([
             api('/v1/wallet/balance'),
             api('/v1/usage'),
             api('/v1/usage/by-api'),
             api('/v1/wallet/transactions?limit=100'),
             api('/v1/subscription').catch(() => null),
+            api('/v1/agents').catch(() => ({ data: [] })),
           ]);
+
+          // ---- Your agents ----
+          renderMyAgents(myAgents.data || []);
 
           // ---- Tier badge ----
           if (sub) {
