@@ -11,6 +11,7 @@ import { upstreamKeyFor } from '~/config';
 import { enforcePolicy } from '~/policy/engine';
 import { calculatorFor } from '~/metering';
 import { X402_ANON_USER_ID } from '~/db/bootstrap';
+import { effectiveTier, TIER_MARKUP_DISCOUNT_PCT } from '~/subscription';
 
 const CACHE_DISCOUNT_PCT = 50; // cached responses charge 50% of full price
 
@@ -22,6 +23,8 @@ interface CallContext {
   endpoint: EndpointConfig;
   params: Record<string, unknown>;
   body: unknown | undefined;
+  /** Effective markup_pct after applying the user's tier discount (free=full, pro=-25%, …) */
+  effectiveMarkupPct: number;
   /** True when this call was settled via x402 native on-chain payment. */
   x402Paid: boolean;
 }
@@ -30,7 +33,7 @@ export async function handleCall(c: Context) {
   const slug = c.req.param('slug')!;
   const endpointKey = c.req.param('endpoint')!;
   const x402Paid = !!c.get('axon:x402_paid');
-  const user = (c.get('user') as { id: string } | undefined) ?? {
+  const user = (c.get('user') as { id: string; tier?: string; tierExpiresAt?: Date | null } | undefined) ?? {
     // Synthetic user for x402-native calls. Created at boot by
     // ensureSystemRows() so the FK on requests.user_id resolves.
     id: X402_ANON_USER_ID,
@@ -41,6 +44,12 @@ export async function handleCall(c: Context) {
 
   const endpoint = api.endpoints[endpointKey];
   if (!endpoint) throw Errors.notFound(`Endpoint '${endpointKey}'`);
+
+  // Tier-based markup discount. effectiveTier handles expiry, so a lapsed
+  // Pro user's calls already pay the full free-tier markup.
+  const tier = effectiveTier({ tier: user.tier ?? 'free', tierExpiresAt: user.tierExpiresAt ?? null });
+  const discount = TIER_MARKUP_DISCOUNT_PCT[tier] ?? 0;
+  const effectiveMarkupPct = Math.max(0, Math.round(endpoint.markup_pct * (100 - discount) / 100));
 
   const url = new URL(c.req.url);
   const params: Record<string, unknown> = {};
@@ -63,6 +72,7 @@ export async function handleCall(c: Context) {
     endpoint,
     params,
     body,
+    effectiveMarkupPct,
     x402Paid,
   };
 
@@ -99,7 +109,7 @@ async function execute(c: Context, ctx: CallContext) {
   // 2. Cache miss → charge full price up front, call upstream
   const fullCostMicro = toMicro(ctx.endpoint.price_usd);
   const markupMicro =
-    (fullCostMicro * BigInt(ctx.endpoint.markup_pct)) / 100n;
+    (fullCostMicro * BigInt(ctx.effectiveMarkupPct)) / 100n;
   const totalMicro = fullCostMicro + markupMicro;
 
   if (!ctx.x402Paid) {
@@ -172,7 +182,7 @@ async function execute(c: Context, ctx: CallContext) {
       if (m.actualCostMicro !== undefined) {
         reconciledCost = m.actualCostMicro;
         reconciledMarkup =
-          (reconciledCost * BigInt(ctx.endpoint.markup_pct)) / 100n;
+          (reconciledCost * BigInt(ctx.effectiveMarkupPct)) / 100n;
         const newTotal = reconciledCost + reconciledMarkup;
         if (newTotal < totalMicro) {
           await credit({

@@ -1,0 +1,67 @@
+import { Hono } from 'hono';
+import {
+  subscribe,
+  cancelAutoRenew,
+  getSubscription,
+  TIER_PRICES,
+  TIER_MARKUP_DISCOUNT_PCT,
+  TIER_RATE_LIMITS,
+  PERIOD_DAYS,
+  type Tier,
+} from '~/subscription';
+import { fromMicro } from '~/wallet/service';
+import { Errors } from '~/lib/errors';
+
+const app = new Hono();
+
+// ─── GET /v1/subscription/plans ──────────────────────────
+// Public — no auth needed. Drives the /upgrade page.
+app.get('/plans', (c) => {
+  const plans = (['free', 'pro', 'team', 'enterprise'] as Tier[]).map((tier) => ({
+    tier,
+    price_usdc: fromMicro(TIER_PRICES[tier]),
+    period_days: PERIOD_DAYS,
+    rate_limit_per_min: TIER_RATE_LIMITS[tier],
+    markup_discount_pct: TIER_MARKUP_DISCOUNT_PCT[tier],
+    self_service: tier !== 'enterprise',
+  }));
+  return c.json({ plans });
+});
+
+// ─── GET /v1/subscription ───────────────────────────────
+// Current state for the authenticated user.
+app.get('/', async (c) => {
+  const user = c.get('user') as { id: string };
+  const sub = await getSubscription(user.id);
+  return c.json(sub);
+});
+
+// ─── POST /v1/subscription/subscribe ────────────────────
+// Body: { tier: 'pro' | 'team', auto_renew?: boolean }
+// Debits the wallet and activates / extends the period.
+app.post('/subscribe', async (c) => {
+  const user = c.get('user') as { id: string };
+  const body = await c.req.json().catch(() => ({}));
+  const tier = body.tier as string | undefined;
+  if (tier !== 'pro' && tier !== 'team') {
+    throw Errors.badRequest('tier must be one of: pro, team');
+  }
+  const result = await subscribe(user.id, tier, {
+    autoRenew: body.auto_renew !== false,
+  });
+  return c.json({
+    ok: true,
+    ...result,
+    charged_usdc: fromMicro(result.charged_micro),
+  });
+});
+
+// ─── POST /v1/subscription/cancel ───────────────────────
+// Disables auto-renew. The user keeps the active tier until tier_expires_at.
+app.post('/cancel', async (c) => {
+  const user = c.get('user') as { id: string };
+  const result = await cancelAutoRenew(user.id);
+  return c.json({ ok: true, ...result });
+});
+
+export default app;

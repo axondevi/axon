@@ -8,26 +8,21 @@
  */
 import type { Context, Next } from 'hono';
 import { redis } from '~/cache/redis';
-
-const TIER_LIMITS: Record<string, number> = {
-  free: 10,
-  pro: 600,
-  team: 3000,
-  enterprise: 30000,
-};
+import { TIER_RATE_LIMITS, effectiveTier } from '~/subscription';
 
 const WINDOW_SEC = 60;
 
 export async function rateLimit(c: Context, next: Next) {
-  const user = c.get('user') as { id: string; tier?: string } | undefined;
+  const user = c.get('user') as { id: string; tier?: string; tierExpiresAt?: Date | null } | undefined;
   if (!user) {
     // No user set → auth middleware should have thrown already
     await next();
     return;
   }
 
-  const tier = user.tier ?? 'free';
-  const limit = TIER_LIMITS[tier] ?? TIER_LIMITS.free;
+  // effectiveTier respects tier_expires_at, so a lapsed Pro user is throttled at free's 10/min
+  const tier = effectiveTier({ tier: user.tier ?? 'free', tierExpiresAt: user.tierExpiresAt ?? null });
+  const limit = TIER_RATE_LIMITS[tier] ?? TIER_RATE_LIMITS.free;
 
   const now = Math.floor(Date.now() / 1000);
   const window = Math.floor(now / WINDOW_SEC);

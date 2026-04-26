@@ -13,6 +13,10 @@ import {
 } from 'drizzle-orm/pg-core';
 
 // ─── Users ────────────────────────────────────────────
+// `tier` is the *active* plan. Once tierExpiresAt elapses, callers
+// (auth middleware, engine) should treat the effective tier as 'free'.
+// The DB row is only rewritten by the renewal cron — keeping the historical
+// tier on disk simplifies billing reports and idempotent re-activations.
 export const users = pgTable(
   'users',
   {
@@ -20,11 +24,14 @@ export const users = pgTable(
     email: text('email'),
     apiKeyHash: text('api_key_hash').notNull(),
     tier: text('tier').notNull().default('free'),
+    tierExpiresAt: timestamp('tier_expires_at'),
+    tierAutoRenew: boolean('tier_auto_renew').notNull().default(true),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => ({
     apiKeyIdx: uniqueIndex('users_api_key_idx').on(t.apiKeyHash),
     emailIdx: uniqueIndex('users_email_idx').on(t.email),
+    tierExpIdx: index('users_tier_exp_idx').on(t.tierExpiresAt),
   }),
 );
 

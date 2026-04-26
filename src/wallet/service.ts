@@ -43,7 +43,7 @@ export async function debit(params: {
   apiSlug?: string;
   requestId?: string;
   meta?: Record<string, unknown>;
-  type?: 'debit' | 'refund';
+  type?: 'debit' | 'refund' | 'subscription_charge';
 }) {
   const { userId, amountMicro, apiSlug, requestId, meta } = params;
   const type = params.type ?? 'debit';

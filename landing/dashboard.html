@@ -329,6 +329,21 @@
       .gallery-tile:hover .dl-btn { opacity: 1; }
       .gallery-tile .dl-btn:hover { background: var(--accent); }
 
+      /* Tier badge in header */
+      .tier-badge {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 4px 10px; border-radius: 4px;
+        cursor: pointer; transition: transform 100ms ease, opacity 100ms ease;
+        white-space: nowrap;
+      }
+      .tier-badge:hover { transform: translateY(-1px); }
+      .tier-badge.tier-free { background: rgba(154,154,164,0.15); color: var(--text-dim); }
+      .tier-badge.tier-pro  { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; }
+      .tier-badge.tier-team { background: linear-gradient(135deg, #f59e0b, #ef4444); color: #0a0a0b; }
+      .tier-badge.tier-enterprise { background: linear-gradient(135deg, #8b5cf6, #ec4899); color: #fff; }
+      .tier-badge.expired { opacity: 0.5; text-decoration: line-through; }
+
       /* Tile fade-in when generated or restored */
       @keyframes tile-pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
       .gallery-tile { animation: tile-pop 180ms ease-out; }
@@ -799,7 +814,8 @@
         root.innerHTML = `
           <header>
             <div class="brand"><span class="logo-dot"></span> axon</div>
-            <div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="tier-badge" id="tier-badge" title="Click to manage subscription" style="display:none">free</span>
               <span class="key-chip" id="keyview">ax_live_…</span>
               <button class="key-chip" id="logout">sign out</button>
             </div>
@@ -876,12 +892,33 @@
         };
 
         try {
-          const [bal, usage, byApi, txs] = await Promise.all([
+          const [bal, usage, byApi, txs, sub] = await Promise.all([
             api('/v1/wallet/balance'),
             api('/v1/usage'),
             api('/v1/usage/by-api'),
             api('/v1/wallet/transactions?limit=100'),
+            api('/v1/subscription').catch(() => null),
           ]);
+
+          // ---- Tier badge ----
+          if (sub) {
+            const tb = document.getElementById('tier-badge');
+            if (tb) {
+              const tier = sub.tier_effective || 'free';
+              tb.textContent = tier;
+              tb.className = 'tier-badge tier-' + tier;
+              if (sub.tier_active !== 'free' && sub.tier_effective === 'free') {
+                tb.classList.add('expired');
+                tb.title = 'Subscription expired — click to renew';
+              } else if (sub.expires_at) {
+                tb.title = `${tier.toUpperCase()} · ${sub.days_remaining}d left · click to manage`;
+              } else {
+                tb.title = 'Click to upgrade';
+              }
+              tb.style.display = '';
+              tb.onclick = () => { window.location.href = '/upgrade'; };
+            }
+          }
 
           // ---- Deposit hero ----
           const depositAddr = bal.address;

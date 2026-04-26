@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Upgrade · Axon</title>
+    <meta name="description" content="Upgrade your Axon plan — pay in USDC from your existing wallet. Higher rate limits and lower per-call markup." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .up-wrap { padding: 56px 0 100px; max-width: 1100px; }
+      .up-wrap h1 { font-size: 40px; letter-spacing: -0.02em; margin: 0 0 12px; }
+      .up-wrap .lede { color: var(--text-dim); font-size: 17px; line-height: 1.6; margin: 0 0 16px; }
+      .up-wrap .pitch { color: var(--text); font-size: 14px; line-height: 1.7; margin: 0 0 36px; }
+      .up-wrap .pitch strong { color: var(--accent-2); }
+      .current-state {
+        display: flex; gap: 14px; align-items: center;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 8px; padding: 14px 18px; margin: 0 0 32px;
+        font-size: 14px;
+      }
+      .current-state .label { color: var(--text-muted); margin-right: 4px; }
+      .current-state strong { color: var(--text); }
+      .current-state .divider { color: var(--text-muted); margin: 0 8px; }
+
+      .plans-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+      @media (max-width: 980px) { .plans-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 560px) { .plans-grid { grid-template-columns: minmax(0, 1fr); } }
+
+      .plan-card {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 12px; padding: 24px; display: flex; flex-direction: column;
+        position: relative;
+        transition: border-color 120ms ease, transform 120ms ease;
+      }
+      .plan-card:hover { border-color: rgba(124,92,255,0.4); transform: translateY(-2px); }
+      .plan-card.is-current { border-color: var(--accent); }
+      .plan-card.is-popular::before {
+        content: 'POPULAR';
+        position: absolute; top: -10px; left: 16px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #0a0a0b;
+        padding: 3px 10px; border-radius: 4px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      }
+      .plan-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 8px; }
+      .plan-name.tier-pro { color: var(--accent); }
+      .plan-name.tier-team { color: #f59e0b; }
+      .plan-name.tier-enterprise { background: linear-gradient(135deg, #8b5cf6, #ec4899); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+      .plan-price { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+      .plan-price .per { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+      .plan-blurb { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 18px; min-height: 42px; }
+      .plan-features { list-style: none; padding: 0; margin: 0 0 22px; flex: 1; }
+      .plan-features li {
+        font-size: 13px; color: var(--text-dim);
+        padding: 6px 0; display: flex; align-items: flex-start; gap: 8px;
+      }
+      .plan-features li::before { content: '✓'; color: var(--accent-2); flex: 0 0 auto; font-weight: 700; }
+      .plan-features li.muted { color: var(--text-muted); }
+      .plan-features li.muted::before { content: '·'; color: var(--text-muted); font-weight: 400; }
+      .plan-cta {
+        display: block; text-align: center;
+        padding: 11px 16px; border-radius: 6px;
+        font-size: 14px; font-weight: 600; cursor: pointer;
+        background: transparent; color: var(--text); border: 1px solid var(--border);
+        text-decoration: none;
+        transition: all 120ms ease;
+      }
+      .plan-cta:hover:not(:disabled) { background: var(--bg-card); border-color: var(--accent); }
+      .plan-cta.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; border-color: transparent; }
+      .plan-cta.primary:hover:not(:disabled) { filter: brightness(1.1); }
+      .plan-cta:disabled { opacity: 0.55; cursor: not-allowed; }
+      .plan-cta.is-current { background: rgba(124,92,255,0.15); color: var(--accent); border-color: var(--accent); }
+
+      .faq { margin: 64px 0 0; max-width: 760px; }
+      .faq h2 { font-size: 22px; font-weight: 700; margin: 0 0 18px; }
+      .faq details {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 8px; padding: 14px 18px; margin: 0 0 10px;
+      }
+      .faq summary { cursor: pointer; font-weight: 600; font-size: 15px; color: var(--text); }
+      .faq summary::-webkit-details-marker { color: var(--text-muted); }
+      .faq p { color: var(--text-dim); font-size: 14px; line-height: 1.6; margin: 10px 0 0; }
+      .faq a { color: var(--accent-2); }
+
+      .login-prompt {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 10px; padding: 28px;
+        text-align: center; margin: 24px 0;
+      }
+      .login-prompt p { color: var(--text-dim); margin: 0 0 16px; }
+      .login-prompt a { color: var(--accent-2); }
+      .toast-mini {
+        position: fixed; bottom: 24px; right: 24px;
+        background: rgba(20,20,28,0.96); border: 1px solid var(--border);
+        color: var(--text); padding: 12px 18px; border-radius: 6px;
+        font-size: 14px; opacity: 0; transition: opacity 200ms ease;
+        z-index: 100; max-width: 380px;
+      }
+      .toast-mini.show { opacity: 1; }
+      .toast-mini.success { border-left: 3px solid #4ade80; }
+      .toast-mini.error { border-left: 3px solid #f87171; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <nav>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/upgrade" aria-current="page">Plans</a>
+          <a href="/learn/">Docs</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container up-wrap">
+      <h1>Choose your plan</h1>
+      <p class="lede">Pay in USDC from the same wallet you use for API calls. No credit card, no monthly invoice — just one debit per period.</p>
+      <p class="pitch">All paid plans get <strong>higher rate limits</strong> and <strong>lower per-call markup</strong> on every API in the catalog. Cancel anytime — keeps the period you paid for, then drops to free.</p>
+
+      <div id="state-row" class="current-state" style="display:none">
+        <span><span class="label">Current:</span> <strong id="cur-tier">—</strong></span>
+        <span class="divider">·</span>
+        <span id="cur-expiry">—</span>
+        <span class="divider">·</span>
+        <span><span class="label">Wallet:</span> <strong id="cur-balance">—</strong> USDC</span>
+      </div>
+
+      <div id="login-block" class="login-prompt" style="display:none">
+        <p>You need to be signed in to subscribe.</p>
+        <p><a href="/dashboard">Sign in to dashboard</a> · or <a href="/#signup">create a free wallet</a></p>
+      </div>
+
+      <div class="plans-grid" id="plans">
+        <div class="plan-card">
+          <div class="plan-name">free</div>
+          <div class="plan-price">$0 <span class="per">/ forever</span></div>
+          <p class="plan-blurb">Try the catalog with no commitment.</p>
+          <ul class="plan-features">
+            <li>10 requests / minute</li>
+            <li>Pay-per-call on every API</li>
+            <li>Full access to all 40 APIs</li>
+            <li class="muted">Standard markup on calls</li>
+            <li class="muted">No SLA</li>
+          </ul>
+          <button class="plan-cta" disabled>Default plan</button>
+        </div>
+
+        <div class="plan-card is-popular">
+          <div class="plan-name tier-pro">pro</div>
+          <div class="plan-price">$20 <span class="per">/ 30 days</span></div>
+          <p class="plan-blurb">For active builders shipping real projects.</p>
+          <ul class="plan-features">
+            <li><strong>600</strong> requests / minute (60×)</li>
+            <li><strong>−25%</strong> markup on every call</li>
+            <li>Priority routing on fallbacks</li>
+            <li>Email alerts on balance / errors</li>
+            <li>Auto-renew (cancel anytime)</li>
+          </ul>
+          <button class="plan-cta primary" data-tier="pro">Subscribe — $20</button>
+        </div>
+
+        <div class="plan-card">
+          <div class="plan-name tier-team">team</div>
+          <div class="plan-price">$100 <span class="per">/ 30 days</span></div>
+          <p class="plan-blurb">For startups with production traffic.</p>
+          <ul class="plan-features">
+            <li><strong>3,000</strong> requests / minute (300×)</li>
+            <li><strong>−50%</strong> markup on every call</li>
+            <li>Custom policy / budget rules</li>
+            <li>Operator dashboard access</li>
+            <li>Priority support</li>
+          </ul>
+          <button class="plan-cta" data-tier="team">Subscribe — $100</button>
+        </div>
+
+        <div class="plan-card">
+          <div class="plan-name tier-enterprise">enterprise</div>
+          <div class="plan-price">Custom <span class="per">/ negotiated</span></div>
+          <p class="plan-blurb">For high-volume use cases.</p>
+          <ul class="plan-features">
+            <li><strong>30,000+</strong> requests / minute</li>
+            <li><strong>−75%+</strong> markup, custom pricing</li>
+            <li>Dedicated upstreams + SLA</li>
+            <li>Private deployment option</li>
+            <li>Quarterly billing</li>
+          </ul>
+          <a class="plan-cta" href="mailto:shopkaolin.com@gmail.com?subject=Axon%20enterprise">Contact us →</a>
+        </div>
+      </div>
+
+      <div class="faq">
+        <h2>FAQ</h2>
+        <details>
+          <summary>How does USDC subscription work?</summary>
+          <p>When you subscribe, the plan price is debited once from your Axon wallet. Your tier activates for 30 days. Auto-renew (on by default) charges the same wallet on day 30 — if there's enough balance, you stay subscribed; otherwise you fall back to free and we email you so you can top up.</p>
+        </details>
+        <details>
+          <summary>Can I cancel?</summary>
+          <p>Yes — anytime. Cancellation just disables auto-renew. You keep your paid tier (rate limits, markup discount, all benefits) until the end of the period you already paid for, then drop to free. No partial refunds — the period was already prepaid.</p>
+        </details>
+        <details>
+          <summary>What if my wallet balance is too low?</summary>
+          <p>If you try to subscribe with less than the plan price, the call returns a 402 with insufficient-funds. <a href="/buy-usdc">Buy USDC</a> first. If your auto-renew triggers with insufficient balance, your tier drops to free and we email you — top up and re-subscribe.</p>
+        </details>
+        <details>
+          <summary>Does the markup discount apply to free upstreams too?</summary>
+          <p>Yes. Even on free upstreams (Open-Meteo, Wikipedia, BrasilAPI, etc.) we apply a small Axon markup to cover infrastructure. Pro/Team users get that markup discounted by 25% / 50% across the entire catalog.</p>
+        </details>
+        <details>
+          <summary>Why USDC and not credit card?</summary>
+          <p>Axon is built on x402 + USDC for a reason: zero processing fees, instant settlement, no chargebacks, no fiat conversion. Subscriptions reusing the same wallet keeps the model coherent — your USDC funds API calls AND your plan, no separate billing relationship.</p>
+        </details>
+        <details>
+          <summary>Can I switch between Pro and Team mid-period?</summary>
+          <p>Yes. Subscribing to Team while on Pro extends from your current expiry rather than resetting it — you don't lose paid days. Downgrades take effect at the next renewal.</p>
+        </details>
+      </div>
+    </main>
+
+    <div id="toast" class="toast-mini"></div>
+
+    <script>
+      const STORAGE_KEY = 'axon.apiKey';
+      const BASE_KEY = 'axon.baseUrl';
+      const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+      const KEY = localStorage.getItem(STORAGE_KEY);
+
+      function showToast(msg, kind) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast-mini ' + (kind || '') + ' show';
+        setTimeout(() => { t.classList.remove('show'); }, 3000);
+      }
+
+      async function api(path, opts) {
+        const res = await fetch(BASE + path, {
+          ...opts,
+          headers: {
+            'Authorization': 'Bearer ' + KEY,
+            'Content-Type': 'application/json',
+            ...(opts && opts.headers),
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const err = new Error((data.error && data.error.message) || data.message || `HTTP ${res.status}`);
+          err.status = res.status; err.data = data;
+          throw err;
+        }
+        return data;
+      }
+
+      async function init() {
+        if (!KEY) {
+          document.getElementById('login-block').style.display = '';
+          // Disable subscribe buttons
+          document.querySelectorAll('[data-tier]').forEach(b => { b.disabled = true; b.textContent = 'Sign in first'; });
+          return;
+        }
+        try {
+          const [sub, bal] = await Promise.all([
+            api('/v1/subscription'),
+            api('/v1/wallet/balance'),
+          ]);
+          const row = document.getElementById('state-row');
+          document.getElementById('cur-tier').textContent = (sub.tier_effective || 'free').toUpperCase();
+          if (sub.tier_active !== 'free' && sub.expires_at) {
+            const exp = new Date(sub.expires_at).toLocaleDateString();
+            document.getElementById('cur-expiry').innerHTML = sub.tier_effective === 'free'
+              ? `<span style="color:#f87171">Expired ${exp}</span>`
+              : `Renews <strong>${exp}</strong> · auto-renew <strong>${sub.auto_renew ? 'on' : 'off'}</strong>`;
+          } else {
+            document.getElementById('cur-expiry').textContent = 'No active paid plan';
+          }
+          document.getElementById('cur-balance').textContent = bal.balance_usdc;
+          row.style.display = '';
+
+          // Mark current tier card
+          document.querySelectorAll('.plan-card').forEach((card) => {
+            const btn = card.querySelector('[data-tier]');
+            if (!btn) return;
+            const tier = btn.dataset.tier;
+            if (tier === sub.tier_effective && sub.tier_effective !== 'free') {
+              card.classList.add('is-current');
+              btn.classList.add('is-current');
+              btn.textContent = `Renew — $${tier === 'pro' ? '20' : '100'}`;
+            }
+          });
+        } catch (e) {
+          showToast('Could not load subscription state — ' + e.message, 'error');
+        }
+
+        document.querySelectorAll('[data-tier]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const tier = btn.dataset.tier;
+            const price = tier === 'pro' ? 20 : 100;
+            if (!confirm(`Subscribe to ${tier.toUpperCase()} for $${price} USDC for 30 days?`)) return;
+            const original = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Processing…';
+            try {
+              const r = await api('/v1/subscription/subscribe', {
+                method: 'POST',
+                body: JSON.stringify({ tier, auto_renew: true }),
+              });
+              showToast(`Subscribed to ${tier.toUpperCase()} until ${new Date(r.expires_at).toLocaleDateString()}`, 'success');
+              setTimeout(() => { window.location.reload(); }, 1500);
+            } catch (e) {
+              const m = e.status === 402 || /insufficient/i.test(e.message)
+                ? 'Insufficient balance. Top up at /buy-usdc first.'
+                : 'Subscribe failed: ' + e.message;
+              showToast(m, 'error');
+              btn.disabled = false; btn.textContent = original;
+            }
+          });
+        });
+      }
+
+      init();
+    </script>
+  </body>
+</html>
