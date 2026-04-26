@@ -125,6 +125,9 @@ app.route('/v1/signup', signupRoutes);
 app.route('/v1/subscription', subscriptionPublicRoutes);
 app.route('/v1/agents', agentsPublicRoutes);
 app.route('/v1/run', agentRunRoutes);
+// Inbound WhatsApp from Evolution servers — no auth, secret in path is the auth.
+// MUST go before the authed /v1 router for the same reason as /v1/signup.
+app.route('/v1/webhooks/whatsapp', whatsappPublicWebhook);
 
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();
@@ -141,7 +144,6 @@ app.route('/v1', v1);
 
 // ─── Webhooks (signature-verified, no auth middleware) ──
 app.route('/v1/webhooks', webhookRoutes);
-app.route('/v1/webhooks/whatsapp', whatsappPublicWebhook);
 
 // ─── Error handler ────────────────────────────────────
 app.onError((err, c) => {
