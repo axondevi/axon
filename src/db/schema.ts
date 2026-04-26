@@ -199,12 +199,49 @@ export const agents = pgTable(
     dailyBudgetMicro: bigint('daily_budget_micro', { mode: 'bigint' })
       .notNull()
       .default(5_000_000n),                          // $5.00 default
+    // Minimum subscription tier the OWNER must hold to keep this agent live.
+    // ('free' = anyone, 'pro' = Pro+, 'team' = Team+)
+    tierRequired: text('tier_required').notNull().default('free'),
+    // A/B testing — alternate system prompt + how often to send it (0-100).
+    systemPromptB: text('system_prompt_b'),
+    abSplit: integer('ab_split').notNull().default(0),  // % of traffic to variant B
+    // Vanity domain mapping (e.g. "agent.cliente.com" → /agent/<slug>).
+    // CNAME-only — actual cert/proxy handled by Cloudflare for SaaS or similar.
+    vanityDomain: text('vanity_domain'),
+    // Auto-detected language for UI strings ('auto' = use browser locale)
+    uiLanguage: text('ui_language').notNull().default('auto'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (t) => ({
     ownerIdx: index('agents_owner_idx').on(t.ownerId),
     slugIdx: uniqueIndex('agents_slug_idx').on(t.slug),
+    vanityIdx: uniqueIndex('agents_vanity_idx').on(t.vanityDomain),
+  }),
+);
+
+// ─── Agent conversation log (opt-in privacy) ──────────────
+// Records the user/assistant turn pairs from /v1/run/:slug/groq/chat
+// so the owner can audit what visitors are asking. Tool results aren't
+// persisted (they're noisy and may contain PII like CNPJ lookups).
+export const agentMessages = pgTable(
+  'agent_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    sessionId: text('session_id'),                   // anon hash of IP+UA, groups a conversation
+    role: text('role').notNull(),                    // 'user' | 'assistant'
+    content: text('content').notNull(),
+    variant: text('variant'),                        // 'A' | 'B' for A/B testing
+    visitorIp: text('visitor_ip'),                   // truncated /24 — kept for ratelimit forensics only
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    agentIdx: index('agent_msg_agent_idx').on(t.agentId),
+    sessionIdx: index('agent_msg_session_idx').on(t.sessionId),
+    createdIdx: index('agent_msg_created_idx').on(t.createdAt),
   }),
 );
 
@@ -240,3 +277,4 @@ export type SettlementRow = typeof settlements.$inferSelect;
 export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 export type Agent = typeof agents.$inferSelect;
+export type AgentMessage = typeof agentMessages.$inferSelect;

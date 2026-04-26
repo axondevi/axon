@@ -174,6 +174,64 @@
       const BASE_KEY = 'axon.baseUrl';
       const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
 
+      // ── i18n: UI strings translated for runner chrome (welcome / chips / inputs) ──
+      const I18N = {
+        en: {
+          welcome_default: 'How can I help you today?',
+          input_placeholder: 'Type your message…',
+          send: 'Send',
+          connect_title: 'Connect your Axon wallet',
+          connect_body: 'This agent runs on the Axon API gateway. Paste your API key below to start chatting — each message debits a few cents from your wallet.',
+          connect_no_account: "No account? <a href='/' target='_blank'>Get a free wallet</a> ($0.50 bonus included).",
+          continue: 'Continue',
+          powered_by: 'powered by axon',
+          not_found_title: 'Agent not found',
+          not_found_body: 'The agent does not exist or is private.',
+          calls: 'calls',
+          cap: 'cap',
+          interrupted: '(interrupted)',
+          error: 'error',
+        },
+        pt: {
+          welcome_default: 'Como posso ajudar hoje?',
+          input_placeholder: 'Escreva sua mensagem…',
+          send: 'Enviar',
+          connect_title: 'Conecte sua wallet Axon',
+          connect_body: 'Este agente roda no gateway Axon. Cole sua API key abaixo pra começar — cada mensagem debita alguns centavos da sua wallet.',
+          connect_no_account: "Sem conta? <a href='/' target='_blank'>Crie wallet grátis</a> (bônus de $0.50 incluso).",
+          continue: 'Continuar',
+          powered_by: 'powered by axon',
+          not_found_title: 'Agente não encontrado',
+          not_found_body: 'Este agente não existe ou está privado.',
+          calls: 'chamadas',
+          cap: 'limite',
+          interrupted: '(interrompido)',
+          error: 'erro',
+        },
+        es: {
+          welcome_default: '¿En qué puedo ayudarte hoy?',
+          input_placeholder: 'Escribe tu mensaje…',
+          send: 'Enviar',
+          connect_title: 'Conecta tu wallet Axon',
+          connect_body: 'Este agente corre en el gateway Axon. Pega tu API key para empezar — cada mensaje debita algunos centavos de tu wallet.',
+          connect_no_account: "¿Sin cuenta? <a href='/' target='_blank'>Crea una wallet gratis</a> (bono de $0.50 incluido).",
+          continue: 'Continuar',
+          powered_by: 'powered by axon',
+          not_found_title: 'Agente no encontrado',
+          not_found_body: 'Este agente no existe o es privado.',
+          calls: 'llamadas',
+          cap: 'tope',
+          interrupted: '(interrumpido)',
+          error: 'error',
+        },
+      };
+      let T = I18N.en;
+      function pickLang(prefer) {
+        const browser = (navigator.language || 'en').slice(0, 2).toLowerCase();
+        const choice = (prefer === 'auto' || !prefer) ? browser : prefer;
+        return I18N[choice] ? choice : 'en';
+      }
+
       // Slug can come from path (/agent/foo) OR query string (?slug=foo).
       // CF Pages _redirects rewrites /agent/:slug → /agent-runner?slug=:slug.
       const _qs = new URLSearchParams(location.search);
@@ -202,15 +260,15 @@
               <h1 id="t-name">Loading…</h1>
               <p id="t-desc"></p>
             </div>
-            <div class="powered"><a href="/" target="_blank">powered by axon</a></div>
+            <div class="powered"><a href="/" target="_blank">${T.powered_by}</a></div>
           </div>
           <div class="agent-body">
             <div class="auth-prompt">
-              <h2>Connect your Axon wallet</h2>
-              <p>This agent runs on the Axon API gateway. Paste your API key below to start chatting — each message debits a few cents from your wallet.</p>
+              <h2>${T.connect_title}</h2>
+              <p>${T.connect_body}</p>
               <input type="password" id="key-in" placeholder="ax_live_..." autocomplete="off" />
-              <div><button onclick="onAuthSubmit()">Continue</button></div>
-              <p class="hint" style="margin-top:14px;">No account? <a href="/" target="_blank">Get a free wallet</a> (\$0.50 bonus included).</p>
+              <div><button onclick="onAuthSubmit()">${T.continue}</button></div>
+              <p class="hint" style="margin-top:14px;">${T.connect_no_account}</p>
             </div>
           </div>
         `;
@@ -260,11 +318,19 @@
           const cfg = await fetch(`${BASE}/v1/agents/by-slug/${slug}`).then(r => r.ok ? r.json() : Promise.reject(new Error('Agent not found')));
           agentConfig = cfg;
         } catch (e) {
-          document.getElementById('page').innerHTML = `<div class="err-panel"><h2>Agent not found</h2><p>The agent <code>${slug}</code> does not exist or is private.</p></div>`;
+          T = I18N[pickLang('auto')];
+          document.getElementById('page').innerHTML = `<div class="err-panel"><h2>${T.not_found_title}</h2><p><code>${slug}</code>: ${T.not_found_body}</p></div>`;
           return;
         }
+        // Resolve i18n strings using agent's preferred language
+        T = I18N[pickLang(agentConfig.ui_language)];
         const color = agentConfig.primary_color || '#7c5cff';
         document.documentElement.style.setProperty('--agent-color', color);
+
+        // A/B variant: pick once per visitor session (sticky), store in sessionStorage
+        agentConfig._session_id = sessionStorageId();
+        agentConfig._variant = pickVariant(agentConfig);
+
         // Owner-paid agents skip the auth prompt — every call charges the owner's wallet.
         if (agentConfig.pay_mode === 'owner') {
           renderChatShell();
@@ -274,8 +340,45 @@
         renderChatShell();
       }
 
+      function sessionStorageId() {
+        let id = sessionStorage.getItem('axon.agent.sid');
+        if (!id) {
+          id = (crypto.randomUUID && crypto.randomUUID().slice(0, 16)) || (Math.random().toString(36).slice(2, 18));
+          sessionStorage.setItem('axon.agent.sid', id);
+        }
+        return id;
+      }
+
+      function pickVariant(cfg) {
+        if (!cfg.system_prompt_b || !cfg.ab_split || cfg.ab_split <= 0) return 'A';
+        // Deterministic by session id so same visitor always sees same variant
+        const sid = cfg._session_id || '';
+        let hash = 0;
+        for (let i = 0; i < sid.length; i++) hash = ((hash << 5) - hash + sid.charCodeAt(i)) | 0;
+        const bucket = Math.abs(hash) % 100;
+        return bucket < cfg.ab_split ? 'B' : 'A';
+      }
+
+      // Fire-and-forget message logging for owner audit
+      function logMessage(role, content) {
+        if (agentConfig.pay_mode !== 'owner') return; // visitor-pay agents don't log centrally
+        try {
+          fetch(`${BASE}/v1/run/${slug}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              role,
+              content: String(content).slice(0, 4000),
+              variant: agentConfig._variant || 'A',
+              session_id: agentConfig._session_id,
+            }),
+          }).catch(() => {});
+        } catch {}
+      }
+
       function renderChatShell() {
         const initials = (agentConfig.name || '?').slice(0,1).toUpperCase();
+        const welcome = agentConfig.welcome_message || T.welcome_default;
         document.getElementById('page').innerHTML = `
           <div class="agent-header">
             <div class="agent-avatar">${initials}</div>
@@ -283,11 +386,11 @@
               <h1>${escape(agentConfig.name)}</h1>
               <p>${escape(agentConfig.description || '')}</p>
             </div>
-            <div class="powered"><a href="/" target="_blank">powered by axon</a></div>
+            <div class="powered"><a href="/" target="_blank">${T.powered_by}</a></div>
           </div>
           <div class="agent-body">
             <div class="agent-msgs" id="msgs">
-              ${agentConfig.welcome_message ? `<div class="agent-welcome">${escape(agentConfig.welcome_message)}</div>` : ''}
+              <div class="agent-welcome">${escape(welcome)}</div>
             </div>
             ${agentConfig.quick_prompts && agentConfig.quick_prompts.length ? `
               <div class="quick-chips" id="chips">
@@ -295,12 +398,12 @@
               </div>
             ` : ''}
             <div class="agent-input-bar">
-              <textarea id="input" rows="2" placeholder="Type your message…"></textarea>
-              <button class="send-btn" id="send">Send</button>
+              <textarea id="input" rows="2" placeholder="${T.input_placeholder}"></textarea>
+              <button class="send-btn" id="send">${T.send}</button>
             </div>
           </div>
           <div class="agent-footer">
-            <span class="calls" id="footer">0 calls · $0.0000 · cap $${agentConfig.budget_per_session_usdc} / $${agentConfig.hard_cap_usdc}</span>
+            <span class="calls" id="footer">$0.0000 · ${T.cap} $${agentConfig.budget_per_session_usdc} / $${agentConfig.hard_cap_usdc}</span>
           </div>
         `;
 
@@ -327,8 +430,10 @@
       function buildSystemPrompt(cfg) {
         const tools = (cfg.allowed_tools || []).filter((t) => TOOL_DEFS[t]);
         const toolList = tools.map((t) => `- ${t}: ${TOOL_DEFS[t].fn.description}`).join('\n');
+        // A/B variant: pick prompt B if assigned and prompt B exists
+        const basePrompt = (cfg._variant === 'B' && cfg.system_prompt_b) ? cfg.system_prompt_b : cfg.system_prompt;
         return [
-          cfg.system_prompt,
+          basePrompt,
           '',
           '## Language',
           'Reply in the same language the user wrote in (PT/EN/ES/etc). Mirror their language for the entire turn — including headings and bullet labels.',
@@ -360,6 +465,7 @@
         inp.value = '';
 
         session.messages.push({ role: 'user', content: text });
+        logMessage('user', text);
         session.running = true;
         renderMessages(true);
         document.getElementById('send').disabled = true;
@@ -443,6 +549,7 @@
             if (finalTcs.length) placeholder.tool_calls = finalTcs;
 
             if (!finalTcs.length) {
+              if (placeholder.content) logMessage('assistant', placeholder.content);
               renderMessages(false);
               break;
             }

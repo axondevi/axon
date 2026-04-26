@@ -355,6 +355,50 @@
             </div>
           </div>
 
+          <div class="row">
+            <div class="field">
+              <label for="b-tier">Required tier (your subscription)</label>
+              <select id="b-tier">
+                <option value="free">Free — anyone can host</option>
+                <option value="pro">Pro — \$20/mo subscription needed</option>
+                <option value="team">Team — \$100/mo subscription needed</option>
+              </select>
+              <div class="hint">Your own Axon plan must be at least this tier to keep the agent live.</div>
+            </div>
+            <div class="field">
+              <label for="b-lang">UI language</label>
+              <select id="b-lang">
+                <option value="auto">Auto (detect visitor browser)</option>
+                <option value="pt">Portuguese</option>
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+              </select>
+              <div class="hint">Affects chat-shell labels (placeholder, send button, etc.)</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="b-vanity">Vanity domain (optional)</label>
+            <input type="text" id="b-vanity" placeholder="agent.cliente.com" />
+            <div class="hint">Set up a CNAME from this domain → axon-5zf.pages.dev. Then GET /v1/agents/by-domain/&lt;your-domain&gt; resolves the agent.</div>
+          </div>
+
+          <details style="margin-bottom:18px;">
+            <summary style="cursor:pointer; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); padding:8px 0;">A/B test prompts (advanced)</summary>
+            <div style="padding:12px 0 4px;">
+              <div class="field">
+                <label for="b-prompt-b">System prompt — variant B</label>
+                <textarea id="b-prompt-b" placeholder="Leave empty to disable A/B testing"></textarea>
+                <div class="hint">When set, a fraction of visitors (configurable below) gets this prompt instead of the main one.</div>
+              </div>
+              <div class="field">
+                <label for="b-ab">% of traffic on variant B</label>
+                <input type="number" id="b-ab" min="0" max="100" step="5" value="0" />
+                <div class="hint">0 = disabled. 50 = balanced split. Visitor hash determines variant — same person always sees the same one.</div>
+              </div>
+            </div>
+          </details>
+
           <div class="field">
             <label for="b-welcome">Welcome message</label>
             <input type="text" id="b-welcome" maxlength="200" placeholder="Shown above the chat input on first load" />
@@ -477,11 +521,13 @@
       let editingAgentId = null;
       let formState = {
         name: '', slug: '', description: '',
-        system_prompt: '', allowed_tools: [],
+        system_prompt: '', system_prompt_b: '', ab_split: 0,
+        allowed_tools: [],
         primary_color: '#7c5cff', welcome_message: '',
         quick_prompts: [], public: true,
         budget_per_session_usdc: '0.50', hard_cap_usdc: '2.00',
         pay_mode: 'visitor', daily_budget_usdc: '5.00',
+        tier_required: 'free', ui_language: 'auto', vanity_domain: '',
       };
 
       // ── Tabs ──────────────────────────────────────────────────────────
@@ -576,6 +622,7 @@
               <div class="ar-actions">
                 <button class="ar-btn" onclick="window.open('/agent/${escape(a.slug)}','_blank')">Open ↗</button>
                 <button class="ar-btn" onclick="showAnalytics('${a.id}','${escape(a.name)}','${escape(a.primary_color)}')">Stats</button>
+                <button class="ar-btn" onclick="showLogs('${a.id}','${escape(a.name)}')">Logs</button>
                 <button class="ar-btn" onclick="showEmbed('${escape(a.slug)}','${escape(a.primary_color)}')">Embed</button>
                 <button class="ar-btn" onclick="editAgent('${a.id}')">Edit</button>
                 <button class="ar-btn danger" onclick="deleteAgent('${a.id}','${escape(a.name)}')">Delete</button>
@@ -723,6 +770,53 @@
         }
       };
 
+      window.showLogs = async function(agentId, name) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
+        wrap.innerHTML = '<div style="background:var(--bg);padding:28px;border-radius:14px;max-width:760px;width:100%;max-height:85vh;overflow-y:auto;"><h3 style="margin:0;font-size:18px;">' + escape(name) + ' — conversation logs</h3><p style="color:var(--text-muted);font-size:12px;margin:6px 0 18px;">Loading…</p></div>';
+        wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+        document.body.appendChild(wrap);
+        try {
+          const d = await api('/v1/agents/' + agentId + '/messages?limit=80');
+          const card = wrap.firstChild;
+          // Group by session_id
+          const sessions = new Map();
+          for (const m of d.data) {
+            const k = m.session_id || 'unknown';
+            if (!sessions.has(k)) sessions.set(k, []);
+            sessions.get(k).push(m);
+          }
+          if (sessions.size === 0) {
+            card.innerHTML = '<h3 style="margin:0 0 8px;font-size:18px;">' + escape(name) + ' — conversation logs</h3>' +
+              '<p style="color:var(--text-muted);font-size:13px;">No conversations recorded yet. Logs are captured for owner-paid agents only — visitors using their own API key chat anonymously.</p>' +
+              '<button onclick="this.parentElement.parentElement.remove()" style="margin-top:14px;padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:13px;">Close</button>';
+            return;
+          }
+          let html = '<div style="display:flex;justify-content:space-between;align-items:baseline;"><h3 style="margin:0;font-size:18px;">' + escape(name) + ' — logs</h3><span style="color:var(--text-muted);font-size:11px;">' + sessions.size + ' session(s) · ' + d.count + ' messages</span></div>';
+          html += '<p style="color:var(--text-muted);font-size:12px;margin:8px 0 18px;">Newest first. Privacy: visitor IPs stored as /24 only.</p>';
+          for (const [sid, msgs] of sessions) {
+            // Order chronologically inside the session
+            msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            html += '<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px;">' +
+                      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:10px;">' +
+                        '<span style="font-family:JetBrains Mono,monospace;">session ' + sid.slice(0,12) + (msgs[0].variant ? ' · variant ' + msgs[0].variant : '') + '</span>' +
+                        '<span>' + new Date(msgs[0].created_at).toLocaleString() + '</span>' +
+                      '</div>';
+            for (const m of msgs) {
+              const align = m.role === 'user' ? 'flex-end' : 'flex-start';
+              const bg = m.role === 'user' ? 'var(--accent)' : 'var(--bg)';
+              const color = m.role === 'user' ? '#0a0a0b' : 'var(--text)';
+              html += '<div style="display:flex;justify-content:' + align + ';margin:6px 0;"><div style="background:' + bg + ';color:' + color + ';padding:8px 12px;border-radius:10px;max-width:75%;font-size:13px;line-height:1.4;white-space:pre-wrap;">' + escape(m.content) + '</div></div>';
+            }
+            html += '</div>';
+          }
+          html += '<div style="margin-top:8px;display:flex;justify-content:flex-end;"><button onclick="this.parentElement.parentElement.remove()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:13px;">Close</button></div>';
+          card.innerHTML = html;
+        } catch (e) {
+          wrap.firstChild.innerHTML = '<h3 style="margin:0 0 8px;">Could not load logs</h3><p style="color:#f87171;font-size:13px;">' + escape(e.message) + '</p>';
+        }
+      };
+
       window.copyVal = function(id, btn) {
         const el = document.getElementById(id);
         el.select(); el.setSelectionRange(0, 99999);
@@ -752,6 +846,11 @@
         document.getElementById('b-hard').value = formState.hard_cap_usdc;
         document.getElementById('b-paymode').value = formState.pay_mode || 'visitor';
         document.getElementById('b-daily').value = formState.daily_budget_usdc || '5.00';
+        document.getElementById('b-tier').value = formState.tier_required || 'free';
+        document.getElementById('b-lang').value = formState.ui_language || 'auto';
+        document.getElementById('b-vanity').value = formState.vanity_domain || '';
+        document.getElementById('b-prompt-b').value = formState.system_prompt_b || '';
+        document.getElementById('b-ab').value = formState.ab_split || 0;
         renderTools();
         renderQuickPrompts();
         renderPreview();
@@ -835,7 +934,7 @@
       }
 
       // Sync form inputs into formState
-      ['b-name','b-slug','b-desc','b-prompt','b-color','b-public','b-welcome','b-soft','b-hard','b-paymode','b-daily'].forEach((id) => {
+      ['b-name','b-slug','b-desc','b-prompt','b-color','b-public','b-welcome','b-soft','b-hard','b-paymode','b-daily','b-tier','b-lang','b-vanity','b-prompt-b','b-ab'].forEach((id) => {
         document.getElementById(id).addEventListener('input', () => {
           formState.name = document.getElementById('b-name').value;
           formState.slug = document.getElementById('b-slug').value.toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40);
@@ -849,6 +948,11 @@
           formState.hard_cap_usdc = document.getElementById('b-hard').value;
           formState.pay_mode = document.getElementById('b-paymode').value;
           formState.daily_budget_usdc = document.getElementById('b-daily').value;
+          formState.tier_required = document.getElementById('b-tier').value;
+          formState.ui_language = document.getElementById('b-lang').value;
+          formState.vanity_domain = document.getElementById('b-vanity').value.trim().toLowerCase();
+          formState.system_prompt_b = document.getElementById('b-prompt-b').value;
+          formState.ab_split = parseInt(document.getElementById('b-ab').value, 10) || 0;
           renderPreview();
         });
       });
@@ -885,6 +989,11 @@
             hard_cap_usdc: formState.hard_cap_usdc,
             pay_mode: formState.pay_mode,
             daily_budget_usdc: formState.daily_budget_usdc,
+            tier_required: formState.tier_required,
+            ui_language: formState.ui_language,
+            vanity_domain: formState.vanity_domain || null,
+            system_prompt_b: formState.system_prompt_b || null,
+            ab_split: formState.ab_split,
           };
           if (editingAgentId) {
             await api('/v1/agents/' + editingAgentId, { method: 'PATCH', body: JSON.stringify(payload) });

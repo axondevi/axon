@@ -9,10 +9,18 @@
 import { Hono } from 'hono';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '~/db';
-import { agents, requests } from '~/db/schema';
+import { agents, requests, agentMessages, users } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { AGENT_TEMPLATES, getTemplate } from '~/agents/templates';
 import { fromMicro, toMicro } from '~/wallet/service';
+import { effectiveTier, type Tier } from '~/subscription';
+
+// Order: free < pro < team < enterprise
+const TIER_RANK: Record<string, number> = { free: 0, pro: 1, team: 2, enterprise: 3 };
+function userMeetsTier(user: { tier: string; tierExpiresAt: Date | null }, required: string): boolean {
+  const eff = effectiveTier({ tier: user.tier, tierExpiresAt: user.tierExpiresAt });
+  return TIER_RANK[eff] >= (TIER_RANK[required] ?? 0);
+}
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$/;
 
@@ -45,15 +53,17 @@ publicRoutes.get('/templates/:id', (c) => {
   return c.json(t);
 });
 
-publicRoutes.get('/by-slug/:slug', async (c) => {
-  const slug = c.req.param('slug');
-  const [a] = await db.select().from(agents).where(eq(agents.slug, slug)).limit(1);
-  if (!a || !a.public) throw Errors.notFound('Agent');
-  return c.json({
+// Public shape for runner. system_prompt(_b) IS exposed so the client-side
+// runner can build the LLM messages array — it isn't a secret in practice
+// (anyone can probe a deployed agent's behavior anyway).
+async function publicShape(a: typeof agents.$inferSelect) {
+  return {
     slug: a.slug,
     name: a.name,
     description: a.description,
     system_prompt: a.systemPrompt,
+    system_prompt_b: a.systemPromptB,
+    ab_split: a.abSplit,
     allowed_tools: a.allowedTools,
     primary_color: a.primaryColor,
     welcome_message: a.welcomeMessage,
@@ -62,8 +72,24 @@ publicRoutes.get('/by-slug/:slug', async (c) => {
     hard_cap_usdc: fromMicro(a.hardCap),
     pay_mode: a.payMode,
     daily_budget_usdc: fromMicro(a.dailyBudgetMicro),
-    owner_id: a.ownerId,
-  });
+    ui_language: a.uiLanguage,
+  };
+}
+
+publicRoutes.get('/by-slug/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  const [a] = await db.select().from(agents).where(eq(agents.slug, slug)).limit(1);
+  if (!a || !a.public) throw Errors.notFound('Agent');
+  return c.json(await publicShape(a));
+});
+
+// Vanity domain lookup — embed.js / DNS proxy hits this when serving a
+// custom domain like agent.cliente.com to find which slug to render.
+publicRoutes.get('/by-domain/:domain', async (c) => {
+  const domain = c.req.param('domain').toLowerCase();
+  const [a] = await db.select().from(agents).where(eq(agents.vanityDomain, domain)).limit(1);
+  if (!a || !a.public) throw Errors.notFound('Agent');
+  return c.json(await publicShape(a));
 });
 
 // ============ Authed routes (mounted under /v1) ============
@@ -113,6 +139,8 @@ app.get('/:id', async (c) => {
     name: a.name,
     description: a.description,
     system_prompt: a.systemPrompt,
+    system_prompt_b: a.systemPromptB,
+    ab_split: a.abSplit,
     allowed_tools: a.allowedTools,
     primary_color: a.primaryColor,
     welcome_message: a.welcomeMessage,
@@ -121,6 +149,9 @@ app.get('/:id', async (c) => {
     hard_cap_usdc: fromMicro(a.hardCap),
     pay_mode: a.payMode,
     daily_budget_usdc: fromMicro(a.dailyBudgetMicro),
+    tier_required: a.tierRequired,
+    vanity_domain: a.vanityDomain,
+    ui_language: a.uiLanguage,
     public: a.public,
     template: a.template,
     created_at: a.createdAt,
@@ -130,7 +161,7 @@ app.get('/:id', async (c) => {
 
 // Create
 app.post('/', async (c) => {
-  const user = c.get('user') as { id: string };
+  const user = c.get('user') as { id: string; tier: string; tierExpiresAt: Date | null };
   const body = await c.req.json().catch(() => ({}));
   const slug = String(body.slug || '').toLowerCase().trim();
   if (!SLUG_RE.test(slug)) throw Errors.badRequest('slug must be 2-40 chars, [a-z0-9-], not start/end with hyphen');
@@ -167,9 +198,22 @@ app.post('/', async (c) => {
     hardCap: body.hard_cap_usdc != null ? toMicro(String(body.hard_cap_usdc)) : 2_000_000n,
     payMode: body.pay_mode === 'owner' ? 'owner' : 'visitor',
     dailyBudgetMicro: body.daily_budget_usdc != null ? toMicro(String(body.daily_budget_usdc)) : 5_000_000n,
+    tierRequired: ['free','pro','team','enterprise'].includes(body.tier_required) ? body.tier_required : 'free',
+    systemPromptB: body.system_prompt_b ?? null,
+    abSplit: Math.max(0, Math.min(100, parseInt(body.ab_split, 10) || 0)),
+    vanityDomain: body.vanity_domain ? String(body.vanity_domain).toLowerCase().trim() : null,
+    uiLanguage: ['auto','pt','en','es'].includes(body.ui_language) ? body.ui_language : 'auto',
     public: body.public !== false,
     template: seed.template ?? body.template ?? null,
   };
+
+  // Enforce tier gate on the OWNER (current user). If they pick a
+  // tier_required higher than their own active tier, bounce the request.
+  if (insert.tierRequired !== 'free') {
+    if (!userMeetsTier(user, insert.tierRequired)) {
+      throw Errors.forbidden();
+    }
+  }
 
   try {
     const [created] = await db.insert(agents).values(insert).returning();
@@ -213,6 +257,11 @@ app.patch('/:id', async (c) => {
   if (body.pay_mode === 'visitor' || body.pay_mode === 'owner') update.payMode = body.pay_mode;
   if (body.daily_budget_usdc != null) update.dailyBudgetMicro = toMicro(String(body.daily_budget_usdc));
   if (typeof body.public === 'boolean') update.public = body.public;
+  if (['free','pro','team','enterprise'].includes(body.tier_required)) update.tierRequired = body.tier_required;
+  if (body.system_prompt_b !== undefined) update.systemPromptB = body.system_prompt_b ? String(body.system_prompt_b) : null;
+  if (body.ab_split !== undefined) update.abSplit = Math.max(0, Math.min(100, parseInt(body.ab_split, 10) || 0));
+  if (body.vanity_domain !== undefined) update.vanityDomain = body.vanity_domain ? String(body.vanity_domain).toLowerCase().trim() : null;
+  if (['auto','pt','en','es'].includes(body.ui_language)) update.uiLanguage = body.ui_language;
 
   await db.update(agents).set(update).where(eq(agents.id, id));
   return c.json({ ok: true });
@@ -305,6 +354,39 @@ app.get('/:id/analytics', async (c) => {
       gross_usdc: fromMicro(BigInt(r.gross_micro ?? 0)),
       cache_hit_rate: Number(r.calls) > 0 ? Number((Number(r.cache_hits) / Number(r.calls)).toFixed(4)) : 0,
     })),
+  });
+});
+
+// Conversation messages — owner-only
+app.get('/:id/messages', async (c) => {
+  const user = c.get('user') as { id: string };
+  const id = c.req.param('id');
+  const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '50', 10), 1), 200);
+
+  // Ownership check
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+  if (!a) throw Errors.notFound('Agent');
+
+  const rows = await db
+    .select()
+    .from(agentMessages)
+    .where(eq(agentMessages.agentId, id))
+    .orderBy(desc(agentMessages.createdAt))
+    .limit(limit);
+
+  return c.json({
+    data: rows.map((m) => ({
+      id: m.id,
+      session_id: m.sessionId,
+      role: m.role,
+      content: m.content,
+      variant: m.variant,
+      created_at: m.createdAt,
+    })),
+    count: rows.length,
   });
 });
 

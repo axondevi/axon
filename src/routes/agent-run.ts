@@ -28,11 +28,12 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { eq } from 'drizzle-orm';
 import { db } from '~/db';
-import { users, agents } from '~/db/schema';
+import { users, agents, agentMessages } from '~/db/schema';
 import { redis } from '~/cache/redis';
 import { Errors } from '~/lib/errors';
 import { handleCall } from '~/wrapper/engine';
 import { isToolAllowed } from '~/agents/templates';
+import { emitWebhook } from '~/webhooks/emitter';
 
 const app = new Hono();
 
@@ -90,12 +91,25 @@ app.post('/:slug/:api/:endpoint', async (c) => {
   const spentRaw = await redis.get(dayKey);
   const spent = BigInt(spentRaw ?? '0');
   if (spent >= agent.dailyBudgetMicro) {
+    // Fire webhook once per day per agent (de-duped via Redis SET NX)
+    const notifyKey = `agentbudget:notified:${agent.id}:${utcDayKey()}`;
+    const wasFirst = await redis.set(notifyKey, '1', 'EX', 86400, 'NX');
+    if (wasFirst === 'OK') {
+      emitWebhook(agent.ownerId, 'agent.budget_exhausted', {
+        agent_id: agent.id,
+        agent_slug: agent.slug,
+        daily_budget_micro: agent.dailyBudgetMicro.toString(),
+        spent_micro: spent.toString(),
+        reset_at: 'utc_midnight' as const,
+      });
+    }
     return c.json({
       error: 'agent_budget_exhausted',
       message: 'This agent has reached its daily spending cap. Please try again tomorrow.',
       meta: { reset_at: 'utc_midnight' },
     }, 402);
   }
+
 
   // Load owner row to inject as authed user
   const [owner] = await db.select().from(users).where(eq(users.id, agent.ownerId)).limit(1);
@@ -130,6 +144,43 @@ app.post('/:slug/:api/:endpoint', async (c) => {
   } catch { /* non-fatal */ }
 
   return res;
+});
+
+// ─── Conversation log endpoint ─────────────────────────────────────
+// Runner POSTs each user message and final assistant response here so the
+// owner can audit what visitors are asking. We truncate content to keep
+// the table tidy; full transcripts are out of scope for this MVP.
+const MAX_MSG_CHARS = 4000;
+
+app.post('/:slug/log', async (c) => {
+  const slug = c.req.param('slug');
+  const body = await c.req.json().catch(() => ({} as any));
+  const role = body.role;
+  const content = String(body.content ?? '').slice(0, MAX_MSG_CHARS);
+  const variant = body.variant === 'B' ? 'B' : 'A';
+  const sessionId = String(body.session_id ?? '').slice(0, 64) || null;
+  if (role !== 'user' && role !== 'assistant') {
+    return c.json({ error: 'bad_request', message: "role must be 'user' or 'assistant'" }, 400);
+  }
+  if (!content) return c.json({ ok: true, skipped: 'empty' });
+
+  const [agent] = await db.select().from(agents).where(eq(agents.slug, slug)).limit(1);
+  if (!agent || !agent.public) return c.json({ ok: true, skipped: 'no agent' }); // soft-fail
+
+  // Truncate IP to /24 for privacy (keeps abuse forensics + drops PII)
+  const fullIp = clientIp(c);
+  const ip = fullIp.split('.').slice(0, 3).join('.') + '.0';
+
+  await db.insert(agentMessages).values({
+    agentId: agent.id,
+    sessionId,
+    role,
+    content,
+    variant,
+    visitorIp: ip,
+  });
+
+  return c.json({ ok: true });
 });
 
 export default app;

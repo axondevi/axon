@@ -10,7 +10,9 @@ export type WebhookEvent =
   | 'policy.denied'
   | 'call.refunded'
   | 'rate_limit.hit'
-  | 'wallet.reserved_exceeds_balance';
+  | 'wallet.reserved_exceeds_balance'
+  | 'agent.budget_exhausted'
+  | 'agent.error_rate_high';
 
 export interface WebhookPayload<T = unknown> {
   id: string;           // unique event id (uuid) — use for idempotency
@@ -49,4 +51,20 @@ export interface RateLimitHitData {
   limit: number;
   retry_after_sec: number;
   tier: string;
+}
+
+export interface AgentBudgetExhaustedData {
+  agent_id: string;
+  agent_slug: string;
+  daily_budget_micro: string;
+  spent_micro: string;
+  reset_at: 'utc_midnight';
+}
+
+export interface AgentErrorRateHighData {
+  agent_id: string;
+  agent_slug: string;
+  error_rate: number;
+  window_minutes: number;
+  recent_errors: number;
 }
