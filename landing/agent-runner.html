@@ -164,7 +164,11 @@
       const BASE_KEY = 'axon.baseUrl';
       const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
 
-      const slug = (location.pathname.match(/\/agent\/([^/?#]+)/) || [])[1];
+      // Slug can come from path (/agent/foo) OR query string (?slug=foo).
+      // CF Pages _redirects rewrites /agent/:slug → /agent-runner?slug=:slug.
+      const _qsSlug = new URLSearchParams(location.search).get('slug');
+      const _pathMatch = location.pathname.match(/\/agent\/([^/?#]+)/);
+      const slug = _qsSlug || (_pathMatch && _pathMatch[1]);
       if (!slug) {
         document.getElementById('page').innerHTML = '<div class="err-panel"><h2>No agent specified</h2><p>The URL should look like <code>/agent/your-agent-slug</code>.</p></div>';
         throw new Error('no slug');

@@ -1,14 +1,13 @@
 # Cloudflare Pages _redirects
 #
 # CF Pages auto-serves matching files (index.html, stats.html, etc.) and
-# automatically redirects .html → pretty URL. We only need a catch-all
-# for 404 so unknown routes don't fall back to index.html.
+# automatically redirects .html → pretty URL.
 #
 # Rules are processed in order; first match wins.
 
-# /agent/:slug → loads agent-runner.html which reads slug from window.location
-# (file is named *-runner because CF Pages auto-strips .html and serves
-# /agent.html at /agent, which would otherwise eat the /agent/* prefix)
-/agent/*  /agent-runner.html  200
+# /agent/:slug → rewrite to /agent-runner with slug in query string.
+# Using ":slug" placeholder + 200 makes CF perform an internal rewrite
+# (URL stays put in the browser) instead of a 308.
+/agent/:slug    /agent-runner?slug=:slug    200
 
 /*    /404.html    404
