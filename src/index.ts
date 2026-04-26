@@ -22,7 +22,7 @@ import policyRoutes from '~/routes/policy';
 import settlementRoutes from '~/routes/settlement';
 import operatorRoutes from '~/routes/operator';
 import signupRoutes from '~/routes/signup';
-import subscriptionRoutes from '~/routes/subscription';
+import subscriptionRoutes, { publicRoutes as subscriptionPublicRoutes } from '~/routes/subscription';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -119,6 +119,7 @@ app.route('/v1/admin/operator', operatorRoutes);
 // ─── Public signup (no auth, IP rate-limited) ─────────
 // MUST be mounted BEFORE the authed /v1 sub-router.
 app.route('/v1/signup', signupRoutes);
+app.route('/v1/subscription', subscriptionPublicRoutes);
 
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();

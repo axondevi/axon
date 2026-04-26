@@ -14,9 +14,10 @@ import { Errors } from '~/lib/errors';
 
 const app = new Hono();
 
-// ─── GET /v1/subscription/plans ──────────────────────────
-// Public — no auth needed. Drives the /upgrade page.
-app.get('/plans', (c) => {
+// Public router — mounted at /v1/subscription/plans BEFORE the authed scope
+// so the upgrade page (and any SDK) can read plan info without an API key.
+export const publicRoutes = new Hono();
+publicRoutes.get('/plans', (c) => {
   const plans = (['free', 'pro', 'team', 'enterprise'] as Tier[]).map((tier) => ({
     tier,
     price_usdc: fromMicro(TIER_PRICES[tier]),
