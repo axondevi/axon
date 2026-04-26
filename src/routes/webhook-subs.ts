@@ -19,6 +19,8 @@ const VALID_EVENTS = [
   'call.refunded',
   'rate_limit.hit',
   'wallet.reserved_exceeds_balance',
+  'agent.budget_exhausted',
+  'agent.error_rate_high',
 ];
 
 // ─── GET /v1/webhook-subscriptions ────────────────────
