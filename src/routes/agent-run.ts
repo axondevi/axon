@@ -102,6 +102,8 @@ app.post('/:slug/:api/:endpoint', async (c) => {
   if (!owner) throw Errors.notFound('Agent owner');
 
   c.set('user', owner);
+  // Stamp agent_id so the engine writes it on every requests row → analytics
+  c.set('axon:agent_id', agent.id);
 
   // Tag the response so the runner can show "powered by owner" feel
   c.header('x-axon-agent-slug', slug);

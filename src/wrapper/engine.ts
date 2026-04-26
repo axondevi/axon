@@ -27,6 +27,8 @@ interface CallContext {
   effectiveMarkupPct: number;
   /** True when this call was settled via x402 native on-chain payment. */
   x402Paid: boolean;
+  /** Set by /v1/run/:slug/... when an agent is driving this call — drives per-agent analytics. */
+  agentId?: string;
 }
 
 export async function handleCall(
@@ -77,6 +79,7 @@ export async function handleCall(
     body,
     effectiveMarkupPct,
     x402Paid,
+    agentId: c.get('axon:agent_id') as string | undefined,
   };
 
   return await execute(c, ctx);
@@ -244,6 +247,7 @@ async function execute(c: Context, ctx: CallContext) {
     cacheHit: false,
     latencyMs: latency,
     status,
+    agentId: ctx.agentId,
   });
 
   const finalTotal = reconciledCost + reconciledMarkup;
@@ -358,6 +362,7 @@ async function serveCacheHit(
     costMicro: chargedMicro,
     markupMicro: chargedMicro, // cache hit = all margin (we didn't pay upstream)
     cacheHit: true,
+    agentId: ctx.agentId,
     latencyMs: latency,
     status: 200,
   });

@@ -7,9 +7,9 @@
  *     GET /v1/agents/by-slug/:slug → public-flagged agent config (drives /agent/:slug)
  */
 import { Hono } from 'hono';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '~/db';
-import { agents } from '~/db/schema';
+import { agents, requests } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { AGENT_TEMPLATES, getTemplate } from '~/agents/templates';
 import { fromMicro, toMicro } from '~/wallet/service';
@@ -216,6 +216,96 @@ app.patch('/:id', async (c) => {
 
   await db.update(agents).set(update).where(eq(agents.id, id));
   return c.json({ ok: true });
+});
+
+// Analytics — owner-only
+app.get('/:id/analytics', async (c) => {
+  const user = c.get('user') as { id: string };
+  const id = c.req.param('id');
+  const days = Math.min(Math.max(parseInt(c.req.query('days') || '30', 10), 1), 90);
+
+  // Verify ownership
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+  if (!a) throw Errors.notFound('Agent');
+
+  // Totals across the window
+  const totalsRow = await db.execute(sql`
+    SELECT
+      COUNT(*)::bigint                                              AS calls,
+      COALESCE(SUM(cost_micro + markup_micro), 0)::bigint            AS gross_micro,
+      COALESCE(SUM(markup_micro), 0)::bigint                          AS net_micro,
+      COUNT(*) FILTER (WHERE cache_hit)::bigint                       AS cache_hits,
+      COALESCE(AVG(latency_ms), 0)::float                             AS avg_latency_ms,
+      COUNT(*) FILTER (WHERE status >= 400)::bigint                   AS errors
+    FROM requests
+    WHERE agent_id = ${id}
+      AND created_at >= NOW() - (${days} || ' days')::interval
+  `);
+  const totals = (totalsRow as any).rows?.[0] ?? (totalsRow as any)[0] ?? {};
+
+  // Daily timeseries
+  const tsRow = await db.execute(sql`
+    SELECT
+      DATE(created_at) AS day,
+      COUNT(*)::bigint AS calls,
+      COALESCE(SUM(cost_micro + markup_micro), 0)::bigint AS gross_micro
+    FROM requests
+    WHERE agent_id = ${id}
+      AND created_at >= NOW() - (${days} || ' days')::interval
+    GROUP BY day
+    ORDER BY day
+  `);
+  const ts = ((tsRow as any).rows ?? (tsRow as any) ?? []) as Array<any>;
+
+  // Top tools
+  const toolsRow = await db.execute(sql`
+    SELECT
+      api_slug,
+      endpoint,
+      COUNT(*)::bigint AS calls,
+      COALESCE(SUM(cost_micro + markup_micro), 0)::bigint AS gross_micro,
+      COUNT(*) FILTER (WHERE cache_hit)::bigint AS cache_hits
+    FROM requests
+    WHERE agent_id = ${id}
+      AND created_at >= NOW() - (${days} || ' days')::interval
+    GROUP BY api_slug, endpoint
+    ORDER BY calls DESC
+    LIMIT 10
+  `);
+  const byTool = ((toolsRow as any).rows ?? (toolsRow as any) ?? []) as Array<any>;
+
+  const calls = Number(totals.calls ?? 0);
+  const errors = Number(totals.errors ?? 0);
+  const cacheHits = Number(totals.cache_hits ?? 0);
+
+  return c.json({
+    window_days: days,
+    agent_id: a.id,
+    agent_slug: a.slug,
+    totals: {
+      calls,
+      gross_usdc: fromMicro(BigInt(totals.gross_micro ?? 0)),
+      net_usdc: fromMicro(BigInt(totals.net_micro ?? 0)),
+      cache_hit_rate: calls > 0 ? Number((cacheHits / calls).toFixed(4)) : 0,
+      error_rate: calls > 0 ? Number((errors / calls).toFixed(4)) : 0,
+      avg_latency_ms: Math.round(Number(totals.avg_latency_ms ?? 0)),
+    },
+    timeseries: ts.map((r: any) => ({
+      day: r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day).slice(0, 10),
+      calls: Number(r.calls),
+      gross_usdc: fromMicro(BigInt(r.gross_micro ?? 0)),
+    })),
+    by_tool: byTool.map((r: any) => ({
+      api_slug: r.api_slug,
+      endpoint: r.endpoint,
+      calls: Number(r.calls),
+      gross_usdc: fromMicro(BigInt(r.gross_micro ?? 0)),
+      cache_hit_rate: Number(r.calls) > 0 ? Number((Number(r.cache_hits) / Number(r.calls)).toFixed(4)) : 0,
+    })),
+  });
 });
 
 // Delete

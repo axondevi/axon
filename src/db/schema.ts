@@ -102,12 +102,16 @@ export const requests = pgTable(
     cacheHit: boolean('cache_hit').notNull().default(false),
     latencyMs: integer('latency_ms'),
     status: integer('status'),
+    // Set when this request was made on behalf of a custom agent
+    // (via /v1/run/:slug/...). Drives /v1/agents/:id/analytics.
+    agentId: uuid('agent_id'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => ({
     userIdx: index('req_user_idx').on(t.userId),
     apiIdx: index('req_api_idx').on(t.apiSlug),
     createdIdx: index('req_created_idx').on(t.createdAt),
+    agentIdx: index('req_agent_idx').on(t.agentId),
   }),
 );
 

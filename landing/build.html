@@ -575,6 +575,7 @@
               <span class="ar-meta">updated ${relTime(a.updated_at)}</span>
               <div class="ar-actions">
                 <button class="ar-btn" onclick="window.open('/agent/${escape(a.slug)}','_blank')">Open ↗</button>
+                <button class="ar-btn" onclick="showAnalytics('${a.id}','${escape(a.name)}','${escape(a.primary_color)}')">Stats</button>
                 <button class="ar-btn" onclick="showEmbed('${escape(a.slug)}','${escape(a.primary_color)}')">Embed</button>
                 <button class="ar-btn" onclick="editAgent('${a.id}')">Edit</button>
                 <button class="ar-btn danger" onclick="deleteAgent('${a.id}','${escape(a.name)}')">Delete</button>
@@ -646,6 +647,80 @@
         wrap.innerHTML = html;
         wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
         document.body.appendChild(wrap);
+      };
+
+      window.showAnalytics = async function(agentId, name, color) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
+        wrap.innerHTML = '<div style="background:var(--bg);padding:32px;border-radius:14px;max-width:780px;width:100%;max-height:85vh;overflow-y:auto;"><h3 style="margin:0;font-size:20px;">' + escape(name) + ' — analytics</h3><p style="color:var(--text-muted);font-size:13px;margin:6px 0 18px;">Loading…</p></div>';
+        wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+        document.body.appendChild(wrap);
+        try {
+          const d = await api('/v1/agents/' + agentId + '/analytics?days=30');
+          const card = wrap.firstChild;
+          const t = d.totals;
+          const tile = (label, value, sub) =>
+            '<div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">' +
+              '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:0 0 6px;">' + label + '</div>' +
+              '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + value + '</div>' +
+              (sub ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + sub + '</div>' : '') +
+            '</div>';
+
+          // Sparkline (CSS bars)
+          const ts = d.timeseries || [];
+          const maxCalls = Math.max(1, ...ts.map(p => p.calls));
+          const sparkW = 600, barW = ts.length ? Math.max(2, Math.floor((sparkW - (ts.length - 1) * 2) / ts.length)) : 4;
+          const sparkBars = ts.length === 0
+            ? '<div style="color:var(--text-muted);font-size:13px;padding:24px;text-align:center;">No calls yet — share the agent URL to get traffic.</div>'
+            : '<div style="display:flex;align-items:flex-end;gap:2px;height:120px;padding:6px 8px;background:var(--bg-elev);border-radius:6px;border:1px solid var(--border);">' +
+              ts.map(p => {
+                const h = Math.max(2, Math.round((p.calls / maxCalls) * 100));
+                return '<div title="' + p.day + ': ' + p.calls + ' calls · $' + p.gross_usdc + '" style="flex:1;height:' + h + '%;background:' + color + ';opacity:0.8;border-radius:2px 2px 0 0;cursor:pointer;"></div>';
+              }).join('') + '</div>' +
+              '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px;"><span>' + (ts[0]?.day || '') + '</span><span>' + (ts[ts.length-1]?.day || '') + '</span></div>';
+
+          // Top tools table
+          const byTool = d.by_tool || [];
+          const toolTable = byTool.length === 0
+            ? '<div style="color:var(--text-muted);font-size:13px;padding:16px;text-align:center;">No tool calls in window.</div>'
+            : '<table style="width:100%;font-size:12px;border-collapse:collapse;">' +
+                '<thead><tr style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;text-align:left;">' +
+                  '<th style="padding:6px 8px;">Tool</th><th style="padding:6px 8px;text-align:right;">Calls</th><th style="padding:6px 8px;text-align:right;">Gross</th><th style="padding:6px 8px;text-align:right;">Cache</th>' +
+                '</tr></thead>' +
+                '<tbody>' +
+                  byTool.map(r =>
+                    '<tr style="border-top:1px solid var(--border);">' +
+                      '<td style="padding:6px 8px;font-family:JetBrains Mono,monospace;">' + escape(r.api_slug) + '/' + escape(r.endpoint) + '</td>' +
+                      '<td style="padding:6px 8px;text-align:right;">' + r.calls + '</td>' +
+                      '<td style="padding:6px 8px;text-align:right;">$' + r.gross_usdc + '</td>' +
+                      '<td style="padding:6px 8px;text-align:right;color:var(--text-muted);">' + (r.cache_hit_rate * 100).toFixed(0) + '%</td>' +
+                    '</tr>'
+                  ).join('') +
+                '</tbody>' +
+              '</table>';
+
+          card.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 4px;">' +
+              '<h3 style="margin:0;font-size:20px;">' + escape(name) + ' — analytics</h3>' +
+              '<span style="color:var(--text-muted);font-size:12px;">Last 30 days</span>' +
+            '</div>' +
+            '<p style="color:var(--text-muted);font-size:13px;margin:0 0 20px;">/agent/' + escape(d.agent_slug) + '</p>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 20px;">' +
+              tile('Calls', t.calls.toLocaleString(), null) +
+              tile('Gross', '$' + t.gross_usdc, null) +
+              tile('Net', '$' + t.net_usdc, 'after upstream cost') +
+              tile('Cache hit', (t.cache_hit_rate * 100).toFixed(0) + '%', t.cache_hit_rate > 0.5 ? 'great' : 'room to grow') +
+              tile('Errors', (t.error_rate * 100).toFixed(1) + '%', null) +
+              tile('Latency', t.avg_latency_ms + 'ms', 'avg') +
+            '</div>' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:0 0 8px;">Daily volume</div>' +
+            sparkBars +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:24px 0 8px;">Top tools</div>' +
+            toolTable +
+            '<div style="margin-top:24px;display:flex;justify-content:flex-end;"><button onclick="this.closest(\'div[style*=fixed]\').remove()" style="padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:13px;">Close</button></div>';
+        } catch (e) {
+          wrap.firstChild.innerHTML = '<h3 style="margin:0 0 8px;">Could not load analytics</h3><p style="color:#f87171;font-size:13px;">' + escape(e.message) + '</p><button onclick="this.parentElement.parentElement.remove()" style="margin-top:14px;padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:13px;">Close</button>';
+        }
       };
 
       window.copyVal = function(id, btn) {
