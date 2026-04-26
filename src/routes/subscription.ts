@@ -50,9 +50,13 @@ app.post('/subscribe', async (c) => {
   const result = await subscribe(user.id, tier, {
     autoRenew: body.auto_renew !== false,
   });
+  // result.charged_micro is a bigint — JSON.stringify throws on bigints,
+  // so we must NOT spread it raw into the response body
   return c.json({
     ok: true,
-    ...result,
+    tier: result.tier,
+    expires_at: result.expires_at,
+    auto_renew: result.auto_renew,
     charged_usdc: fromMicro(result.charged_micro),
   });
 });
