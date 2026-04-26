@@ -188,6 +188,13 @@ export const agents = pgTable(
       .default(2_000_000n),                          // $2.00 default hard cap
     public: boolean('public').notNull().default(true),
     template: text('template'),                      // which template was the seed (optional)
+    // 'visitor' = visitor needs their own API key, charges their wallet (default)
+    // 'owner'   = visitor uses agent for free, owner's wallet pays for every call
+    payMode: text('pay_mode').notNull().default('visitor'),
+    // Daily budget cap when payMode=owner. Resets at UTC midnight.
+    dailyBudgetMicro: bigint('daily_budget_micro', { mode: 'bigint' })
+      .notNull()
+      .default(5_000_000n),                          // $5.00 default
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

@@ -339,6 +339,22 @@
             </div>
           </div>
 
+          <div class="row">
+            <div class="field">
+              <label for="b-paymode">Who pays for calls?</label>
+              <select id="b-paymode">
+                <option value="visitor">Visitor (each user connects their own Axon wallet)</option>
+                <option value="owner">You (owner pays for everyone — best for embeds)</option>
+              </select>
+              <div class="hint">Owner-paid removes the API-key prompt. Visitors just chat.</div>
+            </div>
+            <div class="field">
+              <label for="b-daily">Daily budget (USDC, owner-paid only)</label>
+              <input type="number" id="b-daily" step="0.01" min="0" value="5.00" />
+              <div class="hint">Hard cap per day across all visitors. Resets at UTC midnight.</div>
+            </div>
+          </div>
+
           <div class="field">
             <label for="b-welcome">Welcome message</label>
             <input type="text" id="b-welcome" maxlength="200" placeholder="Shown above the chat input on first load" />
@@ -465,6 +481,7 @@
         primary_color: '#7c5cff', welcome_message: '',
         quick_prompts: [], public: true,
         budget_per_session_usdc: '0.50', hard_cap_usdc: '2.00',
+        pay_mode: 'visitor', daily_budget_usdc: '5.00',
       };
 
       // ── Tabs ──────────────────────────────────────────────────────────
@@ -553,11 +570,12 @@
               <span class="agent-color-dot" style="background:${a.primary_color}"></span>
               <div>
                 <h4 class="ar-name">${escape(a.name)}</h4>
-                <div class="ar-slug">/agent/${escape(a.slug)} · ${a.tool_count} tools · ${a.public ? 'public' : 'private'}</div>
+                <div class="ar-slug">/agent/${escape(a.slug)} · ${a.tool_count} tools · ${a.public ? 'public' : 'private'} · ${a.pay_mode === 'owner' ? 'owner-paid' : 'visitor-paid'}</div>
               </div>
               <span class="ar-meta">updated ${relTime(a.updated_at)}</span>
               <div class="ar-actions">
                 <button class="ar-btn" onclick="window.open('/agent/${escape(a.slug)}','_blank')">Open ↗</button>
+                <button class="ar-btn" onclick="showEmbed('${escape(a.slug)}','${escape(a.primary_color)}')">Embed</button>
                 <button class="ar-btn" onclick="editAgent('${a.id}')">Edit</button>
                 <button class="ar-btn danger" onclick="deleteAgent('${a.id}','${escape(a.name)}')">Delete</button>
               </div>
@@ -596,6 +614,49 @@
         } catch (e) { showToast(e.message, 'error'); }
       };
 
+      window.showEmbed = function(slug, color) {
+        const snippet =
+          '<script async src="' + location.origin + '/embed.js"\n' +
+          '        data-agent="' + slug + '"\n' +
+          '        data-color="' + color + '"\n' +
+          '        data-position="bottom-right"></' + 'script>';
+        const directUrl = location.origin + '/agent/' + slug;
+        const html =
+          '<div style="background: var(--bg); padding: 24px; border-radius: 12px; max-width: 640px;">' +
+            '<h3 style="margin:0 0 12px;font-size:18px;">Share this agent</h3>' +
+            '<p style="color:var(--text-muted);font-size:13px;margin:0 0 20px;line-height:1.5;">' +
+              'Two ways: link visitors directly to the URL, or paste the embed snippet anywhere on a website to add a floating chat button.' +
+            '</p>' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:0 0 6px;">Direct URL</div>' +
+            '<div style="display:flex;gap:6px;margin:0 0 18px;">' +
+              '<input id="embed-direct" readonly style="flex:1;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:5px;font-family:JetBrains Mono,monospace;font-size:12px;" value="' + directUrl + '" />' +
+              '<button onclick="copyVal(\'embed-direct\',this)" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy</button>' +
+            '</div>' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:0 0 6px;">Embed snippet</div>' +
+            '<div style="display:flex;gap:6px;align-items:flex-start;">' +
+              '<textarea id="embed-snippet" readonly style="flex:1;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:5px;font-family:JetBrains Mono,monospace;font-size:11px;line-height:1.5;height:80px;resize:none;">' + snippet.replace(/</g,'&lt;') + '</textarea>' +
+              '<button onclick="copyVal(\'embed-snippet\',this)" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy</button>' +
+            '</div>' +
+            '<p style="color:var(--text-muted);font-size:12px;margin:14px 0 0;">' +
+              '<strong style="color:var(--text);">Tip:</strong> for embed widgets on a customer-facing site, set <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">pay_mode = owner</code> in the agent so visitors don\'t need their own API key.' +
+            '</p>' +
+          '</div>';
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;';
+        wrap.innerHTML = html;
+        wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+        document.body.appendChild(wrap);
+      };
+
+      window.copyVal = function(id, btn) {
+        const el = document.getElementById(id);
+        el.select(); el.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(el.value).then(() => {
+          const o = btn.textContent; btn.textContent = 'Copied!';
+          setTimeout(() => btn.textContent = o, 1200);
+        });
+      };
+
       // ── Builder modal ─────────────────────────────────────────────────
       function openBuilder(init, id) {
         editingAgentId = id;
@@ -614,6 +675,8 @@
         document.getElementById('b-welcome').value = formState.welcome_message || '';
         document.getElementById('b-soft').value = formState.budget_per_session_usdc;
         document.getElementById('b-hard').value = formState.hard_cap_usdc;
+        document.getElementById('b-paymode').value = formState.pay_mode || 'visitor';
+        document.getElementById('b-daily').value = formState.daily_budget_usdc || '5.00';
         renderTools();
         renderQuickPrompts();
         renderPreview();
@@ -697,7 +760,7 @@
       }
 
       // Sync form inputs into formState
-      ['b-name','b-slug','b-desc','b-prompt','b-color','b-public','b-welcome','b-soft','b-hard'].forEach((id) => {
+      ['b-name','b-slug','b-desc','b-prompt','b-color','b-public','b-welcome','b-soft','b-hard','b-paymode','b-daily'].forEach((id) => {
         document.getElementById(id).addEventListener('input', () => {
           formState.name = document.getElementById('b-name').value;
           formState.slug = document.getElementById('b-slug').value.toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40);
@@ -709,6 +772,8 @@
           formState.welcome_message = document.getElementById('b-welcome').value;
           formState.budget_per_session_usdc = document.getElementById('b-soft').value;
           formState.hard_cap_usdc = document.getElementById('b-hard').value;
+          formState.pay_mode = document.getElementById('b-paymode').value;
+          formState.daily_budget_usdc = document.getElementById('b-daily').value;
           renderPreview();
         });
       });
@@ -743,6 +808,8 @@
             public: formState.public,
             budget_per_session_usdc: formState.budget_per_session_usdc,
             hard_cap_usdc: formState.hard_cap_usdc,
+            pay_mode: formState.pay_mode,
+            daily_budget_usdc: formState.daily_budget_usdc,
           };
           if (editingAgentId) {
             await api('/v1/agents/' + editingAgentId, { method: 'PATCH', body: JSON.stringify(payload) });

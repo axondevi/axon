@@ -60,6 +60,8 @@ publicRoutes.get('/by-slug/:slug', async (c) => {
     quick_prompts: a.quickPrompts,
     budget_per_session_usdc: fromMicro(a.budgetPerSession),
     hard_cap_usdc: fromMicro(a.hardCap),
+    pay_mode: a.payMode,
+    daily_budget_usdc: fromMicro(a.dailyBudgetMicro),
     owner_id: a.ownerId,
   });
 });
@@ -85,6 +87,8 @@ app.get('/', async (c) => {
       tool_count: Array.isArray(a.allowedTools) ? a.allowedTools.length : 0,
       primary_color: a.primaryColor,
       public: a.public,
+      pay_mode: a.payMode,
+      daily_budget_usdc: fromMicro(a.dailyBudgetMicro),
       budget_per_session_usdc: fromMicro(a.budgetPerSession),
       hard_cap_usdc: fromMicro(a.hardCap),
       created_at: a.createdAt,
@@ -115,6 +119,8 @@ app.get('/:id', async (c) => {
     quick_prompts: a.quickPrompts,
     budget_per_session_usdc: fromMicro(a.budgetPerSession),
     hard_cap_usdc: fromMicro(a.hardCap),
+    pay_mode: a.payMode,
+    daily_budget_usdc: fromMicro(a.dailyBudgetMicro),
     public: a.public,
     template: a.template,
     created_at: a.createdAt,
@@ -159,6 +165,8 @@ app.post('/', async (c) => {
     quickPrompts: body.quick_prompts ?? seed.quickPrompts ?? null,
     budgetPerSession: body.budget_per_session_usdc != null ? toMicro(String(body.budget_per_session_usdc)) : 500_000n,
     hardCap: body.hard_cap_usdc != null ? toMicro(String(body.hard_cap_usdc)) : 2_000_000n,
+    payMode: body.pay_mode === 'owner' ? 'owner' : 'visitor',
+    dailyBudgetMicro: body.daily_budget_usdc != null ? toMicro(String(body.daily_budget_usdc)) : 5_000_000n,
     public: body.public !== false,
     template: seed.template ?? body.template ?? null,
   };
@@ -202,6 +210,8 @@ app.patch('/:id', async (c) => {
   if (Array.isArray(body.quick_prompts)) update.quickPrompts = body.quick_prompts;
   if (body.budget_per_session_usdc != null) update.budgetPerSession = toMicro(String(body.budget_per_session_usdc));
   if (body.hard_cap_usdc != null) update.hardCap = toMicro(String(body.hard_cap_usdc));
+  if (body.pay_mode === 'visitor' || body.pay_mode === 'owner') update.payMode = body.pay_mode;
+  if (body.daily_budget_usdc != null) update.dailyBudgetMicro = toMicro(String(body.daily_budget_usdc));
   if (typeof body.public === 'boolean') update.public = body.public;
 
   await db.update(agents).set(update).where(eq(agents.id, id));

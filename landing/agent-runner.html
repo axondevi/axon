@@ -15,6 +15,16 @@
       :root { --agent-color: #7c5cff; }
       body { background: var(--bg); }
       .agent-page { min-height: 100vh; display: flex; flex-direction: column; }
+
+      /* Embed mode: tighter chrome, "powered by" footer, body fills viewport */
+      body.embed-mode { background: var(--bg-card); }
+      body.embed-mode .agent-page { min-height: 100vh; }
+      body.embed-mode .agent-header { padding: 12px 14px; }
+      body.embed-mode .agent-avatar { width: 32px; height: 32px; font-size: 14px; }
+      body.embed-mode .agent-title h1 { font-size: 14px; }
+      body.embed-mode .agent-title p { font-size: 11px; }
+      body.embed-mode .agent-body { padding: 14px 12px 8px; }
+      body.embed-mode .agent-footer { padding: 4px 12px 6px; font-size: 10px; }
       .agent-header {
         padding: 18px 24px;
         background: var(--bg-card); border-bottom: 1px solid var(--border);
@@ -166,9 +176,12 @@
 
       // Slug can come from path (/agent/foo) OR query string (?slug=foo).
       // CF Pages _redirects rewrites /agent/:slug → /agent-runner?slug=:slug.
-      const _qsSlug = new URLSearchParams(location.search).get('slug');
+      const _qs = new URLSearchParams(location.search);
+      const _qsSlug = _qs.get('slug');
       const _pathMatch = location.pathname.match(/\/agent\/([^/?#]+)/);
       const slug = _qsSlug || (_pathMatch && _pathMatch[1]);
+      // ?embed=1 → tighter chrome for floating-widget hosts
+      if (_qs.get('embed') === '1') document.body.classList.add('embed-mode');
       if (!slug) {
         document.getElementById('page').innerHTML = '<div class="err-panel"><h2>No agent specified</h2><p>The URL should look like <code>/agent/your-agent-slug</code>.</p></div>';
         throw new Error('no slug');
@@ -252,6 +265,11 @@
         }
         const color = agentConfig.primary_color || '#7c5cff';
         document.documentElement.style.setProperty('--agent-color', color);
+        // Owner-paid agents skip the auth prompt — every call charges the owner's wallet.
+        if (agentConfig.pay_mode === 'owner') {
+          renderChatShell();
+          return;
+        }
         if (!getApiKey()) { renderAuthPrompt(); return; }
         renderChatShell();
       }
@@ -361,9 +379,15 @@
             };
             if (tools.length) { body.tools = tools; body.tool_choice = 'auto'; }
 
-            const res = await fetch(`${BASE}/v1/call/groq/chat`, {
+            const isOwnerPaid = agentConfig.pay_mode === 'owner';
+            const llmUrl = isOwnerPaid
+              ? `${BASE}/v1/run/${slug}/groq/chat`
+              : `${BASE}/v1/call/groq/chat`;
+            const llmHeaders = { 'Content-Type': 'application/json' };
+            if (!isOwnerPaid) llmHeaders['Authorization'] = 'Bearer ' + getApiKey();
+            const res = await fetch(llmUrl, {
               method: 'POST',
-              headers: { 'Authorization': 'Bearer ' + getApiKey(), 'Content-Type': 'application/json' },
+              headers: llmHeaders,
               body: JSON.stringify(body),
             });
             const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
@@ -460,9 +484,21 @@
         }
         const x = def.axon;
         const params = x.map(args);
-        let url = `${BASE}/v1/call/${x.api}/${x.endpoint}`;
-        const init = { method: x.method, headers: { 'Authorization': 'Bearer ' + getApiKey() } };
-        if (x.paramStyle === 'query') {
+        const isOwnerPaid = agentConfig.pay_mode === 'owner';
+        let url = isOwnerPaid
+          ? `${BASE}/v1/run/${slug}/${x.api}/${x.endpoint}`
+          : `${BASE}/v1/call/${x.api}/${x.endpoint}`;
+        const init = { method: isOwnerPaid ? 'POST' : x.method, headers: {} };
+        if (!isOwnerPaid) init.headers['Authorization'] = 'Bearer ' + getApiKey();
+        if (isOwnerPaid && x.paramStyle === 'query') {
+          // /v1/run/:slug/:api/:endpoint is POST-only; encode query params into body
+          init.headers['content-type'] = 'application/json';
+          init.body = JSON.stringify(params);
+          // Also attach query for the engine to read via c.req.url
+          const qs = new URLSearchParams();
+          for (const [k, v] of Object.entries(params)) if (v != null) qs.set(k, String(v));
+          url += '?' + qs.toString();
+        } else if (x.paramStyle === 'query') {
           const qs = new URLSearchParams();
           for (const [k, v] of Object.entries(params)) if (v != null) qs.set(k, String(v));
           url += '?' + qs.toString();
