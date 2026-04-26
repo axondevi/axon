@@ -6,7 +6,9 @@
 #
 # Rules are processed in order; first match wins.
 
-# /agent/:slug → loads agent.html which reads slug from window.location
-/agent/*  /agent.html  200
+# /agent/:slug → loads agent-runner.html which reads slug from window.location
+# (file is named *-runner because CF Pages auto-strips .html and serves
+# /agent.html at /agent, which would otherwise eat the /agent/* prefix)
+/agent/*  /agent-runner.html  200
 
 /*    /404.html    404
