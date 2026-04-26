@@ -146,6 +146,147 @@ app.post('/:slug/:api/:endpoint', async (c) => {
   return res;
 });
 
+// ─── High-level chat endpoint ───────────────────────────────────────
+// THE customer-facing API: one POST, server runs the full agent loop
+// (LLM → tool calls → tool results → LLM → final text), returns JSON.
+//
+// Mobile, backend services, n8n, Zapier, anything that speaks HTTP can
+// call this. No SDK required.
+//
+// POST /v1/run/:slug/chat
+//   { "message": "Qual o frete pra meu CEP 01310-100?" }
+//   OR
+//   { "messages": [{"role":"user","content":"..."}, ...] }
+//
+//   →  { "content": "<assistant reply>",
+//        "tool_calls_executed": [...],
+//        "iterations": N,
+//        "finish_reason": "stop",
+//        "total_cost_usdc": "0.001234" }
+import { runAgent, type ChatMessage } from '~/agents/runtime';
+
+app.post('/:slug/chat', async (c) => {
+  const slug = c.req.param('slug');
+  const body = await c.req.json().catch(() => ({} as any));
+
+  const [agent] = await db.select().from(agents).where(eq(agents.slug, slug)).limit(1);
+  if (!agent || !agent.public) throw Errors.notFound('Agent');
+  if (agent.payMode !== 'owner') {
+    return c.json(
+      { error: 'wrong_pay_mode', message: 'High-level /chat API requires pay_mode=owner. For visitor-paid agents, use the /v1/call/* path with your own API key.' },
+      403,
+    );
+  }
+
+  // Build messages from input — accept either { message } shorthand or full { messages }
+  let messages: ChatMessage[] = [];
+  if (Array.isArray(body.messages)) {
+    messages = body.messages.filter((m: any) =>
+      m && typeof m === 'object' && (m.role === 'user' || m.role === 'assistant')
+    );
+  } else if (typeof body.message === 'string') {
+    messages = [{ role: 'user', content: body.message }];
+  }
+  if (messages.length === 0) {
+    return c.json({ error: 'bad_request', message: "Provide 'message' (string) or 'messages' (array)." }, 400);
+  }
+
+  // Per-IP rate limit (cheap abuse mitigation)
+  const ip = clientIp(c);
+  const rlKey = `agentrun:${slug}:${ip}:${Math.floor(Date.now() / 1000 / VISITOR_WINDOW_SEC)}`;
+  const count = await redis.incr(rlKey);
+  if (count === 1) await redis.expire(rlKey, VISITOR_WINDOW_SEC + 5);
+  if (count > VISITOR_RATE_LIMIT_PER_MIN) {
+    return c.json({ error: 'rate_limited', message: `Too many requests. Try again in ${VISITOR_WINDOW_SEC}s.` }, 429);
+  }
+
+  // Daily budget check (UTC)
+  const dayKey = `agentbudget:${agent.id}:${utcDayKey()}`;
+  const spentRaw = await redis.get(dayKey);
+  const spent = BigInt(spentRaw ?? '0');
+  if (spent >= agent.dailyBudgetMicro) {
+    return c.json(
+      {
+        error: 'agent_budget_exhausted',
+        message: 'This agent has reached its daily spending cap. Please try again tomorrow.',
+        meta: { reset_at: 'utc_midnight' },
+      },
+      402,
+    );
+  }
+
+  // Load owner row, set on context for the engine to charge
+  const [owner] = await db.select().from(users).where(eq(users.id, agent.ownerId)).limit(1);
+  if (!owner) throw Errors.notFound('Agent owner');
+  c.set('user', owner);
+  c.set('axon:agent_id', agent.id);
+
+  // Pick variant (deterministic per IP+UA so retries are stable)
+  let systemPrompt = agent.systemPrompt;
+  let variant: 'A' | 'B' = 'A';
+  if (agent.systemPromptB && agent.abSplit > 0) {
+    const seed = (ip + (c.req.header('user-agent') || '') + agent.id);
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+    const bucket = Math.abs(hash) % 100;
+    if (bucket < agent.abSplit) {
+      variant = 'B';
+      systemPrompt = agent.systemPromptB;
+    }
+  }
+  c.header('x-axon-agent-variant', variant);
+  c.header('x-axon-agent-slug', slug);
+
+  // Run the agent loop
+  let result;
+  try {
+    result = await runAgent({
+      c,
+      systemPrompt,
+      allowedTools: Array.isArray(agent.allowedTools) ? (agent.allowedTools as string[]) : [],
+      messages,
+      ownerId: agent.ownerId,
+    });
+  } catch (err: any) {
+    return c.json({ error: 'agent_error', message: err.message || String(err) }, 500);
+  }
+
+  // Bump daily budget counter from the cost the loop accumulated
+  const costMicro = BigInt(Math.round(parseFloat(result.total_cost_usdc) * 1_000_000));
+  if (costMicro > 0n) {
+    await redis.incrby(dayKey, costMicro.toString());
+    await redis.expire(dayKey, 36 * 60 * 60);
+  }
+
+  // Persist the user msg + final assistant msg for owner audit
+  const sessionId = clientIp(c).split('.').slice(0, 3).join('.') + '.0';
+  const userMsg = messages[messages.length - 1];
+  if (userMsg?.content) {
+    db.insert(agentMessages).values({
+      agentId: agent.id, sessionId, role: 'user',
+      content: String(userMsg.content).slice(0, 4000),
+      variant, visitorIp: sessionId,
+    }).catch(() => {});
+  }
+  if (result.content) {
+    db.insert(agentMessages).values({
+      agentId: agent.id, sessionId, role: 'assistant',
+      content: result.content.slice(0, 4000),
+      variant, visitorIp: sessionId,
+    }).catch(() => {});
+  }
+
+  return c.json({
+    content: result.content,
+    tool_calls_executed: result.tool_calls_executed,
+    iterations: result.iterations,
+    finish_reason: result.finish_reason,
+    total_cost_usdc: result.total_cost_usdc,
+    variant,
+    agent_slug: slug,
+  });
+});
+
 // ─── Conversation log endpoint ─────────────────────────────────────
 // Runner POSTs each user message and final assistant response here so the
 // owner can audit what visitors are asking. We truncate content to keep

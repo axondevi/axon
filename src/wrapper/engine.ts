@@ -33,7 +33,14 @@ interface CallContext {
 
 export async function handleCall(
   c: Context,
-  opts?: { slug?: string; endpoint?: string },
+  opts?: {
+    slug?: string;
+    endpoint?: string;
+    /** Override URL params (e.g. when called programmatically by an agent loop) */
+    paramsOverride?: Record<string, unknown>;
+    /** Override JSON body — bypasses c.req.json() entirely */
+    bodyOverride?: unknown;
+  },
 ) {
   const slug = opts?.slug ?? c.req.param('slug')!;
   const endpointKey = opts?.endpoint ?? c.req.param('endpoint')!;
@@ -56,12 +63,16 @@ export async function handleCall(
   const discount = TIER_MARKUP_DISCOUNT_PCT[tier] ?? 0;
   const effectiveMarkupPct = Math.max(0, Math.round(endpoint.markup_pct * (100 - discount) / 100));
 
-  const url = new URL(c.req.url);
-  const params: Record<string, unknown> = {};
-  url.searchParams.forEach((v, k) => (params[k] = v));
+  let params: Record<string, unknown> = {};
+  if (opts?.paramsOverride) {
+    params = { ...opts.paramsOverride };
+  } else {
+    const url = new URL(c.req.url);
+    url.searchParams.forEach((v, k) => (params[k] = v));
+  }
 
-  let body: unknown;
-  if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+  let body: unknown = opts?.bodyOverride;
+  if (body === undefined && ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
     try {
       body = await c.req.json();
     } catch {

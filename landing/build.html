@@ -663,37 +663,96 @@
       };
 
       window.showEmbed = function(slug, color) {
-        const snippet =
+        const apiBase = (localStorage.getItem('axon.baseUrl') || 'https://axon-kedb.onrender.com');
+        const apiUrl = apiBase + '/v1/run/' + slug + '/chat';
+        const directUrl = location.origin + '/agent/' + slug;
+        const widgetSnippet =
           '<script async src="' + location.origin + '/embed.js"\n' +
           '        data-agent="' + slug + '"\n' +
           '        data-color="' + color + '"\n' +
           '        data-position="bottom-right"></' + 'script>';
-        const directUrl = location.origin + '/agent/' + slug;
-        const html =
-          '<div style="background: var(--bg); padding: 24px; border-radius: 12px; max-width: 640px;">' +
-            '<h3 style="margin:0 0 12px;font-size:18px;">Share this agent</h3>' +
-            '<p style="color:var(--text-muted);font-size:13px;margin:0 0 20px;line-height:1.5;">' +
-              'Two ways: link visitors directly to the URL, or paste the embed snippet anywhere on a website to add a floating chat button.' +
-            '</p>' +
-            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:0 0 6px;">Direct URL</div>' +
+        const curl =
+          'curl -X POST ' + apiUrl + ' \\\n' +
+          "  -H 'Content-Type: application/json' \\\n" +
+          "  -d '{\"message\":\"Olá, qual o frete pra meu CEP 01310-100?\"}'";
+        const js =
+          "const res = await fetch('" + apiUrl + "', {\n" +
+          "  method: 'POST',\n" +
+          "  headers: { 'Content-Type': 'application/json' },\n" +
+          "  body: JSON.stringify({ message: 'Olá!' })\n" +
+          "});\n" +
+          "const { content } = await res.json();\n" +
+          "console.log(content);";
+        const swift =
+          "let url = URL(string: \"" + apiUrl + "\")!\n" +
+          "var req = URLRequest(url: url)\n" +
+          "req.httpMethod = \"POST\"\n" +
+          "req.setValue(\"application/json\", forHTTPHeaderField: \"Content-Type\")\n" +
+          "req.httpBody = try JSONEncoder().encode([\"message\": \"Olá!\"])\n" +
+          "let (data, _) = try await URLSession.shared.data(for: req)\n" +
+          "let json = try JSONDecoder().decode([String:String].self, from: data)\n" +
+          "print(json[\"content\"] ?? \"\")";
+        const tabs = [
+          { id: 'curl', label: 'curl', body: curl },
+          { id: 'js',   label: 'JavaScript', body: js },
+          { id: 'swift',label: 'iOS / Swift', body: swift },
+          { id: 'wid',  label: 'Web widget', body: widgetSnippet.replace(/</g,'&lt;') },
+        ];
+        let html =
+          '<div style="background:var(--bg);padding:28px;border-radius:14px;max-width:760px;width:100%;max-height:88vh;overflow-y:auto;">' +
+            '<h3 style="margin:0 0 6px;font-size:20px;">' + escape(slug) + ' — share & integrate</h3>' +
+            '<p style="color:var(--text-muted);font-size:13px;margin:0 0 22px;">This agent runs as a real HTTP API. Mobile, backend, n8n — anywhere that speaks HTTP.</p>' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:0 0 6px;">Direct URL (chat in browser)</div>' +
+            '<div style="display:flex;gap:6px;margin:0 0 22px;">' +
+              '<input id="ui-direct" readonly style="flex:1;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:5px;font-family:JetBrains Mono,monospace;font-size:12px;" value="' + directUrl + '" />' +
+              '<button onclick="copyVal(\'ui-direct\',this)" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy</button>' +
+            '</div>' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:0 0 6px;">API endpoint</div>' +
             '<div style="display:flex;gap:6px;margin:0 0 18px;">' +
-              '<input id="embed-direct" readonly style="flex:1;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:5px;font-family:JetBrains Mono,monospace;font-size:12px;" value="' + directUrl + '" />' +
-              '<button onclick="copyVal(\'embed-direct\',this)" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy</button>' +
+              '<input id="ui-api" readonly style="flex:1;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:5px;font-family:JetBrains Mono,monospace;font-size:12px;" value="POST ' + apiUrl + '" />' +
+              '<button onclick="copyVal(\'ui-api\',this)" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy</button>' +
             '</div>' +
-            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin:0 0 6px;">Embed snippet</div>' +
-            '<div style="display:flex;gap:6px;align-items:flex-start;">' +
-              '<textarea id="embed-snippet" readonly style="flex:1;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:5px;font-family:JetBrains Mono,monospace;font-size:11px;line-height:1.5;height:80px;resize:none;">' + snippet.replace(/</g,'&lt;') + '</textarea>' +
-              '<button onclick="copyVal(\'embed-snippet\',this)" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy</button>' +
-            '</div>' +
-            '<p style="color:var(--text-muted);font-size:12px;margin:14px 0 0;">' +
-              '<strong style="color:var(--text);">Tip:</strong> for embed widgets on a customer-facing site, set <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">pay_mode = owner</code> in the agent so visitors don\'t need their own API key.' +
-            '</p>' +
+            '<div id="tab-bar" style="display:flex;gap:4px;border-bottom:1px solid var(--border);padding:0 0 8px;margin-bottom:10px;">' +
+              tabs.map((t,i) => `<button class="ti-tab" data-id="${t.id}" style="background:${i===0?'var(--bg-elev)':'transparent'};border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:5px;font-size:12px;cursor:pointer;">${t.label}</button>`).join('') +
+            '</div>';
+        for (const t of tabs) {
+          html += '<pre id="tab-' + t.id + '" class="ti-content" style="display:' + (t.id === 'curl' ? 'block' : 'none') + ';background:var(--bg-elev);border:1px solid var(--border);border-radius:5px;padding:14px 16px;font-family:JetBrains Mono,monospace;font-size:12px;color:var(--text);overflow-x:auto;line-height:1.5;margin:0 0 12px;">' + t.body + '</pre>';
+        }
+        html +=
+          '<div style="display:flex;gap:8px;margin:0 0 16px;">' +
+            '<button id="ti-copy" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy snippet</button>' +
+          '</div>' +
+          '<p style="color:var(--text-muted);font-size:12px;margin:14px 0 0;line-height:1.5;">' +
+            '<strong style="color:var(--text);">Note:</strong> this API requires the agent to be in <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">pay_mode=owner</code>. You pay for every call from your wallet, daily budget cap protects against runaway. For visitor-paid agents, customers must use their own Axon API key via <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">/v1/call/*</code>.' +
+          '</p>' +
           '</div>';
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;';
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
         wrap.innerHTML = html;
         wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
         document.body.appendChild(wrap);
+
+        // Tab switching
+        let activeId = 'curl';
+        wrap.querySelectorAll('.ti-tab').forEach((b) => {
+          b.addEventListener('click', () => {
+            activeId = b.dataset.id;
+            wrap.querySelectorAll('.ti-tab').forEach((x) => x.style.background = 'transparent');
+            b.style.background = 'var(--bg-elev)';
+            wrap.querySelectorAll('.ti-content').forEach((x) => x.style.display = 'none');
+            const target = wrap.querySelector('#tab-' + activeId);
+            if (target) target.style.display = 'block';
+          });
+        });
+        wrap.querySelector('#ti-copy').addEventListener('click', (e) => {
+          const target = wrap.querySelector('#tab-' + activeId);
+          if (target) {
+            navigator.clipboard.writeText(target.textContent).then(() => {
+              const o = e.target.textContent; e.target.textContent = 'Copied!';
+              setTimeout(() => e.target.textContent = o, 1200);
+            });
+          }
+        });
       };
 
       window.showAnalytics = async function(agentId, name, color) {
