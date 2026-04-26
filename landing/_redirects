@@ -6,4 +6,7 @@
 #
 # Rules are processed in order; first match wins.
 
+# /agent/:slug → loads agent.html which reads slug from window.location
+/agent/*  /agent.html  200
+
 /*    /404.html    404

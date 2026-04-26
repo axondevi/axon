@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent · Axon</title>
+    <meta name="description" content="Custom AI agent powered by Axon." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js" defer></script>
+    <style>
+      :root { --agent-color: #7c5cff; }
+      body { background: var(--bg); }
+      .agent-page { min-height: 100vh; display: flex; flex-direction: column; }
+      .agent-header {
+        padding: 18px 24px;
+        background: var(--bg-card); border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; gap: 14px;
+      }
+      .agent-avatar {
+        width: 38px; height: 38px; border-radius: 50%;
+        background: var(--agent-color);
+        flex: 0 0 auto;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px; font-weight: 800; color: #0a0a0b;
+      }
+      .agent-title h1 { font-size: 16px; font-weight: 700; margin: 0; }
+      .agent-title p { font-size: 12px; color: var(--text-muted); margin: 1px 0 0; }
+      .agent-header .powered { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+      .agent-header .powered a { color: var(--text-dim); text-decoration: none; }
+
+      .agent-body {
+        flex: 1; max-width: 880px; width: 100%; margin: 0 auto;
+        padding: 24px 16px 16px;
+        display: flex; flex-direction: column;
+        min-height: 0;
+      }
+      .agent-msgs {
+        flex: 1; overflow-y: auto;
+        display: flex; flex-direction: column; gap: 14px;
+        padding: 4px 4px 14px;
+      }
+      .agent-welcome {
+        background: var(--bg-elev); border-left: 3px solid var(--agent-color);
+        padding: 14px 16px; border-radius: 8px;
+        font-size: 14px; line-height: 1.5;
+      }
+      .msg { display: flex; flex-direction: column; gap: 4px; }
+      .msg-role {
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--text-muted);
+      }
+      .msg-user { align-items: flex-end; }
+      .msg-user .msg-content {
+        background: var(--agent-color); color: #0a0a0b;
+        padding: 10px 14px; border-radius: 14px 14px 4px 14px;
+        max-width: 78%;
+      }
+      .msg-assistant .msg-content {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        padding: 12px 16px; border-radius: 14px 14px 14px 4px;
+        max-width: 88%;
+      }
+      .msg-content.md p { margin: 0 0 8px; }
+      .msg-content.md p:last-child { margin: 0; }
+      .msg-content.md ul, .msg-content.md ol { padding-left: 22px; margin: 0 0 8px; }
+      .msg-content.md code {
+        background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px;
+        font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      }
+      .msg-content.md pre { background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+      .msg-content.md pre code { background: transparent; padding: 0; }
+      .msg-content.md table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+      .msg-content.md th, .msg-content.md td { padding: 5px 10px; border: 1px solid var(--border); }
+      .msg-content.md a { color: var(--agent-color); }
+      .msg-content.md img { max-width: 100%; border-radius: 6px; }
+
+      .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+      .typing span {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--text-muted); animation: typ 1.2s infinite ease-in-out;
+      }
+      .typing span:nth-child(2) { animation-delay: 0.15s; }
+      .typing span:nth-child(3) { animation-delay: 0.30s; }
+      @keyframes typ { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
+      .quick-chips {
+        display: flex; flex-wrap: wrap; gap: 6px;
+        padding: 8px 4px 12px;
+        border-top: 1px solid var(--border);
+        margin-top: 6px;
+      }
+      .qchip {
+        background: transparent; border: 1px solid var(--border);
+        color: var(--text-dim); padding: 6px 12px; border-radius: 16px;
+        font-size: 12px; cursor: pointer; transition: all 100ms ease;
+      }
+      .qchip:hover { color: var(--text); border-color: var(--agent-color); }
+
+      .agent-input-bar {
+        display: flex; gap: 8px; align-items: flex-end;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 12px; padding: 10px;
+      }
+      .agent-input-bar:focus-within { border-color: var(--agent-color); }
+      .agent-input-bar textarea {
+        flex: 1; resize: none; background: transparent;
+        border: 0; outline: 0; color: var(--text);
+        font-family: inherit; font-size: 14px; line-height: 1.5;
+        max-height: 200px; padding: 6px;
+      }
+      .send-btn {
+        background: var(--agent-color); color: #0a0a0b;
+        border: 0; border-radius: 8px;
+        padding: 9px 18px; font-weight: 700; font-size: 13px;
+        cursor: pointer; flex: 0 0 auto;
+        transition: filter 100ms ease;
+      }
+      .send-btn:hover:not(:disabled) { filter: brightness(1.1); }
+      .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      .agent-footer {
+        padding: 8px 16px; text-align: center;
+        font-size: 11px; color: var(--text-muted);
+      }
+      .agent-footer .calls { color: var(--text-dim); }
+
+      .auth-prompt {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 12px; padding: 32px;
+        text-align: center;
+      }
+      .auth-prompt h2 { font-size: 20px; margin: 0 0 8px; }
+      .auth-prompt p { color: var(--text-muted); font-size: 13px; margin: 0 0 16px; line-height: 1.6; }
+      .auth-prompt input {
+        width: 100%; max-width: 400px; box-sizing: border-box;
+        background: var(--bg); border: 1px solid var(--border);
+        color: var(--text); border-radius: 6px; padding: 10px 14px;
+        font-size: 13px; font-family: 'JetBrains Mono', monospace;
+        margin: 0 0 12px;
+      }
+      .auth-prompt button {
+        background: var(--agent-color); color: #0a0a0b;
+        border: 0; padding: 10px 22px; border-radius: 6px;
+        font-weight: 700; font-size: 13px; cursor: pointer;
+      }
+      .auth-prompt .hint { font-size: 12px; color: var(--text-muted); }
+      .auth-prompt .hint a { color: var(--agent-color); }
+
+      .err-panel { padding: 32px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; text-align: center; }
+      .err-panel h2 { color: #f87171; margin: 0 0 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="agent-page" id="page">
+      <div style="padding: 60px 24px; text-align: center; color: var(--text-muted);">Loading agent…</div>
+    </div>
+
+    <script>
+      const STORAGE_KEY = 'axon.apiKey';
+      const BASE_KEY = 'axon.baseUrl';
+      const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+
+      const slug = (location.pathname.match(/\/agent\/([^/?#]+)/) || [])[1];
+      if (!slug) {
+        document.getElementById('page').innerHTML = '<div class="err-panel"><h2>No agent specified</h2><p>The URL should look like <code>/agent/your-agent-slug</code>.</p></div>';
+        throw new Error('no slug');
+      }
+
+      let agentConfig = null;
+      let session = null;
+
+      // ── Auth: agent runner needs a wallet to charge against ────────────
+      function getApiKey() { return localStorage.getItem(STORAGE_KEY); }
+      function setApiKey(k) { localStorage.setItem(STORAGE_KEY, k); }
+
+      function renderAuthPrompt() {
+        document.getElementById('page').innerHTML = `
+          <div class="agent-header">
+            <div class="agent-avatar" id="avatar">?</div>
+            <div class="agent-title">
+              <h1 id="t-name">Loading…</h1>
+              <p id="t-desc"></p>
+            </div>
+            <div class="powered"><a href="/" target="_blank">powered by axon</a></div>
+          </div>
+          <div class="agent-body">
+            <div class="auth-prompt">
+              <h2>Connect your Axon wallet</h2>
+              <p>This agent runs on the Axon API gateway. Paste your API key below to start chatting — each message debits a few cents from your wallet.</p>
+              <input type="password" id="key-in" placeholder="ax_live_..." autocomplete="off" />
+              <div><button onclick="onAuthSubmit()">Continue</button></div>
+              <p class="hint" style="margin-top:14px;">No account? <a href="/" target="_blank">Get a free wallet</a> (\$0.50 bonus included).</p>
+            </div>
+          </div>
+        `;
+        if (agentConfig) {
+          document.getElementById('avatar').textContent = (agentConfig.name || '?').slice(0,1).toUpperCase();
+          document.getElementById('t-name').textContent = agentConfig.name;
+          document.getElementById('t-desc').textContent = agentConfig.description || '';
+          document.documentElement.style.setProperty('--agent-color', agentConfig.primary_color || '#7c5cff');
+        }
+      }
+
+      window.onAuthSubmit = function() {
+        const v = document.getElementById('key-in').value.trim();
+        if (!v.startsWith('ax_')) { alert('Invalid API key format'); return; }
+        setApiKey(v);
+        boot();
+      };
+
+      // ── Tool catalog: same as the dashboard, must match server-side names ──
+      const TOOL_DEFS = {
+        lookup_cnpj:        { fn: { name: 'lookup_cnpj', description: 'Brazilian company by CNPJ', parameters: { type:'object', properties:{cnpj:{type:'string'}}, required:['cnpj'] } }, axon: { api:'brasilapi', endpoint:'cnpj', method:'GET', paramStyle:'query', map:(a)=>({cnpj:String(a.cnpj).replace(/\D/g,'')}) } },
+        lookup_cep:         { fn: { name: 'lookup_cep', description: 'Brazilian postal code', parameters: { type:'object', properties:{cep:{type:'string'}}, required:['cep'] } }, axon: { api:'brasilapi', endpoint:'cep', method:'GET', paramStyle:'query', map:(a)=>({cep:String(a.cep).replace(/\D/g,'')}) } },
+        current_weather:    { fn: { name: 'current_weather', description: 'Current weather (Kelvin)', parameters: { type:'object', properties:{q:{type:'string'}}, required:['q'] } }, axon: { api:'openweather', endpoint:'current', method:'GET', paramStyle:'query', map:(a)=>({q:a.q}) } },
+        weather_forecast:   { fn: { name: 'weather_forecast', description: 'Multi-day forecast', parameters: { type:'object', properties:{latitude:{type:'number'},longitude:{type:'number'},forecast_days:{type:'integer'}}, required:['latitude','longitude'] } }, axon: { api:'open-meteo', endpoint:'forecast', method:'GET', paramStyle:'query', map:(a)=>({latitude:a.latitude,longitude:a.longitude,current:'temperature_2m,weather_code',daily:'temperature_2m_max,temperature_2m_min,precipitation_sum',forecast_days:a.forecast_days||3,timezone:'auto'}) } },
+        lookup_ip:          { fn: { name: 'lookup_ip', description: 'IP geolocation', parameters: { type:'object', properties:{ip:{type:'string'}}, required:['ip'] } }, axon: { api:'ipinfo', endpoint:'lookup', method:'GET', paramStyle:'query', map:(a)=>({ip:a.ip}) } },
+        lookup_country:     { fn: { name: 'lookup_country', description: 'Country data', parameters: { type:'object', properties:{name:{type:'string'}}, required:['name'] } }, axon: { api:'rest-countries', endpoint:'by-name', method:'GET', paramStyle:'query', map:(a)=>({name:a.name,fields:'name,capital,population,currencies,languages,region,flag'}) } },
+        brasilapi_holidays: { fn: { name: 'brasilapi_holidays', description: 'BR holidays', parameters: { type:'object', properties:{year:{type:'integer'}}, required:['year'] } }, axon: { api:'brasilapi', endpoint:'holidays', method:'GET', paramStyle:'query', map:(a)=>({ano:String(a.year)}) } },
+        brasilapi_rates:    { fn: { name: 'brasilapi_rates', description: 'Selic/CDI/IPCA', parameters: { type:'object', properties:{} } }, axon: { api:'brasilapi', endpoint:'rates', method:'GET', paramStyle:'query', map:()=>({}) } },
+        brasilapi_ddd:      { fn: { name: 'brasilapi_ddd', description: 'BR area code', parameters: { type:'object', properties:{ddd:{type:'string'}}, required:['ddd'] } }, axon: { api:'brasilapi', endpoint:'ddd', method:'GET', paramStyle:'query', map:(a)=>({ddd:String(a.ddd).replace(/\D/g,'')}) } },
+        convert_currency:   { fn: { name: 'convert_currency', description: 'FX conversion', parameters: { type:'object', properties:{amount:{type:'number'},from:{type:'string'},to:{type:'string'}}, required:['amount','from','to'] } }, axon: { api:'frankfurter', endpoint:'latest', method:'GET', paramStyle:'query', map:(a)=>({amount:a.amount,base:String(a.from).toUpperCase(),symbols:String(a.to).toUpperCase()}) } },
+        crypto_price:       { fn: { name: 'crypto_price', description: 'Crypto prices', parameters: { type:'object', properties:{ids:{type:'string'},vs_currencies:{type:'string'}}, required:['ids'] } }, axon: { api:'coingecko', endpoint:'simple-price', method:'GET', paramStyle:'query', map:(a)=>({ids:String(a.ids).toLowerCase(),vs_currencies:String(a.vs_currencies||'usd,brl').toLowerCase(),include_24hr_change:'true'}) } },
+        search_web:         { fn: { name: 'search_web', description: 'Tavily web search', parameters: { type:'object', properties:{query:{type:'string'},max_results:{type:'integer'}}, required:['query'] } }, axon: { api:'tavily', endpoint:'search', method:'POST', paramStyle:'body', map:(a)=>({query:a.query,max_results:a.max_results||3,search_depth:'basic'}) } },
+        exa_search:         { fn: { name: 'exa_search', description: 'Exa neural search', parameters: { type:'object', properties:{query:{type:'string'},num_results:{type:'integer'}}, required:['query'] } }, axon: { api:'exa', endpoint:'search', method:'POST', paramStyle:'body', map:(a)=>({query:a.query,numResults:a.num_results||5,type:'auto'}) } },
+        scrape_url:         { fn: { name: 'scrape_url', description: 'Firecrawl URL→markdown', parameters: { type:'object', properties:{url:{type:'string'}}, required:['url'] } }, axon: { api:'firecrawl', endpoint:'scrape', method:'POST', paramStyle:'body', map:(a)=>({url:a.url,formats:['markdown'],onlyMainContent:true}) } },
+        search_hn:          { fn: { name: 'search_hn', description: 'Hacker News search', parameters: { type:'object', properties:{query:{type:'string'},hitsPerPage:{type:'integer'}}, required:['query'] } }, axon: { api:'hackernews', endpoint:'search', method:'GET', paramStyle:'query', map:(a)=>({query:a.query,tags:'story',hitsPerPage:a.hitsPerPage||5}) } },
+        wikipedia_summary:  { fn: { name: 'wikipedia_summary', description: 'Wikipedia summary', parameters: { type:'object', properties:{title:{type:'string'}}, required:['title'] } }, axon: { api:'wikipedia', endpoint:'summary', method:'GET', paramStyle:'query', map:(a)=>({title:String(a.title).replace(/ /g,'_')}) } },
+        wikipedia_search:   { fn: { name: 'wikipedia_search', description: 'Search Wikipedia', parameters: { type:'object', properties:{query:{type:'string'},limit:{type:'integer'}}, required:['query'] } }, axon: { api:'wikipedia', endpoint:'search', method:'GET', paramStyle:'query', map:(a)=>({action:'query',list:'search',srsearch:a.query,srlimit:a.limit||5,format:'json',origin:'*'}) } },
+        embed_text:         { fn: { name: 'embed_text', description: '512-dim embedding', parameters: { type:'object', properties:{input:{type:'string'}}, required:['input'] } }, axon: { api:'voyage', endpoint:'embeddings', method:'POST', paramStyle:'body', map:(a)=>({input:a.input,model:'voyage-3-lite'}) } },
+        calculate:          { fn: { name: 'calculate', description: 'Math eval', parameters: { type:'object', properties:{expr:{type:'string'}}, required:['expr'] } }, local: (a) => { const e = String(a.expr).trim(); if (!/^[-+*/().,%\d\s eE]+$/.test(e)) throw new Error('bad expr'); const v = Function('"use strict"; return (' + e.replace(/,/g,'.') + ')')(); return { expression: a.expr, value: v }; } },
+        get_datetime:       { fn: { name: 'get_datetime', description: 'Current time in TZ', parameters: { type:'object', properties:{timezone:{type:'string'}} } }, local: (a) => { const tz = a.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; const now = new Date(); return { iso_utc: now.toISOString(), local: new Intl.DateTimeFormat('en-US',{timeZone:tz,dateStyle:'full',timeStyle:'long'}).format(now), timezone: tz, weekday: now.toLocaleDateString('en-US',{weekday:'long',timeZone:tz}) }; } },
+        // run_js + generate_image + search_arxiv: use simplified versions or skip in agent runner for now
+      };
+
+      // ── Boot ────────────────────────────────────────────────────────────
+      async function boot() {
+        try {
+          const cfg = await fetch(`${BASE}/v1/agents/by-slug/${slug}`).then(r => r.ok ? r.json() : Promise.reject(new Error('Agent not found')));
+          agentConfig = cfg;
+        } catch (e) {
+          document.getElementById('page').innerHTML = `<div class="err-panel"><h2>Agent not found</h2><p>The agent <code>${slug}</code> does not exist or is private.</p></div>`;
+          return;
+        }
+        const color = agentConfig.primary_color || '#7c5cff';
+        document.documentElement.style.setProperty('--agent-color', color);
+        if (!getApiKey()) { renderAuthPrompt(); return; }
+        renderChatShell();
+      }
+
+      function renderChatShell() {
+        const initials = (agentConfig.name || '?').slice(0,1).toUpperCase();
+        document.getElementById('page').innerHTML = `
+          <div class="agent-header">
+            <div class="agent-avatar">${initials}</div>
+            <div class="agent-title">
+              <h1>${escape(agentConfig.name)}</h1>
+              <p>${escape(agentConfig.description || '')}</p>
+            </div>
+            <div class="powered"><a href="/" target="_blank">powered by axon</a></div>
+          </div>
+          <div class="agent-body">
+            <div class="agent-msgs" id="msgs">
+              ${agentConfig.welcome_message ? `<div class="agent-welcome">${escape(agentConfig.welcome_message)}</div>` : ''}
+            </div>
+            ${agentConfig.quick_prompts && agentConfig.quick_prompts.length ? `
+              <div class="quick-chips" id="chips">
+                ${agentConfig.quick_prompts.map(p => `<button class="qchip">${escape(p)}</button>`).join('')}
+              </div>
+            ` : ''}
+            <div class="agent-input-bar">
+              <textarea id="input" rows="2" placeholder="Type your message…"></textarea>
+              <button class="send-btn" id="send">Send</button>
+            </div>
+          </div>
+          <div class="agent-footer">
+            <span class="calls" id="footer">0 calls · $0.0000 · cap $${agentConfig.budget_per_session_usdc} / $${agentConfig.hard_cap_usdc}</span>
+          </div>
+        `;
+
+        session = {
+          messages: [{ role: 'system', content: buildSystemPrompt(agentConfig) }],
+          spend: 0,
+          running: false,
+        };
+
+        document.getElementById('send').onclick = sendTurn;
+        document.getElementById('input').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendTurn(); }
+        });
+        if (document.getElementById('chips')) {
+          document.querySelectorAll('.qchip').forEach((b) => {
+            b.addEventListener('click', () => {
+              document.getElementById('input').value = b.textContent;
+              document.getElementById('input').focus();
+            });
+          });
+        }
+      }
+
+      function buildSystemPrompt(cfg) {
+        const tools = (cfg.allowed_tools || []).filter((t) => TOOL_DEFS[t]);
+        const toolList = tools.map((t) => `- ${t}: ${TOOL_DEFS[t].fn.description}`).join('\n');
+        return [
+          cfg.system_prompt,
+          '',
+          '## Language',
+          'Reply in the same language the user wrote in (PT/EN/ES/etc). Mirror their language for the entire turn — including headings and bullet labels.',
+          '',
+          tools.length ? '## Tools available' : '',
+          toolList,
+          '',
+          'Current date: ' + new Date().toISOString().slice(0,10) + '.',
+        ].filter(Boolean).join('\n');
+      }
+
+      function getEnabledTools() {
+        const allowed = (agentConfig.allowed_tools || []).filter((t) => TOOL_DEFS[t]);
+        return allowed.map((name) => ({ type: 'function', function: TOOL_DEFS[name].fn }));
+      }
+
+      async function sendTurn() {
+        if (session.running) return;
+        const inp = document.getElementById('input');
+        const text = inp.value.trim();
+        if (!text) return;
+        if (session.spend >= parseFloat(agentConfig.hard_cap_usdc)) {
+          alert('Hard cap of $' + agentConfig.hard_cap_usdc + ' reached for this session. Reload to start a new one.');
+          return;
+        }
+        if (session.spend >= parseFloat(agentConfig.budget_per_session_usdc)) {
+          if (!confirm(`Session has spent $${session.spend.toFixed(4)}. Continue?`)) return;
+        }
+        inp.value = '';
+
+        session.messages.push({ role: 'user', content: text });
+        session.running = true;
+        renderMessages(true);
+        document.getElementById('send').disabled = true;
+
+        try {
+          for (let i = 0; i < 10; i++) {
+            const placeholder = { role: 'assistant', content: '' };
+            session.messages.push(placeholder);
+
+            const tools = getEnabledTools();
+            const body = {
+              model: 'llama-3.3-70b-versatile',
+              messages: session.messages.slice(0, -1),
+              max_tokens: 4096,
+              temperature: 0.3,
+              stream: true,
+            };
+            if (tools.length) { body.tools = tools; body.tool_choice = 'auto'; }
+
+            const res = await fetch(`${BASE}/v1/call/groq/chat`, {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + getApiKey(), 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
+            session.spend += cost;
+            renderFooter();
+
+            if (!res.ok) {
+              const text = await res.text().catch(() => '');
+              let parsed = null; try { parsed = JSON.parse(text); } catch {}
+              const m = (parsed && (parsed.message || (parsed.error && parsed.error.message))) || `groq ${res.status}`;
+              throw new Error(m);
+            }
+
+            // Parse SSE
+            const reader = res.body.getReader();
+            const dec = new TextDecoder();
+            let buf = '';
+            const tcsByIdx = {};
+
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buf += dec.decode(value, { stream: true });
+              let nl;
+              while ((nl = buf.indexOf('\n\n')) !== -1) {
+                const ev = buf.slice(0, nl); buf = buf.slice(nl + 2);
+                for (const line of ev.split('\n')) {
+                  if (!line.startsWith('data:')) continue;
+                  const d = line.slice(5).trim();
+                  if (!d || d === '[DONE]') continue;
+                  let j; try { j = JSON.parse(d); } catch { continue; }
+                  const ch = j.choices && j.choices[0]; if (!ch) continue;
+                  const delta = ch.delta || {};
+                  if (typeof delta.content === 'string' && delta.content) placeholder.content += delta.content;
+                  if (Array.isArray(delta.tool_calls)) {
+                    for (const dtc of delta.tool_calls) {
+                      const idx = dtc.index; if (idx == null) continue;
+                      if (!tcsByIdx[idx]) tcsByIdx[idx] = { id: dtc.id || '', type:'function', function:{name:'',arguments:''} };
+                      const a = tcsByIdx[idx];
+                      if (dtc.id) a.id = dtc.id;
+                      if (dtc.function) {
+                        if (dtc.function.name) a.function.name = dtc.function.name;
+                        if (typeof dtc.function.arguments === 'string') a.function.arguments += dtc.function.arguments;
+                      }
+                    }
+                  }
+                }
+                renderMessages(true);
+              }
+            }
+            const idxs = Object.keys(tcsByIdx).map(Number).sort((a,b)=>a-b);
+            const finalTcs = idxs.map(k => tcsByIdx[k]);
+            if (finalTcs.length) placeholder.tool_calls = finalTcs;
+
+            if (!finalTcs.length) {
+              renderMessages(false);
+              break;
+            }
+
+            for (const tc of finalTcs) {
+              let args; try { args = JSON.parse(tc.function.arguments || '{}'); } catch { args = {}; }
+              try {
+                const out = await execTool(tc.function.name, args);
+                session.spend += out.cost || 0;
+                session.messages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: JSON.stringify(out.body).slice(0, 6000),
+                });
+              } catch (err) {
+                session.messages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: JSON.stringify({ error: err.message }),
+                });
+              }
+              renderFooter();
+            }
+          }
+        } catch (e) {
+          session.messages.push({ role: 'assistant', content: '(error: ' + e.message + ')' });
+        } finally {
+          session.running = false;
+          document.getElementById('send').disabled = false;
+          renderMessages(false);
+        }
+      }
+
+      async function execTool(name, args) {
+        const def = TOOL_DEFS[name];
+        if (!def) throw new Error('Unknown tool: ' + name);
+        if (def.local) {
+          return { body: def.local(args), cost: 0 };
+        }
+        const x = def.axon;
+        const params = x.map(args);
+        let url = `${BASE}/v1/call/${x.api}/${x.endpoint}`;
+        const init = { method: x.method, headers: { 'Authorization': 'Bearer ' + getApiKey() } };
+        if (x.paramStyle === 'query') {
+          const qs = new URLSearchParams();
+          for (const [k, v] of Object.entries(params)) if (v != null) qs.set(k, String(v));
+          url += '?' + qs.toString();
+        } else {
+          init.headers['content-type'] = 'application/json';
+          init.body = JSON.stringify(params);
+        }
+        const res = await fetch(url, init);
+        const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.message || (x.api + '/' + x.endpoint + ' ' + res.status));
+        }
+        const body = await res.json();
+        return { body, cost };
+      }
+
+      function renderMessages(streaming) {
+        const el = document.getElementById('msgs');
+        if (!el) return;
+        const visible = session.messages.filter((m) =>
+          (m.role === 'user' && m.content) ||
+          (m.role === 'assistant' && m.content && typeof m.content === 'string')
+        );
+        const welcome = agentConfig.welcome_message ? `<div class="agent-welcome">${escape(agentConfig.welcome_message)}</div>` : '';
+        let html = (visible.length === 0 ? welcome : '');
+        html += visible.map((m) => {
+          if (m.role === 'user') return `<div class="msg msg-user"><div class="msg-content">${escape(m.content)}</div></div>`;
+          return `<div class="msg msg-assistant"><div class="msg-role">agent</div><div class="msg-content md">${renderMd(m.content)}</div></div>`;
+        }).join('');
+        if (session.running && (streaming || true)) {
+          html += `<div class="msg msg-assistant"><div class="msg-role">agent</div><div class="msg-content"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
+        }
+        el.innerHTML = html;
+        el.scrollTop = el.scrollHeight;
+      }
+
+      function renderFooter() {
+        const f = document.getElementById('footer');
+        if (!f) return;
+        f.textContent = `\$${session.spend.toFixed(4)} · cap \$${agentConfig.budget_per_session_usdc} / \$${agentConfig.hard_cap_usdc}`;
+      }
+
+      function renderMd(text) {
+        if (typeof marked === 'undefined') return escape(text).replace(/\n/g, '<br>');
+        try { return marked.parse(text, { breaks: true }); } catch { return escape(text); }
+      }
+
+      function escape(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

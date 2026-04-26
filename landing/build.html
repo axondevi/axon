@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Build · Axon Agents</title>
+    <meta name="description" content="Construa agentes de IA customizados em minutos. Templates prontos pra e-commerce, jurídico, pesquisa, conteúdo, finanças." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .build-wrap { padding: 40px 0 100px; max-width: 1200px; }
+      .build-hero { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+      .build-hero h1 { font-size: 36px; letter-spacing: -0.02em; margin: 0 0 6px; }
+      .build-hero p { color: var(--text-dim); font-size: 15px; margin: 0; max-width: 560px; }
+      .build-hero .actions { display: flex; gap: 8px; }
+
+      .tab-bar {
+        display: inline-flex;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 8px; padding: 4px;
+        margin: 0 0 24px;
+      }
+      .tab-bar button {
+        background: transparent; border: 0; color: var(--text-muted);
+        padding: 8px 18px; border-radius: 5px;
+        cursor: pointer; font-size: 13px; font-weight: 600;
+        transition: all 120ms ease;
+      }
+      .tab-bar button.active { background: var(--bg-card); color: var(--text); }
+      .tab-bar button:hover:not(.active) { color: var(--text); }
+
+      .panel { display: none; }
+      .panel.active { display: block; }
+
+      /* ===== Templates grid ===== */
+      .tpl-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+      }
+      .tpl-card {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 12px; padding: 20px;
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+        position: relative; overflow: hidden;
+      }
+      .tpl-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: var(--tc, var(--accent));
+      }
+      .tpl-card:hover { transform: translateY(-2px); border-color: var(--tc, var(--accent)); box-shadow: 0 12px 32px rgba(0,0,0,0.2); }
+      .tpl-emoji { font-size: 28px; line-height: 1; margin-bottom: 10px; display: block; }
+      .tpl-card h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+      .tpl-card .tpl-cat {
+        display: inline-block; font-size: 10px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        color: var(--text-muted); margin-bottom: 10px;
+      }
+      .tpl-card .tpl-desc { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0 0 14px; min-height: 60px; }
+      .tpl-card .tpl-meta {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 12px; color: var(--text-muted);
+        padding-top: 12px; border-top: 1px solid var(--border);
+      }
+      .tpl-card .tpl-price { color: var(--text); font-weight: 700; }
+
+      /* ===== My agents list ===== */
+      .agent-list { display: flex; flex-direction: column; gap: 8px; }
+      .agent-row {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 10px; padding: 14px 18px;
+        display: grid;
+        grid-template-columns: auto 1fr auto auto;
+        gap: 14px; align-items: center;
+        transition: border-color 120ms ease;
+      }
+      .agent-row:hover { border-color: rgba(124,92,255,0.3); }
+      .agent-color-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: var(--accent);
+        flex: 0 0 auto;
+      }
+      .agent-row .ar-name { font-weight: 600; font-size: 14px; margin: 0; }
+      .agent-row .ar-slug { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+      .agent-row .ar-meta { color: var(--text-muted); font-size: 12px; }
+      .agent-row .ar-actions { display: flex; gap: 6px; }
+      .ar-btn {
+        background: transparent; border: 1px solid var(--border);
+        color: var(--text-dim); padding: 6px 10px; border-radius: 4px;
+        font-size: 11px; cursor: pointer; transition: all 100ms ease;
+      }
+      .ar-btn:hover { color: var(--text); border-color: var(--accent); }
+      .ar-btn.primary { background: var(--accent); color: #0a0a0b; border-color: var(--accent); }
+      .ar-btn.danger:hover { color: #f87171; border-color: #f87171; }
+
+      .empty-state {
+        background: var(--bg-elev); border: 1px dashed var(--border);
+        border-radius: 12px; padding: 48px 24px; text-align: center;
+      }
+      .empty-state h3 { font-size: 18px; margin: 0 0 8px; }
+      .empty-state p { color: var(--text-muted); font-size: 14px; margin: 0 0 20px; }
+
+      /* ===== Builder modal ===== */
+      .builder-overlay {
+        position: fixed; inset: 0;
+        background: rgba(8,8,12,0.85); backdrop-filter: blur(6px);
+        display: none; z-index: 1500;
+        padding: 24px;
+        overflow-y: auto;
+      }
+      .builder-overlay[data-open="1"] { display: flex; }
+      .builder-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 14px; padding: 0; width: 100%;
+        max-width: 1100px; margin: auto;
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        max-height: calc(100vh - 48px);
+        overflow: hidden;
+      }
+      @media (max-width: 900px) { .builder-card { grid-template-columns: 1fr; } }
+      .builder-form { padding: 24px 28px; overflow-y: auto; }
+      .builder-preview {
+        background: var(--bg); border-left: 1px solid var(--border);
+        padding: 24px; overflow-y: auto;
+      }
+      @media (max-width: 900px) { .builder-preview { border-left: 0; border-top: 1px solid var(--border); } }
+      .builder-form h2 { font-size: 22px; margin: 0 0 4px; }
+      .builder-form .sub { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; }
+      .builder-form .field { margin-bottom: 18px; }
+      .builder-form label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 6px; }
+      .builder-form input[type="text"],
+      .builder-form input[type="number"],
+      .builder-form textarea,
+      .builder-form select {
+        width: 100%; box-sizing: border-box;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        color: var(--text); border-radius: 6px;
+        padding: 9px 12px; font-size: 13px;
+        font-family: inherit;
+      }
+      .builder-form textarea { font-family: 'JetBrains Mono', monospace; font-size: 12px; min-height: 140px; resize: vertical; }
+      .builder-form input:focus, .builder-form textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+      .builder-form .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+      .builder-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .builder-form input[type="color"] { width: 100%; height: 36px; padding: 2px; border-radius: 6px; cursor: pointer; }
+
+      .tools-grid {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px;
+        max-height: 260px; overflow-y: auto;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 6px; padding: 10px;
+      }
+      .tools-grid label {
+        display: flex; align-items: center; gap: 6px; cursor: pointer;
+        padding: 4px 6px; border-radius: 4px;
+        font-size: 12px; text-transform: none; letter-spacing: 0;
+        color: var(--text-dim); margin: 0;
+      }
+      .tools-grid label:hover { background: rgba(124,92,255,0.06); color: var(--text); }
+      .tools-grid input[type="checkbox"] { accent-color: var(--accent); margin: 0; flex: 0 0 auto; }
+      .tools-grid .tool-cat {
+        grid-column: 1/-1; font-size: 10px; font-weight: 700;
+        text-transform: uppercase; color: var(--text-muted);
+        letter-spacing: 0.08em; padding: 6px 4px 2px;
+      }
+
+      .qp-list { display: flex; flex-direction: column; gap: 6px; }
+      .qp-item { display: flex; gap: 6px; }
+      .qp-item input { flex: 1; }
+      .qp-item button { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 0 10px; border-radius: 4px; cursor: pointer; }
+      .qp-item button:hover { color: #f87171; border-color: #f87171; }
+      #qp-add-btn { background: transparent; border: 1px dashed var(--border); color: var(--text-muted); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+      #qp-add-btn:hover { border-color: var(--accent); color: var(--text); }
+
+      .builder-footer {
+        grid-column: 1/-1;
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 8px; padding: 14px 28px;
+        border-top: 1px solid var(--border); background: var(--bg-elev);
+      }
+      .builder-footer button {
+        padding: 10px 20px; border-radius: 6px;
+        font-weight: 600; font-size: 13px; cursor: pointer;
+        background: transparent; color: var(--text); border: 1px solid var(--border);
+      }
+      .builder-footer button:hover { background: var(--bg-card); border-color: var(--accent); }
+      .builder-footer button.primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #0a0a0b; border-color: transparent;
+      }
+      .builder-footer button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+      .builder-footer .err { color: #f87171; font-size: 12px; margin: 0; }
+
+      /* ===== Preview pane ===== */
+      .preview-chip {
+        display: inline-block; padding: 3px 8px; border-radius: 4px;
+        background: var(--prev-color, var(--accent)); color: #0a0a0b;
+        font-size: 11px; font-weight: 700;
+        margin-bottom: 14px;
+      }
+      .preview-name { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+      .preview-desc { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 18px; }
+      .preview-msg {
+        background: var(--bg-elev); border-radius: 10px; padding: 12px 14px;
+        font-size: 13px; line-height: 1.5; margin: 0 0 14px;
+        border-left: 3px solid var(--prev-color, var(--accent));
+      }
+      .preview-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 18px 0 8px; }
+      .preview-tools { display: flex; flex-wrap: wrap; gap: 4px; }
+      .preview-tools span {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        padding: 3px 8px; border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        color: var(--text-dim);
+      }
+      .preview-prompts { display: flex; flex-direction: column; gap: 4px; }
+      .preview-prompts span { font-size: 12px; color: var(--text-dim); }
+      .preview-prompts span:before { content: '› '; color: var(--text-muted); }
+      .preview-link {
+        margin-top: 18px; padding: 10px 12px;
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 6px; font-family: 'JetBrains Mono', monospace;
+        font-size: 11px; color: var(--text-dim); word-break: break-all;
+      }
+
+      .toast-mini {
+        position: fixed; bottom: 24px; right: 24px;
+        background: rgba(20,20,28,0.96); border: 1px solid var(--border);
+        color: var(--text); padding: 12px 18px; border-radius: 6px;
+        font-size: 14px; opacity: 0; transition: opacity 200ms ease;
+        z-index: 2000; max-width: 380px;
+      }
+      .toast-mini.show { opacity: 1; }
+      .toast-mini.success { border-left: 3px solid #4ade80; }
+      .toast-mini.error { border-left: 3px solid #f87171; }
+
+      .login-banner {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 10px; padding: 24px;
+        text-align: center; margin: 24px 0;
+      }
+      .login-banner a { color: var(--accent-2); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <nav>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/build" aria-current="page">Build</a>
+          <a href="/upgrade">Plans</a>
+          <a href="/learn/">Docs</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container build-wrap">
+      <div class="build-hero">
+        <div>
+          <h1>Build your AI agent</h1>
+          <p>Pick a template, customize the prompt and tools, share the URL. Each call is paid from your Axon wallet — no extra hosting, no infra.</p>
+        </div>
+        <div class="actions">
+          <button class="ar-btn primary" id="new-blank">+ Blank agent</button>
+        </div>
+      </div>
+
+      <div class="login-banner" id="login-banner" style="display:none">
+        <p>You need to be signed in to build agents. <a href="/dashboard">Sign in</a> · or <a href="/#signup">create a free wallet</a> first.</p>
+      </div>
+
+      <div class="tab-bar">
+        <button class="active" data-tab="templates">Templates</button>
+        <button data-tab="mine">My agents (<span id="mine-count">0</span>)</button>
+      </div>
+
+      <div class="panel active" id="panel-templates">
+        <div class="tpl-grid" id="tpl-grid">Loading templates…</div>
+      </div>
+
+      <div class="panel" id="panel-mine">
+        <div class="agent-list" id="agent-list">Loading…</div>
+      </div>
+    </main>
+
+    <!-- Builder modal -->
+    <div class="builder-overlay" id="builder">
+      <div class="builder-card">
+        <div class="builder-form">
+          <h2 id="builder-title">Create agent</h2>
+          <p class="sub" id="builder-sub">Customize how your agent thinks and what it can do.</p>
+
+          <div class="row">
+            <div class="field">
+              <label for="b-name">Name</label>
+              <input type="text" id="b-name" placeholder="e.g. Loja XYZ Atendimento" />
+            </div>
+            <div class="field">
+              <label for="b-slug">Public URL slug</label>
+              <input type="text" id="b-slug" placeholder="loja-xyz" />
+              <div class="hint">Will be reachable at <code>/agent/<span id="slug-echo">slug</span></code></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="b-desc">Short description</label>
+            <input type="text" id="b-desc" maxlength="160" placeholder="One-liner shown to visitors" />
+          </div>
+
+          <div class="field">
+            <label for="b-prompt">System prompt</label>
+            <textarea id="b-prompt" placeholder="You are a helpful AI assistant. Use tools when relevant…"></textarea>
+            <div class="hint">Markdown supported. The prompt below "## Language" + tools list is appended automatically.</div>
+          </div>
+
+          <div class="field">
+            <label>Allowed tools</label>
+            <div class="tools-grid" id="tools-grid">Loading…</div>
+            <div class="hint">Pick the smallest set the agent needs — fewer tools = faster + cheaper + less likely to hallucinate calls.</div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label for="b-color">Primary color</label>
+              <input type="color" id="b-color" value="#7c5cff" />
+            </div>
+            <div class="field">
+              <label for="b-public">Visibility</label>
+              <select id="b-public">
+                <option value="true">Public — anyone with the URL can chat</option>
+                <option value="false">Private — only your account</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="b-welcome">Welcome message</label>
+            <input type="text" id="b-welcome" maxlength="200" placeholder="Shown above the chat input on first load" />
+          </div>
+
+          <div class="field">
+            <label>Quick prompts</label>
+            <div class="qp-list" id="qp-list"></div>
+            <button id="qp-add-btn" type="button">+ Add quick prompt</button>
+            <div class="hint">Up to 6 chips that pre-fill the textarea when clicked.</div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label for="b-soft">Soft cap per session (USDC)</label>
+              <input type="number" id="b-soft" step="0.01" min="0" value="0.50" />
+              <div class="hint">User confirms to continue past this</div>
+            </div>
+            <div class="field">
+              <label for="b-hard">Hard cap per session (USDC)</label>
+              <input type="number" id="b-hard" step="0.01" min="0" value="2.00" />
+              <div class="hint">Session stops here regardless</div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="builder-preview" id="preview">
+          <div class="preview-section">Live preview</div>
+          <span class="preview-chip" id="prev-chip">agent</span>
+          <h3 class="preview-name" id="prev-name">Untitled agent</h3>
+          <p class="preview-desc" id="prev-desc">No description yet.</p>
+          <div class="preview-msg" id="prev-welcome">Welcome message will show here.</div>
+          <div class="preview-section">Tools (<span id="prev-tool-count">0</span>)</div>
+          <div class="preview-tools" id="prev-tools"></div>
+          <div class="preview-section">Quick prompts</div>
+          <div class="preview-prompts" id="prev-prompts"></div>
+          <div class="preview-section">Public URL</div>
+          <div class="preview-link" id="prev-url">/agent/—</div>
+        </aside>
+
+        <div class="builder-footer">
+          <p class="err" id="b-err"></p>
+          <div style="display:flex; gap:8px;">
+            <button id="b-cancel">Cancel</button>
+            <button class="primary" id="b-save">Save agent</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast-mini"></div>
+
+    <script>
+      const STORAGE_KEY = 'axon.apiKey';
+      const BASE_KEY = 'axon.baseUrl';
+      const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+      const KEY = localStorage.getItem(STORAGE_KEY);
+
+      // ── Tool catalog (mirrors landing/dashboard.html AGENT_TOOLS) ────────
+      const TOOL_CATALOG = {
+        'Data / Lookup': [
+          { name: 'lookup_cnpj',          desc: 'Brazilian company by CNPJ' },
+          { name: 'lookup_cep',           desc: 'Brazilian postal code' },
+          { name: 'current_weather',      desc: 'Current weather (OpenWeather)' },
+          { name: 'weather_forecast',     desc: 'Multi-day forecast (Open-Meteo, free)' },
+          { name: 'lookup_ip',            desc: 'IP geolocation' },
+          { name: 'lookup_country',       desc: 'Country data' },
+          { name: 'brasilapi_holidays',   desc: 'BR national holidays' },
+          { name: 'brasilapi_rates',      desc: 'Selic/CDI/IPCA' },
+          { name: 'brasilapi_ddd',        desc: 'BR phone area code' },
+        ],
+        'Finance': [
+          { name: 'convert_currency',     desc: 'FX conversion (Frankfurter)' },
+          { name: 'crypto_price',         desc: 'Crypto prices (CoinGecko)' },
+        ],
+        'Search / Scrape': [
+          { name: 'search_web',           desc: 'Tavily web search' },
+          { name: 'exa_search',           desc: 'Exa neural search' },
+          { name: 'scrape_url',           desc: 'Firecrawl URL → markdown' },
+          { name: 'search_hn',            desc: 'Hacker News search' },
+        ],
+        'Knowledge': [
+          { name: 'wikipedia_summary',    desc: 'Wikipedia article summary' },
+          { name: 'wikipedia_search',     desc: 'Search Wikipedia' },
+          { name: 'search_arxiv',         desc: '2.4M scientific papers' },
+        ],
+        'Local — $0': [
+          { name: 'calculate',            desc: 'Math expression eval' },
+          { name: 'get_datetime',         desc: 'Current time in any TZ' },
+          { name: 'run_js',               desc: 'JS sandbox (5s timeout)' },
+        ],
+        'Create': [
+          { name: 'generate_image',       desc: '1024×1024 image (Stability)' },
+        ],
+        'AI': [
+          { name: 'embed_text',           desc: '512-dim embedding (Voyage)' },
+        ],
+      };
+
+      function showToast(msg, kind) {
+        const t = document.getElementById('toast');
+        t.textContent = msg; t.className = 'toast-mini ' + (kind || '') + ' show';
+        setTimeout(() => t.classList.remove('show'), 3000);
+      }
+
+      async function api(path, opts) {
+        const headers = { 'Content-Type': 'application/json', ...(opts && opts.headers) };
+        if (KEY) headers['Authorization'] = 'Bearer ' + KEY;
+        const res = await fetch(BASE + path, { ...opts, headers });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const err = new Error((data.error && data.error.message) || data.message || `HTTP ${res.status}`);
+          err.status = res.status; err.data = data;
+          throw err;
+        }
+        return data;
+      }
+
+      // ── State ─────────────────────────────────────────────────────────
+      let editingAgentId = null;
+      let formState = {
+        name: '', slug: '', description: '',
+        system_prompt: '', allowed_tools: [],
+        primary_color: '#7c5cff', welcome_message: '',
+        quick_prompts: [], public: true,
+        budget_per_session_usdc: '0.50', hard_cap_usdc: '2.00',
+      };
+
+      // ── Tabs ──────────────────────────────────────────────────────────
+      document.querySelectorAll('.tab-bar button').forEach((b) => {
+        b.addEventListener('click', () => {
+          document.querySelectorAll('.tab-bar button').forEach((x) => x.classList.remove('active'));
+          b.classList.add('active');
+          document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+          document.getElementById('panel-' + b.dataset.tab).classList.add('active');
+          if (b.dataset.tab === 'mine') loadMyAgents();
+        });
+      });
+
+      // ── Templates ─────────────────────────────────────────────────────
+      async function loadTemplates() {
+        try {
+          const d = await api('/v1/agents/templates');
+          const grid = document.getElementById('tpl-grid');
+          if (!d.templates || !d.templates.length) {
+            grid.innerHTML = '<p style="color: var(--text-muted)">No templates available.</p>';
+            return;
+          }
+          grid.innerHTML = d.templates.map((t) => `
+            <div class="tpl-card" style="--tc: ${t.primary_color}" data-id="${t.id}">
+              <span class="tpl-emoji">${t.emoji}</span>
+              <span class="tpl-cat">${t.category}</span>
+              <h3>${escape(t.name)}</h3>
+              <p class="tpl-desc">${escape(t.description)}</p>
+              <div class="tpl-meta">
+                <span>${t.tool_count} tools · ${escape(t.target.split(',')[0])}</span>
+                <span class="tpl-price">R$${t.monthly_price_brl}/mo</span>
+              </div>
+            </div>
+          `).join('');
+          grid.querySelectorAll('.tpl-card').forEach((card) => {
+            card.addEventListener('click', () => useTemplate(card.dataset.id));
+          });
+        } catch (e) {
+          document.getElementById('tpl-grid').innerHTML = `<p style="color:#f87171">Could not load templates: ${e.message}</p>`;
+        }
+      }
+
+      async function useTemplate(id) {
+        if (!KEY) { showToast('Sign in first to deploy a template', 'error'); return; }
+        try {
+          const t = await api('/v1/agents/templates/' + id);
+          openBuilder({
+            name: t.name,
+            slug: t.id,
+            description: t.description,
+            system_prompt: t.systemPrompt,
+            allowed_tools: t.tools,
+            primary_color: t.primaryColor,
+            welcome_message: t.welcomeMessage,
+            quick_prompts: t.quickPrompts,
+            public: true,
+            budget_per_session_usdc: '0.50',
+            hard_cap_usdc: '2.00',
+            __template: t.id,
+          }, null);
+        } catch (e) { showToast(e.message, 'error'); }
+      }
+
+      // ── My agents ─────────────────────────────────────────────────────
+      async function loadMyAgents() {
+        if (!KEY) {
+          document.getElementById('agent-list').innerHTML = '<p style="color: var(--text-muted)">Sign in to see your agents.</p>';
+          return;
+        }
+        try {
+          const d = await api('/v1/agents');
+          document.getElementById('mine-count').textContent = d.count || 0;
+          const list = document.getElementById('agent-list');
+          if (!d.data.length) {
+            list.innerHTML = `
+              <div class="empty-state">
+                <h3>No agents yet</h3>
+                <p>Pick a template above or start blank — your agent is live in seconds.</p>
+                <button class="ar-btn primary" onclick="document.getElementById('new-blank').click()">+ Blank agent</button>
+              </div>
+            `;
+            return;
+          }
+          list.innerHTML = d.data.map((a) => `
+            <div class="agent-row">
+              <span class="agent-color-dot" style="background:${a.primary_color}"></span>
+              <div>
+                <h4 class="ar-name">${escape(a.name)}</h4>
+                <div class="ar-slug">/agent/${escape(a.slug)} · ${a.tool_count} tools · ${a.public ? 'public' : 'private'}</div>
+              </div>
+              <span class="ar-meta">updated ${relTime(a.updated_at)}</span>
+              <div class="ar-actions">
+                <button class="ar-btn" onclick="window.open('/agent/${escape(a.slug)}','_blank')">Open ↗</button>
+                <button class="ar-btn" onclick="editAgent('${a.id}')">Edit</button>
+                <button class="ar-btn danger" onclick="deleteAgent('${a.id}','${escape(a.name)}')">Delete</button>
+              </div>
+            </div>
+          `).join('');
+        } catch (e) {
+          document.getElementById('agent-list').innerHTML = `<p style="color:#f87171">${e.message}</p>`;
+        }
+      }
+
+      window.editAgent = async function(id) {
+        try {
+          const a = await api('/v1/agents/' + id);
+          openBuilder({
+            name: a.name,
+            slug: a.slug,
+            description: a.description || '',
+            system_prompt: a.system_prompt,
+            allowed_tools: a.allowed_tools || [],
+            primary_color: a.primary_color || '#7c5cff',
+            welcome_message: a.welcome_message || '',
+            quick_prompts: a.quick_prompts || [],
+            public: a.public,
+            budget_per_session_usdc: a.budget_per_session_usdc,
+            hard_cap_usdc: a.hard_cap_usdc,
+          }, id);
+        } catch (e) { showToast(e.message, 'error'); }
+      };
+
+      window.deleteAgent = async function(id, name) {
+        if (!confirm(`Delete agent "${name}"? This cannot be undone.`)) return;
+        try {
+          await api('/v1/agents/' + id, { method: 'DELETE' });
+          showToast('Agent deleted', 'success');
+          loadMyAgents();
+        } catch (e) { showToast(e.message, 'error'); }
+      };
+
+      // ── Builder modal ─────────────────────────────────────────────────
+      function openBuilder(init, id) {
+        editingAgentId = id;
+        formState = { ...formState, ...init };
+        document.getElementById('builder-title').textContent = id ? 'Edit agent' : 'Create agent';
+        document.getElementById('builder-sub').textContent = init.__template
+          ? `Starting from template "${init.__template}". Tweak anything you like.`
+          : 'Customize how your agent thinks and what it can do.';
+        document.getElementById('b-name').value = formState.name;
+        document.getElementById('b-slug').value = formState.slug;
+        document.getElementById('b-slug').disabled = !!id;
+        document.getElementById('b-desc').value = formState.description || '';
+        document.getElementById('b-prompt').value = formState.system_prompt;
+        document.getElementById('b-color').value = formState.primary_color;
+        document.getElementById('b-public').value = String(formState.public);
+        document.getElementById('b-welcome').value = formState.welcome_message || '';
+        document.getElementById('b-soft').value = formState.budget_per_session_usdc;
+        document.getElementById('b-hard').value = formState.hard_cap_usdc;
+        renderTools();
+        renderQuickPrompts();
+        renderPreview();
+        document.getElementById('builder').dataset.open = '1';
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeBuilder() {
+        document.getElementById('builder').dataset.open = '0';
+        document.body.style.overflow = '';
+        document.getElementById('b-err').textContent = '';
+        editingAgentId = null;
+      }
+
+      function renderTools() {
+        const el = document.getElementById('tools-grid');
+        const selected = new Set(formState.allowed_tools || []);
+        let html = '';
+        for (const [cat, tools] of Object.entries(TOOL_CATALOG)) {
+          html += `<div class="tool-cat">${cat}</div>`;
+          for (const t of tools) {
+            const checked = selected.has(t.name) ? 'checked' : '';
+            html += `<label title="${escape(t.desc)}"><input type="checkbox" data-tool="${t.name}" ${checked} /> ${t.name}</label>`;
+          }
+        }
+        el.innerHTML = html;
+        el.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+          cb.addEventListener('change', () => {
+            const tool = cb.dataset.tool;
+            if (cb.checked) {
+              if (!formState.allowed_tools.includes(tool)) formState.allowed_tools.push(tool);
+            } else {
+              formState.allowed_tools = formState.allowed_tools.filter((t) => t !== tool);
+            }
+            renderPreview();
+          });
+        });
+      }
+
+      function renderQuickPrompts() {
+        const el = document.getElementById('qp-list');
+        el.innerHTML = (formState.quick_prompts || []).map((p, i) => `
+          <div class="qp-item">
+            <input type="text" data-i="${i}" value="${escape(p)}" placeholder="Quick prompt text" />
+            <button data-i="${i}" type="button" title="Remove">×</button>
+          </div>
+        `).join('');
+        el.querySelectorAll('input').forEach((inp) => {
+          inp.addEventListener('input', () => {
+            formState.quick_prompts[+inp.dataset.i] = inp.value;
+            renderPreview();
+          });
+        });
+        el.querySelectorAll('button').forEach((b) => {
+          b.addEventListener('click', () => {
+            formState.quick_prompts.splice(+b.dataset.i, 1);
+            renderQuickPrompts(); renderPreview();
+          });
+        });
+      }
+
+      document.getElementById('qp-add-btn').addEventListener('click', () => {
+        if ((formState.quick_prompts || []).length >= 6) return;
+        formState.quick_prompts = [...(formState.quick_prompts || []), ''];
+        renderQuickPrompts();
+      });
+
+      function renderPreview() {
+        const c = formState.primary_color || '#7c5cff';
+        document.getElementById('preview').style.setProperty('--prev-color', c);
+        document.getElementById('prev-chip').style.setProperty('--prev-color', c);
+        document.getElementById('prev-chip').textContent = formState.slug || 'agent';
+        document.getElementById('prev-name').textContent = formState.name || 'Untitled agent';
+        document.getElementById('prev-desc').textContent = formState.description || 'No description yet.';
+        document.getElementById('prev-welcome').textContent = formState.welcome_message || '(no welcome message)';
+        document.getElementById('prev-tool-count').textContent = (formState.allowed_tools || []).length;
+        document.getElementById('prev-tools').innerHTML = (formState.allowed_tools || []).map(t => `<span>${t}</span>`).join('') || '<span style="color:var(--text-muted)">(no tools — agent will only have LLM-only chat)</span>';
+        document.getElementById('prev-prompts').innerHTML = (formState.quick_prompts || []).filter(Boolean).map(p => `<span>${escape(p)}</span>`).join('') || '<span style="color:var(--text-muted)">(no quick prompts)</span>';
+        document.getElementById('prev-url').textContent = `${location.origin}/agent/${formState.slug || '—'}`;
+        document.getElementById('slug-echo').textContent = formState.slug || 'slug';
+      }
+
+      // Sync form inputs into formState
+      ['b-name','b-slug','b-desc','b-prompt','b-color','b-public','b-welcome','b-soft','b-hard'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', () => {
+          formState.name = document.getElementById('b-name').value;
+          formState.slug = document.getElementById('b-slug').value.toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40);
+          document.getElementById('b-slug').value = formState.slug;
+          formState.description = document.getElementById('b-desc').value;
+          formState.system_prompt = document.getElementById('b-prompt').value;
+          formState.primary_color = document.getElementById('b-color').value;
+          formState.public = document.getElementById('b-public').value === 'true';
+          formState.welcome_message = document.getElementById('b-welcome').value;
+          formState.budget_per_session_usdc = document.getElementById('b-soft').value;
+          formState.hard_cap_usdc = document.getElementById('b-hard').value;
+          renderPreview();
+        });
+      });
+
+      document.getElementById('b-cancel').addEventListener('click', closeBuilder);
+      document.getElementById('builder').addEventListener('click', (e) => {
+        if (e.target.id === 'builder') closeBuilder();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('builder').dataset.open === '1') closeBuilder();
+      });
+
+      document.getElementById('b-save').addEventListener('click', async () => {
+        const errEl = document.getElementById('b-err');
+        errEl.textContent = '';
+        if (!formState.name.trim()) { errEl.textContent = 'Name is required'; return; }
+        if (!editingAgentId && !/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$/.test(formState.slug)) {
+          errEl.textContent = 'Slug must be 2-40 chars, lowercase letters/numbers/hyphens'; return;
+        }
+        if (!formState.system_prompt.trim()) { errEl.textContent = 'System prompt cannot be empty'; return; }
+        const btn = document.getElementById('b-save');
+        btn.disabled = true; btn.textContent = 'Saving…';
+        try {
+          const payload = {
+            name: formState.name,
+            description: formState.description,
+            system_prompt: formState.system_prompt,
+            allowed_tools: formState.allowed_tools,
+            primary_color: formState.primary_color,
+            welcome_message: formState.welcome_message,
+            quick_prompts: (formState.quick_prompts || []).filter(Boolean),
+            public: formState.public,
+            budget_per_session_usdc: formState.budget_per_session_usdc,
+            hard_cap_usdc: formState.hard_cap_usdc,
+          };
+          if (editingAgentId) {
+            await api('/v1/agents/' + editingAgentId, { method: 'PATCH', body: JSON.stringify(payload) });
+            showToast('Agent saved', 'success');
+          } else {
+            payload.slug = formState.slug;
+            if (formState.__template) payload.template = formState.__template;
+            const r = await api('/v1/agents', { method: 'POST', body: JSON.stringify(payload) });
+            showToast('Agent created — open ' + r.url, 'success');
+          }
+          closeBuilder();
+          loadMyAgents();
+          document.querySelector('.tab-bar button[data-tab="mine"]').click();
+        } catch (e) {
+          errEl.textContent = e.message;
+        } finally {
+          btn.disabled = false; btn.textContent = 'Save agent';
+        }
+      });
+
+      document.getElementById('new-blank').addEventListener('click', () => {
+        if (!KEY) { showToast('Sign in first', 'error'); return; }
+        openBuilder({
+          name: '', slug: '', description: '',
+          system_prompt: 'You are a helpful AI assistant. Reply in the same language the user writes in.',
+          allowed_tools: ['calculate', 'get_datetime', 'search_web'],
+          primary_color: '#7c5cff',
+          welcome_message: 'How can I help you today?',
+          quick_prompts: ['Help me with…'],
+          public: true,
+          budget_per_session_usdc: '0.50',
+          hard_cap_usdc: '2.00',
+        }, null);
+      });
+
+      // ── Helpers ──────────────────────────────────────────────────────
+      function escape(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+      }
+      function relTime(iso) {
+        const t = new Date(iso).getTime(); const d = (Date.now() - t) / 1000;
+        if (d < 60) return 'just now';
+        if (d < 3600) return Math.floor(d/60) + 'm ago';
+        if (d < 86400) return Math.floor(d/3600) + 'h ago';
+        return Math.floor(d/86400) + 'd ago';
+      }
+
+      // ── Init ─────────────────────────────────────────────────────────
+      if (!KEY) {
+        document.getElementById('login-banner').style.display = '';
+      }
+      loadTemplates();
+      if (KEY) loadMyAgents();
+    </script>
+  </body>
+</html>

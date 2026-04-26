@@ -161,6 +161,42 @@ export const webhookSubscriptions = pgTable(
   }),
 );
 
+// ─── Agents (custom agent factory) ─────────────────────
+// Each row is one "configured agent" — its system prompt, allowed tools,
+// branding, budget caps. Owners create them; visitors run them either
+// using the owner's wallet (public) or their own (private/API-keyed).
+export const agents = pgTable(
+  'agents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    systemPrompt: text('system_prompt').notNull(),
+    allowedTools: jsonb('allowed_tools').notNull(), // string[] of tool names
+    primaryColor: text('primary_color').default('#7c5cff'),
+    welcomeMessage: text('welcome_message'),
+    quickPrompts: jsonb('quick_prompts'),           // string[]
+    budgetPerSession: bigint('budget_per_session_micro', { mode: 'bigint' })
+      .notNull()
+      .default(500_000n),                            // $0.50 default soft cap
+    hardCap: bigint('hard_cap_micro', { mode: 'bigint' })
+      .notNull()
+      .default(2_000_000n),                          // $2.00 default hard cap
+    public: boolean('public').notNull().default(true),
+    template: text('template'),                      // which template was the seed (optional)
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    ownerIdx: index('agents_owner_idx').on(t.ownerId),
+    slugIdx: uniqueIndex('agents_slug_idx').on(t.slug),
+  }),
+);
+
 // Log of outbound deliveries (for retry/audit)
 export const webhookDeliveries = pgTable(
   'webhook_deliveries',
@@ -192,3 +228,4 @@ export type PolicyRow = typeof policies.$inferSelect;
 export type SettlementRow = typeof settlements.$inferSelect;
 export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
+export type Agent = typeof agents.$inferSelect;

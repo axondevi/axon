@@ -23,6 +23,7 @@ import settlementRoutes from '~/routes/settlement';
 import operatorRoutes from '~/routes/operator';
 import signupRoutes from '~/routes/signup';
 import subscriptionRoutes, { publicRoutes as subscriptionPublicRoutes } from '~/routes/subscription';
+import agentsRoutes, { publicRoutes as agentsPublicRoutes } from '~/routes/agents';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -120,6 +121,7 @@ app.route('/v1/admin/operator', operatorRoutes);
 // MUST be mounted BEFORE the authed /v1 sub-router.
 app.route('/v1/signup', signupRoutes);
 app.route('/v1/subscription', subscriptionPublicRoutes);
+app.route('/v1/agents', agentsPublicRoutes);
 
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();
@@ -129,6 +131,7 @@ v1.route('/wallet', walletRoutes);
 v1.route('/call', callRoutes);
 v1.route('/usage', usageRoutes);
 v1.route('/subscription', subscriptionRoutes);
+v1.route('/agents', agentsRoutes);
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 app.route('/v1', v1);
 
