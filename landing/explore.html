@@ -179,41 +179,71 @@
           const res = await fetch(`${BASE}/v1/agents/explore${qs}`);
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const d = await res.json();
-          if (!d.data || d.data.length === 0) {
+          const all = d.data || [];
+          // Demos (slug starts with "demo-") go FIRST so visitors test free immediately.
+          const demos = all.filter(a => (a.slug || '').startsWith('demo-'));
+          const others = all.filter(a => !(a.slug || '').startsWith('demo-'));
+          const sorted = [...demos, ...others];
+
+          if (sorted.length === 0) {
             grid.innerHTML = `
               <div class="empty-state" style="grid-column:1/-1">
                 <h3>No agents here yet</h3>
-                <p>Be the first — pick a template at <strong>/build</strong> and your agent will show up here once it's public.</p>
+                <p>Backend is warming up. Demo agents should appear here in a moment.</p>
                 <a href="/build">Build the first one →</a>
               </div>`;
             return;
           }
-          grid.innerHTML = d.data.map(a => renderCard(a)).join('');
+
+          let html = '';
+          if (demos.length > 0) {
+            html += `<div style="grid-column:1/-1;padding:16px 0 8px;">
+              <h2 style="margin:0;font-size:18px;letter-spacing:1px;color:#22c55e;">🎮 TESTE GRÁTIS AGORA — sem cadastro</h2>
+              <p style="margin:6px 0 0;color:var(--text-muted);font-size:13px;">Clica em qualquer agente abaixo, conversa de verdade. A Axon paga essas conversas como demonstração.</p>
+            </div>`;
+            html += demos.map(a => renderCard(a, true)).join('');
+          }
+          if (others.length > 0) {
+            html += `<div style="grid-column:1/-1;padding:32px 0 8px;border-top:1px solid var(--border);margin-top:24px;">
+              <h2 style="margin:0;font-size:18px;letter-spacing:1px;">Agentes da comunidade</h2>
+              <p style="margin:6px 0 0;color:var(--text-muted);font-size:13px;">Criados por outros usuários. Alguns são owner-paid (free), outros pedem sua wallet.</p>
+            </div>`;
+            html += others.map(a => renderCard(a, false)).join('');
+          }
+          grid.innerHTML = html;
           grid.querySelectorAll('.ag-card').forEach(card => {
             card.addEventListener('click', () => {
               window.location.href = '/agent/' + card.dataset.slug;
             });
           });
         } catch (e) {
-          grid.innerHTML = `<p style="color:#f87171;grid-column:1/-1;text-align:center;padding:32px;">Could not load agents: ${escape(e.message)}</p>`;
+          grid.innerHTML = `<p style="color:#f87171;grid-column:1/-1;text-align:center;padding:32px;">Backend offline. Tente daqui a 1 min — Render acorda lentamente.</p>`;
         }
       }
 
-      function renderCard(a) {
+      function renderCard(a, isDemo) {
         const meta = TPL_META[a.template] || { emoji: '🤖', cat: 'Custom' };
         const calls = a.calls_30d > 0
           ? `<span class="calls-pill">${a.calls_30d.toLocaleString()} calls / 30d</span>`
-          : '<span class="calls-pill" style="color:var(--text-muted);">new</span>';
-        const free = a.free_to_chat ? '<span class="free-badge">free to chat</span>' : '<span class="calls-pill">bring your wallet</span>';
+          : '<span class="calls-pill" style="color:var(--text-muted);">novo</span>';
+        let badge;
+        if (isDemo) {
+          badge = '<span class="free-badge" style="background:#22c55e;color:#fff;font-weight:700;">DEMO · GRÁTIS</span>';
+        } else if (a.free_to_chat) {
+          badge = '<span class="free-badge">free to chat</span>';
+        } else {
+          badge = '<span class="calls-pill">bring your wallet</span>';
+        }
+        const demoStyle = isDemo ? 'border-color:rgba(34,197,94,0.4);box-shadow:0 0 0 1px rgba(34,197,94,0.2);' : '';
         return `
-          <a class="ag-card" style="--ac:${a.primary_color}" data-slug="${escape(a.slug)}" href="/agent/${escape(a.slug)}">
+          <a class="ag-card" style="--ac:${a.primary_color};${demoStyle}" data-slug="${escape(a.slug)}" href="/agent/${escape(a.slug)}">
             <span class="ag-emoji">${meta.emoji}</span>
             <span class="ag-cat">${meta.cat}</span>
             <h3>${escape(a.name)}</h3>
             <p class="ag-desc">${escape(a.description || 'No description provided.')}</p>
             <div class="ag-meta">
               ${calls}
-              ${free}
+              ${badge}
             </div>
           </a>
         `;
