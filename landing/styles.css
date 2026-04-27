@@ -829,3 +829,73 @@ footer {
     gap: 32px;
   }
 }
+
+/* ─── Mobile audit fixes (telas pequenas, 320-480px) ─────────────────── */
+
+/* Botoes: garantir tap target >=44px */
+.btn { min-height: 44px; padding: 14px 24px; }
+@media (max-width: 480px) {
+  .btn-full, .btn-block { display: block; width: 100%; }
+}
+
+/* Logo grid: 1 coluna em telas pequenas */
+@media (max-width: 480px) {
+  .logo-grid { grid-template-columns: 1fr; gap: 12px; }
+  .logo-card { padding: 18px 16px; }
+}
+
+/* Waitlist form: empilha em mobile */
+@media (max-width: 480px) {
+  .waitlist-form { flex-direction: column; gap: 12px; align-items: stretch; }
+  .waitlist-form input { flex: 1 1 auto; min-width: 0; }
+  .waitlist-form .btn { width: 100%; }
+}
+
+/* API modal: close button >=44px + ajusta posicao em mobile */
+.api-modal-close { min-height: 44px; min-width: 44px; }
+@media (max-width: 600px) {
+  .api-modal-close { top: 12px; right: 12px; width: 44px; height: 44px; }
+  .api-modal { padding: 18px 16px; }
+}
+
+/* Success modal (modal generico): bottom sheet em mobile pra UX nativa */
+@media (max-width: 480px) {
+  #success-modal {
+    padding: 12px 16px !important;
+    align-items: flex-end !important;
+  }
+  #success-modal > div {
+    margin: 16px auto !important;
+    padding: 24px 20px !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+}
+
+/* Test Agora modal (build.html post-publish) - mobile friendly */
+@media (max-width: 600px) {
+  #test-agora-modal > div {
+    border-radius: 12px 12px 0 0 !important;
+    max-height: 92vh !important;
+  }
+  #test-agora-modal pre { font-size: 10px !important; }
+}
+
+/* Tabelas: scroll horizontal em mobile */
+.table-wrap, .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Inputs: 16px impede zoom iOS */
+@media (max-width: 480px) {
+  input, textarea, select { font-size: 16px !important; }
+}
+
+/* Container: padding lateral em telas muito pequenas */
+@media (max-width: 380px) {
+  .container { padding-left: 16px; padding-right: 16px; }
+}
+
+/* Explore grid: 1 col em mobile */
+@media (max-width: 600px) {
+  .ag-grid { grid-template-columns: 1fr !important; }
+}

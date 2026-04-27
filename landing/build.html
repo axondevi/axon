@@ -1433,12 +1433,37 @@
         wrap.addEventListener('click', (e) => { if (e.target === wrap) wrap.remove(); });
       }
 
+      // ── Auto-load template via URL param (?template=X) ─────────────
+      // Vindo de landing verticalizada (/clinica, /restaurante, /loja) abre
+      // o builder ja com o template selecionado.
+      function maybeAutoLoadTemplate() {
+        try {
+          var p = new URLSearchParams(window.location.search);
+          var tplId = p.get('template');
+          if (!tplId) return;
+          // Aguarda templates carregarem entao chama useTemplate
+          var tries = 0;
+          var interval = setInterval(function () {
+            tries++;
+            var card = document.querySelector('[data-tpl-id="' + tplId + '"], [data-id="' + tplId + '"]');
+            // Tenta direto via API (independente do grid ja ter renderizado)
+            if (typeof useTemplate === 'function') {
+              clearInterval(interval);
+              useTemplate(tplId);
+            } else if (tries > 20) {
+              clearInterval(interval);
+            }
+          }, 200);
+        } catch (e) {}
+      }
+
       // ── Init ─────────────────────────────────────────────────────────
       if (!KEY) {
         document.getElementById('login-banner').style.display = '';
       }
       loadTemplates();
       if (KEY) loadMyAgents();
+      maybeAutoLoadTemplate();
     </script>
   </body>
 </html>
