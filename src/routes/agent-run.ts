@@ -283,6 +283,8 @@ app.post('/:slug/chat', async (c) => {
     iterations: result.iterations,
     finish_reason: result.finish_reason,
     total_cost_usdc: result.total_cost_usdc,
+    cached: result.cached || false,
+    cache_similarity: result.cache_similarity,
     variant,
     agent_slug: slug,
   });
