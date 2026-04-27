@@ -116,9 +116,12 @@
       ];
 
       async function check(c) {
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 8000);
         try {
           const t0 = performance.now();
-          const res = await fetch(c.url, { cache: 'no-store' });
+          const res = await fetch(c.url, { cache: 'no-store', signal: ctrl.signal });
+          clearTimeout(timeout);
           const t = Math.round(performance.now() - t0);
           if (!res.ok) return { ok: false, value: `HTTP ${res.status}` };
           if (c.kind === 'json') {
@@ -130,24 +133,39 @@
           }
           return { ok: true, value: `${t}ms` };
         } catch (err) {
-          return { ok: false, value: err.message };
+          clearTimeout(timeout);
+          if (err.name === 'AbortError') return { ok: false, value: 'timeout (>8s)' };
+          return { ok: false, value: err.message || 'fetch failed' };
         }
       }
 
-      async function render() {
+      function renderInitialSkeleton() {
         const grid = document.getElementById('checks');
-        grid.innerHTML = '';
+        grid.innerHTML = checks.map(c => `
+          <div class="check" data-name="${c.name}">
+            <span class="label">${c.name}</span>
+            <span class="value" style="color:var(--text-muted);">checking…</span>
+          </div>
+        `).join('');
+      }
+
+      async function render() {
+        // Em paralelo (mais rápido que sequencial), atualiza individualmente conforme cada check responde
+        const grid = document.getElementById('checks');
+        renderInitialSkeleton();
         let allUp = true;
-        for (const c of checks) {
+        await Promise.all(checks.map(async (c) => {
           const r = await check(c);
           if (!r.ok) allUp = false;
-          grid.insertAdjacentHTML('beforeend', `
-            <div class="check ${r.ok ? 'up' : 'down'}">
+          const node = grid.querySelector(`[data-name="${c.name}"]`);
+          if (node) {
+            node.className = `check ${r.ok ? 'up' : 'down'}`;
+            node.innerHTML = `
               <span class="label">${c.name}</span>
               <span class="value ${r.ok ? 'up' : 'down'}">${r.ok ? '✓ ' : '✗ '}${r.value}</span>
-            </div>
-          `);
-        }
+            `;
+          }
+        }));
 
         const pulse = document.getElementById('pulse');
         pulse.classList.remove('unk', 'bad');
@@ -155,7 +173,7 @@
         document.getElementById('overall-status').textContent =
           allUp ? 'All systems operational' : 'Some services are degraded';
         document.getElementById('overall-sub').textContent =
-          allUp ? 'Everything is responding as expected.' : 'One or more checks failed. We are investigating.';
+          allUp ? 'Everything is responding as expected.' : 'One or more checks failed. The team is investigating.';
         document.getElementById('foot').textContent =
           'Last checked: ' + new Date().toLocaleString();
       }

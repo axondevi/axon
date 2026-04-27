@@ -42,6 +42,7 @@
           <a href="/build">Build</a>
           <a href="/upgrade">Plans</a>
           <a href="/learn">Learn</a>
+          <a href="/stats">Stats</a>
           <a href="/buy-usdc">Buy USDC</a>
           <a href="https://github.com/axondevi/axon">GitHub</a>
         </nav>
@@ -620,28 +621,57 @@
           return '$' + fixed;
         }
 
-        async function fetchJson(url, attempts) {
+        async function fetchJson(url, attempts, timeoutMs) {
           attempts = attempts || 2;
+          timeoutMs = timeoutMs || 6000;
           var lastErr;
           for (var i = 0; i < attempts; i++) {
+            var controller = new AbortController();
+            var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
             try {
-              var r = await fetch(url, { headers: { accept: 'application/json' } });
+              var r = await fetch(url, {
+                headers: { accept: 'application/json' },
+                signal: controller.signal
+              });
+              clearTimeout(timer);
               if (!r.ok) throw new Error('HTTP ' + r.status);
               return await r.json();
             } catch (e) {
+              clearTimeout(timer);
               lastErr = e;
-              if (i < attempts - 1) await new Promise(function (res) { setTimeout(res, 2000); });
+              if (i < attempts - 1) await new Promise(function (res) { setTimeout(res, 1500); });
             }
           }
           throw lastErr;
         }
 
-        async function loadCatalog() {
+        async function loadStaticCatalog() {
           try {
-            var data = await fetchJson(API_BASE + '/v1/apis', 2);
-            renderGrid((data && data.data) || []);
+            var r = await fetch('/catalog.json', { headers: { accept: 'application/json' } });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return await r.json();
           } catch (e) {
-            showError();
+            return null;
+          }
+        }
+
+        async function loadCatalog() {
+          // 1) Carrega fallback estatico INSTANTANEO primeiro (catalogo nunca aparece vazio)
+          var staticData = await loadStaticCatalog();
+          if (staticData && staticData.data && staticData.data.length) {
+            renderGrid(staticData.data);
+          }
+          // 2) Tenta enriquecer com dados ao vivo do backend (com timeout 6s)
+          try {
+            var data = await fetchJson(API_BASE + '/v1/apis', 2, 6000);
+            if (data && data.data && data.data.length) {
+              renderGrid(data.data);  // sobrescreve com dados frescos
+            }
+          } catch (e) {
+            // se backend down e ja temos static, deixa quieto
+            if (!staticData || !staticData.data || !staticData.data.length) {
+              showError();
+            }
           }
         }
 
@@ -674,15 +704,38 @@
           eyebrow.innerHTML = '<span class="dot"></span>27+ APIs live, more every week';
         }
 
+        var __staticDetails = null;
+        async function getStaticDetails() {
+          if (__staticDetails !== null) return __staticDetails;
+          try {
+            var r = await fetch('/catalog.json');
+            if (!r.ok) { __staticDetails = {}; return __staticDetails; }
+            var json = await r.json();
+            __staticDetails = (json && json.details) || {};
+          } catch (e) {
+            __staticDetails = {};
+          }
+          return __staticDetails;
+        }
+
         async function openModal(slug) {
           lastFocused = document.activeElement;
+          // 1) Tenta backend ao vivo (com timeout 4s)
           try {
-            var api = await fetchJson(API_BASE + '/v1/apis/' + encodeURIComponent(slug), 2);
+            var api = await fetchJson(API_BASE + '/v1/apis/' + encodeURIComponent(slug), 2, 4000);
             fillModal(api);
             showModal();
-          } catch (e) {
-            window.open(REGISTRY_URL + slug + '.json', '_blank', 'noopener');
+            return;
+          } catch (e) {}
+          // 2) Fallback: usa detalhes estaticos do catalog.json
+          var details = await getStaticDetails();
+          if (details && details[slug]) {
+            fillModal(details[slug]);
+            showModal();
+            return;
           }
+          // 3) Ultimo recurso: abre registry GitHub
+          window.open(REGISTRY_URL + slug + '.json', '_blank', 'noopener');
         }
 
         function fillModal(a) {

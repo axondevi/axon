@@ -252,10 +252,12 @@
       <div class="container">
         <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
         <nav>
-          <a href="/dashboard">Dashboard</a>
+          <a href="/explore">Explore</a>
           <a href="/build" aria-current="page">Build</a>
+          <a href="/dashboard">Dashboard</a>
           <a href="/upgrade">Plans</a>
-          <a href="/learn/">Docs</a>
+          <a href="/learn/">Learn</a>
+          <a href="/stats">Stats</a>
         </nav>
       </div>
     </header>
@@ -1197,6 +1199,7 @@
             system_prompt_b: formState.system_prompt_b || null,
             ab_split: formState.ab_split,
           };
+          let createdAgent = null;
           if (editingAgentId) {
             await api('/v1/agents/' + editingAgentId, { method: 'PATCH', body: JSON.stringify(payload) });
             showToast('Agent saved', 'success');
@@ -1204,11 +1207,13 @@
             payload.slug = formState.slug;
             if (formState.__template) payload.template = formState.__template;
             const r = await api('/v1/agents', { method: 'POST', body: JSON.stringify(payload) });
+            createdAgent = Object.assign({}, payload, r);
             showToast('Agent created — open ' + r.url, 'success');
           }
           closeBuilder();
           loadMyAgents();
           document.querySelector('.tab-bar button[data-tab="mine"]').click();
+          if (createdAgent) showTestAgoraModal(createdAgent);
         } catch (e) {
           errEl.textContent = e.message;
         } finally {
@@ -1327,6 +1332,105 @@
         if (d < 3600) return Math.floor(d/60) + 'm ago';
         if (d < 86400) return Math.floor(d/3600) + 'h ago';
         return Math.floor(d/86400) + 'd ago';
+      }
+
+      // ── Modal "Teste Agora" pos-criacao ──────────────────────────────
+      function showTestAgoraModal(agent) {
+        // agent: { id, slug, url, name, ... } - retorno do POST /v1/agents enriquecido
+        const slug = agent.slug || (agent.url || '').split('/agent/').pop();
+        const baseHost = window.location.origin;
+        const webUrl = baseHost + '/agent/' + slug;
+        const apiUrl = 'https://axon-kedb.onrender.com/v1/run/' + (agent.id || slug);
+        const embedCode = '<script src="' + baseHost + '/embed.js" data-agent="' + slug + '"></' + 'script>';
+        const curlCmd = 'curl -X POST ' + apiUrl + ' \\\n  -H "x-api-key: YOUR_AXON_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"messages":[{"role":"user","content":"Ola"}]}\'';
+        const waMsg = encodeURIComponent('Quero testar o agente: ' + webUrl);
+        const waUrl = 'https://wa.me/?text=' + waMsg;
+
+        const wrap = document.createElement('div');
+        wrap.id = 'test-agora-modal';
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(8px);';
+
+        wrap.innerHTML = `
+          <div style="background:var(--bg,#13131c);border:1px solid rgba(124,92,255,0.4);border-radius:14px;max-width:760px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+            <div style="padding:24px 28px 18px;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                <span style="background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:12px;letter-spacing:1.5px;">AGENT PUBLISHED</span>
+              </div>
+              <h2 style="margin:0;font-size:22px;color:var(--text,#fff);">Teste seu agente em 4 canais</h2>
+              <p style="margin:6px 0 0;color:var(--text-dim,#888);font-size:13px;">${agent.name || 'Seu agente'} esta no ar. Teste em qualquer canal abaixo.</p>
+            </div>
+
+            <div style="padding:22px 28px;display:grid;gap:18px;">
+
+              <div style="background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.3);border-radius:10px;padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                  <span style="font-size:18px;">🌐</span>
+                  <strong style="color:#fff;">Web URL</strong>
+                  <span style="background:rgba(0,255,136,0.15);color:#00ff88;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:1px;">PRONTO</span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <input readonly value="${webUrl}" style="flex:1;min-width:200px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);color:#ccc;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:12px;" />
+                  <button data-copy="${webUrl}" class="ta-copy" style="background:rgba(124,92,255,0.2);border:1px solid rgba(124,92,255,0.4);color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Copiar</button>
+                  <a href="${webUrl}" target="_blank" rel="noopener" style="background:#7c5cff;border:none;color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;">Abrir →</a>
+                </div>
+                <p style="margin:8px 0 0;color:var(--text-dim,#888);font-size:11px;">Compartilhe esse link. Quem abrir conversa com seu agente direto no navegador.</p>
+              </div>
+
+              <div style="background:rgba(0,200,255,0.06);border:1px solid rgba(0,200,255,0.25);border-radius:10px;padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                  <span style="font-size:18px;">📋</span>
+                  <strong style="color:#fff;">Embed code</strong>
+                  <span style="background:rgba(255,170,68,0.15);color:#ffaa44;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:1px;">COPIA E COLA</span>
+                </div>
+                <pre style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);color:#9fd;padding:10px 12px;border-radius:6px;font-size:11px;overflow-x:auto;margin:0 0 8px;">${embedCode.replace(/</g,'&lt;')}</pre>
+                <button data-copy="${embedCode}" class="ta-copy" style="background:rgba(0,200,255,0.2);border:1px solid rgba(0,200,255,0.4);color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Copiar embed</button>
+                <p style="margin:8px 0 0;color:var(--text-dim,#888);font-size:11px;">Cola esse codigo no HTML do seu site. Vira widget de chat no canto inferior direito.</p>
+              </div>
+
+              <div style="background:rgba(255,170,68,0.06);border:1px solid rgba(255,170,68,0.25);border-radius:10px;padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                  <span style="font-size:18px;">🔌</span>
+                  <strong style="color:#fff;">HTTP API</strong>
+                  <span style="background:rgba(255,170,68,0.15);color:#ffaa44;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:1px;">DEV</span>
+                </div>
+                <pre style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);color:#fc9;padding:10px 12px;border-radius:6px;font-size:11px;overflow-x:auto;margin:0 0 8px;white-space:pre-wrap;">${curlCmd}</pre>
+                <button data-copy='${curlCmd.replace(/'/g, "&#39;")}' class="ta-copy" style="background:rgba(255,170,68,0.2);border:1px solid rgba(255,170,68,0.4);color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Copiar curl</button>
+                <p style="margin:8px 0 0;color:var(--text-dim,#888);font-size:11px;">Pra integrar com seu codigo, app mobile, ou outro sistema.</p>
+              </div>
+
+              <div style="background:rgba(37,211,102,0.06);border:1px solid rgba(37,211,102,0.25);border-radius:10px;padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                  <span style="font-size:18px;">📱</span>
+                  <strong style="color:#fff;">WhatsApp</strong>
+                  <span style="background:rgba(255,170,68,0.15);color:#ffaa44;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:1px;">VIA EVOLUTION</span>
+                </div>
+                <p style="margin:0 0 8px;color:#ccc;font-size:13px;">Compartilhe o link do agente direto no WhatsApp pra clientes testarem:</p>
+                <a href="${waUrl}" target="_blank" rel="noopener" style="background:#25D366;border:none;color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">📱 Compartilhar no WhatsApp</a>
+                <p style="margin:10px 0 0;color:var(--text-dim,#888);font-size:11px;">Pra conectar numero proprio do seu agente no WhatsApp Business, configure no <a href="/dashboard" style="color:#25D366;">dashboard → integrations</a>.</p>
+              </div>
+
+            </div>
+
+            <div style="padding:18px 28px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:10px;justify-content:flex-end;">
+              <button id="ta-close" style="background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text-dim,#888);padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;">Fechar</button>
+              <a href="${webUrl}" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;padding:9px 22px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Abrir agente →</a>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(wrap);
+        wrap.querySelectorAll('.ta-copy').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const txt = btn.getAttribute('data-copy');
+            navigator.clipboard.writeText(txt).then(() => {
+              const orig = btn.textContent;
+              btn.textContent = '✓ Copiado';
+              setTimeout(() => { btn.textContent = orig; }, 1500);
+            });
+          });
+        });
+        wrap.querySelector('#ta-close').addEventListener('click', () => wrap.remove());
+        wrap.addEventListener('click', (e) => { if (e.target === wrap) wrap.remove(); });
       }
 
       // ── Init ─────────────────────────────────────────────────────────

@@ -13,6 +13,8 @@ on:
     branches: [main]
     paths:
       - 'landing/**'
+      - 'registry/**'
+      - 'scripts/build-catalog.py'
       - '.github/workflows/deploy-landing.yml'
   workflow_dispatch: {}
 
@@ -26,6 +28,9 @@ jobs:
       deployments: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate static catalog from registry
+        run: python scripts/build-catalog.py
 
       - name: Publish
         uses: cloudflare/wrangler-action@v3

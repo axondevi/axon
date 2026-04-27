@@ -114,54 +114,91 @@
         ? `${window.location.protocol}//${window.location.host}`
         : 'https://axon-kedb.onrender.com';
 
+      // Demo data: serve as instantaneous fallback so the page never sits empty
+      const DEMO_DATA = {
+        window_days: 30,
+        generated_at: new Date().toISOString(),
+        totals: { requests: 12847, cache_hit_rate: 0.41 },
+        by_api: [
+          { api: 'openai',     requests: 3421, cache_hit_rate: 0.62, p50_latency_ms: 412, p95_latency_ms: 1280 },
+          { api: 'anthropic',  requests: 2108, cache_hit_rate: 0.55, p50_latency_ms: 580, p95_latency_ms: 1820 },
+          { api: 'serpapi',    requests: 1842, cache_hit_rate: 0.31, p50_latency_ms: 920, p95_latency_ms: 2400 },
+          { api: 'firecrawl',  requests: 1284, cache_hit_rate: 0.48, p50_latency_ms: 1100, p95_latency_ms: 2900 },
+          { api: 'tavily',     requests: 980,  cache_hit_rate: 0.36, p50_latency_ms: 850, p95_latency_ms: 2100 },
+          { api: 'elevenlabs', requests: 642,  cache_hit_rate: 0.22, p50_latency_ms: 1400, p95_latency_ms: 3800 },
+          { api: 'replicate',  requests: 521,  cache_hit_rate: 0.18, p50_latency_ms: 1900, p95_latency_ms: 4200 },
+          { api: 'perplexity', requests: 412,  cache_hit_rate: 0.44, p50_latency_ms: 720, p95_latency_ms: 1950 },
+        ],
+        _demo: true,
+      };
+
+      function fetchWithTimeout(url, ms) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(t));
+      }
+
+      function render(d, isDemo) {
+        const demoNote = isDemo ? ' <span style="color:var(--text-muted);font-size:11px;">(demo data)</span>' : '';
+        document.getElementById('metaline').innerHTML =
+          `last ${d.window_days} days · ${d.totals.requests.toLocaleString()} requests · generated ${new Date(d.generated_at).toLocaleString()}${demoNote}`;
+
+        const totalsDiv = document.getElementById('totals');
+        totalsDiv.innerHTML = `
+          <div class="card">
+            <div class="lbl">Total requests</div>
+            <div class="val">${d.totals.requests.toLocaleString()}</div>
+          </div>
+          <div class="card">
+            <div class="lbl">Cache hit rate</div>
+            <div class="val">${(d.totals.cache_hit_rate * 100).toFixed(1)}<span class="u">%</span></div>
+          </div>
+          <div class="card">
+            <div class="lbl">APIs in catalog</div>
+            <div class="val">${d.by_api.length}</div>
+          </div>
+        `;
+
+        if (!d.by_api.length) {
+          document.getElementById('empty').style.display = 'block';
+          return;
+        }
+
+        const tbody = document.querySelector('#table tbody');
+        tbody.innerHTML = '';
+        const maxHit = Math.max(...d.by_api.map((a) => a.cache_hit_rate), 0.01);
+        d.by_api.forEach((a) => {
+          const hitPct = (a.cache_hit_rate * 100).toFixed(1);
+          const barPct = Math.round((a.cache_hit_rate / maxHit) * 100);
+          const slow = a.p95_latency_ms > 3000 ? ' slow' : '';
+          tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td class="label">${a.api}</td>
+              <td>${a.requests.toLocaleString()}</td>
+              <td><span class="bar"><span style="width:${barPct}%"></span></span><span class="${a.cache_hit_rate >= 0.3 ? 'hit' : 'dim'}">${hitPct}%</span></td>
+              <td class="${a.p50_latency_ms > 2000 ? 'slow' : ''}">${a.p50_latency_ms}ms</td>
+              <td class="${slow}">${a.p95_latency_ms}ms</td>
+            </tr>
+          `);
+        });
+        document.getElementById('table').style.display = 'table';
+      }
+
       async function load() {
+        // 1) Renderiza demo INSTANTANEAMENTE (pagina nunca aparece vazia)
+        render(DEMO_DATA, true);
+        // 2) Tenta upgrade pra dados reais (timeout 6s)
         try {
-          const res = await fetch(`${BASE}/v1/stats/public?days=30`);
+          const res = await fetchWithTimeout(`${BASE}/v1/stats/public?days=30`, 6000);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
           const d = await res.json();
-
-          document.getElementById('metaline').textContent =
-            `last ${d.window_days} days · ${d.totals.requests.toLocaleString()} requests · generated ${new Date(d.generated_at).toLocaleString()}`;
-
-          const totalsDiv = document.getElementById('totals');
-          totalsDiv.innerHTML = `
-            <div class="card">
-              <div class="lbl">Total requests</div>
-              <div class="val">${d.totals.requests.toLocaleString()}</div>
-            </div>
-            <div class="card">
-              <div class="lbl">Cache hit rate</div>
-              <div class="val">${(d.totals.cache_hit_rate * 100).toFixed(1)}<span class="u">%</span></div>
-            </div>
-            <div class="card">
-              <div class="lbl">APIs in catalog</div>
-              <div class="val">${d.by_api.length}</div>
-            </div>
-          `;
-
-          if (d.by_api.length === 0) {
-            document.getElementById('empty').style.display = 'block';
-            return;
-          }
-
-          const tbody = document.querySelector('#table tbody');
-          const maxHit = Math.max(...d.by_api.map((a) => a.cache_hit_rate), 0.01);
-          d.by_api.forEach((a) => {
-            const hitPct = (a.cache_hit_rate * 100).toFixed(1);
-            const barPct = Math.round((a.cache_hit_rate / maxHit) * 100);
-            const slow = a.p95_latency_ms > 3000 ? ' slow' : '';
-            tbody.insertAdjacentHTML('beforeend', `
-              <tr>
-                <td class="label">${a.api}</td>
-                <td>${a.requests.toLocaleString()}</td>
-                <td><span class="bar"><span style="width:${barPct}%"></span></span><span class="${a.cache_hit_rate >= 0.3 ? 'hit' : 'dim'}">${hitPct}%</span></td>
-                <td class="${a.p50_latency_ms > 2000 ? 'slow' : ''}">${a.p50_latency_ms}ms</td>
-                <td class="${slow}">${a.p95_latency_ms}ms</td>
-              </tr>
-            `);
-          });
-          document.getElementById('table').style.display = 'table';
+          if (d && d.by_api) render(d, false);
         } catch (err) {
-          document.getElementById('metaline').textContent = `Could not load stats: ${err.message}`;
+          // demo data ja esta na tela, so adiciona nota discreta
+          const ml = document.getElementById('metaline');
+          if (ml && !ml.innerHTML.includes('demo')) {
+            ml.innerHTML += ' <span style="color:#ff8866;font-size:11px;">(showing demo — live API offline)</span>';
+          }
         }
       }
 

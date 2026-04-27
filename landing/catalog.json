@@ -1,0 +1,2071 @@
+{
+  "data": [
+    {
+      "slug": "alchemy",
+      "provider": "Alchemy",
+      "category": "Blockchain Data",
+      "description": "Multichain JSON-RPC + enhanced APIs (NFTs, transfers, prices).",
+      "homepage": "https://docs.alchemy.com",
+      "endpoints": [
+        "nft-by-owner",
+        "token-prices"
+      ]
+    },
+    {
+      "slug": "anthropic",
+      "provider": "Anthropic",
+      "category": "LLM",
+      "description": "Claude 4.x family — Opus, Sonnet, Haiku. Best-in-class reasoning and long context.",
+      "homepage": "https://console.anthropic.com",
+      "endpoints": [
+        "messages"
+      ]
+    },
+    {
+      "slug": "apollo",
+      "provider": "Apollo.io",
+      "category": "Enrichment",
+      "description": "B2B contact and company enrichment — people, emails, firmographics.",
+      "homepage": "https://apollo.io",
+      "endpoints": [
+        "people-match",
+        "organization-enrich"
+      ]
+    },
+    {
+      "slug": "arxiv",
+      "provider": "arXiv",
+      "category": "Knowledge & Research",
+      "description": "Cornell's e-print archive of 2.4M+ scientific papers (physics, math, CS, bio, econ, stat). Free public API, no key. Returns Atom XML — agents should parse with their XML tooling.",
+      "homepage": "https://info.arxiv.org/help/api/index.html",
+      "endpoints": [
+        "search",
+        "by-id"
+      ]
+    },
+    {
+      "slug": "assemblyai",
+      "provider": "AssemblyAI",
+      "category": "Speech & Audio",
+      "description": "Premium speech-to-text with speaker diarization, summarization, sentiment, topic detection, and PII redaction. LeMUR LLM over transcripts.",
+      "homepage": "https://www.assemblyai.com",
+      "endpoints": [
+        "transcribe-submit",
+        "transcribe-get",
+        "lemur-summary",
+        "lemur-qa",
+        "upload"
+      ]
+    },
+    {
+      "slug": "brasilapi",
+      "provider": "BrasilAPI",
+      "category": "Brazil & LatAm Data",
+      "description": "Native Brazilian data for AI agents — CNPJ, CEP, FIPE, holidays, interest rates, banks. The only x402 gateway with first-class LatAm coverage.",
+      "homepage": "https://brasilapi.com.br",
+      "endpoints": [
+        "cnpj",
+        "cep",
+        "bank",
+        "banks",
+        "fipe-price",
+        "fipe-brands",
+        "holidays",
+        "rates",
+        "rate",
+        "ddd"
+      ]
+    },
+    {
+      "slug": "brave-search",
+      "provider": "Brave Search",
+      "category": "Web Intelligence",
+      "description": "Independent web search index. Not a Google scrape.",
+      "homepage": "https://brave.com/search/api",
+      "endpoints": [
+        "search",
+        "news"
+      ]
+    },
+    {
+      "slug": "bright-data",
+      "provider": "Bright Data",
+      "category": "Web Intelligence",
+      "description": "Enterprise-grade scraping infra with proxies + SERP.",
+      "homepage": "https://docs.brightdata.com",
+      "endpoints": [
+        "serp"
+      ]
+    },
+    {
+      "slug": "cartesia",
+      "provider": "Cartesia",
+      "category": "Voice",
+      "description": "Ultra-low-latency voice synthesis (Sonic).",
+      "homepage": "https://docs.cartesia.ai",
+      "endpoints": [
+        "tts"
+      ]
+    },
+    {
+      "slug": "clearbit",
+      "provider": "Clearbit",
+      "category": "Enrichment",
+      "description": "Company + person enrichment from domain or email.",
+      "homepage": "https://dashboard.clearbit.com/docs",
+      "endpoints": [
+        "company"
+      ]
+    },
+    {
+      "slug": "cohere",
+      "provider": "Cohere",
+      "category": "LLM",
+      "description": "Command R+ chat, multilingual embeddings, and best-in-class rerank for RAG pipelines.",
+      "homepage": "https://cohere.com",
+      "endpoints": [
+        "chat",
+        "rerank",
+        "embed",
+        "models"
+      ]
+    },
+    {
+      "slug": "coingecko",
+      "provider": "CoinGecko",
+      "category": "Finance & Markets",
+      "description": "Crypto market data — prices, market caps, OHLC, historical, exchanges, NFT floors, derivatives. Free Demo tier: 30 req/min, 10k credits/month, 50+ endpoints.",
+      "homepage": "https://www.coingecko.com/en/api",
+      "endpoints": [
+        "simple-price",
+        "coins-list",
+        "coins-markets",
+        "coin-by-id",
+        "coin-history",
+        "coin-ohlc",
+        "trending",
+        "global"
+      ]
+    },
+    {
+      "slug": "deepgram",
+      "provider": "Deepgram",
+      "category": "Voice",
+      "description": "Fast, accurate speech-to-text and real-time transcription.",
+      "homepage": "https://deepgram.com",
+      "endpoints": [
+        "transcribe-url"
+      ]
+    },
+    {
+      "slug": "deepl",
+      "provider": "DeepL",
+      "category": "Translation",
+      "description": "High-quality machine translation across 30+ languages.",
+      "homepage": "https://www.deepl.com/docs-api",
+      "endpoints": [
+        "translate"
+      ]
+    },
+    {
+      "slug": "elevenlabs",
+      "provider": "ElevenLabs",
+      "category": "Voice",
+      "description": "State-of-the-art text-to-speech and voice cloning.",
+      "homepage": "https://elevenlabs.io",
+      "endpoints": [
+        "tts",
+        "voices"
+      ]
+    },
+    {
+      "slug": "exa",
+      "provider": "Exa",
+      "category": "Web Intelligence",
+      "description": "Neural search built for AI agents — semantic web search.",
+      "homepage": "https://exa.ai",
+      "endpoints": [
+        "search",
+        "contents",
+        "similar"
+      ]
+    },
+    {
+      "slug": "firecrawl",
+      "provider": "Firecrawl",
+      "category": "Web Intelligence",
+      "description": "LLM-ready web scraping — clean markdown from any URL.",
+      "homepage": "https://firecrawl.dev",
+      "endpoints": [
+        "scrape",
+        "crawl",
+        "search"
+      ]
+    },
+    {
+      "slug": "frankfurter",
+      "provider": "Frankfurter",
+      "category": "Finance & Markets",
+      "description": "Free FX rate API backed by the European Central Bank reference rates. No API key required. ~30 currencies, daily updates, full history back to 1999.",
+      "homepage": "https://frankfurter.dev",
+      "endpoints": [
+        "latest",
+        "historical",
+        "timeseries",
+        "currencies"
+      ]
+    },
+    {
+      "slug": "groq",
+      "provider": "Groq",
+      "category": "LLM",
+      "description": "Ultra-fast inference for open-weight LLMs (Llama 3.3, Mixtral, Gemma). OpenAI-compatible API.",
+      "homepage": "https://groq.com",
+      "endpoints": [
+        "chat",
+        "models"
+      ]
+    },
+    {
+      "slug": "hackernews",
+      "provider": "Hacker News (Algolia Search)",
+      "category": "News & Social",
+      "description": "Hacker News full-text search, item lookup, and user profiles via Algolia. No API key. Covers the entire HN history with millisecond response times.",
+      "homepage": "https://hn.algolia.com/api",
+      "endpoints": [
+        "search",
+        "search-by-date",
+        "item",
+        "user"
+      ]
+    },
+    {
+      "slug": "hunter",
+      "provider": "Hunter.io",
+      "category": "Enrichment",
+      "description": "Find and verify professional email addresses from a domain.",
+      "homepage": "https://hunter.io/api-documentation/v2",
+      "endpoints": [
+        "domain-search",
+        "email-finder",
+        "verify"
+      ]
+    },
+    {
+      "slug": "ipinfo",
+      "provider": "IPinfo",
+      "category": "Geo & Weather",
+      "description": "IP → geolocation, ASN, company, carrier, abuse info.",
+      "homepage": "https://ipinfo.io/developers",
+      "endpoints": [
+        "lookup"
+      ]
+    },
+    {
+      "slug": "jina",
+      "provider": "Jina AI",
+      "category": "AI & ML",
+      "description": "Embeddings, reranking, reader, grounding — RAG toolkit.",
+      "homepage": "https://jina.ai",
+      "endpoints": [
+        "embeddings",
+        "rerank",
+        "reader"
+      ]
+    },
+    {
+      "slug": "mem0",
+      "provider": "Mem0",
+      "category": "Agent Memory",
+      "description": "Persistent long-term memory layer for AI agents — store, search, and forget user-specific facts that survive across sessions. Closes the 'goldfish memory' gap.",
+      "homepage": "https://mem0.ai",
+      "endpoints": [
+        "add-memory",
+        "search-memory",
+        "list-memories",
+        "get-memory",
+        "update-memory",
+        "delete-memory",
+        "history"
+      ]
+    },
+    {
+      "slug": "mindee",
+      "provider": "Mindee",
+      "category": "Documents",
+      "description": "OCR and structured data extraction — invoices, receipts, IDs, custom docs.",
+      "homepage": "https://developers.mindee.com",
+      "endpoints": [
+        "invoice",
+        "receipt"
+      ]
+    },
+    {
+      "slug": "mistral",
+      "provider": "Mistral AI",
+      "category": "LLM",
+      "description": "European frontier LLMs — Mistral Large, Small, Codestral. Strong multilingual (PT/ES/FR/DE) and code generation.",
+      "homepage": "https://mistral.ai",
+      "endpoints": [
+        "chat",
+        "fim",
+        "embed",
+        "models"
+      ]
+    },
+    {
+      "slug": "neynar",
+      "provider": "Neynar",
+      "category": "Social",
+      "description": "Farcaster protocol API — read/write casts, user graph, channels.",
+      "homepage": "https://docs.neynar.com",
+      "endpoints": [
+        "user-by-fid",
+        "casts-by-fid"
+      ]
+    },
+    {
+      "slug": "open-meteo",
+      "provider": "Open-Meteo",
+      "category": "Weather & Geo",
+      "description": "Free weather forecast API — no API key required. Often more accurate than commercial alternatives because it blends national weather services (DWD, NOAA, MeteoFrance, etc.). Includes forecast, historical, marine, air quality, geocoding.",
+      "homepage": "https://open-meteo.com",
+      "endpoints": [
+        "forecast",
+        "air-quality",
+        "marine",
+        "elevation",
+        "geocoding"
+      ]
+    },
+    {
+      "slug": "openai",
+      "provider": "OpenAI",
+      "category": "LLM",
+      "description": "GPT-4, GPT-4o, embeddings, and more from OpenAI.",
+      "homepage": "https://platform.openai.com",
+      "endpoints": [
+        "chat",
+        "embeddings",
+        "moderation"
+      ]
+    },
+    {
+      "slug": "openweather",
+      "provider": "OpenWeather",
+      "category": "Geo & Weather",
+      "description": "Current weather, forecasts, and historical data worldwide.",
+      "homepage": "https://openweathermap.org/api",
+      "endpoints": [
+        "current",
+        "forecast",
+        "geocode"
+      ]
+    },
+    {
+      "slug": "perplexity",
+      "provider": "Perplexity",
+      "category": "Web Intelligence",
+      "description": "LLM-backed search with citations, sonar models.",
+      "homepage": "https://docs.perplexity.ai",
+      "endpoints": [
+        "chat"
+      ]
+    },
+    {
+      "slug": "replicate",
+      "provider": "Replicate",
+      "category": "AI & ML",
+      "description": "Run any open-source model (Llama, FLUX, SDXL, Whisper, etc.) via one API.",
+      "homepage": "https://replicate.com",
+      "endpoints": [
+        "predict",
+        "status",
+        "flux-schnell"
+      ]
+    },
+    {
+      "slug": "rest-countries",
+      "provider": "REST Countries",
+      "category": "Geography & Reference",
+      "description": "Free world country data — population, capital, currencies, languages, flags, borders, area, timezones, calling codes. No API key. Open-source community-maintained.",
+      "homepage": "https://restcountries.com",
+      "endpoints": [
+        "by-name",
+        "by-code",
+        "by-region",
+        "by-capital",
+        "by-currency",
+        "by-language",
+        "all"
+      ]
+    },
+    {
+      "slug": "runway",
+      "provider": "Runway",
+      "category": "AI & ML",
+      "description": "Gen-3 video generation.",
+      "homepage": "https://docs.dev.runwayml.com",
+      "endpoints": [
+        "image-to-video",
+        "task-status"
+      ]
+    },
+    {
+      "slug": "serpapi",
+      "provider": "SerpAPI",
+      "category": "Web Intelligence",
+      "description": "Real-time Google, Bing, YouTube and Amazon search results API.",
+      "homepage": "https://serpapi.com",
+      "endpoints": [
+        "search"
+      ]
+    },
+    {
+      "slug": "stability",
+      "provider": "Stability AI",
+      "category": "AI & ML",
+      "description": "Stable Diffusion / SDXL image generation and editing.",
+      "homepage": "https://platform.stability.ai",
+      "endpoints": [
+        "generate-sd3",
+        "generate-xl",
+        "upscale"
+      ]
+    },
+    {
+      "slug": "tavily",
+      "provider": "Tavily",
+      "category": "Web Intelligence",
+      "description": "Search engine purpose-built for AI agents — returns LLM-ready context.",
+      "homepage": "https://tavily.com",
+      "endpoints": [
+        "search",
+        "extract"
+      ]
+    },
+    {
+      "slug": "together",
+      "provider": "Together AI",
+      "category": "LLM",
+      "description": "Run open-source models (Llama 4, Qwen, DeepSeek, Mixtral, etc.) at scale.",
+      "homepage": "https://docs.together.ai",
+      "endpoints": [
+        "chat",
+        "completions",
+        "embeddings"
+      ]
+    },
+    {
+      "slug": "voyage",
+      "provider": "Voyage AI",
+      "category": "AI & ML",
+      "description": "Best-in-class embeddings for retrieval, RAG, and semantic search.",
+      "homepage": "https://docs.voyageai.com",
+      "endpoints": [
+        "embeddings",
+        "rerank"
+      ]
+    },
+    {
+      "slug": "wikipedia",
+      "provider": "Wikipedia",
+      "category": "Knowledge & Research",
+      "description": "Wikipedia's official REST API + Action API. No key required. Page summaries, search, full article content, related pages, in 300+ languages.",
+      "homepage": "https://en.wikipedia.org/api/rest_v1/",
+      "endpoints": [
+        "summary",
+        "html",
+        "related",
+        "random",
+        "search",
+        "opensearch"
+      ]
+    }
+  ],
+  "count": 40,
+  "_generated": true,
+  "_source": "registry/*.json",
+  "details": {
+    "alchemy": {
+      "slug": "alchemy",
+      "provider": "Alchemy",
+      "category": "Blockchain Data",
+      "description": "Multichain JSON-RPC + enhanced APIs (NFTs, transfers, prices).",
+      "homepage": "https://docs.alchemy.com",
+      "endpoints": [
+        {
+          "key": "nft-by-owner",
+          "method": "GET",
+          "path": "/nft/v3/:apiKey/getNFTsForOwner",
+          "price_usd": 0.0002,
+          "markup_pct": 25,
+          "cache_ttl": 60,
+          "effective_price_usd": 0.00025,
+          "cached_price_usd": 0.0001
+        },
+        {
+          "key": "token-prices",
+          "method": "POST",
+          "path": "/prices/v1/:apiKey/tokens/by-symbol",
+          "price_usd": 0.0005,
+          "markup_pct": 20,
+          "cache_ttl": 300,
+          "effective_price_usd": 0.0006,
+          "cached_price_usd": 0.00025
+        }
+      ]
+    },
+    "anthropic": {
+      "slug": "anthropic",
+      "provider": "Anthropic",
+      "category": "LLM",
+      "description": "Claude 4.x family — Opus, Sonnet, Haiku. Best-in-class reasoning and long context.",
+      "homepage": "https://console.anthropic.com",
+      "endpoints": [
+        {
+          "key": "messages",
+          "method": "POST",
+          "path": "/v1/messages",
+          "price_usd": 0.012,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.013200000000000002,
+          "cached_price_usd": 0.006
+        }
+      ]
+    },
+    "apollo": {
+      "slug": "apollo",
+      "provider": "Apollo.io",
+      "category": "Enrichment",
+      "description": "B2B contact and company enrichment — people, emails, firmographics.",
+      "homepage": "https://apollo.io",
+      "endpoints": [
+        {
+          "key": "people-match",
+          "method": "POST",
+          "path": "/v1/people/match",
+          "price_usd": 0.02,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.023,
+          "cached_price_usd": 0.01
+        },
+        {
+          "key": "organization-enrich",
+          "method": "GET",
+          "path": "/v1/organizations/enrich",
+          "price_usd": 0.015,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.017249999999999998,
+          "cached_price_usd": 0.0075
+        }
+      ]
+    },
+    "arxiv": {
+      "slug": "arxiv",
+      "provider": "arXiv",
+      "category": "Knowledge & Research",
+      "description": "Cornell's e-print archive of 2.4M+ scientific papers (physics, math, CS, bio, econ, stat). Free public API, no key. Returns Atom XML — agents should parse with their XML tooling.",
+      "homepage": "https://info.arxiv.org/help/api/index.html",
+      "endpoints": [
+        {
+          "key": "search",
+          "method": "GET",
+          "path": "/api/query",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "by-id",
+          "method": "GET",
+          "path": "/api/query",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        }
+      ]
+    },
+    "assemblyai": {
+      "slug": "assemblyai",
+      "provider": "AssemblyAI",
+      "category": "Speech & Audio",
+      "description": "Premium speech-to-text with speaker diarization, summarization, sentiment, topic detection, and PII redaction. LeMUR LLM over transcripts.",
+      "homepage": "https://www.assemblyai.com",
+      "endpoints": [
+        {
+          "key": "transcribe-submit",
+          "method": "POST",
+          "path": "/v2/transcript",
+          "price_usd": 0.1,
+          "markup_pct": 12,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.11200000000000002,
+          "cached_price_usd": 0.05
+        },
+        {
+          "key": "transcribe-get",
+          "method": "GET",
+          "path": "/v2/transcript/:id",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        },
+        {
+          "key": "lemur-summary",
+          "method": "POST",
+          "path": "/lemur/v3/generate/summary",
+          "price_usd": 0.05,
+          "markup_pct": 15,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.057499999999999996,
+          "cached_price_usd": 0.025
+        },
+        {
+          "key": "lemur-qa",
+          "method": "POST",
+          "path": "/lemur/v3/generate/question-answer",
+          "price_usd": 0.05,
+          "markup_pct": 15,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.057499999999999996,
+          "cached_price_usd": 0.025
+        },
+        {
+          "key": "upload",
+          "method": "POST",
+          "path": "/v2/upload",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        }
+      ]
+    },
+    "brasilapi": {
+      "slug": "brasilapi",
+      "provider": "BrasilAPI",
+      "category": "Brazil & LatAm Data",
+      "description": "Native Brazilian data for AI agents — CNPJ, CEP, FIPE, holidays, interest rates, banks. The only x402 gateway with first-class LatAm coverage.",
+      "homepage": "https://brasilapi.com.br",
+      "endpoints": [
+        {
+          "key": "cnpj",
+          "method": "GET",
+          "path": "/api/cnpj/v1/:cnpj",
+          "price_usd": 0.002,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0026000000000000003,
+          "cached_price_usd": 0.001
+        },
+        {
+          "key": "cep",
+          "method": "GET",
+          "path": "/api/cep/v2/:cep",
+          "price_usd": 0.0005,
+          "markup_pct": 30,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0006500000000000001,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "bank",
+          "method": "GET",
+          "path": "/api/banks/v1/:code",
+          "price_usd": 0.0005,
+          "markup_pct": 30,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0006500000000000001,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "banks",
+          "method": "GET",
+          "path": "/api/banks/v1",
+          "price_usd": 0.0005,
+          "markup_pct": 30,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0006500000000000001,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "fipe-price",
+          "method": "GET",
+          "path": "/api/fipe/preco/v1/:codigoFipe",
+          "price_usd": 0.001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0013000000000000002,
+          "cached_price_usd": 0.0005
+        },
+        {
+          "key": "fipe-brands",
+          "method": "GET",
+          "path": "/api/fipe/marcas/v1/:tipoVeiculo",
+          "price_usd": 0.0005,
+          "markup_pct": 30,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0006500000000000001,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "holidays",
+          "method": "GET",
+          "path": "/api/feriados/v1/:ano",
+          "price_usd": 0.0005,
+          "markup_pct": 30,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0006500000000000001,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "rates",
+          "method": "GET",
+          "path": "/api/taxas/v1",
+          "price_usd": 0.001,
+          "markup_pct": 30,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0013000000000000002,
+          "cached_price_usd": 0.0005
+        },
+        {
+          "key": "rate",
+          "method": "GET",
+          "path": "/api/taxas/v1/:sigla",
+          "price_usd": 0.001,
+          "markup_pct": 30,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0013000000000000002,
+          "cached_price_usd": 0.0005
+        },
+        {
+          "key": "ddd",
+          "method": "GET",
+          "path": "/api/ddd/v1/:ddd",
+          "price_usd": 0.0005,
+          "markup_pct": 30,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0006500000000000001,
+          "cached_price_usd": 0.00025
+        }
+      ]
+    },
+    "brave-search": {
+      "slug": "brave-search",
+      "provider": "Brave Search",
+      "category": "Web Intelligence",
+      "description": "Independent web search index. Not a Google scrape.",
+      "homepage": "https://brave.com/search/api",
+      "endpoints": [
+        {
+          "key": "search",
+          "method": "GET",
+          "path": "/res/v1/web/search",
+          "price_usd": 0.005,
+          "markup_pct": 10,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0055000000000000005,
+          "cached_price_usd": 0.0025
+        },
+        {
+          "key": "news",
+          "method": "GET",
+          "path": "/res/v1/news/search",
+          "price_usd": 0.005,
+          "markup_pct": 10,
+          "cache_ttl": 1800,
+          "effective_price_usd": 0.0055000000000000005,
+          "cached_price_usd": 0.0025
+        }
+      ]
+    },
+    "bright-data": {
+      "slug": "bright-data",
+      "provider": "Bright Data",
+      "category": "Web Intelligence",
+      "description": "Enterprise-grade scraping infra with proxies + SERP.",
+      "homepage": "https://docs.brightdata.com",
+      "endpoints": [
+        {
+          "key": "serp",
+          "method": "POST",
+          "path": "/request",
+          "price_usd": 0.01,
+          "markup_pct": 10,
+          "cache_ttl": 1800,
+          "effective_price_usd": 0.011000000000000001,
+          "cached_price_usd": 0.005
+        }
+      ]
+    },
+    "cartesia": {
+      "slug": "cartesia",
+      "provider": "Cartesia",
+      "category": "Voice",
+      "description": "Ultra-low-latency voice synthesis (Sonic).",
+      "homepage": "https://docs.cartesia.ai",
+      "endpoints": [
+        {
+          "key": "tts",
+          "method": "POST",
+          "path": "/tts/bytes",
+          "price_usd": 0.02,
+          "markup_pct": 10,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.022000000000000002,
+          "cached_price_usd": 0.01
+        }
+      ]
+    },
+    "clearbit": {
+      "slug": "clearbit",
+      "provider": "Clearbit",
+      "category": "Enrichment",
+      "description": "Company + person enrichment from domain or email.",
+      "homepage": "https://dashboard.clearbit.com/docs",
+      "endpoints": [
+        {
+          "key": "company",
+          "method": "GET",
+          "path": "/v2/companies/find",
+          "price_usd": 0.02,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.023,
+          "cached_price_usd": 0.01
+        }
+      ]
+    },
+    "cohere": {
+      "slug": "cohere",
+      "provider": "Cohere",
+      "category": "LLM",
+      "description": "Command R+ chat, multilingual embeddings, and best-in-class rerank for RAG pipelines.",
+      "homepage": "https://cohere.com",
+      "endpoints": [
+        {
+          "key": "chat",
+          "method": "POST",
+          "path": "/v2/chat",
+          "price_usd": 0.003,
+          "markup_pct": 15,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.00345,
+          "cached_price_usd": 0.0015
+        },
+        {
+          "key": "rerank",
+          "method": "POST",
+          "path": "/v2/rerank",
+          "price_usd": 0.002,
+          "markup_pct": 15,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0023,
+          "cached_price_usd": 0.001
+        },
+        {
+          "key": "embed",
+          "method": "POST",
+          "path": "/v2/embed",
+          "price_usd": 0.0001,
+          "markup_pct": 15,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00011499999999999999,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "models",
+          "method": "GET",
+          "path": "/v1/models",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        }
+      ]
+    },
+    "coingecko": {
+      "slug": "coingecko",
+      "provider": "CoinGecko",
+      "category": "Finance & Markets",
+      "description": "Crypto market data — prices, market caps, OHLC, historical, exchanges, NFT floors, derivatives. Free Demo tier: 30 req/min, 10k credits/month, 50+ endpoints.",
+      "homepage": "https://www.coingecko.com/en/api",
+      "endpoints": [
+        {
+          "key": "simple-price",
+          "method": "GET",
+          "path": "/api/v3/simple/price",
+          "price_usd": 0.0002,
+          "markup_pct": 25,
+          "cache_ttl": 60,
+          "effective_price_usd": 0.00025,
+          "cached_price_usd": 0.0001
+        },
+        {
+          "key": "coins-list",
+          "method": "GET",
+          "path": "/api/v3/coins/list",
+          "price_usd": 0.0002,
+          "markup_pct": 25,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00025,
+          "cached_price_usd": 0.0001
+        },
+        {
+          "key": "coins-markets",
+          "method": "GET",
+          "path": "/api/v3/coins/markets",
+          "price_usd": 0.0003,
+          "markup_pct": 25,
+          "cache_ttl": 60,
+          "effective_price_usd": 0.00037499999999999995,
+          "cached_price_usd": 0.00015
+        },
+        {
+          "key": "coin-by-id",
+          "method": "GET",
+          "path": "/api/v3/coins/:id",
+          "price_usd": 0.0003,
+          "markup_pct": 25,
+          "cache_ttl": 300,
+          "effective_price_usd": 0.00037499999999999995,
+          "cached_price_usd": 0.00015
+        },
+        {
+          "key": "coin-history",
+          "method": "GET",
+          "path": "/api/v3/coins/:id/history",
+          "price_usd": 0.0003,
+          "markup_pct": 25,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00037499999999999995,
+          "cached_price_usd": 0.00015
+        },
+        {
+          "key": "coin-ohlc",
+          "method": "GET",
+          "path": "/api/v3/coins/:id/ohlc",
+          "price_usd": 0.0003,
+          "markup_pct": 25,
+          "cache_ttl": 600,
+          "effective_price_usd": 0.00037499999999999995,
+          "cached_price_usd": 0.00015
+        },
+        {
+          "key": "trending",
+          "method": "GET",
+          "path": "/api/v3/search/trending",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 300,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "global",
+          "method": "GET",
+          "path": "/api/v3/global",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 300,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        }
+      ]
+    },
+    "deepgram": {
+      "slug": "deepgram",
+      "provider": "Deepgram",
+      "category": "Voice",
+      "description": "Fast, accurate speech-to-text and real-time transcription.",
+      "homepage": "https://deepgram.com",
+      "endpoints": [
+        {
+          "key": "transcribe-url",
+          "method": "POST",
+          "path": "/v1/listen",
+          "price_usd": 0.015,
+          "markup_pct": 10,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0165,
+          "cached_price_usd": 0.0075
+        }
+      ]
+    },
+    "deepl": {
+      "slug": "deepl",
+      "provider": "DeepL",
+      "category": "Translation",
+      "description": "High-quality machine translation across 30+ languages.",
+      "homepage": "https://www.deepl.com/docs-api",
+      "endpoints": [
+        {
+          "key": "translate",
+          "method": "POST",
+          "path": "/v2/translate",
+          "price_usd": 0.004,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.0046,
+          "cached_price_usd": 0.002
+        }
+      ]
+    },
+    "elevenlabs": {
+      "slug": "elevenlabs",
+      "provider": "ElevenLabs",
+      "category": "Voice",
+      "description": "State-of-the-art text-to-speech and voice cloning.",
+      "homepage": "https://elevenlabs.io",
+      "endpoints": [
+        {
+          "key": "tts",
+          "method": "POST",
+          "path": "/v1/text-to-speech/:voice_id",
+          "price_usd": 0.03,
+          "markup_pct": 10,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.033,
+          "cached_price_usd": 0.015
+        },
+        {
+          "key": "voices",
+          "method": "GET",
+          "path": "/v1/voices",
+          "price_usd": 0.001,
+          "markup_pct": 25,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.00125,
+          "cached_price_usd": 0.0005
+        }
+      ]
+    },
+    "exa": {
+      "slug": "exa",
+      "provider": "Exa",
+      "category": "Web Intelligence",
+      "description": "Neural search built for AI agents — semantic web search.",
+      "homepage": "https://exa.ai",
+      "endpoints": [
+        {
+          "key": "search",
+          "method": "POST",
+          "path": "/search",
+          "price_usd": 0.005,
+          "markup_pct": 10,
+          "cache_ttl": 1800,
+          "effective_price_usd": 0.0055000000000000005,
+          "cached_price_usd": 0.0025
+        },
+        {
+          "key": "contents",
+          "method": "POST",
+          "path": "/contents",
+          "price_usd": 0.003,
+          "markup_pct": 10,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0033000000000000004,
+          "cached_price_usd": 0.0015
+        },
+        {
+          "key": "similar",
+          "method": "POST",
+          "path": "/findSimilar",
+          "price_usd": 0.005,
+          "markup_pct": 10,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0055000000000000005,
+          "cached_price_usd": 0.0025
+        }
+      ]
+    },
+    "firecrawl": {
+      "slug": "firecrawl",
+      "provider": "Firecrawl",
+      "category": "Web Intelligence",
+      "description": "LLM-ready web scraping — clean markdown from any URL.",
+      "homepage": "https://firecrawl.dev",
+      "endpoints": [
+        {
+          "key": "scrape",
+          "method": "POST",
+          "path": "/v1/scrape",
+          "price_usd": 0.005,
+          "markup_pct": 10,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0055000000000000005,
+          "cached_price_usd": 0.0025
+        },
+        {
+          "key": "crawl",
+          "method": "POST",
+          "path": "/v1/crawl",
+          "price_usd": 0.05,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.05500000000000001,
+          "cached_price_usd": 0.025
+        },
+        {
+          "key": "search",
+          "method": "POST",
+          "path": "/v1/search",
+          "price_usd": 0.01,
+          "markup_pct": 10,
+          "cache_ttl": 1800,
+          "effective_price_usd": 0.011000000000000001,
+          "cached_price_usd": 0.005
+        }
+      ]
+    },
+    "frankfurter": {
+      "slug": "frankfurter",
+      "provider": "Frankfurter",
+      "category": "Finance & Markets",
+      "description": "Free FX rate API backed by the European Central Bank reference rates. No API key required. ~30 currencies, daily updates, full history back to 1999.",
+      "homepage": "https://frankfurter.dev",
+      "endpoints": [
+        {
+          "key": "latest",
+          "method": "GET",
+          "path": "/v1/latest",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "historical",
+          "method": "GET",
+          "path": "/v1/:date",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "timeseries",
+          "method": "GET",
+          "path": "/v1/:start..:end",
+          "price_usd": 0.0002,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00026000000000000003,
+          "cached_price_usd": 0.0001
+        },
+        {
+          "key": "currencies",
+          "method": "GET",
+          "path": "/v1/currencies",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        }
+      ]
+    },
+    "groq": {
+      "slug": "groq",
+      "provider": "Groq",
+      "category": "LLM",
+      "description": "Ultra-fast inference for open-weight LLMs (Llama 3.3, Mixtral, Gemma). OpenAI-compatible API.",
+      "homepage": "https://groq.com",
+      "endpoints": [
+        {
+          "key": "chat",
+          "method": "POST",
+          "path": "/openai/v1/chat/completions",
+          "price_usd": 0.0005,
+          "markup_pct": 15,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.000575,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "models",
+          "method": "GET",
+          "path": "/openai/v1/models",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        }
+      ]
+    },
+    "hackernews": {
+      "slug": "hackernews",
+      "provider": "Hacker News (Algolia Search)",
+      "category": "News & Social",
+      "description": "Hacker News full-text search, item lookup, and user profiles via Algolia. No API key. Covers the entire HN history with millisecond response times.",
+      "homepage": "https://hn.algolia.com/api",
+      "endpoints": [
+        {
+          "key": "search",
+          "method": "GET",
+          "path": "/api/v1/search",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 300,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "search-by-date",
+          "method": "GET",
+          "path": "/api/v1/search_by_date",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 60,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "item",
+          "method": "GET",
+          "path": "/api/v1/items/:id",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 600,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "user",
+          "method": "GET",
+          "path": "/api/v1/users/:username",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        }
+      ]
+    },
+    "hunter": {
+      "slug": "hunter",
+      "provider": "Hunter.io",
+      "category": "Enrichment",
+      "description": "Find and verify professional email addresses from a domain.",
+      "homepage": "https://hunter.io/api-documentation/v2",
+      "endpoints": [
+        {
+          "key": "domain-search",
+          "method": "GET",
+          "path": "/v2/domain-search",
+          "price_usd": 0.005,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.00575,
+          "cached_price_usd": 0.0025
+        },
+        {
+          "key": "email-finder",
+          "method": "GET",
+          "path": "/v2/email-finder",
+          "price_usd": 0.01,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.0115,
+          "cached_price_usd": 0.005
+        },
+        {
+          "key": "verify",
+          "method": "GET",
+          "path": "/v2/email-verifier",
+          "price_usd": 0.002,
+          "markup_pct": 20,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0024,
+          "cached_price_usd": 0.001
+        }
+      ]
+    },
+    "ipinfo": {
+      "slug": "ipinfo",
+      "provider": "IPinfo",
+      "category": "Geo & Weather",
+      "description": "IP → geolocation, ASN, company, carrier, abuse info.",
+      "homepage": "https://ipinfo.io/developers",
+      "endpoints": [
+        {
+          "key": "lookup",
+          "method": "GET",
+          "path": "/:ip/json",
+          "price_usd": 0.0005,
+          "markup_pct": 30,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0006500000000000001,
+          "cached_price_usd": 0.00025
+        }
+      ]
+    },
+    "jina": {
+      "slug": "jina",
+      "provider": "Jina AI",
+      "category": "AI & ML",
+      "description": "Embeddings, reranking, reader, grounding — RAG toolkit.",
+      "homepage": "https://jina.ai",
+      "endpoints": [
+        {
+          "key": "embeddings",
+          "method": "POST",
+          "path": "/v1/embeddings",
+          "price_usd": 0.0012,
+          "markup_pct": 10,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.00132,
+          "cached_price_usd": 0.0006
+        },
+        {
+          "key": "rerank",
+          "method": "POST",
+          "path": "/v1/rerank",
+          "price_usd": 0.0025,
+          "markup_pct": 10,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0027500000000000003,
+          "cached_price_usd": 0.00125
+        },
+        {
+          "key": "reader",
+          "method": "POST",
+          "path": "/",
+          "price_usd": 0.003,
+          "markup_pct": 10,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0033000000000000004,
+          "cached_price_usd": 0.0015
+        }
+      ]
+    },
+    "mem0": {
+      "slug": "mem0",
+      "provider": "Mem0",
+      "category": "Agent Memory",
+      "description": "Persistent long-term memory layer for AI agents — store, search, and forget user-specific facts that survive across sessions. Closes the 'goldfish memory' gap.",
+      "homepage": "https://mem0.ai",
+      "endpoints": [
+        {
+          "key": "add-memory",
+          "method": "POST",
+          "path": "/v1/memories/",
+          "price_usd": 0.001,
+          "markup_pct": 20,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0012,
+          "cached_price_usd": 0.0005
+        },
+        {
+          "key": "search-memory",
+          "method": "POST",
+          "path": "/v1/memories/search/",
+          "price_usd": 0.0008,
+          "markup_pct": 20,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.00096,
+          "cached_price_usd": 0.0004
+        },
+        {
+          "key": "list-memories",
+          "method": "GET",
+          "path": "/v1/memories/",
+          "price_usd": 0.0005,
+          "markup_pct": 15,
+          "cache_ttl": 30,
+          "effective_price_usd": 0.000575,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "get-memory",
+          "method": "GET",
+          "path": "/v1/memories/:memory_id/",
+          "price_usd": 0,
+          "markup_pct": 15,
+          "cache_ttl": 60,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        },
+        {
+          "key": "update-memory",
+          "method": "PUT",
+          "path": "/v1/memories/:memory_id/",
+          "price_usd": 0.001,
+          "markup_pct": 20,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0012,
+          "cached_price_usd": 0.0005
+        },
+        {
+          "key": "delete-memory",
+          "method": "DELETE",
+          "path": "/v1/memories/:memory_id/",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        },
+        {
+          "key": "history",
+          "method": "GET",
+          "path": "/v1/memories/:memory_id/history/",
+          "price_usd": 0.0002,
+          "markup_pct": 15,
+          "cache_ttl": 30,
+          "effective_price_usd": 0.00022999999999999998,
+          "cached_price_usd": 0.0001
+        }
+      ]
+    },
+    "mindee": {
+      "slug": "mindee",
+      "provider": "Mindee",
+      "category": "Documents",
+      "description": "OCR and structured data extraction — invoices, receipts, IDs, custom docs.",
+      "homepage": "https://developers.mindee.com",
+      "endpoints": [
+        {
+          "key": "invoice",
+          "method": "POST",
+          "path": "/v1/products/mindee/invoices/v4/predict",
+          "price_usd": 0.02,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.023,
+          "cached_price_usd": 0.01
+        },
+        {
+          "key": "receipt",
+          "method": "POST",
+          "path": "/v1/products/mindee/expense_receipts/v5/predict",
+          "price_usd": 0.015,
+          "markup_pct": 15,
+          "cache_ttl": 604800,
+          "effective_price_usd": 0.017249999999999998,
+          "cached_price_usd": 0.0075
+        }
+      ]
+    },
+    "mistral": {
+      "slug": "mistral",
+      "provider": "Mistral AI",
+      "category": "LLM",
+      "description": "European frontier LLMs — Mistral Large, Small, Codestral. Strong multilingual (PT/ES/FR/DE) and code generation.",
+      "homepage": "https://mistral.ai",
+      "endpoints": [
+        {
+          "key": "chat",
+          "method": "POST",
+          "path": "/v1/chat/completions",
+          "price_usd": 0.002,
+          "markup_pct": 15,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0023,
+          "cached_price_usd": 0.001
+        },
+        {
+          "key": "fim",
+          "method": "POST",
+          "path": "/v1/fim/completions",
+          "price_usd": 0.001,
+          "markup_pct": 15,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.00115,
+          "cached_price_usd": 0.0005
+        },
+        {
+          "key": "embed",
+          "method": "POST",
+          "path": "/v1/embeddings",
+          "price_usd": 0.0001,
+          "markup_pct": 15,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00011499999999999999,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "models",
+          "method": "GET",
+          "path": "/v1/models",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        }
+      ]
+    },
+    "neynar": {
+      "slug": "neynar",
+      "provider": "Neynar",
+      "category": "Social",
+      "description": "Farcaster protocol API — read/write casts, user graph, channels.",
+      "homepage": "https://docs.neynar.com",
+      "endpoints": [
+        {
+          "key": "user-by-fid",
+          "method": "GET",
+          "path": "/v2/farcaster/user/bulk",
+          "price_usd": 0.0005,
+          "markup_pct": 25,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.000625,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "casts-by-fid",
+          "method": "GET",
+          "path": "/v2/farcaster/feed/user/casts",
+          "price_usd": 0.001,
+          "markup_pct": 20,
+          "cache_ttl": 300,
+          "effective_price_usd": 0.0012,
+          "cached_price_usd": 0.0005
+        }
+      ]
+    },
+    "open-meteo": {
+      "slug": "open-meteo",
+      "provider": "Open-Meteo",
+      "category": "Weather & Geo",
+      "description": "Free weather forecast API — no API key required. Often more accurate than commercial alternatives because it blends national weather services (DWD, NOAA, MeteoFrance, etc.). Includes forecast, historical, marine, air quality, geocoding.",
+      "homepage": "https://open-meteo.com",
+      "endpoints": [
+        {
+          "key": "forecast",
+          "method": "GET",
+          "path": "/v1/forecast",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 600,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "air-quality",
+          "method": "GET",
+          "path": "/v1/air-quality",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 1800,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "marine",
+          "method": "GET",
+          "path": "/v1/marine",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 1800,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "elevation",
+          "method": "GET",
+          "path": "/v1/elevation",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "geocoding",
+          "method": "GET",
+          "path": "/v1/search",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        }
+      ]
+    },
+    "openai": {
+      "slug": "openai",
+      "provider": "OpenAI",
+      "category": "LLM",
+      "description": "GPT-4, GPT-4o, embeddings, and more from OpenAI.",
+      "homepage": "https://platform.openai.com",
+      "endpoints": [
+        {
+          "key": "chat",
+          "method": "POST",
+          "path": "/v1/chat/completions",
+          "price_usd": 0.01,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.011000000000000001,
+          "cached_price_usd": 0.005
+        },
+        {
+          "key": "embeddings",
+          "method": "POST",
+          "path": "/v1/embeddings",
+          "price_usd": 0.002,
+          "markup_pct": 10,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0022,
+          "cached_price_usd": 0.001
+        },
+        {
+          "key": "moderation",
+          "method": "POST",
+          "path": "/v1/moderations",
+          "price_usd": 0.001,
+          "markup_pct": 15,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.00115,
+          "cached_price_usd": 0.0005
+        }
+      ]
+    },
+    "openweather": {
+      "slug": "openweather",
+      "provider": "OpenWeather",
+      "category": "Geo & Weather",
+      "description": "Current weather, forecasts, and historical data worldwide.",
+      "homepage": "https://openweathermap.org/api",
+      "endpoints": [
+        {
+          "key": "current",
+          "method": "GET",
+          "path": "/data/2.5/weather",
+          "price_usd": 0.0005,
+          "markup_pct": 20,
+          "cache_ttl": 900,
+          "effective_price_usd": 0.0006,
+          "cached_price_usd": 0.00025
+        },
+        {
+          "key": "forecast",
+          "method": "GET",
+          "path": "/data/2.5/forecast",
+          "price_usd": 0.001,
+          "markup_pct": 20,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0012,
+          "cached_price_usd": 0.0005
+        },
+        {
+          "key": "geocode",
+          "method": "GET",
+          "path": "/geo/1.0/direct",
+          "price_usd": 0.0005,
+          "markup_pct": 25,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.000625,
+          "cached_price_usd": 0.00025
+        }
+      ]
+    },
+    "perplexity": {
+      "slug": "perplexity",
+      "provider": "Perplexity",
+      "category": "Web Intelligence",
+      "description": "LLM-backed search with citations, sonar models.",
+      "homepage": "https://docs.perplexity.ai",
+      "endpoints": [
+        {
+          "key": "chat",
+          "method": "POST",
+          "path": "/chat/completions",
+          "price_usd": 0.01,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.011000000000000001,
+          "cached_price_usd": 0.005
+        }
+      ]
+    },
+    "replicate": {
+      "slug": "replicate",
+      "provider": "Replicate",
+      "category": "AI & ML",
+      "description": "Run any open-source model (Llama, FLUX, SDXL, Whisper, etc.) via one API.",
+      "homepage": "https://replicate.com",
+      "endpoints": [
+        {
+          "key": "predict",
+          "method": "POST",
+          "path": "/v1/predictions",
+          "price_usd": 0.02,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.022000000000000002,
+          "cached_price_usd": 0.01
+        },
+        {
+          "key": "status",
+          "method": "GET",
+          "path": "/v1/predictions/:id",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        },
+        {
+          "key": "flux-schnell",
+          "method": "POST",
+          "path": "/v1/models/black-forest-labs/flux-schnell/predictions",
+          "price_usd": 0.003,
+          "markup_pct": 15,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.00345,
+          "cached_price_usd": 0.0015
+        }
+      ]
+    },
+    "rest-countries": {
+      "slug": "rest-countries",
+      "provider": "REST Countries",
+      "category": "Geography & Reference",
+      "description": "Free world country data — population, capital, currencies, languages, flags, borders, area, timezones, calling codes. No API key. Open-source community-maintained.",
+      "homepage": "https://restcountries.com",
+      "endpoints": [
+        {
+          "key": "by-name",
+          "method": "GET",
+          "path": "/v3.1/name/:name",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "by-code",
+          "method": "GET",
+          "path": "/v3.1/alpha/:code",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "by-region",
+          "method": "GET",
+          "path": "/v3.1/region/:region",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "by-capital",
+          "method": "GET",
+          "path": "/v3.1/capital/:capital",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "by-currency",
+          "method": "GET",
+          "path": "/v3.1/currency/:currency",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "by-language",
+          "method": "GET",
+          "path": "/v3.1/lang/:language",
+          "price_usd": 0.0001,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00013000000000000002,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "all",
+          "method": "GET",
+          "path": "/v3.1/all",
+          "price_usd": 0.0002,
+          "markup_pct": 30,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.00026000000000000003,
+          "cached_price_usd": 0.0001
+        }
+      ]
+    },
+    "runway": {
+      "slug": "runway",
+      "provider": "Runway",
+      "category": "AI & ML",
+      "description": "Gen-3 video generation.",
+      "homepage": "https://docs.dev.runwayml.com",
+      "endpoints": [
+        {
+          "key": "image-to-video",
+          "method": "POST",
+          "path": "/v1/image_to_video",
+          "price_usd": 0.5,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.55,
+          "cached_price_usd": 0.25
+        },
+        {
+          "key": "task-status",
+          "method": "GET",
+          "path": "/v1/tasks/:id",
+          "price_usd": 0,
+          "markup_pct": 0,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0,
+          "cached_price_usd": 0.0
+        }
+      ]
+    },
+    "serpapi": {
+      "slug": "serpapi",
+      "provider": "SerpAPI",
+      "category": "Web Intelligence",
+      "description": "Real-time Google, Bing, YouTube and Amazon search results API.",
+      "homepage": "https://serpapi.com",
+      "endpoints": [
+        {
+          "key": "search",
+          "method": "GET",
+          "path": "/search",
+          "price_usd": 0.005,
+          "markup_pct": 10,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0055000000000000005,
+          "cached_price_usd": 0.0025
+        }
+      ]
+    },
+    "stability": {
+      "slug": "stability",
+      "provider": "Stability AI",
+      "category": "AI & ML",
+      "description": "Stable Diffusion / SDXL image generation and editing.",
+      "homepage": "https://platform.stability.ai",
+      "endpoints": [
+        {
+          "key": "generate-sd3",
+          "method": "POST",
+          "path": "/v2beta/stable-image/generate/sd3",
+          "price_usd": 0.065,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.07150000000000001,
+          "cached_price_usd": 0.0325
+        },
+        {
+          "key": "generate-xl",
+          "method": "POST",
+          "path": "/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
+          "price_usd": 0.012,
+          "markup_pct": 15,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0138,
+          "cached_price_usd": 0.006
+        },
+        {
+          "key": "upscale",
+          "method": "POST",
+          "path": "/v2beta/stable-image/upscale/creative",
+          "price_usd": 0.25,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.275,
+          "cached_price_usd": 0.125
+        }
+      ]
+    },
+    "tavily": {
+      "slug": "tavily",
+      "provider": "Tavily",
+      "category": "Web Intelligence",
+      "description": "Search engine purpose-built for AI agents — returns LLM-ready context.",
+      "homepage": "https://tavily.com",
+      "endpoints": [
+        {
+          "key": "search",
+          "method": "POST",
+          "path": "/search",
+          "price_usd": 0.008,
+          "markup_pct": 10,
+          "cache_ttl": 1800,
+          "effective_price_usd": 0.0088,
+          "cached_price_usd": 0.004
+        },
+        {
+          "key": "extract",
+          "method": "POST",
+          "path": "/extract",
+          "price_usd": 0.005,
+          "markup_pct": 10,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.0055000000000000005,
+          "cached_price_usd": 0.0025
+        }
+      ]
+    },
+    "together": {
+      "slug": "together",
+      "provider": "Together AI",
+      "category": "LLM",
+      "description": "Run open-source models (Llama 4, Qwen, DeepSeek, Mixtral, etc.) at scale.",
+      "homepage": "https://docs.together.ai",
+      "endpoints": [
+        {
+          "key": "chat",
+          "method": "POST",
+          "path": "/v1/chat/completions",
+          "price_usd": 0.002,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0022,
+          "cached_price_usd": 0.001
+        },
+        {
+          "key": "completions",
+          "method": "POST",
+          "path": "/v1/completions",
+          "price_usd": 0.002,
+          "markup_pct": 10,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.0022,
+          "cached_price_usd": 0.001
+        },
+        {
+          "key": "embeddings",
+          "method": "POST",
+          "path": "/v1/embeddings",
+          "price_usd": 0.0005,
+          "markup_pct": 15,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.000575,
+          "cached_price_usd": 0.00025
+        }
+      ]
+    },
+    "voyage": {
+      "slug": "voyage",
+      "provider": "Voyage AI",
+      "category": "AI & ML",
+      "description": "Best-in-class embeddings for retrieval, RAG, and semantic search.",
+      "homepage": "https://docs.voyageai.com",
+      "endpoints": [
+        {
+          "key": "embeddings",
+          "method": "POST",
+          "path": "/v1/embeddings",
+          "price_usd": 0.0015,
+          "markup_pct": 10,
+          "cache_ttl": 2592000,
+          "effective_price_usd": 0.0016500000000000002,
+          "cached_price_usd": 0.00075
+        },
+        {
+          "key": "rerank",
+          "method": "POST",
+          "path": "/v1/rerank",
+          "price_usd": 0.003,
+          "markup_pct": 10,
+          "cache_ttl": 86400,
+          "effective_price_usd": 0.0033000000000000004,
+          "cached_price_usd": 0.0015
+        }
+      ]
+    },
+    "wikipedia": {
+      "slug": "wikipedia",
+      "provider": "Wikipedia",
+      "category": "Knowledge & Research",
+      "description": "Wikipedia's official REST API + Action API. No key required. Page summaries, search, full article content, related pages, in 300+ languages.",
+      "homepage": "https://en.wikipedia.org/api/rest_v1/",
+      "endpoints": [
+        {
+          "key": "summary",
+          "method": "GET",
+          "path": "/api/rest_v1/page/summary/:title",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "html",
+          "method": "GET",
+          "path": "/api/rest_v1/page/html/:title",
+          "price_usd": 0.0002,
+          "markup_pct": 25,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.00025,
+          "cached_price_usd": 0.0001
+        },
+        {
+          "key": "related",
+          "method": "GET",
+          "path": "/api/rest_v1/page/related/:title",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 3600,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "random",
+          "method": "GET",
+          "path": "/api/rest_v1/page/random/summary",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 0,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "search",
+          "method": "GET",
+          "path": "/w/api.php",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 600,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        },
+        {
+          "key": "opensearch",
+          "method": "GET",
+          "path": "/w/api.php",
+          "price_usd": 0.0001,
+          "markup_pct": 25,
+          "cache_ttl": 600,
+          "effective_price_usd": 0.000125,
+          "cached_price_usd": 5e-05
+        }
+      ]
+    }
+  }
+}
