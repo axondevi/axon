@@ -9,9 +9,11 @@
 import { Hono } from 'hono';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '~/db';
-import { agents, requests, agentMessages, users } from '~/db/schema';
+import { agents, requests, agentMessages, users, wallets } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { AGENT_TEMPLATES, getTemplate } from '~/agents/templates';
+import { getCacheStats } from '~/agents/knowledge-cache';
+import { mintAgentNft, buildMetadataUrl, isNftEnabled } from '~/nft/agent-nft';
 import { fromMicro, toMicro } from '~/wallet/service';
 import { effectiveTier, type Tier } from '~/subscription';
 
@@ -266,6 +268,29 @@ app.post('/', async (c) => {
 
   try {
     const [created] = await db.insert(agents).values(insert).returning();
+
+    // ─── NFT mint silencioso ─────────────────────────────────
+    // Usuário não vê isso. Mintamos no background pra ter ownership on-chain.
+    // Falha não bloqueia criação — agente funciona mesmo sem NFT.
+    if (isNftEnabled()) {
+      // Resolve user wallet address (Privy embedded or external)
+      const [walletRow] = await db
+        .select()
+        .from(wallets)
+        .where(eq(wallets.userId, user.id))
+        .limit(1);
+      const userWallet = walletRow?.address;
+      if (userWallet && userWallet.startsWith('0x') && !userWallet.startsWith('0x0000000')) {
+        // Fire-and-forget mint — don't block response on chain confirmation
+        void mintAgentNft({
+          to: userWallet,
+          agentId: created.id,
+          slug: created.slug,
+          metadataUrl: buildMetadataUrl(created.slug),
+        }).catch(() => {/* logged inside */});
+      }
+    }
+
     return c.json({
       ok: true,
       id: created.id,
@@ -404,6 +429,21 @@ app.get('/:id/analytics', async (c) => {
       cache_hit_rate: Number(r.calls) > 0 ? Number((Number(r.cache_hits) / Number(r.calls)).toFixed(4)) : 0,
     })),
   });
+});
+
+// Knowledge Cache stats — owner-only
+// Returns: { entries, total_hits, cost_saved_usdc, hit_rate_pct }
+// Used by dashboard to show "your agent saved you $X via semantic cache".
+app.get('/:id/cache-stats', async (c) => {
+  const user = c.get('user') as { id: string };
+  const id = c.req.param('id');
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+  if (!a) throw Errors.notFound('Agent');
+  const stats = await getCacheStats(id);
+  return c.json(stats);
 });
 
 // Conversation messages — owner-only

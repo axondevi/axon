@@ -103,6 +103,26 @@ export async function ensureSystemRows() {
       .onConflictDoNothing();
   }
 
+  // ─── Self-healing schema: ensure agent_cache exists ─────────
+  // Migration 0007_agent_cache.sql may not have been applied if the operator
+  // skipped `db:migrate`. This block is idempotent — it makes Render
+  // auto-deploys "just work" without manual intervention.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "agent_cache" (
+      "id"                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "agent_id"           uuid NOT NULL REFERENCES "agents"("id") ON DELETE CASCADE,
+      "query_text"         text NOT NULL,
+      "query_embedding"    jsonb NOT NULL,
+      "response_text"      text NOT NULL,
+      "hits"               integer NOT NULL DEFAULT 0,
+      "last_hit"           timestamp NOT NULL DEFAULT NOW(),
+      "cost_saved_micro"   bigint NOT NULL DEFAULT 0,
+      "created_at"         timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_cache_agent_idx" ON "agent_cache" ("agent_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_cache_lasthit_idx" ON "agent_cache" ("last_hit" DESC)`);
+
   // Touch the row so timestamps refresh if someone queries health.
   await db.execute(sql`SELECT 1`);
 }

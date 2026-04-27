@@ -296,8 +296,38 @@
       </div>
 
       <div class="login-banner" id="login-banner" style="display:none">
-        <p>You need to be signed in to build agents. <a href="/dashboard">Sign in</a> · or <a href="/#signup">create a free wallet</a> first.</p>
+        <p style="margin-bottom:12px;">You need to be signed in to build your own agent.</p>
+        <button onclick="axonPrivyLogin()" id="privy-signin-btn" style="background:#7c5cff;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;display:none;">
+          ✉️ Sign in with email — wallet created automatically
+        </button>
+        <button onclick="window.location.href='/dashboard'" id="legacy-signin-btn" style="background:rgba(255,255,255,0.06);color:var(--text);border:1px solid var(--border);padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;margin-left:8px;">
+          Use API key (advanced)
+        </button>
+        <p style="margin-top:14px;font-size:12px;color:var(--text-dim);">
+          Or just <a href="/explore" style="color:var(--accent);">try a demo agent (no signup needed)</a>.
+        </p>
       </div>
+      <script src="/privy-login.js" async></script>
+      <script>
+        // Show Privy button only if backend has it configured
+        (function () {
+          var tries = 0;
+          var iv = setInterval(function () {
+            tries++;
+            if (window.axonPrivyAvailable) {
+              clearInterval(iv);
+              window.axonPrivyAvailable().then(function (ok) {
+                if (ok) {
+                  var btn = document.getElementById('privy-signin-btn');
+                  if (btn) btn.style.display = 'inline-block';
+                }
+              });
+            } else if (tries > 25) {
+              clearInterval(iv);
+            }
+          }, 200);
+        })();
+      </script>
 
       <div class="tab-bar">
         <button class="active" data-tab="templates">Templates</button>

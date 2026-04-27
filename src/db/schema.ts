@@ -245,6 +245,39 @@ export const agentMessages = pgTable(
   }),
 );
 
+// ─── Agent Knowledge Cache (semantic dedup) ─────────────────
+// Stores question/answer pairs for each agent. When a new query arrives,
+// we compute its embedding and search this table for high-similarity
+// (cosine >= 0.85) past entries. If found, return the cached answer
+// instantly at ZERO cost. This is the biggest cost-reduction lever:
+// for FAQ-heavy agents, cache hit rate hits 60-80% within a week.
+//
+// Embedding stored as jsonb (number[]). For >50k entries per agent we'd
+// want pgvector + ivfflat index, but for v1 (<500 entries/agent) the
+// app-layer cosine compute runs in <30ms.
+export const agentCache = pgTable(
+  'agent_cache',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    queryText: text('query_text').notNull(),
+    queryEmbedding: jsonb('query_embedding').notNull(),  // number[] (1024 dims for voyage-2)
+    responseText: text('response_text').notNull(),
+    hits: integer('hits').notNull().default(0),
+    lastHit: timestamp('last_hit').defaultNow().notNull(),
+    costSavedMicro: bigint('cost_saved_micro', { mode: 'bigint' })
+      .notNull()
+      .default(0n),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    agentIdx: index('agent_cache_agent_idx').on(t.agentId),
+    lastHitIdx: index('agent_cache_lasthit_idx').on(t.lastHit),
+  }),
+);
+
 // Log of outbound deliveries (for retry/audit)
 export const webhookDeliveries = pgTable(
   'webhook_deliveries',

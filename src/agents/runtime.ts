@@ -20,6 +20,7 @@ import type { Context } from 'hono';
 import { handleCall } from '~/wrapper/engine';
 import { TOOL_TO_AXON } from '~/agents/templates';
 import { upstreamKeyFor } from '~/config';
+import { checkCache, storeInCache } from '~/agents/knowledge-cache';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -204,10 +205,16 @@ interface RunAgentResult {
   iterations: number;
   finish_reason: 'stop' | 'max_iterations' | 'error';
   total_cost_usdc: string;
+  /** When true, response was served from semantic cache at $0 cost. */
+  cached?: boolean;
+  /** Cosine similarity to cached entry (only set if cached=true). */
+  cache_similarity?: number;
 }
 
 const MAX_ITERATIONS = 8;
 const MAX_TOOL_RESULT_CHARS = 6000;
+/** Estimated cost of a typical LLM turn — used to credit the cache for $$ saved. */
+const TYPICAL_LLM_TURN_COST_MICRO = 1500n;  // ~$0.0015
 
 /**
  * Run the agent loop server-side. Caller has already loaded the agent +
@@ -220,8 +227,42 @@ export async function runAgent(opts: {
   allowedTools: string[];
   messages: ChatMessage[];
   ownerId: string;
+  /** Agent ID — required for the semantic cache lookup. */
+  agentId?: string;
+  /** When false, skip cache lookup/store. Useful for "force fresh" debug. */
+  enableCache?: boolean;
 }): Promise<RunAgentResult> {
-  const { c, systemPrompt, allowedTools, messages, ownerId } = opts;
+  const { c, systemPrompt, allowedTools, messages, ownerId, agentId, enableCache = true } = opts;
+
+  // ─── KNOWLEDGE CACHE: try to short-circuit before calling LLM ─────────
+  // Only cache when:
+  //   1. We have an agentId (required for keying)
+  //   2. enableCache is true (caller can disable)
+  //   3. The last user message is a self-contained question
+  //      (not a follow-up that depends on conversation history)
+  // Conservative: skip cache when conversation has >2 turns (likely contextual).
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  const looksContextual = messages.filter((m) => m.role === 'user').length > 2;
+  if (
+    agentId &&
+    enableCache &&
+    lastUser?.content &&
+    typeof lastUser.content === 'string' &&
+    !looksContextual
+  ) {
+    const cached = await checkCache(agentId, lastUser.content).catch(() => null);
+    if (cached?.hit) {
+      return {
+        content: cached.response,
+        tool_calls_executed: [],
+        iterations: 0,
+        finish_reason: 'stop',
+        total_cost_usdc: '0.000000',
+        cached: true,
+        cache_similarity: cached.similarity,
+      };
+    }
+  }
 
   const tools = buildToolsArray(allowedTools);
   const toolList = allowedTools
@@ -288,8 +329,26 @@ export async function runAgent(opts: {
 
     const tcs = msg.tool_calls ?? [];
     if (tcs.length === 0) {
+      const content = String(msg.content ?? '');
+
+      // ─── Store in cache for future deduplication ───────────────
+      // Fire-and-forget: don't block the response on cache write.
+      // Skip if no agentId, no cache enabled, no question to key on, or contextual convo.
+      if (
+        agentId &&
+        enableCache &&
+        lastUser?.content &&
+        typeof lastUser.content === 'string' &&
+        !looksContextual &&
+        content.length > 10
+      ) {
+        const turnCost = totalCostMicro + TYPICAL_LLM_TURN_COST_MICRO;
+        // void = explicit fire-and-forget
+        void storeInCache(agentId, lastUser.content, content, turnCost).catch(() => {});
+      }
+
       return {
-        content: String(msg.content ?? ''),
+        content,
         tool_calls_executed: toolCallsExecuted,
         iterations: iter + 1,
         finish_reason: 'stop',

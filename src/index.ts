@@ -22,6 +22,7 @@ import policyRoutes from '~/routes/policy';
 import settlementRoutes from '~/routes/settlement';
 import operatorRoutes from '~/routes/operator';
 import signupRoutes from '~/routes/signup';
+import authPrivyRoutes from '~/routes/auth-privy';
 import subscriptionRoutes, { publicRoutes as subscriptionPublicRoutes } from '~/routes/subscription';
 import agentsRoutes, { publicRoutes as agentsPublicRoutes } from '~/routes/agents';
 import agentRunRoutes from '~/routes/agent-run';
@@ -122,6 +123,7 @@ app.route('/v1/admin/operator', operatorRoutes);
 // ─── Public signup (no auth, IP rate-limited) ─────────
 // MUST be mounted BEFORE the authed /v1 sub-router.
 app.route('/v1/signup', signupRoutes);
+app.route('/v1/auth/privy', authPrivyRoutes);
 app.route('/v1/subscription', subscriptionPublicRoutes);
 app.route('/v1/agents', agentsPublicRoutes);
 app.route('/v1/run', agentRunRoutes);

@@ -246,6 +246,7 @@ app.post('/:slug/chat', async (c) => {
       allowedTools: Array.isArray(agent.allowedTools) ? (agent.allowedTools as string[]) : [],
       messages,
       ownerId: agent.ownerId,
+      agentId: agent.id,
     });
   } catch (err: any) {
     return c.json({ error: 'agent_error', message: err.message || String(err) }, 500);
