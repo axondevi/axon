@@ -270,6 +270,18 @@ export async function runAgent(opts: {
     .map((t) => `- ${t}: ${SERVER_TOOLS[t].description}`)
     .join('\n');
 
+  // Time/locale awareness — lets agents say "bom dia" vs "boa noite", reference
+  // weekday for scheduling, and note Brazilian-time-of-day even though servers run in UTC.
+  const now = new Date();
+  const isoDate = now.toISOString().slice(0, 10);
+  const hourBR = (now.getUTCHours() + 24 - 3) % 24;  // BR = UTC-3
+  const minBR = String(now.getUTCMinutes()).padStart(2, '0');
+  const weekdayBR = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][
+    new Date(now.getTime() - 3 * 3600_000).getUTCDay()
+  ];
+  const greetingHint =
+    hourBR < 12 ? 'bom dia' : hourBR < 18 ? 'boa tarde' : 'boa noite';
+
   const fullSystemPrompt = [
     systemPrompt,
     '',
@@ -279,7 +291,7 @@ export async function runAgent(opts: {
     tools.length ? '## Tools available' : '',
     toolList,
     '',
-    'Current date: ' + new Date().toISOString().slice(0, 10) + '.',
+    `Current date: ${isoDate} (${weekdayBR}, ${hourBR}h${minBR} no Brasil — saudação adequada agora: "${greetingHint}").`,
   ]
     .filter(Boolean)
     .join('\n');

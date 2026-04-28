@@ -250,16 +250,74 @@ publicWebhook.post('/:secret', async (c) => {
   } catch {
     return c.json({ ignored: 'cannot_decrypt_key' });
   }
-  await sendText({
-    instanceUrl: conn.instanceUrl,
-    instanceName: conn.instanceName,
-    apiKey,
-    number: inbound.phone,
-    text: reply,
-  });
+
+  // Multi-bubble: humans don't dump a paragraph; they send 2-3 short bursts.
+  // Agent uses "||" to mark bubble breaks (taught in the system prompt).
+  // If the agent forgot, fall back to splitting long replies on sentence boundaries.
+  const bubbles = splitReply(reply);
+  for (let i = 0; i < bubbles.length; i++) {
+    const part = bubbles[i];
+    // Typing simulation scaled to message length — ~30 chars/sec, capped at 3s.
+    // Subsequent bubbles get a slightly longer delay to feel like the person is
+    // composing the next thought (not robotically firing them off).
+    const typingMs = Math.min(800 + part.length * 35, 3000) + i * 300;
+    await sendText({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey,
+      number: inbound.phone,
+      text: part,
+      delayMs: typingMs,
+    });
+    // Small pause between bubbles (in addition to typing delay) so they
+    // arrive separately on the recipient's screen.
+    if (i < bubbles.length - 1) {
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
 
   return c.json({ ok: true });
 });
+
+/**
+ * Split an agent reply into 1..N WhatsApp bubbles.
+ *
+ * Priority order:
+ *   1. Honor explicit "||" separators inserted by the LLM (taught via system prompt).
+ *      This is the primary mechanism — gives the LLM precise control.
+ *   2. Fallback: if no separator AND reply exceeds ~180 chars AND has multiple
+ *      sentences, split into 2 bubbles by sentence boundary.
+ *   3. Otherwise return as single bubble.
+ *
+ * Hard cap: never produce more than 4 bubbles (WhatsApp users hate spam).
+ */
+export function splitReply(text: string): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  // Explicit separator path
+  if (trimmed.includes('||')) {
+    const parts = trimmed
+      .split(/\|\|+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return parts.slice(0, 4);
+  }
+
+  // Auto-split long replies
+  if (trimmed.length > 180) {
+    // Match sentences ending in . ! ? followed by space or end
+    const sentences = trimmed.match(/[^.!?]+[.!?]+(?:\s+|$)/g);
+    if (sentences && sentences.length >= 2) {
+      const mid = Math.ceil(sentences.length / 2);
+      const a = sentences.slice(0, mid).join('').trim();
+      const b = sentences.slice(mid).join('').trim();
+      return [a, b].filter(Boolean);
+    }
+  }
+
+  return [trimmed];
+}
 
 // Helper — derive the public webhook URL for an instance secret.
 // On Render the proxy reports `req.url` as `http://...` even though the

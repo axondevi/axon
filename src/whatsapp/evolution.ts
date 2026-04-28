@@ -99,13 +99,21 @@ export async function setWebhook(opts: {
   }
 }
 
-/** Send a text reply on the instance. */
+/**
+ * Send a text reply on the instance.
+ *
+ * delayMs controls Evolution's typing-simulation pause BEFORE the message
+ * appears on the recipient's screen ("typing..." indicator visible during it).
+ * Default 1200ms. Caller may scale to message length for natural feel
+ * (e.g. longer messages → longer typing).
+ */
 export async function sendText(opts: {
   instanceUrl: string;
   instanceName: string;
   apiKey: string;
   number: string;       // raw phone like "5511999999999"
   text: string;
+  delayMs?: number;
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await evoFetch(opts.instanceUrl, `/message/sendText/${encodeURIComponent(opts.instanceName)}`, {
@@ -114,7 +122,7 @@ export async function sendText(opts: {
       body: JSON.stringify({
         number: opts.number,
         text: opts.text,
-        delay: 1200,        // small typing delay so replies don't feel robotic
+        delay: opts.delayMs ?? 1200,
       }),
     });
     if (!res.ok) {
