@@ -131,6 +131,26 @@
         padding: 24px; overflow-y: auto;
       }
       @media (max-width: 900px) { .builder-preview { border-left: 0; border-top: 1px solid var(--border); } }
+      @media (max-width: 600px) {
+        .builder-overlay { padding: 8px; }
+        .builder-card { max-height: 95vh; }
+        .builder-form { padding: 18px 16px; }
+        .builder-preview { padding: 16px; }
+        .builder-form h2 { font-size: 18px; }
+        .builder-form .row { grid-template-columns: 1fr; gap: 0; }
+        .tools-grid { grid-template-columns: 1fr !important; }
+        .tools-grid label { font-size: 13px; padding: 10px 8px; min-height: 44px; align-items: center; }
+        .ar-btn { padding: 10px 14px; min-height: 40px; }
+        .qp-item button { padding: 10px 12px; min-height: 40px; }
+        #qp-add-btn { padding: 10px 14px; min-height: 40px; }
+        .tab-bar button { padding: 12px 16px; min-height: 44px; font-size: 13px; }
+        .tpl-card { padding: 16px; }
+        .tpl-grid { grid-template-columns: 1fr !important; gap: 12px; }
+        /* Modal-style overlays inside the page (Teste Agora etc) */
+        #wa-card { max-width: calc(100vw - 24px) !important; padding: 18px !important; }
+        /* Inputs inside modals — kill min-width on small screens */
+        input[style*="min-width"] { min-width: 0 !important; }
+      }
       .builder-form h2 { font-size: 22px; margin: 0 0 4px; }
       .builder-form .sub { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; }
       .builder-form .field { margin-bottom: 18px; }

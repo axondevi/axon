@@ -80,6 +80,18 @@
         background: var(--bg-elev); border: 1px dashed var(--border);
         border-radius: 12px; padding: 56px 24px; text-align: center;
       }
+      @media (max-width: 500px) {
+        .ag-grid { grid-template-columns: 1fr; gap: 10px; }
+        .ag-card { padding: 16px; }
+        .ag-card h3 { font-size: 15px; }
+        .ag-card .ag-desc { font-size: 12px; }
+        .chip-btn { padding: 10px 14px; min-height: 40px; font-size: 12px; }
+        .filter-row { padding: 10px 14px; gap: 6px; }
+        .empty-state { padding: 32px 18px; }
+        .empty-state h3 { font-size: 16px; }
+        .empty-state a { padding: 12px 18px; min-height: 44px; display: inline-flex; align-items: center; }
+        .build-cta { margin-top: 24px; padding: 20px 16px !important; }
+      }
       .empty-state h3 { font-size: 18px; margin: 0 0 8px; }
       .empty-state p { color: var(--text-muted); font-size: 14px; line-height: 1.6; margin: 0 0 20px; }
       .empty-state a {

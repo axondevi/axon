@@ -164,6 +164,34 @@
 
       .err-panel { padding: 32px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; text-align: center; }
       .err-panel h2 { color: #f87171; margin: 0 0 8px; }
+
+      /* ─── Mobile (< 600px) ──────────────────────────────────── */
+      @media (max-width: 600px) {
+        .agent-header { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
+        .agent-avatar { width: 36px; height: 36px; font-size: 15px; }
+        .agent-title h1 { font-size: 14px; }
+        .agent-title p { font-size: 11px; }
+        .agent-body { padding: 12px 10px 8px; max-width: 100%; }
+        .msg-content { font-size: 14px; padding: 10px 12px; max-width: 92% !important; }
+        .msg-role { font-size: 11px; }
+        .msg-assistant .md p { font-size: 14px; line-height: 1.45; }
+        .msg-assistant .md pre { font-size: 11px; overflow-x: auto; }
+        .agent-input-bar { padding: 10px; flex-wrap: nowrap; gap: 6px; }
+        .agent-input-bar textarea { font-size: 14px; padding: 10px 12px; }
+        .send-btn { padding: 10px 14px; min-height: 44px; font-size: 13px; }
+        .qchip { padding: 9px 12px; font-size: 12px; min-height: 40px; }
+        .qchip-row { gap: 6px; }
+        .agent-footer { padding: 10px 14px; font-size: 11px; }
+        .auth-prompt { padding: 24px 18px; max-width: calc(100vw - 24px); }
+        .auth-prompt input { padding: 12px; font-size: 14px; }
+        .auth-prompt button { padding: 12px; font-size: 14px; min-height: 44px; }
+        .powered { font-size: 10px; }
+        body.embed-mode .agent-input-bar { padding: 8px; }
+      }
+      @media (max-width: 380px) {
+        .agent-title p { display: none; }
+        .send-btn { padding: 10px; }
+      }
     </style>
   </head>
   <body>
