@@ -131,117 +131,213 @@
       <div class="container">
         <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
         <nav>
-          <a href="/explore">Explore</a>
-          <a href="/build">Build</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/upgrade" aria-current="page">Plans</a>
-          <a href="/learn/">Learn</a>
-          <a href="/stats">Stats</a>
+          <a href="/explore">Explorar</a>
+          <a href="/build">Criar agente</a>
+          <a href="/dashboard">Painel</a>
+          <a href="/upgrade" aria-current="page">Planos</a>
+          <a href="/learn/">Tutoriais</a>
+          <a href="/stats">Estatísticas</a>
         </nav>
       </div>
     </header>
 
     <main class="container up-wrap">
       <h1>Escolha seu plano</h1>
-      <p class="lede">Pay in USDC from the same wallet you use for API calls. No credit card, no monthly invoice — just one debit per period.</p>
-      <p class="pitch">Todos os planos pagos têm <strong>mais rate limits <span class="info-tip" data-tip="Quantas chamadas/minuto você pode fazer. Free=10/min (1 cliente), Pro=600/min (60 clientes simultâneos), Team=3000/min (300 clientes).">?</span></strong> e <strong>menos taxa por chamada <span class="info-tip" data-tip="Você paga 25% (Pro) ou 50% (Team) menos em cada chamada de API. Em alto volume, isso compensa muito.">?</span></strong> em todas as APIs do catálogo. Cancele quando quiser — mantém até o fim do período pago, aí volta pra grátis.</p>
+      <p class="lede">Pague em USDC da sua carteira Axon. Sem cartão, sem fatura mensal — um débito direto por período de 30 dias.</p>
+      <p class="pitch">Cada plano destrava <strong>capacidade real</strong> pro seu agente: quantos clientes simultâneos consegue atender, e quanto economiza em taxas por chamada. Cancele a hora que quiser.</p>
 
       <div id="state-row" class="current-state" style="display:none">
-        <span><span class="label">Current:</span> <strong id="cur-tier">—</strong></span>
+        <span><span class="label">Plano atual:</span> <strong id="cur-tier">—</strong></span>
         <span class="divider">·</span>
         <span id="cur-expiry">—</span>
         <span class="divider">·</span>
-        <span><span class="label">Wallet:</span> <strong id="cur-balance">—</strong> USDC</span>
+        <span><span class="label">Saldo:</span> <strong id="cur-balance">—</strong> USDC</span>
       </div>
 
       <div id="login-block" class="login-prompt" style="display:none">
-        <p>You need to be signed in to subscribe.</p>
-        <p><a href="/dashboard">Sign in to dashboard</a> · or <a href="/#signup">create a free wallet</a></p>
+        <p>Você precisa estar logado pra assinar.</p>
+        <p><a href="/dashboard">Entrar no painel</a> · ou <a href="/#signup">criar conta grátis</a></p>
       </div>
 
+      <!-- Tabela comparativa rápida — o que muda na prática -->
+      <div class="comparison-card" style="margin-bottom:32px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
+          <h2 style="margin:0;font-size:18px;">Comparativo rápido</h2>
+          <p style="margin:4px 0 0;color:var(--text-dim);font-size:13px;">O que cada plano <strong>realmente</strong> destrava pro seu agente.</p>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="comp-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:14px 16px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);">Capacidade</th>
+                <th style="padding:14px 12px;text-align:center;font-weight:600;color:var(--text-dim);border-bottom:1px solid var(--border);">Free</th>
+                <th style="padding:14px 12px;text-align:center;font-weight:600;color:var(--accent);border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);">Pro</th>
+                <th style="padding:14px 12px;text-align:center;font-weight:600;color:#ff8c42;border-bottom:1px solid var(--border);">Team</th>
+                <th style="padding:14px 12px;text-align:center;font-weight:600;color:#a855f7;border-bottom:1px solid var(--border);">Enterprise</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Clientes simultâneos no WhatsApp <span class="info-tip" data-tip="Cada cliente em conversa ativa pode estar gerando ~10 chamadas/min (LLM + memória + ferramentas).">?</span></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">~1</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);"><strong>~60</strong></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);"><strong>~300</strong></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">3000+</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Conversas/dia (estimativa) <span class="info-tip" data-tip="Calculado em msgs por dia, considerando ~5 turnos por conversa típica.">?</span></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">~30</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);"><strong>~2.000</strong></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);"><strong>~10.000</strong></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);ilimitado">ilimitado</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Taxa por chamada <span class="info-tip" data-tip="Quanto Axon adiciona por cima do custo da API. Quanto menor, mais lucro pra você.">?</span></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">100% (padrão)</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);"><strong>−25%</strong></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);"><strong>−50%</strong></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);−75%+</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Templates premium <span class="info-tip" data-tip="Recepcionista clínica, atendente restaurante, etc — agentes verticais prontos.">?</span></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">Básicos</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);">Todos</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">Todos + customizado</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);Customizados</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Alertas por email <span class="info-tip" data-tip="Avisos automáticos de saldo baixo, erros, conversas com problema.">?</span></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-muted);">—</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);">✓</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Painel operador (admin) <span class="info-tip" data-tip="Métricas agregadas: profit, custos, top APIs.">?</span></td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-muted);">—</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);color:var(--text-muted);">—</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;">Suporte</td>
+                <td style="padding:12px;text-align:center;color:var(--text-muted);">Email lento</td>
+                <td style="padding:12px;text-align:center;background:rgba(124,92,255,0.04);">Email rápido</td>
+                <td style="padding:12px;text-align:center;">Suporte prioritário</td>
+                <td style="padding:12px;text-align:center;">SLA garantido</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h2 style="font-size:18px;margin:32px 0 12px;">Casos de uso reais</h2>
+      <div class="use-cases" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:32px;">
+        <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Free</div>
+          <h3 style="margin:0 0 8px;font-size:15px;">Testando a ideia</h3>
+          <p style="font-size:13px;color:var(--text-dim);margin:0;">Você cria 1 agente, conecta no WhatsApp pessoal, valida que funciona com amigos. ~30 conversas/dia.</p>
+        </div>
+        <div style="background:rgba(124,92,255,0.05);border:1px solid rgba(124,92,255,0.25);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Pro · $20/mês</div>
+          <h3 style="margin:0 0 8px;font-size:15px;">Pequeno negócio rodando</h3>
+          <p style="font-size:13px;color:var(--text-dim);margin:0;">1-2 agentes ativos no WhatsApp da empresa. ~2.000 conversas/mês. Você economiza ~$30/mês na taxa só pela margem reduzida.</p>
+        </div>
+        <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;color:#ff8c42;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Team · $100/mês</div>
+          <h3 style="margin:0 0 8px;font-size:15px;">Múltiplos clientes / franquia</h3>
+          <p style="font-size:13px;color:var(--text-dim);margin:0;">5-10 agentes pra clientes diferentes. ~10.000 conversas/mês. Acesso a métricas de gestão e suporte prioritário.</p>
+        </div>
+      </div>
+
+      <h2 style="font-size:18px;margin:32px 0 12px;">Planos detalhados</h2>
       <div class="plans-grid" id="plans">
         <div class="plan-card">
           <div class="plan-name">free</div>
-          <div class="plan-price">$0 <span class="per">/ forever</span></div>
-          <p class="plan-blurb">Try the catalog with no commitment.</p>
+          <div class="plan-price">$0 <span class="per">/ pra sempre</span></div>
+          <p class="plan-blurb">Pra testar e validar a ideia.</p>
           <ul class="plan-features">
-            <li>10 requests / minute</li>
-            <li>Pay-per-call on every API</li>
-            <li>Full access to all 40 APIs</li>
-            <li class="muted">Standard markup on calls</li>
-            <li class="muted">No SLA</li>
+            <li>10 chamadas / min</li>
+            <li>Pague por chamada (taxa padrão)</li>
+            <li>Acesso a todas as 40 APIs</li>
+            <li class="muted">Templates básicos</li>
+            <li class="muted">Sem SLA</li>
           </ul>
-          <button class="plan-cta" disabled>Default plan</button>
+          <button class="plan-cta" disabled>Plano padrão</button>
         </div>
 
         <div class="plan-card is-popular">
           <div class="plan-name tier-pro">pro</div>
-          <div class="plan-price">$20 <span class="per">/ 30 days</span></div>
-          <p class="plan-blurb">For active builders shipping real projects.</p>
+          <div class="plan-price">$20 <span class="per">/ 30 dias</span></div>
+          <p class="plan-blurb">Pra quem já tem agente no ar.</p>
           <ul class="plan-features">
-            <li><strong>600</strong> requests / minute (60×)</li>
-            <li><strong>−25%</strong> markup on every call</li>
-            <li>Priority routing on fallbacks</li>
-            <li>Email alerts on balance / errors</li>
-            <li>Auto-renew (cancel anytime)</li>
+            <li><strong>600</strong> chamadas / min (60×)</li>
+            <li><strong>−25%</strong> taxa em todas chamadas</li>
+            <li>Templates premium destravados</li>
+            <li>Alertas por email</li>
+            <li>Renovação automática (cancele a hora que quiser)</li>
           </ul>
           <button class="plan-cta primary" data-tier="pro">Assinar — $20</button>
         </div>
 
         <div class="plan-card">
           <div class="plan-name tier-team">team</div>
-          <div class="plan-price">$100 <span class="per">/ 30 days</span></div>
-          <p class="plan-blurb">For startups with production traffic.</p>
+          <div class="plan-price">$100 <span class="per">/ 30 dias</span></div>
+          <p class="plan-blurb">Pra agências e franquias.</p>
           <ul class="plan-features">
-            <li><strong>3,000</strong> requests / minute (300×)</li>
-            <li><strong>−50%</strong> markup on every call</li>
-            <li>Custom policy / budget rules</li>
-            <li>Operator dashboard access</li>
-            <li>Priority support</li>
+            <li><strong>3.000</strong> chamadas / min (300×)</li>
+            <li><strong>−50%</strong> taxa em todas chamadas</li>
+            <li>Regras de orçamento customizadas</li>
+            <li>Painel admin com métricas</li>
+            <li>Suporte prioritário</li>
           </ul>
           <button class="plan-cta" data-tier="team">Assinar — $100</button>
         </div>
 
         <div class="plan-card">
           <div class="plan-name tier-enterprise">enterprise</div>
-          <div class="plan-price">Custom <span class="per">/ negotiated</span></div>
-          <p class="plan-blurb">For high-volume use cases.</p>
+          <div class="plan-price">Customizado <span class="per">/ negociado</span></div>
+          <p class="plan-blurb">Pra alto volume / SLA.</p>
           <ul class="plan-features">
-            <li><strong>30,000+</strong> requests / minute</li>
-            <li><strong>−75%+</strong> markup, custom pricing</li>
-            <li>Dedicated upstreams + SLA</li>
-            <li>Private deployment option</li>
-            <li>Quarterly billing</li>
+            <li><strong>30.000+</strong> chamadas / min</li>
+            <li><strong>−75%+</strong> taxa, preço negociado</li>
+            <li>Upstreams dedicados + SLA</li>
+            <li>Deploy privado (opcional)</li>
+            <li>Cobrança trimestral</li>
           </ul>
-          <a class="plan-cta" href="mailto:shopkaolin.com@gmail.com?subject=Axon%20enterprise">Contact us →</a>
+          <a class="plan-cta" href="mailto:shopkaolin.com@gmail.com?subject=Axon%20enterprise">Falar com a gente →</a>
         </div>
       </div>
 
       <div class="faq">
-        <h2>FAQ</h2>
+        <h2>Perguntas frequentes</h2>
         <details>
-          <summary>How does USDC subscription work?</summary>
-          <p>When you subscribe, the plan price is debited once from your Axon wallet. Your tier activates for 30 days. Auto-renew (on by default) charges the same wallet on day 30 — if there's enough balance, you stay subscribed; otherwise you fall back to free and we email you so you can top up.</p>
+          <summary>Como funciona a assinatura em USDC?</summary>
+          <p>Quando você assina, o preço do plano é debitado uma vez da sua carteira Axon. Seu plano ativa por 30 dias. Renovação automática (ligada por padrão) cobra a mesma carteira no dia 30 — se tiver saldo, continua; se não tiver, volta pra grátis e enviamos email avisando.</p>
         </details>
         <details>
-          <summary>Can I cancel?</summary>
-          <p>Yes — anytime. Cancellation just disables auto-renew. You keep your paid tier (rate limits, markup discount, all benefits) until the end of the period you already paid for, then drop to free. No partial refunds — the period was already prepaid.</p>
+          <summary>Posso cancelar quando quiser?</summary>
+          <p>Sim — a hora que quiser. Cancelar só desativa a renovação automática. Você mantém o plano pago (rate limits, taxas reduzidas, todos benefícios) até o fim do período já pago, depois volta pra grátis. Não tem reembolso parcial — o período já foi pré-pago.</p>
         </details>
         <details>
-          <summary>What if my wallet balance is too low?</summary>
-          <p>If you try to subscribe with less than the plan price, the call returns a 402 with insufficient-funds. <a href="/buy-usdc">Buy USDC</a> first. If your auto-renew triggers with insufficient balance, your tier drops to free and we email you — top up and re-subscribe.</p>
+          <summary>E se meu saldo USDC estiver baixo?</summary>
+          <p>Se você tentar assinar com menos que o preço do plano, a chamada retorna erro de saldo insuficiente. <a href="/buy-usdc">Compre USDC</a> primeiro. Se a renovação automática disparar sem saldo, o plano volta pra grátis e enviamos email — você adiciona USDC e re-assina.</p>
         </details>
         <details>
-          <summary>Does the markup discount apply to free upstreams too?</summary>
-          <p>Yes. Even on free upstreams (Open-Meteo, Wikipedia, BrasilAPI, etc.) we apply a small Axon markup to cover infrastructure. Pro/Team users get that markup discounted by 25% / 50% across the entire catalog.</p>
+          <summary>O desconto de taxa vale pra APIs grátis também?</summary>
+          <p>Sim. Mesmo em APIs grátis (Open-Meteo, Wikipedia, BrasilAPI, etc) aplicamos uma pequena taxa Axon pra cobrir infraestrutura. Usuários Pro/Team têm essa taxa descontada em 25% / 50% em todo o catálogo.</p>
         </details>
         <details>
-          <summary>Why USDC and not credit card?</summary>
-          <p>Axon is built on x402 + USDC for a reason: zero processing fees, instant settlement, no chargebacks, no fiat conversion. Subscriptions reusing the same wallet keeps the model coherent — your USDC funds API calls AND your plan, no separate billing relationship.</p>
+          <summary>Por que USDC e não cartão de crédito?</summary>
+          <p>Axon usa USDC porque: zero taxa de processamento, liquidação instantânea, sem chargeback, sem conversão pra real. Reusar a mesma carteira pra assinatura E chamadas mantém o modelo simples — seu USDC paga TUDO, sem segunda relação de cobrança.</p>
         </details>
         <details>
-          <summary>Can I switch between Pro and Team mid-period?</summary>
-          <p>Yes. Subscribing to Team while on Pro extends from your current expiry rather than resetting it — you don't lose paid days. Downgrades take effect at the next renewal.</p>
+          <summary>Posso trocar de Pro pra Team no meio do mês?</summary>
+          <p>Sim. Assinar Team enquanto está no Pro estende a partir do vencimento atual em vez de resetar — você não perde dias pagos. Downgrades só viram no próximo período.</p>
+        </details>
+        <details>
+          <summary>Quantos agentes posso criar em cada plano?</summary>
+          <p>Sem limite hard. Mas a quantidade prática depende do tráfego: Free aguenta 1 agente leve. Pro: 1-3 agentes ativos. Team: 5-10 agentes em paralelo. Enterprise: ilimitado.</p>
         </details>
       </div>
     </main>

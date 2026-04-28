@@ -725,6 +725,8 @@
             slug: a.slug,
             description: a.description || '',
             system_prompt: a.system_prompt,
+            system_prompt_b: a.system_prompt_b || '',
+            ab_split: a.ab_split || 0,
             allowed_tools: a.allowed_tools || [],
             primary_color: a.primary_color || '#7c5cff',
             welcome_message: a.welcome_message || '',
@@ -732,6 +734,11 @@
             public: a.public,
             budget_per_session_usdc: a.budget_per_session_usdc,
             hard_cap_usdc: a.hard_cap_usdc,
+            pay_mode: a.pay_mode || 'visitor',
+            daily_budget_usdc: a.daily_budget_usdc || '5.00',
+            tier_required: a.tier_required || 'free',
+            ui_language: a.ui_language || 'auto',
+            vanity_domain: a.vanity_domain || '',
           }, id);
         } catch (e) { showToast(e.message, 'error'); }
       };
@@ -1493,6 +1500,21 @@
         wrap.addEventListener('click', (e) => { if (e.target === wrap) wrap.remove(); });
       }
 
+      // ── Auto-load existing agent for editing (?edit=AGENT_ID) ──────
+      // Vindo do dashboard pelo botão "⚙ Editar" no card do agente.
+      function maybeAutoLoadEdit() {
+        try {
+          var p = new URLSearchParams(window.location.search);
+          var editId = p.get('edit');
+          if (!editId || !KEY) return;
+          // Switch to "Meus agentes" tab so context is visible
+          var mineBtn = document.querySelector('.tab-bar button[data-tab="mine"]');
+          if (mineBtn) mineBtn.click();
+          // Open the editor populated with this agent's config
+          setTimeout(function () { editAgent(editId); }, 200);
+        } catch (e) {}
+      }
+
       // ── Auto-load template via URL param (?template=X) ─────────────
       // Vindo de landing verticalizada (/clinica, /restaurante, /loja) abre
       // o builder ja com o template selecionado.
@@ -1523,6 +1545,7 @@
       }
       loadTemplates();
       if (KEY) loadMyAgents();
+      maybeAutoLoadEdit();
       maybeAutoLoadTemplate();
     </script>
   </body>

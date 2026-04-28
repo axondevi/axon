@@ -206,6 +206,77 @@
         -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent);
       }
       .deposit-info .copy-btn { flex-shrink: 0; }
+
+      /* ─── Agent rows (rich management cards) ──────────────── */
+      .agent-row {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 10px; padding: 16px;
+        display: grid; gap: 12px;
+        grid-template-columns: 1fr;
+      }
+      .agent-row-head { display: flex; gap: 12px; align-items: flex-start; }
+      .agent-dot {
+        width: 12px; height: 12px; border-radius: 50%;
+        flex: 0 0 auto; margin-top: 5px;
+      }
+      .agent-row-title { flex: 1; min-width: 0; }
+      .agent-row-name { font-weight: 600; font-size: 15px; margin: 0 0 4px; }
+      .agent-row-meta {
+        font-size: 11px; color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+        display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+      }
+      .agent-row-meta .mono { color: var(--text-dim); }
+
+      .agent-channels {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        padding: 8px 0; border-top: 1px solid var(--border);
+      }
+      .ch-pill {
+        font-size: 11px; padding: 3px 8px; border-radius: 4px;
+        background: var(--bg); border: 1px solid var(--border);
+        color: var(--text-dim); font-weight: 500;
+      }
+      .ch-pill.ch-web { background: rgba(154,154,164,0.08); }
+      .ch-pill.ch-embed { background: rgba(124,92,255,0.1); border-color: rgba(124,92,255,0.3); color: var(--accent); }
+      .ch-pill.ch-api { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+      .ch-pill.ch-wa-on { background: rgba(37,211,102,0.12); border-color: rgba(37,211,102,0.35); color: #25d366; font-weight: 600; }
+      .ch-pill.ch-wa-off { background: rgba(154,154,164,0.05); border-color: var(--border); color: var(--text-muted); }
+      .ch-pill.ch-wa-warn { background: rgba(255,214,10,0.1); border-color: rgba(255,214,10,0.3); color: #ffd60a; }
+      .ch-pill.ch-loading { color: var(--text-muted); font-style: italic; }
+
+      .agent-stats {
+        font-size: 12px; color: var(--text-dim);
+        padding: 4px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      }
+      .agent-stats strong { color: var(--text); font-weight: 600; }
+      .agent-stats .stat-sep { color: var(--text-muted); }
+      .agent-stats .stat-loading { color: var(--text-muted); font-style: italic; }
+
+      .agent-actions {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        padding-top: 8px; border-top: 1px solid var(--border);
+      }
+      .agent-btn {
+        background: transparent; border: 1px solid var(--border);
+        color: var(--text-dim); padding: 7px 12px;
+        border-radius: 5px; font-size: 12px; font-weight: 500;
+        text-decoration: none; cursor: pointer; font-family: inherit;
+        transition: all 0.1s; display: inline-flex; align-items: center; gap: 4px;
+        white-space: nowrap;
+      }
+      .agent-btn:hover { background: var(--bg-card); color: var(--text); border-color: var(--text-muted); }
+      .agent-btn.agent-btn-danger:hover { background: rgba(255,95,87,0.1); color: var(--danger); border-color: var(--danger); }
+
+      @media (max-width: 500px) {
+        .agent-row { padding: 12px; gap: 10px; }
+        .agent-row-name { font-size: 14px; }
+        .agent-row-meta { font-size: 10px; }
+        .agent-actions { gap: 4px; }
+        .agent-btn { padding: 8px 10px; font-size: 11px; min-height: 36px; }
+        .ch-pill { font-size: 10px; padding: 3px 6px; }
+        .agent-stats { font-size: 11px; }
+      }
       @media (max-width: 640px) {
         .deposit-hero {
           grid-template-columns: 1fr;
@@ -789,8 +860,10 @@
 
       function formatUsdc(s) { return Number(s).toFixed(4); }
 
-      // Render the user's owned agents card on dashboard
-      function renderMyAgents(agents) {
+      // Render the user's owned agents card — rich per-agent management UI.
+      // For each agent, also fetches WhatsApp connection status + contact count
+      // in parallel so the card shows real-time channel state.
+      async function renderMyAgents(agents) {
         const el = document.getElementById('my-agents-card');
         if (!el) return;
         if (!agents || agents.length === 0) {
@@ -804,31 +877,254 @@
           `;
           return;
         }
-        const formatChannels = (a) => {
-          const ch = [];
-          ch.push('<a href="/agent/' + escapeAttr(a.slug) + '" target="_blank" title="Abrir no navegador" style="color:var(--text-dim);text-decoration:none;font-size:11px;padding:2px 6px;border-radius:3px;background:var(--bg);border:1px solid var(--border);">Web</a>');
-          if (a.pay_mode === 'owner') {
-            ch.push('<span title="HTTP API ativa" style="color:#4ade80;font-size:11px;padding:2px 6px;border-radius:3px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);">API</span>');
-            ch.push('<span title="Embed ready" style="color:var(--accent);font-size:11px;padding:2px 6px;border-radius:3px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);">Embed</span>');
-          }
-          return ch.join(' ');
-        };
-        el.innerHTML = `
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            ${agents.map(a => `
-              <div style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:12px 14px;background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;">
-                <span style="width:10px;height:10px;border-radius:50%;background:${escapeAttr(a.primary_color)};flex:0 0 auto;"></span>
-                <div style="min-width:0;">
-                  <div style="font-weight:600;font-size:14px;margin:0 0 3px;">${escapeHtml(a.name)}</div>
-                  <div style="font-size:11px;color:var(--text-muted);font-family:JetBrains Mono,monospace;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">/agent/${escapeHtml(a.slug)} · ${a.tool_count} tools · ${a.pay_mode === 'owner' ? 'owner-paid' : 'visitor-paid'}</div>
-                  <div style="display:flex;gap:5px;">${formatChannels(a)}</div>
+
+        // Initial render with skeletons; we hydrate per-agent stats below
+        el.innerHTML = `<div id="agent-list" style="display:flex;flex-direction:column;gap:12px;">${
+          agents.map(a => agentCardSkeleton(a)).join('')
+        }</div>`;
+
+        // Hydrate each card in parallel with WhatsApp + contacts data
+        agents.forEach(a => hydrateAgentCard(a));
+      }
+
+      function agentCardSkeleton(a) {
+        return `
+          <div class="agent-row" id="agent-row-${escapeAttr(a.id)}" data-slug="${escapeAttr(a.slug)}">
+            <div class="agent-row-head">
+              <span class="agent-dot" style="background:${escapeAttr(a.primary_color)};"></span>
+              <div class="agent-row-title">
+                <div class="agent-row-name">${escapeHtml(a.name)}</div>
+                <div class="agent-row-meta">
+                  <span class="mono">/agent/${escapeHtml(a.slug)}</span>
+                  <span>·</span>
+                  <span>${a.tool_count} ferramenta${a.tool_count === 1 ? '' : 's'}</span>
+                  <span>·</span>
+                  <span>${a.pay_mode === 'owner' ? 'você paga' : 'visitante paga'}</span>
+                  ${a.public ? '' : '<span>·</span><span style="color:var(--warn,#ffd60a);">privado</span>'}
                 </div>
-                <a href="/build" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:6px 12px;border-radius:5px;font-size:12px;text-decoration:none;white-space:nowrap;">Manage →</a>
               </div>
-            `).join('')}
+            </div>
+            <div class="agent-channels" id="channels-${escapeAttr(a.id)}">
+              <span class="ch-pill ch-web">🌐 Web</span>
+              <span class="ch-pill ch-loading">💬 carregando WhatsApp…</span>
+              ${a.pay_mode === 'owner' ? '<span class="ch-pill ch-embed">🔌 Embed</span><span class="ch-pill ch-api">⚙ API</span>' : ''}
+            </div>
+            <div class="agent-stats" id="stats-${escapeAttr(a.id)}">
+              <span class="stat-loading">carregando estatísticas…</span>
+            </div>
+            <div class="agent-actions">
+              <a class="agent-btn" href="/whatsapp" title="Ver memória, contatos e conversas">🧠 Cérebro</a>
+              <button class="agent-btn" onclick="openWhatsappModal('${escapeAttr(a.id)}', '${escapeAttr(a.name)}')">💬 WhatsApp</button>
+              <a class="agent-btn" href="/build?edit=${escapeAttr(a.id)}" title="Editar prompt, ferramentas, cor">⚙ Editar</a>
+              <a class="agent-btn" href="/agent/${escapeAttr(a.slug)}" target="_blank" title="Abrir chat público">🔗 Abrir</a>
+              <button class="agent-btn agent-btn-danger" onclick="deleteAgent('${escapeAttr(a.id)}', '${escapeAttr(a.name)}')" title="Excluir agente permanentemente">×</button>
+            </div>
           </div>
         `;
       }
+
+      async function hydrateAgentCard(a) {
+        // Load whatsapp connection + contacts count in parallel
+        const [conn, contacts] = await Promise.all([
+          api(`/v1/agents/${a.id}/whatsapp`).catch(() => ({ connected: false })),
+          api(`/v1/agents/${a.id}/contacts?limit=200`).catch(() => ({ contacts: [] })),
+        ]);
+
+        // Update channels pill — WhatsApp status visible immediately
+        const channelsEl = document.getElementById(`channels-${a.id}`);
+        if (channelsEl) {
+          const waStatus = !conn.connected
+            ? '<span class="ch-pill ch-wa-off" title="WhatsApp não conectado — clique 💬 WhatsApp pra configurar">💬 WhatsApp ✗</span>'
+            : conn.status === 'open' || conn.status === 'connected'
+              ? `<span class="ch-pill ch-wa-on" title="WhatsApp ativo — última atividade ${conn.last_event_at ? relativeTime(conn.last_event_at) : 'desconhecida'}">💬 WhatsApp ✓</span>`
+              : `<span class="ch-pill ch-wa-warn" title="WhatsApp em estado: ${conn.status}">💬 WhatsApp ⚠</span>`;
+          // Replace the loading WhatsApp pill while keeping siblings
+          const html = channelsEl.innerHTML.replace(
+            /<span class="ch-pill ch-loading">[^<]*<\/span>/,
+            waStatus
+          );
+          channelsEl.innerHTML = html;
+        }
+
+        // Calculate today's messages
+        const ctx = (contacts.contacts || []);
+        const today = new Date().toISOString().slice(0, 10);
+        const todayMsgs = ctx
+          .filter(c => c.last_contact_at && c.last_contact_at.startsWith(today))
+          .reduce((sum, c) => sum + (c.message_count || 0), 0);
+        const totalContacts = ctx.length;
+
+        const statsEl = document.getElementById(`stats-${a.id}`);
+        if (statsEl) {
+          statsEl.innerHTML = `
+            <span class="stat-item"><strong>${totalContacts}</strong> contato${totalContacts === 1 ? '' : 's'}</span>
+            <span class="stat-sep">·</span>
+            <span class="stat-item"><strong>${todayMsgs}</strong> msg${todayMsgs === 1 ? '' : 's'} hoje</span>
+            <span class="stat-sep">·</span>
+            <span class="stat-item">orçamento <strong>$${a.daily_budget_usdc}</strong>/dia</span>
+          `;
+        }
+      }
+
+      // ─── WhatsApp connect/disconnect modal ────────────────────────────────
+      window.openWhatsappModal = async function(agentId, agentName) {
+        // Show loading immediately
+        const overlay = document.createElement('div');
+        overlay.id = 'wa-modal';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+        overlay.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:540px;width:100%;text-align:center;color:var(--text-dim);">Carregando…</div>`;
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+
+        const conn = await api(`/v1/agents/${agentId}/whatsapp`).catch(() => ({ connected: false }));
+
+        const inner = conn.connected
+          ? renderWaConnectedView(agentId, agentName, conn)
+          : renderWaConnectForm(agentId, agentName);
+
+        overlay.innerHTML = '';
+        const card = document.createElement('div');
+        card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;';
+        card.innerHTML = inner;
+        overlay.appendChild(card);
+
+        // Wire actions
+        const closeBtn = card.querySelector('[data-act="close"]');
+        if (closeBtn) closeBtn.onclick = () => overlay.remove();
+
+        const disconnectBtn = card.querySelector('[data-act="disconnect"]');
+        if (disconnectBtn) disconnectBtn.onclick = async () => {
+          if (!confirm(`Desconectar WhatsApp do agente "${agentName}"? O Axon vai parar de receber mensagens, mas a instância Evolution continua rodando.`)) return;
+          disconnectBtn.disabled = true;
+          disconnectBtn.textContent = 'Desconectando…';
+          try {
+            await api(`/v1/agents/${agentId}/whatsapp`, { method: 'DELETE' });
+            window.AxonUI && AxonUI.toast('WhatsApp desconectado', { type: 'success' });
+            overlay.remove();
+            location.reload();
+          } catch (e) {
+            window.AxonUI && AxonUI.toast('Falha ao desconectar: ' + e.message, { type: 'error' });
+            disconnectBtn.disabled = false;
+            disconnectBtn.textContent = 'Desconectar';
+          }
+        };
+
+        const connectBtn = card.querySelector('[data-act="connect"]');
+        if (connectBtn) connectBtn.onclick = async () => {
+          const url = card.querySelector('#wa-url').value.trim();
+          const name = card.querySelector('#wa-name').value.trim();
+          const key = card.querySelector('#wa-key').value.trim();
+          if (!url || !name || !key) {
+            window.AxonUI && AxonUI.toast('Preencha todos os 3 campos', { type: 'error' });
+            return;
+          }
+          connectBtn.disabled = true;
+          connectBtn.textContent = 'Conectando…';
+          try {
+            const r = await api(`/v1/agents/${agentId}/whatsapp`, {
+              method: 'POST',
+              body: JSON.stringify({ instance_url: url, instance_name: name, api_key: key }),
+            });
+            window.AxonUI && AxonUI.toast(`WhatsApp conectado! Status: ${r.connection?.status || 'ok'}`, { type: 'success' });
+            overlay.remove();
+            location.reload();
+          } catch (e) {
+            window.AxonUI && AxonUI.toast('Falha: ' + e.message, { type: 'error', durationMs: 8000 });
+            connectBtn.disabled = false;
+            connectBtn.textContent = 'Conectar';
+          }
+        };
+      };
+
+      function renderWaConnectedView(agentId, agentName, conn) {
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0;font-size:18px;">💬 WhatsApp conectado</h2>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(agentName)}</div>
+            </div>
+            <button data-act="close" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>
+          </div>
+
+          <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:12px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+            <strong style="color:#22c55e;">Status: ${escapeHtml(conn.status || 'connected')}</strong>
+          </div>
+
+          <div style="font-size:13px;line-height:1.7;">
+            <div><strong>Servidor Evolution:</strong></div>
+            <div class="mono" style="color:var(--text-dim);font-size:11px;word-break:break-all;margin-bottom:10px;">${escapeHtml(conn.instance_url)}</div>
+            <div><strong>Nome da instância:</strong> <span class="mono" style="color:var(--text-dim);">${escapeHtml(conn.instance_name)}</span></div>
+            <div><strong>Webhook registrado:</strong></div>
+            <div class="mono" style="color:var(--text-muted);font-size:10px;word-break:break-all;margin-bottom:10px;">${escapeHtml(conn.webhook_url || '')}</div>
+            ${conn.last_event_at ? `<div><strong>Última atividade:</strong> ${relativeTime(conn.last_event_at)}</div>` : ''}
+          </div>
+
+          <div style="margin-top:20px;padding:12px;background:rgba(124,92,255,0.06);border-radius:6px;font-size:12px;color:var(--text-dim);">
+            <strong style="color:var(--text);">Próximos passos:</strong><br/>
+            • <a href="/whatsapp" style="color:var(--accent-2);">Veja contatos e memória →</a><br/>
+            • Reconfigure a instância no painel da Evolution se precisar
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+            <button data-act="close" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer;">Fechar</button>
+            <button data-act="disconnect" style="background:#ff5f57;color:white;border:none;padding:9px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Desconectar</button>
+          </div>
+        `;
+      }
+
+      function renderWaConnectForm(agentId, agentName) {
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0;font-size:18px;">💬 Conectar WhatsApp</h2>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(agentName)}</div>
+            </div>
+            <button data-act="close" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>
+          </div>
+
+          <p style="font-size:13px;color:var(--text-dim);margin:0 0 16px;">
+            Cole as 3 credenciais da sua instância <a href="https://github.com/EvolutionAPI/evolution-api" target="_blank" style="color:var(--accent-2);">Evolution API</a>.
+            <a href="/whatsapp" style="color:var(--accent-2);">Não tem Evolution rodando? Veja como obter →</a>
+          </p>
+
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <label style="display:block;">
+              <span style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Servidor Evolution (URL)</span>
+              <input id="wa-url" type="text" placeholder="https://evolution.seu-host.com" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace;box-sizing:border-box;" />
+            </label>
+            <label style="display:block;">
+              <span style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Nome da instância</span>
+              <input id="wa-name" type="text" placeholder="ex: minha-clinica" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace;box-sizing:border-box;" />
+            </label>
+            <label style="display:block;">
+              <span style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">API key da Evolution</span>
+              <input id="wa-key" type="password" placeholder="AUTHENTICATION_API_KEY" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace;box-sizing:border-box;" />
+            </label>
+          </div>
+
+          <div style="margin-top:16px;padding:10px 12px;background:rgba(255,214,10,0.06);border:1px solid rgba(255,214,10,0.15);border-radius:6px;font-size:12px;color:var(--text-dim);">
+            ⚠️ A instância Evolution já precisa estar conectada a um número WhatsApp (escaneando QR ou pareando) <strong>antes</strong> de você conectar aqui.
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+            <button data-act="close" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer;">Cancelar</button>
+            <button data-act="connect" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Conectar</button>
+          </div>
+        `;
+      }
+
+      // ─── Delete agent (with confirmation) ────────────────────────────────
+      window.deleteAgent = async function(agentId, agentName) {
+        if (!confirm(`Excluir o agente "${agentName}"?\n\nIsso vai deletar PERMANENTEMENTE: o agente, todas as conversas, toda a memória de contatos, e desconectar do WhatsApp se conectado.\n\nAção irreversível.`)) return;
+        try {
+          await api(`/v1/agents/${agentId}`, { method: 'DELETE' });
+          window.AxonUI && AxonUI.toast(`Agente "${agentName}" excluído`, { type: 'success' });
+          location.reload();
+        } catch (e) {
+          window.AxonUI && AxonUI.toast('Falha ao excluir: ' + e.message, { type: 'error' });
+        }
+      };
 
       function escapeAttr(s) {
         return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
