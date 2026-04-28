@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/_ui-kit.css" />
+    <script src="/_ui-kit.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js" defer></script>
     <style>
       :root { --agent-color: #7c5cff; }
@@ -282,7 +284,11 @@
 
       window.onAuthSubmit = function() {
         const v = document.getElementById('key-in').value.trim();
-        if (!v.startsWith('ax_')) { alert('Invalid API key format'); return; }
+        if (!v.startsWith('ax_')) {
+          if (window.AxonUI) AxonUI.toast('Formato de API key inválido — deve começar com "ax_"', { type: 'error' });
+          else alert('Formato de API key inválido');
+          return;
+        }
         setApiKey(v);
         boot();
       };
@@ -456,11 +462,19 @@
         const text = inp.value.trim();
         if (!text) return;
         if (session.spend >= parseFloat(agentConfig.hard_cap_usdc)) {
-          alert('Hard cap of $' + agentConfig.hard_cap_usdc + ' reached for this session. Reload to start a new one.');
+          if (window.AxonUI) {
+            AxonUI.toast('Limite de $' + agentConfig.hard_cap_usdc + ' atingido. Recarregue a página pra começar nova sessão.', {
+              type: 'error',
+              title: 'Sessão encerrada',
+              durationMs: 8000,
+            });
+          } else {
+            alert('Limite atingido. Recarregue a página.');
+          }
           return;
         }
         if (session.spend >= parseFloat(agentConfig.budget_per_session_usdc)) {
-          if (!confirm(`Session has spent $${session.spend.toFixed(4)}. Continue?`)) return;
+          if (!confirm(`Esta sessão já gastou $${session.spend.toFixed(4)}. Quer continuar?`)) return;
         }
         inp.value = '';
 
@@ -497,6 +511,10 @@
               body: JSON.stringify(body),
             });
             const cost = parseFloat(res.headers.get('x-axon-cost-usdc') || '0') || 0;
+            const cacheHit = res.headers.get('x-axon-cache') === 'hit';
+            // Attach cost + cache flag to the placeholder so renderMessages can show inline badge.
+            placeholder.cost = cost;
+            placeholder.cached = cacheHit;
             session.spend += cost;
             renderFooter();
 
@@ -634,10 +652,17 @@
         let html = (visible.length === 0 ? welcome : '');
         html += visible.map((m) => {
           if (m.role === 'user') return `<div class="msg msg-user"><div class="msg-content">${escape(m.content)}</div></div>`;
-          return `<div class="msg msg-assistant"><div class="msg-role">agent</div><div class="msg-content md">${renderMd(m.content)}</div></div>`;
+          // Inline cost badge per agent reply — visitor knows what each turn cost.
+          // m.cost is set during sendTurn() after each LLM call; cached responses get .cached=true.
+          const costBadge = (typeof m.cost === 'number' && m.cost > 0)
+            ? `<span class="cost-badge${m.cached ? ' cache' : ''}" title="${m.cached ? 'Resposta do cache (50% mais barato)' : 'Custo desta resposta'}">${m.cached ? '⚡ ' : ''}$${m.cost.toFixed(4)}</span>`
+            : (typeof m.cost === 'number' && m.cost === 0 && m.cached)
+              ? `<span class="cost-badge cache" title="Cache hit — sem custo">⚡ grátis</span>`
+              : '';
+          return `<div class="msg msg-assistant"><div class="msg-role">agente${costBadge}</div><div class="msg-content md">${renderMd(m.content)}</div></div>`;
         }).join('');
         if (session.running && (streaming || true)) {
-          html += `<div class="msg msg-assistant"><div class="msg-role">agent</div><div class="msg-content"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
+          html += `<div class="msg msg-assistant"><div class="msg-role">agente</div><div class="msg-content"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
         }
         el.innerHTML = html;
         el.scrollTop = el.scrollHeight;
@@ -646,7 +671,9 @@
       function renderFooter() {
         const f = document.getElementById('footer');
         if (!f) return;
-        f.textContent = `\$${session.spend.toFixed(4)} · cap \$${agentConfig.budget_per_session_usdc} / \$${agentConfig.hard_cap_usdc}`;
+        const sessLimit = agentConfig.budget_per_session_usdc;
+        const hardLimit = agentConfig.hard_cap_usdc;
+        f.innerHTML = `Gasto: <strong>$${session.spend.toFixed(4)}</strong> · Limite sessão: $${sessLimit} · Limite total: $${hardLimit}`;
       }
 
       function renderMd(text) {

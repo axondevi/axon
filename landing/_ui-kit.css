@@ -1,0 +1,195 @@
+/**
+ * Axon shared UI kit — tooltips, toasts, badges.
+ *
+ * Drop-in via:
+ *   <link rel="stylesheet" href="/_ui-kit.css" />
+ *   <script src="/_ui-kit.js" defer></script>
+ *
+ * The CSS uses native attributes (no class collisions). Pages opt in by
+ * adding [data-tip] to any element. JS handles toast notifications.
+ */
+
+/* ─── Info tooltip (?) ─────────────────────────────────────────────
+ * Usage:
+ *   <span class="info-tip" data-tip="USDC = stablecoin atrelada ao dólar...">?</span>
+ *
+ * Or inline next to a label:
+ *   <label>USDC <span class="info-tip" data-tip="...">?</span></label>
+ */
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-card, #16161a);
+  color: var(--text-dim, #9a9aa4);
+  border: 1px solid var(--border, #25252b);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'Inter', system-ui, sans-serif;
+  cursor: help;
+  position: relative;
+  margin-left: 4px;
+  vertical-align: middle;
+  transition: all 0.15s;
+  user-select: none;
+}
+.info-tip:hover {
+  background: var(--accent, #7c5cff);
+  color: white;
+  border-color: var(--accent, #7c5cff);
+}
+.info-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elev, #111114);
+  color: var(--text, #eeeef0);
+  border: 1px solid var(--border, #25252b);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  width: max-content;
+  max-width: 260px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 9999;
+  text-transform: none;
+  letter-spacing: 0;
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.info-tip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border, #25252b);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 9999;
+}
+.info-tip:hover::after,
+.info-tip:hover::before,
+.info-tip:focus::after,
+.info-tip:focus::before {
+  opacity: 1;
+  visibility: visible;
+}
+/* Variants for placement near edges */
+.info-tip[data-tip-pos="right"]::after {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + 12px);
+  transform: translateY(-50%);
+}
+.info-tip[data-tip-pos="right"]::before {
+  bottom: auto;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  border-top-color: transparent;
+  border-right-color: var(--border, #25252b);
+}
+
+/* ─── Toast notifications ────────────────────────────────────── */
+#axon-toasts {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.axon-toast {
+  background: var(--bg-elev, #111114);
+  border: 1px solid var(--border, #25252b);
+  border-left: 3px solid var(--accent, #7c5cff);
+  color: var(--text, #eeeef0);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Inter', system-ui, sans-serif;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  max-width: 360px;
+  animation: axon-toast-in 0.2s ease-out;
+}
+.axon-toast.success { border-left-color: #22c55e; }
+.axon-toast.error { border-left-color: #ff5f57; }
+.axon-toast.warn { border-left-color: #ffd60a; }
+.axon-toast .toast-title { font-weight: 600; margin-bottom: 4px; }
+.axon-toast .toast-msg { font-size: 13px; color: var(--text-dim, #9a9aa4); }
+.axon-toast.fading { opacity: 0; transform: translateX(40px); transition: all 0.2s; }
+@keyframes axon-toast-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── Cost badge (inline, e.g. in chat bubbles) ───────────────── */
+.cost-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(124, 92, 255, 0.1);
+  border: 1px solid rgba(124, 92, 255, 0.25);
+  color: var(--accent, #7c5cff);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.cost-badge.cache {
+  background: rgba(25, 213, 198, 0.1);
+  border-color: rgba(25, 213, 198, 0.25);
+  color: var(--accent-2, #19d5c6);
+}
+
+/* ─── Empty state helper ──────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-dim, #9a9aa4);
+}
+.empty-state .empty-icon {
+  font-size: 48px;
+  opacity: 0.4;
+  margin-bottom: 16px;
+}
+.empty-state .empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text, #eeeef0);
+  margin-bottom: 8px;
+}
+.empty-state .empty-sub {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+.empty-state .empty-cta {
+  display: inline-block;
+  background: var(--accent, #7c5cff);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+.empty-state .empty-cta:hover { opacity: 0.9; }

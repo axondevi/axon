@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/_ui-kit.css" />
+    <script src="/_ui-kit.js" defer></script>
     <style>
       .build-wrap { padding: 40px 0 100px; max-width: 1200px; }
       .build-hero { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
@@ -163,6 +165,10 @@
       }
       .tools-grid label:hover { background: rgba(124,92,255,0.06); color: var(--text); }
       .tools-grid input[type="checkbox"] { accent-color: var(--accent); margin: 0; flex: 0 0 auto; }
+      .tools-grid .tool-name { flex: 1; }
+      .tools-grid .tool-cost { font-size: 10px; font-family: 'JetBrains Mono', monospace; padding: 1px 5px; border-radius: 3px; }
+      .tools-grid .cost-free { color: #22c55e; background: rgba(34,197,94,0.1); }
+      .tools-grid .cost-paid { color: var(--text-muted); background: rgba(255,255,255,0.05); }
       .tools-grid .tool-cat {
         grid-column: 1/-1; font-size: 10px; font-weight: 700;
         text-transform: uppercase; color: var(--text-muted);
@@ -265,7 +271,7 @@
     <main class="container build-wrap">
       <div class="build-hero">
         <div>
-          <h1>Build your AI agent</h1>
+          <h1>Construa seu agente de IA</h1>
           <p>Pick a template, customize the prompt and tools, share the URL. Each call is paid from your Axon wallet — no extra hosting, no infra.</p>
         </div>
         <div class="actions">
@@ -330,7 +336,7 @@
       </script>
 
       <div class="tab-bar">
-        <button class="active" data-tab="templates">Templates</button>
+        <button class="active" data-tab="templates">Modelos prontos</button>
         <button data-tab="mine">My agents (<span id="mine-count">0</span>)</button>
       </div>
 
@@ -347,94 +353,94 @@
     <div class="builder-overlay" id="builder">
       <div class="builder-card">
         <div class="builder-form">
-          <h2 id="builder-title">Create agent</h2>
-          <p class="sub" id="builder-sub">Customize how your agent thinks and what it can do.</p>
+          <h2 id="builder-title">Criar agente</h2>
+          <p class="sub" id="builder-sub">Customize como seu agente pensa e o que ele pode fazer.</p>
 
           <div class="row">
             <div class="field">
-              <label for="b-name">Name</label>
-              <input type="text" id="b-name" placeholder="e.g. Loja XYZ Atendimento" />
+              <label for="b-name">Nome <span class="info-tip" data-tip="Aparece no cabeçalho do chat e na página /explore">?</span></label>
+              <input type="text" id="b-name" placeholder="ex: Loja XYZ Atendimento" />
             </div>
             <div class="field">
-              <label for="b-slug">Public URL slug</label>
+              <label for="b-slug">URL pública <span class="info-tip" data-tip="Identificador único na URL. Use letras minúsculas, números e hífens. Não pode mudar depois.">?</span></label>
               <input type="text" id="b-slug" placeholder="loja-xyz" />
-              <div class="hint">Will be reachable at <code>/agent/<span id="slug-echo">slug</span></code></div>
+              <div class="hint">Vai ficar em <code>/agent/<span id="slug-echo">slug</span></code></div>
             </div>
           </div>
 
           <div class="field">
-            <label for="b-desc">Short description</label>
-            <input type="text" id="b-desc" maxlength="160" placeholder="One-liner shown to visitors" />
+            <label for="b-desc">Descrição curta <span class="info-tip" data-tip="Frase de uma linha mostrada aos visitantes na home do agente.">?</span></label>
+            <input type="text" id="b-desc" maxlength="160" placeholder="Uma frase mostrada aos visitantes" />
           </div>
 
           <div class="field">
-            <label for="b-prompt">System prompt</label>
-            <textarea id="b-prompt" placeholder="You are a helpful AI assistant. Use tools when relevant…"></textarea>
-            <div class="hint">Markdown supported. The prompt below "## Language" + tools list is appended automatically.</div>
+            <label for="b-prompt">Prompt do agente <span class="info-tip" data-tip="Define personalidade, regras e papel do agente. Ex: 'Você é a Camila, recepcionista da clínica X. Seja calorosa, mensagens curtas...'">?</span></label>
+            <textarea id="b-prompt" placeholder="Você é uma assistente prestativa. Use ferramentas quando relevante…"></textarea>
+            <div class="hint">Suporta Markdown. O bloco "## Language" e a lista de ferramentas são anexados automaticamente.</div>
           </div>
 
           <div class="field">
-            <label>Allowed tools</label>
-            <div class="tools-grid" id="tools-grid">Loading…</div>
-            <div class="hint">Pick the smallest set the agent needs — fewer tools = faster + cheaper + less likely to hallucinate calls.</div>
+            <label>Ferramentas permitidas <span class="info-tip" data-tip="O que o agente pode fazer: consultar CNPJ, gerar imagem, buscar na web, etc. Cada ferramenta tem um custo aproximado por chamada.">?</span></label>
+            <div class="tools-grid" id="tools-grid">Carregando…</div>
+            <div class="hint">Escolha o mínimo necessário — menos ferramentas = mais rápido, mais barato, menos chance de erro.</div>
           </div>
 
           <div class="row">
             <div class="field">
-              <label for="b-color">Primary color</label>
+              <label for="b-color">Cor principal <span class="info-tip" data-tip="Cor do botão de envio + cabeçalho da página de chat público.">?</span></label>
               <input type="color" id="b-color" value="#7c5cff" />
             </div>
             <div class="field">
-              <label for="b-public">Visibility</label>
+              <label for="b-public">Visibilidade <span class="info-tip" data-tip="Público = qualquer um com o link conversa. Privado = só você.">?</span></label>
               <select id="b-public">
-                <option value="true">Public — anyone with the URL can chat</option>
-                <option value="false">Private — only your account</option>
+                <option value="true">Público — qualquer um com o link pode conversar</option>
+                <option value="false">Privado — só sua conta</option>
               </select>
             </div>
           </div>
 
           <div class="row">
             <div class="field">
-              <label for="b-paymode">Who pays for calls?</label>
+              <label for="b-paymode">Quem paga as chamadas? <span class="info-tip" data-tip="Você (owner) = visitantes não precisam de conta. Visitante = cada um usa sua própria carteira Axon.">?</span></label>
               <select id="b-paymode">
-                <option value="visitor">Visitor (each user connects their own Axon wallet)</option>
-                <option value="owner">You (owner pays for everyone — best for embeds)</option>
+                <option value="visitor">Visitante (cada um usa carteira própria)</option>
+                <option value="owner">Eu (você paga por todos — ideal pra embed/WhatsApp)</option>
               </select>
-              <div class="hint">Owner-paid removes the API-key prompt. Visitors just chat.</div>
+              <div class="hint">Owner-paid remove o pedido de API key. Visitantes só conversam.</div>
             </div>
             <div class="field">
-              <label for="b-daily">Daily budget (USDC, owner-paid only)</label>
+              <label for="b-daily">Orçamento diário (USDC, só se você paga) <span class="info-tip" data-tip="Limite máximo por dia somando todos os visitantes. Reseta à meia-noite UTC.">?</span></label>
               <input type="number" id="b-daily" step="0.01" min="0" value="5.00" />
-              <div class="hint">Hard cap per day across all visitors. Resets at UTC midnight.</div>
+              <div class="hint">Limite duro por dia. Reseta à meia-noite UTC.</div>
             </div>
           </div>
 
           <div class="row">
             <div class="field">
-              <label for="b-tier">Required tier (your subscription)</label>
+              <label for="b-tier">Plano mínimo (sua assinatura) <span class="info-tip" data-tip="Seu plano Axon precisa ser pelo menos esse pra manter o agente no ar. Templates premium exigem Pro/Team.">?</span></label>
               <select id="b-tier">
-                <option value="free">Free — anyone can host</option>
-                <option value="pro">Pro — \$20/mo subscription needed</option>
-                <option value="team">Team — \$100/mo subscription needed</option>
+                <option value="free">Free — qualquer um pode hospedar</option>
+                <option value="pro">Pro — assinatura $20/mês necessária</option>
+                <option value="team">Team — assinatura $100/mês necessária</option>
               </select>
-              <div class="hint">Your own Axon plan must be at least this tier to keep the agent live.</div>
+              <div class="hint">Seu plano Axon precisa ser pelo menos este pra agente ficar ativo.</div>
             </div>
             <div class="field">
-              <label for="b-lang">UI language</label>
+              <label for="b-lang">Idioma da interface <span class="info-tip" data-tip="Idioma das labels do chat público (botão Enviar, placeholder, etc). 'Auto' detecta browser do visitante.">?</span></label>
               <select id="b-lang">
-                <option value="auto">Auto (detect visitor browser)</option>
-                <option value="pt">Portuguese</option>
+                <option value="auto">Automático (detecta browser do visitante)</option>
+                <option value="pt">Português</option>
                 <option value="en">English</option>
-                <option value="es">Spanish</option>
+                <option value="es">Español</option>
               </select>
-              <div class="hint">Affects chat-shell labels (placeholder, send button, etc.)</div>
+              <div class="hint">Afeta labels do chat (placeholder, botão enviar, etc).</div>
             </div>
           </div>
 
           <div class="field">
-            <label for="b-vanity">Vanity domain (optional)</label>
-            <input type="text" id="b-vanity" placeholder="agent.cliente.com" />
-            <div class="hint">Set up a CNAME from this domain → axon-5zf.pages.dev. Then GET /v1/agents/by-domain/&lt;your-domain&gt; resolves the agent.</div>
+            <label for="b-vanity">Domínio próprio (opcional, avançado) <span class="info-tip" data-tip="Quer agente.suaempresa.com em vez de axon-5zf.pages.dev/agent/X? Configure CNAME apontando pra cá.">?</span></label>
+            <input type="text" id="b-vanity" placeholder="agente.cliente.com" />
+            <div class="hint">Configure um CNAME → axon-5zf.pages.dev. Depois GET /v1/agents/by-domain/&lt;seu-dominio&gt; resolve o agente.</div>
           </div>
 
           <details style="margin-bottom:18px;">
@@ -496,8 +502,8 @@
         <div class="builder-footer">
           <p class="err" id="b-err"></p>
           <div style="display:flex; gap:8px;">
-            <button id="b-cancel">Cancel</button>
-            <button class="primary" id="b-save">Save agent</button>
+            <button id="b-cancel">Cancelar</button>
+            <button class="primary" id="b-save">Salvar agente</button>
           </div>
         </div>
       </div>
@@ -512,43 +518,45 @@
       const KEY = localStorage.getItem(STORAGE_KEY);
 
       // ── Tool catalog (mirrors landing/dashboard.html AGENT_TOOLS) ────────
+      // cost = approximate USD per call; "free" = no upstream cost (just markup);
+      // shown next to each tool so the lojista sees what they're picking.
       const TOOL_CATALOG = {
-        'Data / Lookup': [
-          { name: 'lookup_cnpj',          desc: 'Brazilian company by CNPJ' },
-          { name: 'lookup_cep',           desc: 'Brazilian postal code' },
-          { name: 'current_weather',      desc: 'Current weather (OpenWeather)' },
-          { name: 'weather_forecast',     desc: 'Multi-day forecast (Open-Meteo, free)' },
-          { name: 'lookup_ip',            desc: 'IP geolocation' },
-          { name: 'lookup_country',       desc: 'Country data' },
-          { name: 'brasilapi_holidays',   desc: 'BR national holidays' },
-          { name: 'brasilapi_rates',      desc: 'Selic/CDI/IPCA' },
-          { name: 'brasilapi_ddd',        desc: 'BR phone area code' },
+        'Dados / Consulta BR': [
+          { name: 'lookup_cnpj',          desc: 'Empresa brasileira por CNPJ', cost: 'free' },
+          { name: 'lookup_cep',           desc: 'CEP brasileiro → endereço', cost: 'free' },
+          { name: 'current_weather',      desc: 'Clima atual (OpenWeather)', cost: '~$0.0005' },
+          { name: 'weather_forecast',     desc: 'Previsão multi-dia (Open-Meteo)', cost: 'free' },
+          { name: 'lookup_ip',            desc: 'Geolocalização de IP', cost: '~$0.0005' },
+          { name: 'lookup_country',       desc: 'Dados de país', cost: 'free' },
+          { name: 'brasilapi_holidays',   desc: 'Feriados nacionais BR', cost: 'free' },
+          { name: 'brasilapi_rates',      desc: 'Selic/CDI/IPCA atuais', cost: 'free' },
+          { name: 'brasilapi_ddd',        desc: 'DDD → estado + cidades', cost: 'free' },
         ],
-        'Finance': [
-          { name: 'convert_currency',     desc: 'FX conversion (Frankfurter)' },
-          { name: 'crypto_price',         desc: 'Crypto prices (CoinGecko)' },
+        'Finanças': [
+          { name: 'convert_currency',     desc: 'Conversão FX (Frankfurter)', cost: 'free' },
+          { name: 'crypto_price',         desc: 'Preços crypto (CoinGecko)', cost: 'free' },
         ],
-        'Search / Scrape': [
-          { name: 'search_web',           desc: 'Tavily web search' },
-          { name: 'exa_search',           desc: 'Exa neural search' },
-          { name: 'scrape_url',           desc: 'Firecrawl URL → markdown' },
-          { name: 'search_hn',            desc: 'Hacker News search' },
+        'Busca / Scraping': [
+          { name: 'search_web',           desc: 'Pesquisa web (Tavily)', cost: '~$0.005' },
+          { name: 'exa_search',           desc: 'Busca neural (Exa)', cost: '~$0.005' },
+          { name: 'scrape_url',           desc: 'URL → markdown (Firecrawl)', cost: '~$0.002' },
+          { name: 'search_hn',            desc: 'Hacker News search', cost: 'free' },
         ],
-        'Knowledge': [
-          { name: 'wikipedia_summary',    desc: 'Wikipedia article summary' },
-          { name: 'wikipedia_search',     desc: 'Search Wikipedia' },
-          { name: 'search_arxiv',         desc: '2.4M scientific papers' },
+        'Conhecimento': [
+          { name: 'wikipedia_summary',    desc: 'Resumo de artigo Wikipedia', cost: 'free' },
+          { name: 'wikipedia_search',     desc: 'Pesquisar Wikipedia', cost: 'free' },
+          { name: 'search_arxiv',         desc: '2.4M papers científicos', cost: 'free' },
         ],
-        'Local — $0': [
-          { name: 'calculate',            desc: 'Math expression eval' },
-          { name: 'get_datetime',         desc: 'Current time in any TZ' },
-          { name: 'run_js',               desc: 'JS sandbox (5s timeout)' },
+        'Local — sem custo': [
+          { name: 'calculate',            desc: 'Avaliar expressão matemática', cost: '$0' },
+          { name: 'get_datetime',         desc: 'Hora atual em qualquer fuso', cost: '$0' },
+          { name: 'run_js',               desc: 'Sandbox JS (5s timeout)', cost: '$0' },
         ],
-        'Create': [
-          { name: 'generate_image',       desc: '1024×1024 image (Stability)' },
+        'Criar conteúdo': [
+          { name: 'generate_image',       desc: 'Imagem 1024×1024 (Stability SDXL)', cost: '~$0.014' },
         ],
-        'AI': [
-          { name: 'embed_text',           desc: '512-dim embedding (Voyage)' },
+        'IA': [
+          { name: 'embed_text',           desc: 'Embedding 512-dim (Voyage)', cost: '~$0.00005' },
         ],
       };
 
@@ -625,7 +633,7 @@
       }
 
       async function useTemplate(id) {
-        if (!KEY) { showToast('Sign in first to deploy a template', 'error'); return; }
+        if (!KEY) { showToast('Entre primeiro pra usar um modelo', 'error'); return; }
         try {
           const t = await api('/v1/agents/templates/' + id);
           openBuilder({
@@ -1064,7 +1072,7 @@
       function openBuilder(init, id) {
         editingAgentId = id;
         formState = { ...formState, ...init };
-        document.getElementById('builder-title').textContent = id ? 'Edit agent' : 'Create agent';
+        document.getElementById('builder-title').textContent = id ? 'Editar agente' : 'Criar agente';
         document.getElementById('builder-sub').textContent = init.__template
           ? `Starting from template "${init.__template}". Tweak anything you like.`
           : 'Customize how your agent thinks and what it can do.';
@@ -1107,7 +1115,9 @@
           html += `<div class="tool-cat">${cat}</div>`;
           for (const t of tools) {
             const checked = selected.has(t.name) ? 'checked' : '';
-            html += `<label title="${escape(t.desc)}"><input type="checkbox" data-tool="${t.name}" ${checked} /> ${t.name}</label>`;
+            const costClass = t.cost === '$0' || t.cost === 'free' ? 'cost-free' : 'cost-paid';
+            const costLabel = t.cost === 'free' ? 'grátis' : t.cost;
+            html += `<label title="${escape(t.desc)}"><input type="checkbox" data-tool="${t.name}" ${checked} /> <span class="tool-name">${t.name}</span><span class="tool-cost ${costClass}">${costLabel}</span></label>`;
           }
         }
         el.innerHTML = html;
@@ -1247,7 +1257,7 @@
         } catch (e) {
           errEl.textContent = e.message;
         } finally {
-          btn.disabled = false; btn.textContent = 'Save agent';
+          btn.disabled = false; btn.textContent = 'Salvar agente';
         }
       });
 
@@ -1338,7 +1348,7 @@
       });
 
       document.getElementById('new-blank').addEventListener('click', () => {
-        if (!KEY) { showToast('Sign in first', 'error'); return; }
+        if (!KEY) { showToast('Entre primeiro', 'error'); return; }
         openBuilder({
           name: '', slug: '', description: '',
           system_prompt: 'You are a helpful AI assistant. Reply in the same language the user writes in.',

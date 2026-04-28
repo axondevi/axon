@@ -1,15 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Upgrade · Axon</title>
-    <meta name="description" content="Upgrade your Axon plan — pay in USDC from your existing wallet. Higher rate limits and lower per-call markup." />
+    <title>Planos · Axon</title>
+    <meta name="description" content="Faça upgrade do seu plano Axon — pague em USDC da sua carteira existente. Mais rate limits e menos taxa por chamada." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/_ui-kit.css" />
+    <script src="/_ui-kit.js" defer></script>
     <style>
       .up-wrap { padding: 56px 0 100px; max-width: 1100px; }
       .up-wrap h1 { font-size: 40px; letter-spacing: -0.02em; margin: 0 0 12px; }
@@ -125,9 +127,9 @@
     </header>
 
     <main class="container up-wrap">
-      <h1>Choose your plan</h1>
+      <h1>Escolha seu plano</h1>
       <p class="lede">Pay in USDC from the same wallet you use for API calls. No credit card, no monthly invoice — just one debit per period.</p>
-      <p class="pitch">All paid plans get <strong>higher rate limits</strong> and <strong>lower per-call markup</strong> on every API in the catalog. Cancel anytime — keeps the period you paid for, then drops to free.</p>
+      <p class="pitch">Todos os planos pagos têm <strong>mais rate limits <span class="info-tip" data-tip="Quantas chamadas/minuto você pode fazer. Free=10/min (1 cliente), Pro=600/min (60 clientes simultâneos), Team=3000/min (300 clientes).">?</span></strong> e <strong>menos taxa por chamada <span class="info-tip" data-tip="Você paga 25% (Pro) ou 50% (Team) menos em cada chamada de API. Em alto volume, isso compensa muito.">?</span></strong> em todas as APIs do catálogo. Cancele quando quiser — mantém até o fim do período pago, aí volta pra grátis.</p>
 
       <div id="state-row" class="current-state" style="display:none">
         <span><span class="label">Current:</span> <strong id="cur-tier">—</strong></span>
@@ -168,7 +170,7 @@
             <li>Email alerts on balance / errors</li>
             <li>Auto-renew (cancel anytime)</li>
           </ul>
-          <button class="plan-cta primary" data-tier="pro">Subscribe — $20</button>
+          <button class="plan-cta primary" data-tier="pro">Assinar — $20</button>
         </div>
 
         <div class="plan-card">
@@ -182,7 +184,7 @@
             <li>Operator dashboard access</li>
             <li>Priority support</li>
           </ul>
-          <button class="plan-cta" data-tier="team">Subscribe — $100</button>
+          <button class="plan-cta" data-tier="team">Assinar — $100</button>
         </div>
 
         <div class="plan-card">
@@ -266,7 +268,7 @@
         if (!KEY) {
           document.getElementById('login-block').style.display = '';
           // Disable subscribe buttons
-          document.querySelectorAll('[data-tier]').forEach(b => { b.disabled = true; b.textContent = 'Sign in first'; });
+          document.querySelectorAll('[data-tier]').forEach(b => { b.disabled = true; b.textContent = 'Entre primeiro'; });
           return;
         }
         try {
@@ -280,7 +282,7 @@
             const exp = new Date(sub.expires_at).toLocaleDateString();
             document.getElementById('cur-expiry').innerHTML = sub.tier_effective === 'free'
               ? `<span style="color:#f87171">Expired ${exp}</span>`
-              : `Renews <strong>${exp}</strong> · auto-renew <strong>${sub.auto_renew ? 'on' : 'off'}</strong>`;
+              : `Renova <strong>${exp}</strong> · renovação automática <strong>${sub.auto_renew ? 'ligada' : 'desligada'}</strong>`;
           } else {
             document.getElementById('cur-expiry').textContent = 'No active paid plan';
           }
@@ -306,7 +308,7 @@
           btn.addEventListener('click', async () => {
             const tier = btn.dataset.tier;
             const price = tier === 'pro' ? 20 : 100;
-            if (!confirm(`Subscribe to ${tier.toUpperCase()} for $${price} USDC for 30 days?`)) return;
+            if (!confirm(`Assinar plano ${tier.toUpperCase()} por $${price} USDC por 30 dias?`)) return;
             const original = btn.textContent;
             btn.disabled = true; btn.textContent = 'Processing…';
             try {
@@ -314,12 +316,12 @@
                 method: 'POST',
                 body: JSON.stringify({ tier, auto_renew: true }),
               });
-              showToast(`Subscribed to ${tier.toUpperCase()} until ${new Date(r.expires_at).toLocaleDateString()}`, 'success');
+              showToast(`Assinado plano ${tier.toUpperCase()} até ${new Date(r.expires_at).toLocaleDateString('pt-BR')}`, 'success');
               setTimeout(() => { window.location.reload(); }, 1500);
             } catch (e) {
               const m = e.status === 402 || /insufficient/i.test(e.message)
                 ? 'Insufficient balance. Top up at /buy-usdc first.'
-                : 'Subscribe failed: ' + e.message;
+                : 'Falha na assinatura: ' + e.message;
               showToast(m, 'error');
               btn.disabled = false; btn.textContent = original;
             }

@@ -1,15 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-br">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Axon · Dashboard</title>
+    <title>Axon · Painel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="/_ui-kit.css" />
+    <script src="/_ui-kit.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js" defer></script>
     <style>
       :root {
@@ -809,24 +811,37 @@
       function renderLogin(err) {
         document.getElementById('app').innerHTML = `
           <div class="login-wrap">
-            <h1>Axon Dashboard</h1>
-            <p>Paste your API key to get started.</p>
+            <h1>Painel Axon</h1>
+            <p>Cole sua API key pra acessar seus agentes, carteira e histórico.</p>
             ${err ? `<div class="error">${err}</div>` : ''}
             <input type="text" id="base" placeholder="https://axon-kedb.onrender.com" />
             <input type="password" id="key" placeholder="ax_live_..." />
-            <button class="primary" id="go">Open dashboard</button>
+            <button class="primary" id="go">Entrar no painel</button>
+            <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted); text-align: center;">
+              Sem conta? <a href="/" style="color: var(--accent);">Criar conta grátis</a> · Perdeu a key? <a href="mailto:shopkaolin.com@gmail.com" style="color: var(--accent);">contato</a>
+            </p>
           </div>
         `;
         document.getElementById('base').value = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
         document.getElementById('go').onclick = async () => {
           const base = document.getElementById('base').value.trim();
           const key = document.getElementById('key').value.trim();
-          if (!key) return renderLogin('API key is required');
+          if (!key) return renderLogin('Cole sua API key pra continuar');
+          if (!key.startsWith('ax_')) return renderLogin('API key inválida — deve começar com "ax_"');
           localStorage.setItem(BASE_KEY, base);
           localStorage.setItem(STORAGE_KEY, key);
           try { await api('/v1/wallet/balance'); renderApp(); }
-          catch (e) { localStorage.removeItem(STORAGE_KEY); renderLogin(e.message); }
+          catch (e) {
+            localStorage.removeItem(STORAGE_KEY);
+            const msg = String(e.message || e).includes('401')
+              ? 'Key não reconhecida. Verifica se copiou completa, ou cria conta nova em /'
+              : 'Erro: ' + e.message;
+            renderLogin(msg);
+          }
         };
+        document.getElementById('key').addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') document.getElementById('go').click();
+        });
       }
 
       function copyToClipboard(text, btn) {
@@ -860,38 +875,38 @@
           <header>
             <div class="brand"><span class="logo-dot"></span> axon</div>
             <nav style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-              <a href="/build" style="color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;border-radius:5px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);">+ Build agent</a>
+              <a href="/build" style="color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;border-radius:5px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);">+ Criar agente</a>
               <a href="/whatsapp" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">💬 WhatsApp</a>
-              <a href="/explore" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Explore</a>
-              <a href="/upgrade" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Plans</a>
-              <a href="/learn/" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Learn</a>
-              <a href="/stats" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Stats</a>
-              <a href="/status" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" title="System status">●</a>
+              <a href="/explore" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Explorar</a>
+              <a href="/upgrade" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Planos</a>
+              <a href="/learn/" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Tutoriais</a>
+              <a href="/stats" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Estatísticas</a>
+              <a href="/status" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" title="Status do sistema">●</a>
             </nav>
             <div style="display:flex; gap:8px; align-items:center;">
               <span class="tier-badge" id="tier-badge" title="Click to manage subscription" style="display:none">free</span>
               <span class="key-chip" id="keyview">ax_live_…</span>
-              <button class="key-chip" id="logout">sign out</button>
+              <button class="key-chip" id="logout">sair</button>
             </div>
           </header>
           <div class="container">
-            <h1>Dashboard</h1>
+            <h1>Painel</h1>
             <div id="deposit-hero-wrap"></div>
-            <div class="grid" id="metrics">Loading…</div>
+            <div class="grid" id="metrics">Carregando…</div>
             <div class="section">
               <h2 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                <span>Your agents</span>
-                <a href="/build" style="font-size:13px;font-weight:600;color:#0a0a0b;background:linear-gradient(135deg,var(--accent),var(--accent-2));padding:8px 16px;border-radius:6px;text-decoration:none;">+ New agent</a>
+                <span>Seus agentes <span class="info-tip" data-tip="Cada agente tem seu prompt, ferramentas e canais (web, WhatsApp, embed). Crie quantos quiser.">?</span></span>
+                <a href="/build" style="font-size:13px;font-weight:600;color:#0a0a0b;background:linear-gradient(135deg,var(--accent),var(--accent-2));padding:8px 16px;border-radius:6px;text-decoration:none;">+ Novo agente</a>
               </h2>
-              <div id="my-agents-card" class="card">Loading…</div>
+              <div id="my-agents-card" class="card">Carregando…</div>
             </div>
             <div class="section">
-              <h2>Try a call</h2>
-              <div class="card" id="trycall">Loading…</div>
+              <h2>Teste uma chamada <span class="info-tip" data-tip="Comando curl pra testar o gateway diretamente. Útil pra integrar em scripts/automações.">?</span></h2>
+              <div class="card" id="trycall">Carregando…</div>
             </div>
             <div class="section">
-              <h2>Spend by API (last 30 days)</h2>
-              <div class="card" id="byapi">Loading…</div>
+              <h2>Gasto por API (últimos 30 dias) <span class="info-tip" data-tip="Quanto você gastou em cada API agregada. Identifique quais ferramentas seu agente usa mais.">?</span></h2>
+              <div class="card" id="byapi">Carregando…</div>
             </div>
             <div class="section">
               <h2 translate="no">Agent</h2>
@@ -994,13 +1009,13 @@
                 <img class="qr-img" src="${qrUrl}" width="150" height="150" alt="QR code for ${depositAddr}" loading="lazy" />
               </div>
               <div class="deposit-info">
-                <div class="label">Your deposit address</div>
-                <span class="network-pill">USDC · Base L2</span>
+                <div class="label">Endereço de depósito <span class="info-tip" data-tip="Esta é sua carteira USDC. Mande USDC pra esse endereço pra creditar saldo. Use a rede Base L2 (não Ethereum, não Polygon).">?</span></div>
+                <span class="network-pill">USDC · Base L2 <span class="info-tip" data-tip="USDC é um stablecoin atrelado ao dólar (1 USDC = US$1). Base é uma rede blockchain rápida e barata da Coinbase.">?</span></span>
                 <div class="addr">
                   <code>${depositAddr}</code>
-                  <button class="copy-btn" id="copy-addr">Copy</button>
+                  <button class="copy-btn" id="copy-addr">Copiar</button>
                 </div>
-                <div class="warning">⚠ Only send USDC on Base network. Other tokens or networks = permanent loss.</div>
+                <div class="warning">⚠ Envie SOMENTE USDC pela rede Base. Outras moedas ou redes = perda permanente.</div>
               </div>
             </div>
           `;
@@ -1011,31 +1026,31 @@
           const burn = computeBurnRate(txs.data, 7);
           const runway = burn > 0 ? Number(bal.available_usdc) / burn : null;
           const runwayDisplay = runway === null ? '—' : runway > 999 ? '999+' : runway.toFixed(0);
-          const burnDisplay = burn > 0 ? '$' + burn.toFixed(4) + '/day (7d avg)' : 'No recent spend';
+          const burnDisplay = burn > 0 ? '$' + burn.toFixed(4) + '/dia (média 7d)' : 'Sem gasto recente';
 
           document.getElementById('metrics').innerHTML = `
             <div class="card">
-              <div class="metric-label">Available balance</div>
+              <div class="metric-label">Saldo disponível <span class="info-tip" data-tip="Quanto você tem pra usar agora. Cada chamada de API debita micro-frações automaticamente.">?</span></div>
               <div class="metric-value">${formatUsdc(bal.available_usdc)}<span class="unit">USDC</span></div>
               <div class="metric-sub">
-                ${bal.reserved_usdc === '0.000000' ? 'No funds reserved.' : bal.reserved_usdc + ' reserved'}
-                · <a href="/buy-usdc" style="color: var(--accent-2); text-decoration: none;">Top up →</a>
+                ${bal.reserved_usdc === '0.000000' ? 'Nada reservado.' : bal.reserved_usdc + ' reservado'}
+                · <a href="/buy-usdc" style="color: var(--accent-2); text-decoration: none;">Adicionar →</a>
               </div>
             </div>
             <div class="card">
-              <div class="metric-label">Burn rate</div>
-              <div class="metric-value">${runwayDisplay}<span class="unit">days runway</span></div>
+              <div class="metric-label">Autonomia <span class="info-tip" data-tip="Quantos dias seu saldo dura no ritmo atual de gasto (média dos últimos 7 dias). Adicione USDC quando estiver baixo.">?</span></div>
+              <div class="metric-value">${runwayDisplay}<span class="unit">dias</span></div>
               <div class="metric-sub">${burnDisplay}</div>
             </div>
             <div class="card">
-              <div class="metric-label">Requests</div>
+              <div class="metric-label">Chamadas <span class="info-tip" data-tip="Total de requests feitas pela sua conta (todas as APIs, todos agentes).">?</span></div>
               <div class="metric-value">${usage.total_requests}</div>
-              <div class="metric-sub">${usage.cache_hits} cache hits · ${formatUsdc(usage.total_spent_usdc)} spent</div>
+              <div class="metric-sub">${usage.cache_hits} cache hits · ${formatUsdc(usage.total_spent_usdc)} gasto</div>
             </div>
             <div class="card">
-              <div class="metric-label">Cache hit rate</div>
+              <div class="metric-label">Taxa de cache <span class="info-tip" data-tip="% de chamadas servidas do cache (resposta de pergunta similar feita antes). Cache custa 50% menos. Quanto maior, melhor.">?</span></div>
               <div class="metric-value">${hitRatePct}<span class="unit">%</span></div>
-              <div class="metric-sub">More is better — you pay 50% less on hits</div>
+              <div class="metric-sub">Mais é melhor — você paga 50% nos hits</div>
             </div>
           `;
 
@@ -1048,8 +1063,8 @@
             `  "${base}/v1/call/brasilapi/cnpj?cnpj=00000000000191"`;
           document.getElementById('trycall').innerHTML = `
             <p style="margin:0 0 12px;color:var(--text-dim);font-size:14px;">
-              Copy-paste this into your terminal — costs about <span class="mono">$0.001</span> and returns
-              data on Banco do Brasil (CNPJ 00.000.000/0001-91).
+              Cole isso no seu terminal — custa cerca de <span class="mono">$0.001</span> e retorna
+              dados do Banco do Brasil (CNPJ 00.000.000/0001-91). Útil pra integrar em scripts.
             </p>
             <div class="try-call-code">
               <button class="copy-btn" id="copy-curl">Copy</button>

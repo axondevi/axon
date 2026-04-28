@@ -10,6 +10,8 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="/_ui-kit.css" />
+    <script src="/_ui-kit.js" defer></script>
     <style>
       :root {
         --bg: #0a0a0b;
@@ -319,6 +321,9 @@
         const connLabel = !conn ? 'sem conexão WhatsApp neste agente' :
           conn.status === 'open' || conn.status === 'connected' ? 'WhatsApp conectado' :
           conn.status || 'desconhecido';
+        const connectButton = !conn
+          ? '<button onclick="showConnectModal()" style="margin-left:auto;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;">+ Conectar WhatsApp</button>'
+          : '';
 
         document.getElementById('app').innerHTML = `
           <header>
@@ -344,29 +349,37 @@
             <span class="dot ${connDot}"></span>
             <span><strong>${connLabel}</strong></span>
             ${conn ? `<span style="color:var(--text-muted)">· ${escapeHtml(conn.instance_url || '')}</span>` : ''}
-            ${conn ? `<span style="color:var(--text-muted)">· instance: ${escapeHtml(conn.instance_name || '')}</span>` : ''}
-            <span style="margin-left: auto; color: var(--text-muted); font-size: 12px;">
-              <span class="refresh-indicator"></span> auto-refresh ${REFRESH_MS/1000}s
+            ${conn ? `<span style="color:var(--text-muted)">· instância: ${escapeHtml(conn.instance_name || '')}</span>` : ''}
+            ${connectButton}
+            <span style="margin-left: ${connectButton ? '12px' : 'auto'}; color: var(--text-muted); font-size: 12px;">
+              <span class="refresh-indicator"></span> atualiza a cada ${REFRESH_MS/1000}s
             </span>
           </div>
 
           <main>
             <div class="contacts-pane">
-              <div class="contacts-header">${state.contacts.length} contatos</div>
-              ${state.contacts.length === 0 ? `
+              <div class="contacts-header">${state.contacts.length} contatos <span class="info-tip" data-tip="Lista de pessoas que conversaram com seu agente. Cada uma tem memória própria (nome, fatos, histórico).">?</span></div>
+              ${state.contacts.length === 0 ? (!conn ? `
+                <div class="empty">
+                  <div class="empty-emoji">📲</div>
+                  <strong style="color:var(--text);">WhatsApp não conectado</strong><br/>
+                  <span style="font-size:12px;">Conecte uma instância Evolution<br/>pra começar a receber zaps</span><br/>
+                  <button onclick="showConnectModal()" style="margin-top:14px;background:var(--accent);color:white;border:none;padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Conectar agora →</button>
+                </div>
+              ` : `
                 <div class="empty">
                   <div class="empty-emoji">💬</div>
-                  Nenhum contato ainda.<br/>
-                  Mande um zap pro número conectado.
+                  <strong style="color:var(--text);">Nenhum contato ainda</strong><br/>
+                  <span style="font-size:12px;">Mande um zap pro número conectado.<br/>O contato aparece aqui após a 1ª mensagem.</span>
                 </div>
-              ` : state.contacts.map(c => `
+              `) : state.contacts.map(c => `
                 <div class="contact-item ${c.phone === state.selectedPhone ? 'active' : ''}"
                      onclick="selectContact('${c.phone}')">
                   <div class="contact-name">${escapeHtml(c.display_name || 'sem nome')}</div>
                   <div class="contact-phone">+${escapeHtml(c.phone)}</div>
                   <div class="contact-meta">
-                    <span class="badge">${c.message_count} msg</span>
-                    ${c.facts_count > 0 ? `<span class="badge facts">${c.facts_count} facts</span>` : ''}
+                    <span class="badge" title="Mensagens trocadas com este contato">${c.message_count} msg</span>
+                    ${c.facts_count > 0 ? `<span class="badge facts" title="Informações que o agente lembra deste contato (ex: alergia, plano, idade)">${c.facts_count} fatos</span>` : ''}
                     <span style="margin-left: auto;">${relTime(c.last_contact_at)}</span>
                   </div>
                 </div>
@@ -383,7 +396,7 @@
 
       function renderMemory() {
         if (!state.selectedPhone) {
-          return '<div class="empty"><div class="empty-emoji">🧠</div>Selecione um contato pra ver o cérebro</div>';
+          return '<div class="empty"><div class="empty-emoji">🧠</div>Selecione um contato à esquerda<br/>para ver o que o agente lembra dele</div>';
         }
         const m = state.memory;
         if (!m) return '<div class="empty">carregando memória…</div>';
@@ -391,7 +404,7 @@
         const tags = Array.isArray(m.tags) ? m.tags : [];
 
         return `
-          <h2>🧠 Memória do contato</h2>
+          <h2>🧠 Memória do contato <span class="info-tip" data-tip="Tudo que o agente sabe deste contato. Carregado automaticamente antes de cada resposta.">?</span></h2>
           <div class="mem-grid">
             <div class="mem-row">
               <div class="mem-label">Nome</div>
@@ -402,11 +415,11 @@
               <div class="mem-value">${escapeHtml(m.language || '—')}</div>
             </div>
             <div class="mem-row">
-              <div class="mem-label">Tom</div>
+              <div class="mem-label">Tom <span class="info-tip" data-tip="Formal/informal — agente adapta a fala">?</span></div>
               <div class="mem-value">${escapeHtml(m.formality || '—')}</div>
             </div>
             <div class="mem-row">
-              <div class="mem-label">Tags</div>
+              <div class="mem-label">Tags <span class="info-tip" data-tip="Marcadores que você define manualmente (ex: VIP, moroso)">?</span></div>
               <div class="mem-value">${tags.length ? tags.map(t => `<span class="badge">${escapeHtml(t)}</span>`).join(' ') : '—'}</div>
             </div>
             <div class="mem-row">
@@ -420,7 +433,7 @@
           </div>
 
           ${facts.length > 0 ? `
-            <h2 style="margin-top: 16px;">📋 Facts extraídos (${facts.length})</h2>
+            <h2 style="margin-top: 16px;">📋 Fatos lembrados (${facts.length}) <span class="info-tip" data-tip="Informações extraídas automaticamente do que o cliente disse. Pílula 'manual' = você editou; 'llm' = agente capturou sozinho.">?</span></h2>
             <table class="facts-table">
               <tbody>
                 ${facts.map(f => `
@@ -428,13 +441,13 @@
                     <td>${escapeHtml(f.key)}</td>
                     <td>
                       ${escapeHtml(f.value)}
-                      <span class="source-pill ${f.source}">${f.source}</span>
+                      <span class="source-pill ${f.source}" title="${f.source === 'manual' ? 'Você editou esse fato' : 'O agente extraiu da conversa'}">${f.source}</span>
                     </td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
-          ` : '<p style="color: var(--text-muted); font-size: 13px;">Sem facts extraídos ainda. Conforme o cliente conversar, o agente extrai automaticamente.</p>'}
+          ` : '<p style="color: var(--text-muted); font-size: 13px;">Sem fatos lembrados ainda. Conforme o cliente conversar, o agente extrai automaticamente.</p>'}
 
           ${m.summary ? `
             <h2 style="margin-top: 16px;">📝 Resumo</h2>
@@ -442,6 +455,64 @@
           ` : ''}
         `;
       }
+
+      // ─── Connect WhatsApp modal ────────────────────────────
+      window.showConnectModal = () => {
+        const overlay = document.createElement('div');
+        overlay.id = 'connect-modal';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.innerHTML = `
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:32px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+              <h2 style="margin:0;font-size:20px;">Conectar WhatsApp em 3 passos</h2>
+              <button onclick="document.getElementById('connect-modal').remove()" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;">×</button>
+            </div>
+
+            <div style="margin-bottom:20px;padding:16px;background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.2);border-radius:8px;font-size:13px;">
+              <strong>O que você precisa antes:</strong> uma instância <a href="https://github.com/EvolutionAPI/evolution-api" target="_blank" style="color:var(--accent-2);">Evolution API</a> rodando (gerenciada ou self-hosted) + 1 número WhatsApp livre pra usar como bot.
+            </div>
+
+            <ol style="padding-left:20px;line-height:1.7;font-size:14px;">
+              <li style="margin-bottom:12px;">
+                <strong>Crie um agente</strong> em <a href="/build" style="color:var(--accent-2);">/build</a> com pay_mode = <code>owner</code> (você paga as conversas).
+              </li>
+              <li style="margin-bottom:12px;">
+                <strong>Pegue suas credenciais Evolution:</strong>
+                <ul style="margin-top:6px;padding-left:18px;color:var(--text-dim);font-size:13px;">
+                  <li><code>instance_url</code>: ex <code>https://evolution.seu-host.com</code></li>
+                  <li><code>instance_name</code>: nome da instance no Evolution</li>
+                  <li><code>api_key</code>: AUTHENTICATION_API_KEY do servidor</li>
+                </ul>
+              </li>
+              <li style="margin-bottom:12px;">
+                <strong>Conecte via API ou CLI</strong> (passe o agent_id criado):
+                <pre style="background:#0a0a0b;border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px;font-size:11px;overflow-x:auto;color:var(--accent-2);">curl -X POST $AXON_BASE/v1/agents/$AGENT_ID/whatsapp \\
+  -H "x-api-key: $YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"instance_url":"https://...","instance_name":"...","api_key":"..."}'</pre>
+                Axon registra webhook automaticamente. Depois disso, escaneie QR (ou use código de pareamento) na sua instância Evolution.
+              </li>
+            </ol>
+
+            <p style="margin-top:20px;font-size:13px;color:var(--text-dim);">
+              <strong style="color:var(--text);">Ainda não tem Evolution?</strong> Opções:<br/>
+              • <strong>Z-API</strong> (R$99/mês, BR-friendly) — z-api.io<br/>
+              • <strong>Evolution Cloud</strong> (€9/mês oficial) — evolution-api.com<br/>
+              • <strong>Self-hosted</strong> grátis em VPS — github.com/EvolutionAPI/evolution-api<br/>
+              • <strong>Render free tier</strong> ⚠️ não funciona pra produção (hiberna)
+            </p>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+              <button onclick="document.getElementById('connect-modal').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;">Fechar</button>
+              <a href="/build" style="background:var(--accent);color:white;border:none;padding:8px 16px;border-radius:6px;font-size:13px;text-decoration:none;font-weight:600;">Criar agente primeiro →</a>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) overlay.remove();
+        });
+      };
 
       function renderChat() {
         if (!state.selectedPhone) return '';
