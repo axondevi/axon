@@ -123,6 +123,31 @@ export async function ensureSystemRows() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_cache_agent_idx" ON "agent_cache" ("agent_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_cache_lasthit_idx" ON "agent_cache" ("last_hit" DESC)`);
 
+  // ─── Self-healing schema: ensure contact_memory exists ──────
+  // Migration 0008_contact_memory.sql may not have been applied if the operator
+  // skipped `db:migrate`. Idempotent block so Render auto-deploys "just work".
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "contact_memory" (
+      "id"                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "agent_id"           uuid NOT NULL REFERENCES "agents"("id") ON DELETE CASCADE,
+      "phone"              text NOT NULL,
+      "display_name"       text,
+      "language"           text NOT NULL DEFAULT 'pt-br',
+      "formality"          text NOT NULL DEFAULT 'auto',
+      "tags"               jsonb NOT NULL DEFAULT '[]'::jsonb,
+      "facts"              jsonb NOT NULL DEFAULT '[]'::jsonb,
+      "summary"            text,
+      "message_count"      integer NOT NULL DEFAULT 0,
+      "first_contact_at"   timestamp NOT NULL DEFAULT NOW(),
+      "last_contact_at"    timestamp NOT NULL DEFAULT NOW(),
+      "created_at"         timestamp NOT NULL DEFAULT NOW(),
+      "updated_at"         timestamp NOT NULL DEFAULT NOW(),
+      CONSTRAINT "contact_memory_agent_phone_unique" UNIQUE ("agent_id", "phone")
+    )
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_agent_idx" ON "contact_memory" ("agent_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_last_contact_idx" ON "contact_memory" ("last_contact_at" DESC)`);
+
   // Touch the row so timestamps refresh if someone queries health.
   await db.execute(sql`SELECT 1`);
 }

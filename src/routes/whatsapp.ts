@@ -20,6 +20,12 @@ import { Errors } from '~/lib/errors';
 import { encrypt, decrypt } from '~/lib/crypto';
 import { checkInstance, setWebhook, sendText, extractInbound } from '~/whatsapp/evolution';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
+import {
+  getOrCreateMemory,
+  buildMemoryContext,
+  recordTurn,
+  extractFactsFromTurn,
+} from '~/agents/contact-memory';
 
 // ─── Owner-authed sub-router (mounted under /v1/agents) ────
 export const ownerWhatsapp = new Hono();
@@ -181,6 +187,16 @@ publicWebhook.post('/:secret', async (c) => {
 
   const messages: ChatMessage[] = [...priorMessages, { role: 'user', content: inbound.text }];
 
+  // ─── Contact memory: load before generation ─────────────────
+  // Lazy-create the contact_memory row on first contact. Inject what we
+  // know (name/language/facts/history) into the system prompt so the agent
+  // recognizes the person across sessions and personalizes its reply.
+  const memory = await getOrCreateMemory(a.id, inbound.phone, inbound.pushName).catch(() => null);
+  const memoryContext = memory ? buildMemoryContext(memory) : '';
+  const augmentedSystemPrompt = memoryContext
+    ? `${a.systemPrompt}\n\n## O que você sabe sobre este contato\n${memoryContext}`
+    : a.systemPrompt;
+
   // Run the agent (synchronously — Evolution waits up to ~30s)
   c.set('user', owner);
   c.set('axon:agent_id', a.id);
@@ -189,10 +205,13 @@ publicWebhook.post('/:secret', async (c) => {
   try {
     const result = await runAgent({
       c,
-      systemPrompt: a.systemPrompt,
+      systemPrompt: augmentedSystemPrompt,
       allowedTools: Array.isArray(a.allowedTools) ? (a.allowedTools as string[]) : [],
       messages,
       ownerId: a.ownerId,
+      // Disable semantic cache: each contact's context is unique. The same
+      // question from Pedro (VIP) vs Maria (new) warrants different replies.
+      enableCache: false,
     });
     reply = result.content || '🤖 (sem resposta no momento)';
 
@@ -207,6 +226,19 @@ publicWebhook.post('/:secret', async (c) => {
       content: reply.slice(0, 4000),
       visitorIp: 'whatsapp',
     }).catch(() => {});
+
+    // ─── Memory update (fire-and-forget, no await) ───────────
+    // Extract durable facts from the user's message and bump turn counter.
+    // These run in background so the WhatsApp reply isn't delayed.
+    if (memory) {
+      void recordTurn(a.id, inbound.phone).catch(() => {});
+      void extractFactsFromTurn({
+        agentId: a.id,
+        phone: inbound.phone,
+        userMessage: inbound.text,
+        currentMemory: memory,
+      }).catch(() => {});
+    }
   } catch (err: any) {
     reply = '🤖 Desculpe, tive um problema técnico. Tente de novo em alguns segundos.';
   }

@@ -341,3 +341,48 @@ export const whatsappConnections = pgTable(
   }),
 );
 export type WhatsappConnection = typeof whatsappConnections.$inferSelect;
+
+// ─── Contact Memory (durable per-contact profile + facts) ────
+// Keyed by (agent_id, phone). Stores long-term knowledge about each person
+// the agent talks to: their name, language, preferences, plus an array of
+// LLM-extracted facts ("alergic to lactose", "prefers PIX", etc).
+//
+// Loaded BEFORE every WhatsApp turn and injected into the system prompt so
+// the agent recognizes the contact across sessions and personalizes responses.
+// Owner can manually edit via /v1/agents/:id/contacts/:phone (PATCH).
+export const contactMemory = pgTable(
+  'contact_memory',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    phone: text('phone').notNull(),
+
+    // Owner-editable profile
+    displayName: text('display_name'),
+    language: text('language').notNull().default('pt-br'),
+    formality: text('formality').notNull().default('auto'),  // 'formal' | 'informal' | 'auto'
+    tags: jsonb('tags').notNull().default(sql`'[]'::jsonb`),  // string[] e.g. ["VIP", "moroso"]
+
+    // LLM-extracted durable facts. Shape: Array<{key, value, confidence, extracted_at}>
+    facts: jsonb('facts').notNull().default(sql`'[]'::jsonb`),
+
+    // Rolling summary (refreshed periodically when transcript exceeds N turns)
+    summary: text('summary'),
+
+    // Stats
+    messageCount: integer('message_count').notNull().default(0),
+    firstContactAt: timestamp('first_contact_at').defaultNow().notNull(),
+    lastContactAt: timestamp('last_contact_at').defaultNow().notNull(),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    agentPhoneUnique: uniqueIndex('contact_memory_agent_phone_unique').on(t.agentId, t.phone),
+    agentIdx: index('contact_memory_agent_idx').on(t.agentId),
+    lastContactIdx: index('contact_memory_last_contact_idx').on(t.lastContactAt),
+  }),
+);
+export type ContactMemory = typeof contactMemory.$inferSelect;

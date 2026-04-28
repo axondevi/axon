@@ -27,6 +27,7 @@ import subscriptionRoutes, { publicRoutes as subscriptionPublicRoutes } from '~/
 import agentsRoutes, { publicRoutes as agentsPublicRoutes } from '~/routes/agents';
 import agentRunRoutes from '~/routes/agent-run';
 import { ownerWhatsapp, publicWebhook as whatsappPublicWebhook } from '~/routes/whatsapp';
+import { ownerContacts } from '~/routes/contacts';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -141,6 +142,7 @@ v1.route('/usage', usageRoutes);
 v1.route('/subscription', subscriptionRoutes);
 v1.route('/agents', agentsRoutes);
 v1.route('/agents', ownerWhatsapp);  // adds /v1/agents/:id/whatsapp under same auth
+v1.route('/agents', ownerContacts);  // adds /v1/agents/:id/contacts/* under same auth
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 app.route('/v1', v1);
 
