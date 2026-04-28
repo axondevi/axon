@@ -261,8 +261,15 @@ publicWebhook.post('/:secret', async (c) => {
   return c.json({ ok: true });
 });
 
-// Helper — derive the public webhook URL for an instance secret
+// Helper — derive the public webhook URL for an instance secret.
+// On Render the proxy reports `req.url` as `http://...` even though the
+// public hostname only serves HTTPS. Honor X-Forwarded-Proto so Evolution
+// receives a webhook URL it can actually POST to (Evolution does not
+// follow 301 redirects from HTTP→HTTPS).
 function webhookUrlFor(c: any, secret: string): string {
   const url = new URL(c.req.url);
-  return `${url.origin}/v1/webhooks/whatsapp/${secret}`;
+  const fwdProto = c.req.header('x-forwarded-proto');
+  const proto = fwdProto || (url.protocol === 'https:' ? 'https' : 'http');
+  const host = c.req.header('x-forwarded-host') || url.host;
+  return `${proto}://${host}/v1/webhooks/whatsapp/${secret}`;
 }

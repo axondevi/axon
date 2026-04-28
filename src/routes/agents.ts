@@ -451,6 +451,7 @@ app.get('/:id/messages', async (c) => {
   const user = c.get('user') as { id: string };
   const id = c.req.param('id');
   const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '50', 10), 1), 200);
+  const sessionId = c.req.query('session_id');
 
   // Ownership check
   const [a] = await db
@@ -459,10 +460,15 @@ app.get('/:id/messages', async (c) => {
     .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
   if (!a) throw Errors.notFound('Agent');
 
+  // Optional filter by session (e.g. session_id=wa:5511995432538 for one WhatsApp contact)
+  const where = sessionId
+    ? and(eq(agentMessages.agentId, id), eq(agentMessages.sessionId, sessionId))
+    : eq(agentMessages.agentId, id);
+
   const rows = await db
     .select()
     .from(agentMessages)
-    .where(eq(agentMessages.agentId, id))
+    .where(where)
     .orderBy(desc(agentMessages.createdAt))
     .limit(limit);
 

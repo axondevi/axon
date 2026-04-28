@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon · WhatsApp Brain</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0a0b;
+        --bg-elev: #111114;
+        --bg-card: #16161a;
+        --bg-hover: #1c1c22;
+        --border: #25252b;
+        --text: #eeeef0;
+        --text-dim: #9a9aa4;
+        --text-muted: #6a6a76;
+        --accent: #7c5cff;
+        --accent-2: #19d5c6;
+        --whatsapp: #25d366;
+        --danger: #ff5f57;
+        --warn: #ffd60a;
+        --radius: 10px;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+        overflow: hidden;
+      }
+
+      /* ─── Header ───────────────────────────────── */
+      header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-elev);
+      }
+      .brand { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: 18px; }
+      .logo-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      }
+      .header-actions { display: flex; gap: 12px; align-items: center; }
+      .agent-select {
+        background: var(--bg-card); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 6px 10px; font-size: 13px; font-family: inherit;
+      }
+      .key-chip {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px; color: var(--text-muted);
+        background: var(--bg-card); padding: 5px 8px;
+        border-radius: 5px; border: 1px solid var(--border);
+      }
+      .key-chip button {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; padding: 0 0 0 8px; font-size: 11px;
+      }
+      .nav-link {
+        color: var(--text-dim); text-decoration: none; font-size: 13px;
+      }
+      .nav-link:hover { color: var(--text); }
+
+      /* ─── Conn status bar ──────────────────────── */
+      .conn-bar {
+        display: flex; gap: 16px; align-items: center;
+        padding: 10px 24px;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+      .dot.green { background: var(--whatsapp); box-shadow: 0 0 8px var(--whatsapp); }
+      .dot.yellow { background: var(--warn); }
+      .dot.red { background: var(--danger); }
+
+      /* ─── Main layout ──────────────────────────── */
+      main {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        height: calc(100vh - 110px);
+      }
+
+      /* Left: contacts ─────────────────────────── */
+      .contacts-pane {
+        border-right: 1px solid var(--border);
+        background: var(--bg-elev);
+        overflow-y: auto;
+      }
+      .contacts-header {
+        padding: 14px 18px;
+        font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border);
+        position: sticky; top: 0; background: var(--bg-elev);
+      }
+      .contact-item {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .contact-item:hover { background: var(--bg-hover); }
+      .contact-item.active { background: var(--bg-card); border-left: 3px solid var(--accent); padding-left: 15px; }
+      .contact-name { font-weight: 600; font-size: 14px; }
+      .contact-phone {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px; color: var(--text-muted); margin-top: 2px;
+      }
+      .contact-meta {
+        display: flex; gap: 8px; margin-top: 6px;
+        font-size: 11px; color: var(--text-dim);
+      }
+      .badge {
+        background: var(--bg-card); padding: 2px 6px; border-radius: 4px;
+        font-size: 10px; color: var(--text-dim); border: 1px solid var(--border);
+      }
+      .badge.facts { color: var(--accent-2); border-color: var(--accent-2); }
+
+      /* Right: chat + memory ────────────────────── */
+      .detail-pane {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        overflow: hidden;
+      }
+      .memory-card {
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border);
+        padding: 18px 24px;
+        max-height: 40vh;
+        overflow-y: auto;
+      }
+      .memory-card h2 {
+        font-size: 14px; font-weight: 600; margin: 0 0 14px;
+        color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;
+      }
+      .mem-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .mem-row { font-size: 13px; }
+      .mem-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .mem-value { font-weight: 500; margin-top: 2px; }
+      .facts-table { width: 100%; font-size: 13px; }
+      .facts-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+      .facts-table td:first-child {
+        color: var(--accent-2); width: 40%;
+        font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      }
+      .facts-table tr:last-child td { border-bottom: none; }
+      .source-pill {
+        display: inline-block; padding: 1px 5px; border-radius: 3px;
+        font-size: 9px; text-transform: uppercase; margin-left: 6px;
+        border: 1px solid;
+      }
+      .source-pill.manual { color: var(--accent-2); border-color: var(--accent-2); }
+      .source-pill.llm { color: var(--text-muted); border-color: var(--text-muted); }
+
+      .chat-pane {
+        overflow-y: auto;
+        padding: 18px 24px;
+      }
+      .chat-pane h2 {
+        font-size: 14px; font-weight: 600; margin: 0 0 14px;
+        color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;
+      }
+      .turn { margin: 12px 0; max-width: 75%; }
+      .turn.user { margin-left: auto; }
+      .turn.assistant { margin-right: auto; }
+      .bubble {
+        padding: 10px 14px; border-radius: 12px;
+        font-size: 14px; line-height: 1.45;
+        white-space: pre-wrap; word-break: break-word;
+      }
+      .turn.user .bubble {
+        background: var(--accent); color: white;
+        border-bottom-right-radius: 4px;
+      }
+      .turn.assistant .bubble {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-bottom-left-radius: 4px;
+      }
+      .turn-meta {
+        font-size: 10px; color: var(--text-muted);
+        margin-top: 4px; padding: 0 6px;
+      }
+      .turn.user .turn-meta { text-align: right; }
+
+      .empty {
+        text-align: center; color: var(--text-muted);
+        padding: 40px 20px; font-size: 14px;
+      }
+      .empty-emoji { font-size: 32px; opacity: 0.5; margin-bottom: 12px; }
+
+      /* Login screen ─────────────────────────── */
+      .login-screen {
+        display: flex; align-items: center; justify-content: center;
+        height: 100vh; padding: 20px;
+      }
+      .login-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 32px; max-width: 420px; width: 100%;
+      }
+      .login-card h1 { font-size: 22px; margin: 0 0 8px; }
+      .login-card p { color: var(--text-dim); font-size: 14px; margin: 0 0 24px; }
+      .input {
+        width: 100%; background: var(--bg);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 12px; font-family: 'JetBrains Mono', monospace;
+        font-size: 13px; color: var(--text);
+      }
+      .btn {
+        background: var(--accent); color: white; border: none;
+        border-radius: 6px; padding: 10px 18px; font-weight: 600;
+        font-family: inherit; font-size: 14px; cursor: pointer;
+        margin-top: 12px;
+      }
+      .btn:hover { opacity: 0.9; }
+
+      .refresh-indicator {
+        display: inline-block; width: 6px; height: 6px;
+        border-radius: 50%; background: var(--accent-2);
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+      }
+
+      /* Mobile ─────────────────────────────── */
+      @media (max-width: 800px) {
+        main { grid-template-columns: 1fr; grid-template-rows: 200px 1fr; }
+        .contacts-pane { max-height: 200px; }
+        .conn-bar { flex-wrap: wrap; gap: 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const STORAGE_KEY = 'axon_api_key';
+      const API_BASE = 'https://axon-kedb.onrender.com';
+      const REFRESH_MS = 5000;
+
+      let state = {
+        apiKey: localStorage.getItem(STORAGE_KEY) || '',
+        agents: [],
+        selectedAgentId: null,
+        contacts: [],
+        selectedPhone: null,
+        memory: null,
+        messages: [],
+        whatsappConn: null,
+      };
+
+      let refreshTimer = null;
+
+      // ─── API helpers ───────────────────────────
+      async function api(path, opts = {}) {
+        const r = await fetch(API_BASE + path, {
+          ...opts,
+          headers: {
+            'x-api-key': state.apiKey,
+            'Content-Type': 'application/json',
+            ...(opts.headers || {}),
+          },
+        });
+        if (!r.ok) {
+          if (r.status === 401) {
+            localStorage.removeItem(STORAGE_KEY);
+            state.apiKey = '';
+            render();
+          }
+          throw new Error(`${r.status} ${r.statusText}`);
+        }
+        return r.json();
+      }
+
+      // ─── Render ────────────────────────────────
+      function render() {
+        if (!state.apiKey) { renderLogin(); return; }
+        renderApp();
+      }
+
+      function renderLogin() {
+        document.getElementById('app').innerHTML = `
+          <div class="login-screen">
+            <div class="login-card">
+              <h1>WhatsApp Brain</h1>
+              <p>Cole sua Axon API key pra ver os agentes WhatsApp e o cérebro de cada contato.</p>
+              <input class="input" id="key-in" placeholder="ax_live_..." autofocus />
+              <button class="btn" onclick="doLogin()">Entrar</button>
+              <p style="margin-top: 16px; font-size: 12px;">
+                Não tem? <a href="/" style="color: var(--accent)">Criar conta</a>
+              </p>
+            </div>
+          </div>
+        `;
+        document.getElementById('key-in').addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') doLogin();
+        });
+      }
+
+      function renderApp() {
+        const conn = state.whatsappConn;
+        const connDot = !conn ? 'red' : (conn.status === 'open' || conn.status === 'connected' ? 'green' : 'yellow');
+        const connLabel = !conn ? 'sem conexão WhatsApp neste agente' :
+          conn.status === 'open' || conn.status === 'connected' ? 'WhatsApp conectado' :
+          conn.status || 'desconhecido';
+
+        document.getElementById('app').innerHTML = `
+          <header>
+            <div class="brand">
+              <div class="logo-dot"></div>
+              <span>WhatsApp Brain</span>
+            </div>
+            <div class="header-actions">
+              <a href="/dashboard" class="nav-link">← Dashboard</a>
+              <select class="agent-select" id="agent-sel" onchange="onAgentChange(this.value)">
+                ${state.agents.map(a => `
+                  <option value="${a.id}" ${a.id === state.selectedAgentId ? 'selected' : ''}>${escapeHtml(a.name)}</option>
+                `).join('')}
+              </select>
+              <span class="key-chip">
+                ${state.apiKey.slice(0, 12)}…
+                <button onclick="logout()">sair</button>
+              </span>
+            </div>
+          </header>
+
+          <div class="conn-bar">
+            <span class="dot ${connDot}"></span>
+            <span><strong>${connLabel}</strong></span>
+            ${conn ? `<span style="color:var(--text-muted)">· ${escapeHtml(conn.instance_url || '')}</span>` : ''}
+            ${conn ? `<span style="color:var(--text-muted)">· instance: ${escapeHtml(conn.instance_name || '')}</span>` : ''}
+            <span style="margin-left: auto; color: var(--text-muted); font-size: 12px;">
+              <span class="refresh-indicator"></span> auto-refresh ${REFRESH_MS/1000}s
+            </span>
+          </div>
+
+          <main>
+            <div class="contacts-pane">
+              <div class="contacts-header">${state.contacts.length} contatos</div>
+              ${state.contacts.length === 0 ? `
+                <div class="empty">
+                  <div class="empty-emoji">💬</div>
+                  Nenhum contato ainda.<br/>
+                  Mande um zap pro número conectado.
+                </div>
+              ` : state.contacts.map(c => `
+                <div class="contact-item ${c.phone === state.selectedPhone ? 'active' : ''}"
+                     onclick="selectContact('${c.phone}')">
+                  <div class="contact-name">${escapeHtml(c.display_name || 'sem nome')}</div>
+                  <div class="contact-phone">+${escapeHtml(c.phone)}</div>
+                  <div class="contact-meta">
+                    <span class="badge">${c.message_count} msg</span>
+                    ${c.facts_count > 0 ? `<span class="badge facts">${c.facts_count} facts</span>` : ''}
+                    <span style="margin-left: auto;">${relTime(c.last_contact_at)}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <div class="detail-pane">
+              <div class="memory-card">${renderMemory()}</div>
+              <div class="chat-pane">${renderChat()}</div>
+            </div>
+          </main>
+        `;
+      }
+
+      function renderMemory() {
+        if (!state.selectedPhone) {
+          return '<div class="empty"><div class="empty-emoji">🧠</div>Selecione um contato pra ver o cérebro</div>';
+        }
+        const m = state.memory;
+        if (!m) return '<div class="empty">carregando memória…</div>';
+        const facts = Array.isArray(m.facts) ? m.facts : [];
+        const tags = Array.isArray(m.tags) ? m.tags : [];
+
+        return `
+          <h2>🧠 Memória do contato</h2>
+          <div class="mem-grid">
+            <div class="mem-row">
+              <div class="mem-label">Nome</div>
+              <div class="mem-value">${escapeHtml(m.display_name || '—')}</div>
+            </div>
+            <div class="mem-row">
+              <div class="mem-label">Idioma</div>
+              <div class="mem-value">${escapeHtml(m.language || '—')}</div>
+            </div>
+            <div class="mem-row">
+              <div class="mem-label">Tom</div>
+              <div class="mem-value">${escapeHtml(m.formality || '—')}</div>
+            </div>
+            <div class="mem-row">
+              <div class="mem-label">Tags</div>
+              <div class="mem-value">${tags.length ? tags.map(t => `<span class="badge">${escapeHtml(t)}</span>`).join(' ') : '—'}</div>
+            </div>
+            <div class="mem-row">
+              <div class="mem-label">Mensagens</div>
+              <div class="mem-value">${m.message_count}</div>
+            </div>
+            <div class="mem-row">
+              <div class="mem-label">Primeiro contato</div>
+              <div class="mem-value">${m.first_contact_at ? new Date(m.first_contact_at).toLocaleDateString('pt-BR') : '—'}</div>
+            </div>
+          </div>
+
+          ${facts.length > 0 ? `
+            <h2 style="margin-top: 16px;">📋 Facts extraídos (${facts.length})</h2>
+            <table class="facts-table">
+              <tbody>
+                ${facts.map(f => `
+                  <tr>
+                    <td>${escapeHtml(f.key)}</td>
+                    <td>
+                      ${escapeHtml(f.value)}
+                      <span class="source-pill ${f.source}">${f.source}</span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : '<p style="color: var(--text-muted); font-size: 13px;">Sem facts extraídos ainda. Conforme o cliente conversar, o agente extrai automaticamente.</p>'}
+
+          ${m.summary ? `
+            <h2 style="margin-top: 16px;">📝 Resumo</h2>
+            <p style="font-size: 13px; color: var(--text-dim);">${escapeHtml(m.summary)}</p>
+          ` : ''}
+        `;
+      }
+
+      function renderChat() {
+        if (!state.selectedPhone) return '';
+        const msgs = [...state.messages].reverse(); // chronological
+        if (msgs.length === 0) {
+          return '<div class="empty">Nenhuma mensagem com este contato ainda</div>';
+        }
+        return `
+          <h2>💬 Conversa (${msgs.length} mensagens)</h2>
+          ${msgs.map(m => `
+            <div class="turn ${m.role}">
+              <div class="bubble">${escapeHtml(m.content)}</div>
+              <div class="turn-meta">${m.role === 'user' ? 'cliente' : '🤖 agente'} · ${relTime(m.created_at)}</div>
+            </div>
+          `).join('')}
+        `;
+      }
+
+      // ─── Actions ───────────────────────────────
+      window.doLogin = async () => {
+        const k = document.getElementById('key-in').value.trim();
+        if (!k.startsWith('ax_')) { alert('API key precisa começar com ax_'); return; }
+        state.apiKey = k;
+        localStorage.setItem(STORAGE_KEY, k);
+        try {
+          await loadAgents();
+          render();
+          startRefresh();
+        } catch (e) {
+          alert('Falha login: ' + e.message);
+          state.apiKey = '';
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      };
+
+      window.logout = () => {
+        localStorage.removeItem(STORAGE_KEY);
+        state = { ...state, apiKey: '', agents: [], selectedAgentId: null, contacts: [], selectedPhone: null, memory: null, messages: [], whatsappConn: null };
+        stopRefresh();
+        render();
+      };
+
+      window.onAgentChange = async (agentId) => {
+        state.selectedAgentId = agentId;
+        state.selectedPhone = null;
+        state.memory = null;
+        state.messages = [];
+        await loadAgentData();
+        render();
+      };
+
+      window.selectContact = async (phone) => {
+        state.selectedPhone = phone;
+        await loadContactDetails();
+        render();
+      };
+
+      // ─── Data ─────────────────────────────────
+      async function loadAgents() {
+        const r = await api('/v1/agents');
+        state.agents = r.data || [];
+        if (state.agents.length === 0) {
+          alert('Nenhum agente nesta conta. Crie um em /build primeiro.');
+          return;
+        }
+        if (!state.selectedAgentId || !state.agents.find(a => a.id === state.selectedAgentId)) {
+          state.selectedAgentId = state.agents[0].id;
+        }
+        await loadAgentData();
+      }
+
+      async function loadAgentData() {
+        if (!state.selectedAgentId) return;
+        const [contacts, conn] = await Promise.all([
+          api(`/v1/agents/${state.selectedAgentId}/contacts`).catch(() => ({ contacts: [] })),
+          api(`/v1/agents/${state.selectedAgentId}/whatsapp`).catch(() => ({ connected: false })),
+        ]);
+        state.contacts = contacts.contacts || [];
+        state.whatsappConn = conn.connected ? conn : null;
+        if (state.selectedPhone) await loadContactDetails();
+      }
+
+      async function loadContactDetails() {
+        if (!state.selectedAgentId || !state.selectedPhone) return;
+        const sessionId = 'wa:' + state.selectedPhone;
+        const [mem, msgs] = await Promise.all([
+          api(`/v1/agents/${state.selectedAgentId}/contacts/${state.selectedPhone}`),
+          api(`/v1/agents/${state.selectedAgentId}/messages?session_id=${encodeURIComponent(sessionId)}&limit=100`),
+        ]);
+        state.memory = mem;
+        state.messages = msgs.data || [];
+      }
+
+      // ─── Refresh loop ─────────────────────────
+      function startRefresh() {
+        stopRefresh();
+        refreshTimer = setInterval(async () => {
+          try { await loadAgentData(); render(); } catch (e) { console.warn('refresh failed', e); }
+        }, REFRESH_MS);
+      }
+      function stopRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+
+      // ─── Utils ────────────────────────────────
+      function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[c]);
+      }
+      function relTime(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+        if (diffSec < 60) return 'agora';
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m atrás`;
+        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h atrás`;
+        return d.toLocaleDateString('pt-BR');
+      }
+
+      // ─── Boot ─────────────────────────────────
+      (async () => {
+        if (state.apiKey) {
+          try { await loadAgents(); render(); startRefresh(); }
+          catch (e) {
+            console.error(e);
+            state.apiKey = '';
+            localStorage.removeItem(STORAGE_KEY);
+            render();
+          }
+        } else {
+          render();
+        }
+      })();
+    </script>
+  </body>
+</html>
