@@ -13,4 +13,11 @@
 # /agent-preview/:slug → preview UI ("test drive" before connecting WhatsApp).
 /agent-preview/:slug    /agent-preview?slug=:slug    200
 
+# Vertical niche pages — single template (niche.html) renders all 3 verticals
+# from one config. URLs stay pretty (clinica/restaurante/loja) for SEO,
+# rewrite is internal (200) so the bar shows the friendly path.
+/clinica          /niche?tipo=clinica          200
+/restaurante      /niche?tipo=restaurante      200
+/loja             /niche?tipo=loja             200
+
 /*    /404.html    404
