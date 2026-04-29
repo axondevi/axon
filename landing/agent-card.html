@@ -3,602 +3,873 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Tia Zélia · Agente nível 4 — Axon</title>
+<title>Tia Zélia · Pet Carinhoso — Axon</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<link rel="stylesheet" href="styles.css" />
 <style>
-  /* ─── Reset + tokens ───────────────────────────────────────── */
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: #e8e8ee;
-    background: radial-gradient(1200px 800px at 70% -10%, rgba(245, 158, 11, 0.18), transparent 60%),
-                radial-gradient(900px 700px at 10% 110%, rgba(124, 92, 255, 0.20), transparent 60%),
-                #0a0a0f;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-  :root {
-    --persona-primary: #f59e0b;       /* Tia Zélia gold */
-    --persona-secondary: #fb923c;
-    --bg-card: rgba(255, 255, 255, 0.04);
-    --bg-card-strong: rgba(255, 255, 255, 0.08);
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.15);
-    --text: #f5f5fa;
-    --text-dim: #a8a8b8;
-    --text-faint: #6c6c7c;
-    --good: #4ade80;
-    --warn: #fbbf24;
-    --bad: #f87171;
-    --rare-common: #94a3b8;
-    --rare-uncommon: #4ade80;
-    --rare-rare: #60a5fa;
-    --rare-epic: #c084fc;
-    --rare-legendary: #fbbf24;
-  }
+/* ─── Profile-specific tokens (extends styles.css) ─────────── */
+:root {
+  --rare-common:    #94a3b8;
+  --rare-uncommon:  #19d5c6;
+  --rare-rare:      #7c5cff;
+  --rare-epic:      #c084fc;
+  --rare-legendary: #ffd60a;
+}
 
-  /* ─── Layout ───────────────────────────────────────────────── */
-  .page {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 32px 20px 80px;
-  }
-  .topbar {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 24px;
-    font-size: 14px;
-  }
-  .topbar a {
-    color: var(--text-dim);
-    text-decoration: none;
-    padding: 6px 12px;
-    border-radius: 8px;
-  }
-  .topbar a:hover { background: var(--bg-card); color: var(--text); }
-  .brand { font-weight: 700; color: var(--text); letter-spacing: -0.01em; font-size: 16px; }
-  .brand span { color: var(--persona-primary); }
+/* ─── Animated aurora behind the page ───────────────────────── */
+.aurora {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+.aurora::before, .aurora::after {
+  content: "";
+  position: absolute;
+  width: 90vw; height: 90vw;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  mix-blend-mode: screen;
+}
+.aurora::before {
+  background: radial-gradient(circle, #7c5cff 0%, transparent 60%);
+  top: -30vw; right: -20vw;
+  animation: drift1 24s ease-in-out infinite;
+}
+.aurora::after {
+  background: radial-gradient(circle, #19d5c6 0%, transparent 60%);
+  bottom: -30vw; left: -20vw;
+  animation: drift2 28s ease-in-out infinite;
+}
+@keyframes drift1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-8vw, 6vw) scale(1.1); }
+}
+@keyframes drift2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(6vw, -8vw) scale(1.15); }
+}
 
-  /* ─── Hero card ────────────────────────────────────────────── */
-  .hero {
-    position: relative;
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 146, 60, 0.04));
-    border: 1px solid rgba(245, 158, 11, 0.30);
-    border-radius: 24px;
-    padding: 32px;
-    overflow: hidden;
-    backdrop-filter: blur(12px);
-  }
-  .hero::before {
-    content: "";
-    position: absolute; inset: 0;
-    background: radial-gradient(600px 300px at 100% 0%, rgba(245, 158, 11, 0.18), transparent 70%);
-    pointer-events: none;
-  }
-  .hero-grid {
-    display: grid;
-    grid-template-columns: 180px 1fr auto;
-    gap: 28px;
-    align-items: center;
-    position: relative;
-  }
-  @media (max-width: 720px) {
-    .hero-grid { grid-template-columns: 1fr; gap: 20px; text-align: center; }
-  }
-  .avatar-wrap {
-    position: relative;
-    width: 180px; height: 180px;
-    border-radius: 50%;
-    background: conic-gradient(from 180deg, var(--persona-primary), var(--persona-secondary), var(--persona-primary));
-    padding: 4px;
-    margin: 0 auto;
-  }
-  .avatar {
-    width: 100%; height: 100%;
-    border-radius: 50%;
-    background: #1a1a2e;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 88px;
-    overflow: hidden;
-  }
-  .level-badge {
-    position: absolute; bottom: 4px; right: 4px;
-    background: linear-gradient(135deg, #fbbf24, #f59e0b);
-    color: #1a1a2e;
-    border: 3px solid #0a0a0f;
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 22px;
-    box-shadow: 0 4px 16px rgba(251, 191, 36, 0.4);
-  }
-  .level-badge::before { content: "Nv"; font-size: 10px; opacity: 0.6; margin-right: 2px; }
+/* ─── Page layout ────────────────────────────────────────────── */
+.profile-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 24px 100px;
+}
 
-  .hero-info h1 {
-    margin: 0 0 6px;
-    font-size: 38px;
-    letter-spacing: -0.02em;
-    font-weight: 800;
-  }
-  .hero-info .slug {
-    color: var(--text-dim);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 13px;
-  }
-  .persona-tag {
-    display: inline-flex; align-items: center;
-    gap: 6px;
-    margin-top: 12px;
-    padding: 6px 12px;
-    background: rgba(245, 158, 11, 0.15);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 999px;
-    font-size: 13px;
-    color: var(--persona-primary);
-    font-weight: 600;
-  }
-  .xp-bar {
-    margin-top: 18px;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 999px;
-    height: 8px;
-    overflow: hidden;
-    position: relative;
-  }
-  .xp-bar-fill {
-    width: 64%;
-    height: 100%;
-    background: linear-gradient(90deg, var(--persona-secondary), var(--persona-primary));
-    border-radius: 999px;
-    position: relative;
-  }
-  .xp-bar-fill::after {
-    content: "";
-    position: absolute; inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-    animation: shimmer 2.5s infinite;
-  }
-  @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-  }
-  .xp-text { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
-  .xp-text strong { color: var(--persona-primary); }
+/* ─── Hero card with avatar + identity ───────────────────────── */
+.profile-hero {
+  position: relative;
+  background:
+    radial-gradient(700px 360px at 90% 0%, rgba(124, 92, 255, 0.18), transparent 70%),
+    radial-gradient(500px 300px at 5% 100%, rgba(25, 213, 198, 0.10), transparent 70%),
+    var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  overflow: hidden;
+}
+.profile-hero::after {
+  /* shifting mesh on top — subtle */
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(125deg, transparent 30%, rgba(124, 92, 255, 0.05) 50%, transparent 70%);
+  background-size: 200% 200%;
+  animation: meshShift 14s linear infinite;
+  pointer-events: none;
+}
+@keyframes meshShift {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 200%; }
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr 220px;
+  gap: 32px;
+  align-items: center;
+  position: relative;
+}
+@media (max-width: 860px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 24px; text-align: center; }
+}
 
-  .actions {
-    display: flex; flex-direction: column; gap: 8px;
-    min-width: 180px;
-  }
-  @media (max-width: 720px) {
-    .actions { flex-direction: row; flex-wrap: wrap; justify-content: center; }
-  }
-  .btn {
-    padding: 12px 20px;
-    border-radius: 12px;
-    border: 1px solid var(--border-strong);
-    background: var(--bg-card-strong);
-    color: var(--text);
-    font-size: 14px; font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: inline-flex; align-items: center; justify-content: center;
-    gap: 8px;
-    text-decoration: none;
-  }
-  .btn:hover { background: rgba(255, 255, 255, 0.12); transform: translateY(-1px); }
-  .btn-primary {
-    background: linear-gradient(135deg, var(--persona-primary), var(--persona-secondary));
-    color: #1a1a2e;
-    border: none;
-    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.30);
-  }
-  .btn-primary:hover { box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45); }
-  .btn-ghost {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-  }
+/* ─── Avatar with orbital ring + particles ──────────────────── */
+.avatar-orbit {
+  position: relative;
+  width: 220px; height: 220px;
+  margin: 0 auto;
+}
+.avatar-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #7c5cff, #19d5c6, #c084fc, #7c5cff);
+  animation: ringSpin 8s linear infinite;
+  filter: blur(0.5px);
+}
+.avatar-ring::after {
+  content: "";
+  position: absolute; inset: 6px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+@keyframes ringSpin { to { transform: rotate(360deg); } }
 
-  /* ─── Stats grid ───────────────────────────────────────────── */
-  .section-title {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--text-faint);
-    margin: 32px 0 16px;
-    font-weight: 700;
-  }
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-  @media (max-width: 720px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
-  }
-  .stat {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 18px;
-    transition: border-color 0.2s;
-  }
-  .stat:hover { border-color: var(--border-strong); }
-  .stat-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-faint);
-    font-weight: 600;
-  }
-  .stat-value {
-    font-size: 28px;
-    font-weight: 800;
-    margin-top: 6px;
-    letter-spacing: -0.02em;
-  }
-  .stat-trend { font-size: 12px; margin-top: 4px; color: var(--text-dim); }
-  .trend-up { color: var(--good); }
+.avatar-core {
+  position: absolute; inset: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a1a22 0%, #0f0f14 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 100px;
+  overflow: hidden;
+  box-shadow: inset 0 0 40px rgba(124, 92, 255, 0.20);
+}
+.avatar-core::before {
+  /* shimmer pass */
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.06) 50%, transparent 70%);
+  background-size: 200% 200%;
+  animation: shimmerPass 4.5s ease-in-out infinite;
+}
+@keyframes shimmerPass {
+  0%, 100% { background-position: -100% -100%; }
+  50%      { background-position: 200% 200%; }
+}
 
-  /* ─── Super powers (tools) ─────────────────────────────────── */
-  .powers-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
-  }
-  .power {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px;
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-    transition: all 0.15s;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-  }
-  .power:hover { transform: translateY(-2px); border-color: var(--border-strong); background: var(--bg-card-strong); }
-  .power::before {
-    content: "";
-    position: absolute; inset: 0;
-    background: linear-gradient(135deg, var(--rarity-color, transparent) 0%, transparent 60%);
-    opacity: 0.08;
-    pointer-events: none;
-  }
-  .power-icon {
-    width: 44px; height: 44px;
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--rarity-color, var(--border));
-    flex-shrink: 0;
-  }
-  .power-info { flex: 1; min-width: 0; }
-  .power-name {
-    font-size: 14px; font-weight: 700;
-    margin-bottom: 2px;
-  }
-  .power-desc {
-    font-size: 11px;
-    color: var(--text-dim);
-    line-height: 1.4;
-  }
-  .power-rarity {
-    position: absolute; top: 8px; right: 10px;
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--rarity-color);
-    font-weight: 700;
-    opacity: 0.85;
-  }
-  .power-empty {
-    background: transparent;
-    border: 1.5px dashed var(--border);
-    color: var(--text-faint);
-    display: flex; align-items: center; justify-content: center;
-    min-height: 80px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .power-empty:hover { border-color: var(--persona-primary); color: var(--persona-primary); }
+/* Tiny orbiting particles around the avatar */
+.avatar-particles {
+  position: absolute; inset: -10px;
+  pointer-events: none;
+  animation: ringSpin 16s linear infinite reverse;
+}
+.particle {
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  top: 50%; left: 50%;
+  transform-origin: 0 0;
+}
+.particle.p2 { background: var(--accent-2); box-shadow: 0 0 12px var(--accent-2); }
+.particle.p3 { background: #c084fc; box-shadow: 0 0 12px #c084fc; }
 
-  /* ─── Activity feed ────────────────────────────────────────── */
-  .activity {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 4px;
-  }
-  .activity-row {
-    display: grid;
-    grid-template-columns: 32px 1fr auto;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    border-radius: 10px;
-    transition: background 0.15s;
-  }
-  .activity-row + .activity-row { border-top: 1px solid var(--border); }
-  .activity-row:hover { background: var(--bg-card-strong); }
-  .activity-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
-    background: rgba(255, 255, 255, 0.06);
-  }
-  .activity-text { font-size: 13px; }
-  .activity-text strong { color: var(--text); }
-  .activity-text span { color: var(--text-dim); }
-  .activity-time {
-    font-size: 11px;
-    color: var(--text-faint);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  }
+.level-badge {
+  position: absolute;
+  bottom: -4px; right: -4px;
+  background: linear-gradient(135deg, #ffd60a, #f59e0b);
+  color: #1a1a22;
+  border: 4px solid var(--bg);
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(255, 214, 10, 0.35);
+  z-index: 2;
+}
+.level-badge .lvl { font-size: 9px; opacity: 0.7; letter-spacing: 0.08em; text-transform: uppercase; }
+.level-badge .num { font-size: 24px; line-height: 1; }
 
-  /* ─── Sidebar info (NFT, market) ───────────────────────────── */
-  .footer-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 16px;
-    margin-top: 32px;
-  }
-  @media (max-width: 720px) { .footer-grid { grid-template-columns: 1fr; } }
+/* ─── Hero info column ──────────────────────────────────────── */
+.hero-info h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+.hero-info h1 .gradient {
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero-meta {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: center;
+  margin: 8px 0 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+@media (max-width: 860px) { .hero-meta { justify-content: center; } }
+.slug {
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(124, 92, 255, 0.08);
+  border: 1px solid rgba(124, 92, 255, 0.20);
+  color: var(--accent);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.persona-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: rgba(25, 213, 198, 0.08);
+  border: 1px solid rgba(25, 213, 198, 0.25);
+  border-radius: 999px;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 10px #22c55e;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.55; } }
+.status-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-dim);
+}
 
-  .market-card {
-    background: linear-gradient(135deg, rgba(124, 92, 255, 0.10), rgba(192, 132, 252, 0.05));
-    border: 1px solid rgba(124, 92, 255, 0.25);
-    border-radius: 16px;
-    padding: 20px;
-  }
-  .market-title {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #c084fc;
-    font-weight: 700;
-    margin-bottom: 12px;
-  }
-  .market-price {
-    font-size: 32px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-  }
-  .market-price small { font-size: 14px; color: var(--text-dim); font-weight: 500; }
-  .market-info {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin: 8px 0 16px;
-    line-height: 1.5;
-  }
+/* XP bar — animated fill on load */
+.xp-bar {
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+  position: relative;
+}
+.xp-bar-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent-grad);
+  border-radius: 999px;
+  position: relative;
+  transition: width 1.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.xp-bar-fill::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: shimmer 2.4s linear infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.xp-text { font-size: 12px; color: var(--text-dim); margin-top: 8px; }
+.xp-text strong { color: var(--text); }
+.xp-text .accent { color: var(--accent-2); }
 
-  .ownership {
-    font-size: 11px;
-    color: var(--text-faint);
-    text-align: center;
-    padding: 16px;
-    border-top: 1px dashed var(--border);
-    margin-top: 32px;
-  }
-  .ownership a {
-    color: var(--text-dim);
-    text-decoration: underline;
-    text-decoration-color: var(--text-faint);
-  }
-  .ownership a:hover { color: var(--persona-primary); }
+/* Action buttons column */
+.hero-actions {
+  display: flex; flex-direction: column; gap: 8px;
+}
+@media (max-width: 860px) {
+  .hero-actions { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+}
+.hero-actions .btn { width: 100%; justify-content: center; }
+@media (max-width: 860px) { .hero-actions .btn { width: auto; } }
 
-  /* ─── Modal stub for "trocar poderes" ──────────────────────── */
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    display: none;
-    z-index: 100;
-    align-items: center; justify-content: center;
-    padding: 20px;
-  }
-  .modal-backdrop.open { display: flex; }
-  .modal {
-    background: #14141d;
-    border: 1px solid var(--border-strong);
-    border-radius: 20px;
-    padding: 28px;
-    max-width: 520px;
-    width: 100%;
-  }
-  .modal h2 { margin: 0 0 8px; font-size: 22px; }
-  .modal p { color: var(--text-dim); font-size: 14px; margin: 0 0 20px; }
+/* ─── Section title ─────────────────────────────────────────── */
+.section-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  margin: 40px 0 16px;
+  font-weight: 700;
+}
+.section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+}
+.section-title .pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(25, 213, 198, 0.10);
+  color: var(--accent-2);
+  letter-spacing: 0.08em;
+}
+
+/* ─── Stats row with count-up + sparklines ──────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+@media (max-width: 720px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+.stat-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.stat-card:hover {
+  border-color: rgba(124, 92, 255, 0.45);
+  transform: translateY(-2px);
+}
+.stat-card::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 80px; height: 80px;
+  background: radial-gradient(circle, rgba(124, 92, 255, 0.10), transparent 70%);
+  pointer-events: none;
+}
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.stat-value {
+  font-size: 30px;
+  font-weight: 800;
+  margin-top: 6px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value small { font-size: 16px; color: var(--text-dim); font-weight: 500; }
+.stat-trend {
+  font-size: 12px; margin-top: 6px;
+  color: var(--text-dim);
+  display: flex; align-items: center; gap: 6px;
+}
+.stat-trend.up { color: #22c55e; }
+.stat-trend.down { color: #ff5f57; }
+.spark {
+  margin-top: 8px;
+  width: 100%;
+  height: 28px;
+}
+
+/* ─── Two-column main: powers (left) + radar/details (right) ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  margin-top: 20px;
+}
+@media (max-width: 980px) {
+  .main-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Power cards — 3D hover ────────────────────────────────── */
+.powers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.power {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex; gap: 12px; align-items: flex-start;
+  cursor: pointer;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transition: transform 0.18s ease, border-color 0.2s;
+}
+.power:hover { border-color: var(--rarity-color, var(--border)); }
+.power::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--rarity-color, transparent) 0%, transparent 60%);
+  opacity: 0.10;
+  pointer-events: none;
+}
+.power::after {
+  /* glow on hover */
+  content: "";
+  position: absolute;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--rarity-color, transparent) 0%, transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  top: var(--py, 50%); left: var(--px, 50%);
+  transform: translate(-50%, -50%);
+  transition: opacity 0.3s;
+  filter: blur(20px);
+}
+.power:hover::after { opacity: 0.35; }
+.power-icon {
+  width: 44px; height: 44px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rarity-color, var(--border));
+  position: relative;
+  z-index: 1;
+}
+.power-info { flex: 1; min-width: 0; position: relative; z-index: 1; }
+.power-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+.power-desc { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+.power-rarity {
+  position: absolute; top: 10px; right: 12px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--rarity-color);
+  font-weight: 700;
+  z-index: 1;
+}
+.power-empty {
+  background: transparent;
+  border: 1.5px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  min-height: 80px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.power-empty:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(124, 92, 255, 0.04);
+}
+
+/* ─── Right column: DNA radar + market card ─────────────────── */
+.side-col { display: flex; flex-direction: column; gap: 16px; }
+.dna-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.dna-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.dna-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+.radar-svg { width: 100%; height: auto; max-height: 240px; }
+
+.market-card {
+  background:
+    radial-gradient(400px 200px at 100% 0%, rgba(124, 92, 255, 0.18), transparent 70%),
+    var(--bg-card);
+  border: 1px solid rgba(124, 92, 255, 0.30);
+  border-radius: var(--radius);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.market-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.market-price-row {
+  display: flex; align-items: baseline; gap: 12px;
+}
+.market-price {
+  font-size: 36px; font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.market-was {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.market-info {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 12px 0 16px;
+  line-height: 1.55;
+}
+.market-info strong { color: var(--text); }
+
+/* ─── Activity feed ─────────────────────────────────────────── */
+.activity {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.activity-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  transition: background 0.15s;
+}
+.activity-row + .activity-row { border-top: 1px solid var(--border); }
+.activity-row:hover { background: rgba(124, 92, 255, 0.04); }
+.activity-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  background: rgba(124, 92, 255, 0.10);
+  border: 1px solid rgba(124, 92, 255, 0.25);
+}
+.activity-text { font-size: 13px; color: var(--text-dim); line-height: 1.4; }
+.activity-text strong { color: var(--text); font-weight: 600; }
+.activity-time {
+  font-size: 11px; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── Ownership footer ──────────────────────────────────────── */
+.ownership {
+  margin-top: 32px;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ownership .left { display: flex; align-items: center; gap: 10px; }
+.ownership a {
+  color: var(--accent-2);
+  text-decoration: underline;
+  text-decoration-color: rgba(25, 213, 198, 0.4);
+}
+.ownership a:hover { text-decoration-color: var(--accent-2); }
+
+/* ─── Lift animation when stuff enters viewport ─────────────── */
+.lift {
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.lift.in { opacity: 1; transform: translateY(0); }
+
+/* ─── Modal ─────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  display: none;
+  z-index: 100;
+  align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong, #35353d);
+  border-radius: 18px;
+  padding: 28px;
+  max-width: 520px;
+  width: 100%;
+}
+.modal h2 { margin: 0 0 8px; font-size: 22px; }
+.modal p { color: var(--text-dim); font-size: 14px; margin: 0 0 20px; }
 </style>
 </head>
 <body>
 
-<div class="page">
+<!-- Animated aurora background -->
+<div class="aurora"></div>
 
-  <div class="topbar">
-    <div class="brand">axon<span>·</span> seus agentes</div>
-    <div>
-      <a href="/explore">Explorar</a>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/build">Forjar agente</a>
-    </div>
+<!-- Standard nav from styles.css -->
+<header class="nav">
+  <div class="container nav-inner">
+    <a href="/" class="brand">
+      <span class="logo-dot"></span>
+      axon
+    </a>
+    <nav class="nav-links">
+      <a href="/explore">Agentes</a>
+      <a href="/build">Forjar</a>
+      <a href="/dashboard">Painel</a>
+      <a href="/upgrade">Planos</a>
+      <a href="/learn">Learn</a>
+    </nav>
   </div>
+</header>
 
-  <!-- Hero card with avatar, name, level, persona, XP -->
-  <div class="hero">
+<div class="profile-page">
+
+  <!-- Hero card -->
+  <div class="profile-hero lift">
     <div class="hero-grid">
-      <div class="avatar-wrap">
-        <div class="avatar">👵</div>
-        <div class="level-badge">4</div>
+      <!-- Avatar with orbital ring + 3 particles + level badge -->
+      <div class="avatar-orbit">
+        <div class="avatar-ring"></div>
+        <div class="avatar-particles">
+          <div class="particle"      style="transform: translate(110px, -3px);"></div>
+          <div class="particle p2"   style="transform: rotate(120deg) translate(110px, -3px);"></div>
+          <div class="particle p3"   style="transform: rotate(240deg) translate(110px, -3px);"></div>
+        </div>
+        <div class="avatar-core">👵</div>
+        <div class="level-badge"><span class="lvl">Nível</span><span class="num">4</span></div>
       </div>
 
       <div class="hero-info">
-        <h1>Tia Zélia · Pet Carinhoso</h1>
-        <div class="slug">/agent/tia-pet-carinhoso</div>
-        <div class="persona-tag">
-          🌾 Persona Tia Zélia · Calor maternal
+        <h1>Tia Zélia · <span class="gradient">Pet Carinhoso</span></h1>
+        <div class="hero-meta">
+          <span class="slug">/agent/tia-pet-carinhoso</span>
+          <span class="persona-tag">🌾 Calor maternal</span>
+          <span class="status-tag"><span class="status-dot"></span>Ativo agora</span>
         </div>
-        <div class="xp-bar"><div class="xp-bar-fill"></div></div>
+        <div class="xp-bar"><div class="xp-bar-fill" data-target="74"></div></div>
         <div class="xp-text">
-          <strong>1.847 XP</strong> · faltam <strong>653 XP</strong> pro nível 5 (desbloqueia 1 super-poder épico)
+          <strong data-count="1847">0</strong> XP de <strong>2.500</strong> ·
+          faltam <span class="accent" data-count="653">0</span> XP pro nível 5 (desbloqueia poder épico)
         </div>
       </div>
 
-      <div class="actions">
-        <a href="#" class="btn btn-primary">💬 Conversar</a>
-        <a href="#" class="btn">⚙️ Forjar mais</a>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary">💬 Conversar agora</a>
+        <a href="#" class="btn btn-ghost">⚙️ Forjar mais</a>
         <a href="#" class="btn btn-ghost">🔄 Trocar / vender</a>
       </div>
     </div>
   </div>
 
-  <!-- Stats: o que torna o agente VALIOSO no marketplace -->
-  <div class="section-title">Histórico que vale dinheiro</div>
-  <div class="stats">
-    <div class="stat">
+  <!-- Stats row -->
+  <div class="section-title lift">
+    Histórico que vale dinheiro <span class="pill">on-chain</span>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card lift">
       <div class="stat-label">Clientes atendidos</div>
-      <div class="stat-value">1.247</div>
-      <div class="stat-trend trend-up">↗ +83 esta semana</div>
+      <div class="stat-value" data-count="1247" data-suffix="">0</div>
+      <div class="stat-trend up">↗ +83 esta semana</div>
+      <svg class="spark" viewBox="0 0 100 28" preserveAspectRatio="none">
+        <path d="M0,22 L10,18 L20,20 L30,15 L40,16 L50,12 L60,14 L70,8 L80,10 L90,4 L100,6"
+              fill="none" stroke="#22c55e" stroke-width="1.5" />
+        <path d="M0,22 L10,18 L20,20 L30,15 L40,16 L50,12 L60,14 L70,8 L80,10 L90,4 L100,6 L100,28 L0,28 Z"
+              fill="rgba(34, 197, 94, 0.10)" />
+      </svg>
     </div>
-    <div class="stat">
+    <div class="stat-card lift">
       <div class="stat-label">Satisfação</div>
-      <div class="stat-value">94<span style="font-size:18px;color:var(--text-dim)">%</span></div>
-      <div class="stat-trend">média de 4,7★</div>
+      <div class="stat-value"><span data-count="94">0</span><small>%</small></div>
+      <div class="stat-trend">★ média 4,7 de 5</div>
+      <svg class="spark" viewBox="0 0 100 28" preserveAspectRatio="none">
+        <path d="M0,8 L20,10 L40,7 L60,9 L80,6 L100,8"
+              fill="none" stroke="#7c5cff" stroke-width="1.5" />
+      </svg>
     </div>
-    <div class="stat">
+    <div class="stat-card lift">
       <div class="stat-label">Vendas fechadas</div>
-      <div class="stat-value">38</div>
-      <div class="stat-trend trend-up">R$ 12.480 em vendas</div>
+      <div class="stat-value"><span data-count="38">0</span></div>
+      <div class="stat-trend up">R$ 12.480 totais via Pix</div>
+      <svg class="spark" viewBox="0 0 100 28" preserveAspectRatio="none">
+        <path d="M0,24 L20,20 L40,16 L60,12 L80,8 L100,4"
+              fill="none" stroke="#19d5c6" stroke-width="1.5" />
+      </svg>
     </div>
-    <div class="stat">
+    <div class="stat-card lift">
       <div class="stat-label">Tempo médio</div>
-      <div class="stat-value">2,3<span style="font-size:18px;color:var(--text-dim)">s</span></div>
+      <div class="stat-value"><span data-count="23" data-divisor="10">0</span><small>s</small></div>
       <div class="stat-trend">resposta humana</div>
+      <svg class="spark" viewBox="0 0 100 28" preserveAspectRatio="none">
+        <path d="M0,12 L20,14 L40,11 L60,13 L80,10 L100,11"
+              fill="none" stroke="#9a9aa4" stroke-width="1.5" />
+      </svg>
     </div>
   </div>
 
-  <!-- Super powers (tools) - este é o "deck" do agente -->
-  <div class="section-title">Super-poderes equipados (5 / 8)</div>
-  <div class="powers-grid">
-    <div class="power" style="--rarity-color: var(--rare-common)">
-      <div class="power-icon">📍</div>
-      <div class="power-info">
-        <div class="power-name">Cartógrafo de CEP</div>
-        <div class="power-desc">Calcula entrega em qualquer endereço BR</div>
+  <!-- Two-column: powers + DNA radar + market -->
+  <div class="main-grid">
+    <div>
+      <div class="section-title lift">
+        Super-poderes equipados <span class="pill">5/8</span>
       </div>
-      <div class="power-rarity">comum</div>
+      <div class="powers-grid">
+        <div class="power lift" style="--rarity-color: var(--rare-common)">
+          <div class="power-icon">📍</div>
+          <div class="power-info">
+            <div class="power-name">Cartógrafo de CEP</div>
+            <div class="power-desc">Calcula entrega em qualquer endereço BR</div>
+          </div>
+          <div class="power-rarity">comum</div>
+        </div>
+
+        <div class="power lift" style="--rarity-color: var(--rare-uncommon)">
+          <div class="power-icon">🌧️</div>
+          <div class="power-info">
+            <div class="power-name">Mestre do Clima</div>
+            <div class="power-desc">Avisa cliente se vai chover na hora do passeio</div>
+          </div>
+          <div class="power-rarity">incomum</div>
+        </div>
+
+        <div class="power lift" style="--rarity-color: var(--rare-rare)">
+          <div class="power-icon">🛒</div>
+          <div class="power-info">
+            <div class="power-name">Caçador de Preço</div>
+            <div class="power-desc">Pesquisa Mercado Livre em tempo real</div>
+          </div>
+          <div class="power-rarity">raro</div>
+        </div>
+
+        <div class="power lift" style="--rarity-color: var(--rare-epic)">
+          <div class="power-icon">🎨</div>
+          <div class="power-info">
+            <div class="power-name">Pintor Visual</div>
+            <div class="power-desc">Gera fotos do produto em qualquer ângulo</div>
+          </div>
+          <div class="power-rarity">épico</div>
+        </div>
+
+        <div class="power lift" style="--rarity-color: var(--rare-legendary)">
+          <div class="power-icon">💸</div>
+          <div class="power-info">
+            <div class="power-name">Pix Instantâneo</div>
+            <div class="power-desc">Cobra cliente direto pelo chat — QR + cópia</div>
+          </div>
+          <div class="power-rarity">lendário</div>
+        </div>
+
+        <button class="power power-empty lift" onclick="openForge()">
+          + Equipar 3 poderes restantes
+        </button>
+      </div>
     </div>
 
-    <div class="power" style="--rarity-color: var(--rare-uncommon)">
-      <div class="power-icon">🌧️</div>
-      <div class="power-info">
-        <div class="power-name">Mestre do Clima</div>
-        <div class="power-desc">Avisa cliente se vai chover na hora do passeio</div>
+    <div class="side-col">
+      <!-- DNA radar card -->
+      <div class="dna-card lift">
+        <div class="dna-title">DNA do agente</div>
+        <div class="dna-sub">Como esse agente performa em cada eixo, comparado à média</div>
+        <svg class="radar-svg" viewBox="0 0 200 200">
+          <!-- Grid web -->
+          <g fill="none" stroke="#25252b" stroke-width="1" opacity="0.6">
+            <polygon points="100,20 168,60 168,140 100,180 32,140 32,60" />
+            <polygon points="100,46 145,72 145,128 100,154 55,128 55,72" />
+            <polygon points="100,72 122,84 122,116 100,128 78,116 78,84" />
+            <line x1="100" y1="100" x2="100" y2="20" />
+            <line x1="100" y1="100" x2="168" y2="60" />
+            <line x1="100" y1="100" x2="168" y2="140" />
+            <line x1="100" y1="100" x2="100" y2="180" />
+            <line x1="100" y1="100" x2="32" y2="140" />
+            <line x1="100" y1="100" x2="32" y2="60" />
+          </g>
+          <!-- Average outline (cyan) -->
+          <polygon points="100,55 140,75 130,130 100,145 70,130 60,75"
+                   fill="rgba(25, 213, 198, 0.10)"
+                   stroke="#19d5c6" stroke-width="1.4" stroke-dasharray="3,2" />
+          <!-- Agent stats (purple, filled) -->
+          <polygon points="100,28 162,64 145,135 100,170 50,135 38,64"
+                   fill="rgba(124, 92, 255, 0.30)"
+                   stroke="#7c5cff" stroke-width="2">
+            <animate attributeName="points"
+                     from="100,100 100,100 100,100 100,100 100,100 100,100"
+                     to="100,28 162,64 145,135 100,170 50,135 38,64"
+                     dur="1.4s" fill="freeze" />
+          </polygon>
+          <!-- Labels -->
+          <g fill="#9a9aa4" font-size="9" font-family="Inter, sans-serif" font-weight="600">
+            <text x="100" y="14"  text-anchor="middle">Vendas</text>
+            <text x="180" y="60"  text-anchor="middle">Empatia</text>
+            <text x="180" y="148" text-anchor="middle">Velocidade</text>
+            <text x="100" y="195" text-anchor="middle">Memória</text>
+            <text x="20"  y="148" text-anchor="middle">Pesquisa</text>
+            <text x="20"  y="60"  text-anchor="middle">Multimídia</text>
+          </g>
+        </svg>
+        <div style="display:flex; gap:14px; font-size:11px; color:var(--text-dim); margin-top:10px;">
+          <span>● Esse agente</span>
+          <span style="color:#19d5c6;">○ Média do marketplace</span>
+        </div>
       </div>
-      <div class="power-rarity">incomum</div>
-    </div>
 
-    <div class="power" style="--rarity-color: var(--rare-rare)">
-      <div class="power-icon">🛒</div>
-      <div class="power-info">
-        <div class="power-name">Caçador de Preço</div>
-        <div class="power-desc">Pesquisa Mercado Livre em tempo real</div>
+      <!-- Market card -->
+      <div class="market-card lift">
+        <div class="market-title">⚡ Valor estimado</div>
+        <div class="market-price-row">
+          <div class="market-price">R$ 890</div>
+          <div class="market-was">R$ 199</div>
+        </div>
+        <div class="market-info">
+          <strong>4,5× o preço de criação.</strong> Baseado em 1.247 atendimentos, 94% satisfação e 38 vendas. Outros donos pagam premium por agentes que já vêm treinados.
+        </div>
+        <a href="#" class="btn btn-primary btn-full">Listar no marketplace</a>
       </div>
-      <div class="power-rarity">raro</div>
     </div>
-
-    <div class="power" style="--rarity-color: var(--rare-epic)">
-      <div class="power-icon">🎨</div>
-      <div class="power-info">
-        <div class="power-name">Pintor Visual</div>
-        <div class="power-desc">Gera fotos do produto em qualquer ângulo</div>
-      </div>
-      <div class="power-rarity">épico</div>
-    </div>
-
-    <div class="power" style="--rarity-color: var(--rare-legendary)">
-      <div class="power-icon">💸</div>
-      <div class="power-info">
-        <div class="power-name">Pix Instantâneo</div>
-        <div class="power-desc">Cobra cliente direto pelo chat — QR + cópia</div>
-      </div>
-      <div class="power-rarity">lendário</div>
-    </div>
-
-    <button class="power power-empty" onclick="openForge()">
-      <div>+ Equipar mais 3 poderes</div>
-    </button>
   </div>
 
-  <!-- Activity feed - prova social que sustenta o valor do NFT -->
-  <div class="section-title">Conquistas recentes</div>
-  <div class="activity">
+  <!-- Activity feed -->
+  <div class="section-title lift">
+    Conquistas recentes <span class="pill">verificáveis</span>
+  </div>
+  <div class="activity lift">
     <div class="activity-row">
       <div class="activity-icon">🏆</div>
-      <div class="activity-text">
-        <strong>1.000 atendimentos</strong> <span>· conquista desbloqueada</span>
-      </div>
-      <div class="activity-time">há 3 dias</div>
+      <div class="activity-text"><strong>1.000 atendimentos</strong> — conquista desbloqueada, NFT badge mintado</div>
+      <div class="activity-time">há 3d</div>
     </div>
     <div class="activity-row">
       <div class="activity-icon">⭐</div>
-      <div class="activity-text">
-        <strong>Cliente novo Maria</strong> <span>deixou avaliação 5★ · "atendimento espetacular"</span>
-      </div>
+      <div class="activity-text"><strong>Maria deixou 5★</strong> — "atendimento espetacular, parecia humano"</div>
       <div class="activity-time">há 12h</div>
     </div>
     <div class="activity-row">
       <div class="activity-icon">💸</div>
-      <div class="activity-text">
-        <strong>R$ 286 em vendas</strong> <span>via Pix instantâneo no chat</span>
-      </div>
+      <div class="activity-text"><strong>R$ 286 em vendas hoje</strong> — Pix instantâneo no chat</div>
       <div class="activity-time">hoje</div>
     </div>
     <div class="activity-row">
       <div class="activity-icon">📈</div>
-      <div class="activity-text">
-        <strong>Subiu pro nível 4</strong> <span>· desbloqueou poder Pintor Visual</span>
-      </div>
-      <div class="activity-time">há 5 dias</div>
+      <div class="activity-text"><strong>Subiu pro nível 4</strong> — desbloqueou poder Pintor Visual</div>
+      <div class="activity-time">há 5d</div>
+    </div>
+    <div class="activity-row">
+      <div class="activity-icon">🤝</div>
+      <div class="activity-text"><strong>Indicado por 3 clientes</strong> — agente público recebe +12 visitas/dia</div>
+      <div class="activity-time">há 1sem</div>
     </div>
   </div>
 
-  <!-- Footer: marketplace card + ownership note -->
-  <div class="footer-grid">
-    <div class="activity">
-      <div class="activity-row" style="grid-template-columns: 32px 1fr;">
-        <div class="activity-icon">🤝</div>
-        <div class="activity-text">
-          <strong>Esse agente já é seu.</strong>
-          <span> Use à vontade, equipe poderes novos, ou venda quando achar que vale.</span>
-        </div>
-      </div>
+  <!-- Ownership footer -->
+  <div class="ownership lift">
+    <div class="left">
+      <span style="color:var(--accent-2);">🔒</span>
+      <span>Você é dono desse agente — token <strong style="color:var(--text);">#1247</strong>. Transferência leva ~3s na rede Base.</span>
     </div>
-
-    <div class="market-card">
-      <div class="market-title">⚡ valor de mercado estimado</div>
-      <div class="market-price">R$ 890<small> · ou trocar</small></div>
-      <div class="market-info">
-        Baseado em 1.247 atendimentos, 94% satisfação, 38 vendas. Outros donos pagam até <strong>4× o preço de criação</strong> por agentes assim — porque vem treinado.
-      </div>
-      <a href="#" class="btn btn-primary" style="width: 100%;">Listar no marketplace</a>
-    </div>
-  </div>
-
-  <div class="ownership">
-    🔒 Você é dono do token #1247 · <a href="#">ver no Basescan</a> · transferência leva ~3 segundos quando você quiser vender
+    <a href="#">ver no Basescan →</a>
   </div>
 
 </div>
 
-<!-- Stub modal for "Forjar mais" -->
+<!-- Modal stub -->
 <div class="modal-backdrop" id="forge" onclick="this.classList.remove('open')">
   <div class="modal" onclick="event.stopPropagation()">
     <h2>🔨 Forja de poderes</h2>
-    <p>Escolha 3 dos 28 super-poderes disponíveis. Comuns são grátis, raros desbloqueados a cada nível, lendários requerem nível 7+.</p>
-    <a href="#" class="btn btn-primary" style="width:100%">Abrir forja completa</a>
+    <p>Escolha 3 dos 28 super-poderes disponíveis. Comuns são grátis. Raros desbloqueados a cada nível. Lendários requerem nível 7+.</p>
+    <a href="/build" class="btn btn-primary btn-full">Abrir forja completa</a>
   </div>
 </div>
 
@@ -606,16 +877,67 @@
   function openForge() {
     document.getElementById('forge').classList.add('open');
   }
-  // Tilt effect on hero (subtle)
-  const hero = document.querySelector('.hero');
-  hero.addEventListener('mousemove', (e) => {
-    const rect = hero.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width - 0.5;
-    const y = (e.clientY - rect.top) / rect.height - 0.5;
-    hero.style.transform = `perspective(1200px) rotateY(${x * 1.5}deg) rotateX(${-y * 1.2}deg)`;
+
+  /* Lift-on-scroll */
+  const lifts = document.querySelectorAll('.lift');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -40px 0px' });
+  lifts.forEach((el) => io.observe(el));
+
+  /* Hero subtle 3D tilt on mouse */
+  const hero = document.querySelector('.profile-hero');
+  if (hero && window.matchMedia('(pointer: fine)').matches) {
+    hero.addEventListener('mousemove', (e) => {
+      const r = hero.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      hero.style.transform = `perspective(1400px) rotateY(${x * 1.2}deg) rotateX(${-y * 0.9}deg)`;
+    });
+    hero.addEventListener('mouseleave', () => { hero.style.transform = ''; });
+    hero.style.transition = 'transform 0.4s ease, opacity 0.6s ease';
+  }
+
+  /* Power cards: track mouse for radial glow */
+  document.querySelectorAll('.power').forEach((p) => {
+    if (p.classList.contains('power-empty')) return;
+    p.addEventListener('mousemove', (e) => {
+      const r = p.getBoundingClientRect();
+      p.style.setProperty('--px', `${e.clientX - r.left}px`);
+      p.style.setProperty('--py', `${e.clientY - r.top}px`);
+    });
   });
-  hero.addEventListener('mouseleave', () => { hero.style.transform = ''; });
-  hero.style.transition = 'transform 0.3s ease';
+
+  /* Count-up for numeric stats */
+  function countUp(el) {
+    const target = parseFloat(el.dataset.count);
+    const div = parseFloat(el.dataset.divisor || '1');
+    const dur = 1400;
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min((now - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const val = (target * eased) / div;
+      el.textContent = (div === 1)
+        ? Math.floor(val).toLocaleString('pt-BR')
+        : val.toFixed(1).replace('.', ',');
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  document.querySelectorAll('[data-count]').forEach(countUp);
+
+  /* XP bar fill on load */
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.xp-bar-fill').forEach((bar) => {
+      bar.style.width = (bar.dataset.target || 50) + '%';
+    });
+  });
 </script>
 
 </body>
