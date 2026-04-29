@@ -10,4 +10,7 @@
 # (URL stays put in the browser) instead of a 308.
 /agent/:slug    /agent-runner?slug=:slug    200
 
+# /agent-preview/:slug → preview UI ("test drive" before connecting WhatsApp).
+/agent-preview/:slug    /agent-preview?slug=:slug    200
+
 /*    /404.html    404

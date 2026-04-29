@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pré-visualização do agente · Axon</title>
+<meta name="description" content="Veja como o agente responde antes de conectar WhatsApp. Teste ao vivo, capacidades, métricas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --bg-elev: #111114;
+    --bg-card: #16161a;
+    --bg-hover: #1c1c22;
+    --border: #25252b;
+    --text: #eeeef0;
+    --text-dim: #9a9aa4;
+    --text-muted: #6a6a76;
+    --accent: #7c5cff;
+    --accent-2: #19d5c6;
+    --whatsapp: #25d366;
+    --warn: #ffd60a;
+    --danger: #ff5f57;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  a { color: var(--accent-2); }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px 80px; }
+  .nav { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; font-size: 13px; }
+  .nav a { color: var(--text-dim); text-decoration: none; }
+  .nav a:hover { color: var(--text); }
+  .nav .sep { color: var(--text-muted); }
+
+  /* Hero */
+  .hero {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 18px;
+    align-items: center;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(124,92,255,0.08), rgba(25,213,198,0.04));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .avatar {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 38px; font-weight: 800;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .hero h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.01em; }
+  .hero .desc { color: var(--text-dim); font-size: 14px; margin: 0; }
+  .hero .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .badge {
+    display: inline-block; padding: 3px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .badge.on { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+  .badge.nft { background: rgba(255,184,0,0.1); border-color: rgba(255,184,0,0.3); color: #ffb800; text-decoration: none; }
+  .badge.nft:hover { filter: brightness(1.2); }
+
+  /* Layout */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 24px;
+  }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+
+  /* Capabilities */
+  .cap-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; font-size: 13px; }
+  .cap { display: flex; align-items: center; gap: 8px; color: var(--text-dim); }
+  .cap.on { color: var(--text); }
+  .cap-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+  .cap.on .cap-dot { background: var(--whatsapp); box-shadow: 0 0 6px var(--whatsapp); }
+
+  /* Tools */
+  .tool-group { margin-bottom: 12px; }
+  .tool-group-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 6px; }
+  .tool-pill {
+    display: inline-block;
+    padding: 3px 8px;
+    margin: 2px 2px 0 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* Chat sandbox */
+  .chat {
+    display: flex;
+    flex-direction: column;
+    height: 460px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .chat-msgs {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bubble {
+    max-width: 80%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  .bubble.user { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .bubble.assistant { background: var(--bg-card); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
+  .bubble.tool {
+    background: rgba(124,92,255,0.08);
+    border: 1px dashed rgba(124,92,255,0.3);
+    align-self: flex-start;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .bubble img { max-width: 100%; border-radius: 6px; margin-top: 6px; }
+
+  .chat-input { display: flex; padding: 10px; border-top: 1px solid var(--border); gap: 8px; background: var(--bg-card); }
+  .chat-input input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+  }
+  .chat-input input:focus { border-color: var(--accent); }
+  .chat-input button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .chat-input button:disabled { opacity: 0.5; cursor: wait; }
+
+  .quick-prompts { display: flex; gap: 6px; padding: 0 14px 10px; flex-wrap: wrap; background: var(--bg-card); border-top: 1px solid var(--border); }
+  .quick-prompts button {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 5px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .quick-prompts button:hover { color: var(--text); border-color: var(--accent); }
+
+  .quota {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 6px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+  }
+  .typing { color: var(--text-muted); font-size: 12px; font-style: italic; padding: 4px 14px 0; }
+
+  .cta-strip {
+    margin-top: 24px;
+    background: linear-gradient(135deg, rgba(124,92,255,0.08), rgba(25,213,198,0.04));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 16px;
+  }
+  .cta-strip h3 { margin: 0 0 4px; font-size: 16px; }
+  .cta-strip p { margin: 0; color: var(--text-dim); font-size: 13px; }
+  .cta-btn {
+    background: var(--accent); color: #fff; padding: 10px 20px;
+    border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;
+  }
+  .empty-state { color: var(--text-muted); padding: 32px; text-align: center; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <a href="/dashboard">← Painel</a>
+    <span class="sep">·</span>
+    <a href="/whatsapp">Cérebro</a>
+    <span class="sep">·</span>
+    <a href="/build">Editar agentes</a>
+  </div>
+
+  <div id="root">
+    <div class="empty-state">Carregando…</div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : 'https://axon-kedb.onrender.com';
+
+  // Slug from URL: /agent-preview/<slug> OR ?slug=<slug>
+  const path = window.location.pathname;
+  const m = path.match(/\/agent-preview\/([^\/?]+)/);
+  const slug = (m && m[1]) || new URLSearchParams(window.location.search).get('slug');
+
+  if (!slug) {
+    document.getElementById('root').innerHTML =
+      '<div class="empty-state">Slug não encontrado na URL. Acesse via /agent-preview/&lt;slug&gt;</div>';
+  } else {
+    loadPreview();
+  }
+
+  let agentMeta = null;
+  let chatHistory = []; // [{role, content}]
+  let remainingQuota = 10;
+
+  async function loadPreview() {
+    try {
+      const res = await fetch(`${API_BASE}/v1/agents/${encodeURIComponent(slug)}/preview`);
+      if (!res.ok) {
+        document.getElementById('root').innerHTML =
+          '<div class="empty-state">Agente não encontrado ou está privado.</div>';
+        return;
+      }
+      agentMeta = await res.json();
+      document.title = `${agentMeta.name} · Pré-visualização`;
+      render();
+    } catch (e) {
+      document.getElementById('root').innerHTML =
+        `<div class="empty-state">Erro ao carregar: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function render() {
+    const a = agentMeta;
+    const initials = a.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    const cap = a.capabilities;
+    const capRow = (label, on) => `<div class="cap ${on ? 'on' : ''}"><span class="cap-dot"></span>${label}</div>`;
+
+    document.getElementById('root').innerHTML = `
+      <div class="hero">
+        <div class="avatar" style="background: linear-gradient(135deg, ${escapeAttr(a.primary_color)}, var(--accent-2));">${escapeHtml(initials)}</div>
+        <div>
+          <h1>${escapeHtml(a.name)}</h1>
+          <p class="desc">${escapeHtml(a.description || '—')}</p>
+          <div class="badges">
+            ${a.template ? `<span class="badge">📋 ${escapeHtml(a.template)}</span>` : ''}
+            <span class="badge">🔧 ${a.tool_count} ferramentas</span>
+            <span class="badge">🌐 ${escapeHtml(a.ui_language)}</span>
+            ${cap.memory_per_contact ? '<span class="badge on">🧠 lembra contatos</span>' : ''}
+            ${cap.image_generation ? '<span class="badge on">🎨 gera imagens</span>' : ''}
+            ${cap.pix_in_chat ? '<span class="badge on">💸 Pix no chat</span>' : ''}
+            ${cap.vision ? '<span class="badge on">👁 vê fotos</span>' : ''}
+            ${cap.voice_in ? '<span class="badge on">🎤 ouve áudio</span>' : ''}
+            ${cap.voice_out ? '<span class="badge on">🔊 fala áudio</span>' : ''}
+            ${a.nft_url ? `<a class="badge nft" href="${escapeAttr(a.nft_url)}" target="_blank">🪙 NFT verificado</a>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>🧪 Testar agente</h2>
+          <div class="chat">
+            <div id="chat-msgs" class="chat-msgs">
+              ${a.welcome_message ? `<div class="bubble assistant">${escapeHtml(a.welcome_message)}</div>` : ''}
+            </div>
+            <div id="chat-typing" class="typing" style="display:none;">${escapeHtml(a.name)} está digitando…</div>
+            ${Array.isArray(a.quick_prompts) && a.quick_prompts.length ? `
+              <div class="quick-prompts">
+                ${a.quick_prompts.slice(0, 4).map(p => `<button onclick="useQuickPrompt('${escapeAttr(p)}')">${escapeHtml(p)}</button>`).join('')}
+              </div>
+            ` : ''}
+            <div class="chat-input">
+              <input id="chat-input" type="text" placeholder="Pergunte algo pro agente…" onkeydown="if(event.key==='Enter')sendChat()">
+              <button id="chat-send" onclick="sendChat()">Enviar</button>
+            </div>
+            <div class="quota" id="chat-quota">${remainingQuota} mensagens grátis nesta hora</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin-bottom:20px;">
+            <h2>⚙ Capacidades</h2>
+            <div class="cap-list">
+              ${capRow('Memória de contato', cap.memory_per_contact)}
+              ${capRow('Cache semântico', cap.semantic_cache)}
+              ${capRow('Saudação por hora', cap.time_aware_greeting)}
+              ${capRow('Geração de imagem', cap.image_generation)}
+              ${capRow('Pix dinâmico', cap.pix_in_chat)}
+              ${capRow('Entende fotos (Vision)', cap.vision)}
+              ${capRow('Ouve áudio (STT)', cap.voice_in)}
+              ${capRow('Fala áudio (TTS)', cap.voice_out)}
+            </div>
+          </div>
+          <div class="card">
+            <h2>🛠 Ferramentas (${a.tool_count})</h2>
+            ${renderToolGroups(a.tools_by_group)}
+          </div>
+        </div>
+      </div>
+
+      <div class="cta-strip">
+        <div>
+          <h3>Gostou do que viu?</h3>
+          <p>Conecte WhatsApp em 1 click — bot responde clientes em segundos.</p>
+        </div>
+        <a class="cta-btn" href="/whatsapp">Conectar WhatsApp →</a>
+      </div>
+    `;
+
+    document.getElementById('chat-input').focus();
+  }
+
+  function renderToolGroups(g) {
+    const groups = [
+      { key: 'consultas_br', label: 'Consultas BR', icon: '🇧🇷' },
+      { key: 'pesquisa', label: 'Pesquisa', icon: '🔍' },
+      { key: 'financeiro', label: 'Financeiro', icon: '💰' },
+      { key: 'multimodal', label: 'Multimodal', icon: '🎨' },
+      { key: 'locale', label: 'Localização & Tempo', icon: '🌍' },
+    ];
+    return groups
+      .filter(grp => Array.isArray(g[grp.key]) && g[grp.key].length)
+      .map(grp => `
+        <div class="tool-group">
+          <div class="tool-group-title">${grp.icon} ${grp.label}</div>
+          ${g[grp.key].map(t => `<span class="tool-pill">${escapeHtml(t)}</span>`).join('')}
+        </div>
+      `).join('') || '<p style="color:var(--text-muted);font-size:13px;">Nenhuma ferramenta nesta categoria.</p>';
+  }
+
+  window.useQuickPrompt = (p) => {
+    document.getElementById('chat-input').value = p;
+    sendChat();
+  };
+
+  window.sendChat = async () => {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    const sendBtn = document.getElementById('chat-send');
+    const typing = document.getElementById('chat-typing');
+    sendBtn.disabled = true;
+    input.disabled = true;
+    typing.style.display = 'block';
+
+    chatHistory.push({ role: 'user', content: text });
+    appendBubble('user', text);
+    input.value = '';
+
+    try {
+      const res = await fetch(`${API_BASE}/v1/agents/${encodeURIComponent(slug)}/preview/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: chatHistory }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        appendBubble('tool', '⚠ ' + (data.message || data.error || 'erro'));
+      } else {
+        // Show tool calls if any
+        if (Array.isArray(data.tool_calls) && data.tool_calls.length) {
+          for (const tc of data.tool_calls) {
+            appendBubble('tool', `🔧 ${tc.name}${tc.ok ? ' ✓' : ' ✗'}`);
+          }
+        }
+        // Show generated images
+        if (Array.isArray(data.images) && data.images.length) {
+          for (const img of data.images) {
+            appendImageBubble(img.base64);
+          }
+        }
+        // Show pix preview
+        if (Array.isArray(data.pix_preview) && data.pix_preview.length) {
+          for (const p of data.pix_preview) {
+            appendBubble('tool', `💸 R$${p.amount_brl} — ${p.description} (preview)`);
+            appendImageBubble(p.qr_code_base64);
+          }
+        }
+        if (data.content) {
+          chatHistory.push({ role: 'assistant', content: data.content });
+          appendBubble('assistant', data.content);
+        }
+        if (typeof data.remaining_quota === 'number') {
+          remainingQuota = data.remaining_quota;
+          document.getElementById('chat-quota').textContent =
+            `${remainingQuota} mensagens grátis nesta hora`;
+        }
+      }
+    } catch (e) {
+      appendBubble('tool', '⚠ Erro de rede: ' + e.message);
+    } finally {
+      sendBtn.disabled = false;
+      input.disabled = false;
+      typing.style.display = 'none';
+      input.focus();
+    }
+  };
+
+  function appendBubble(role, text) {
+    const div = document.createElement('div');
+    div.className = `bubble ${role}`;
+    // Basic ||-bubble splitting for assistant messages mirrors WhatsApp behavior
+    if (role === 'assistant' && text.includes('||')) {
+      const parts = text.split(/\|\|+/).map(s => s.trim()).filter(Boolean);
+      const wrap = document.getElementById('chat-msgs');
+      parts.forEach((p, i) => {
+        setTimeout(() => {
+          const b = document.createElement('div');
+          b.className = 'bubble assistant';
+          b.textContent = p;
+          wrap.appendChild(b);
+          wrap.scrollTop = wrap.scrollHeight;
+        }, i * 400);
+      });
+      return;
+    }
+    div.textContent = text;
+    const wrap = document.getElementById('chat-msgs');
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function appendImageBubble(base64) {
+    const div = document.createElement('div');
+    div.className = 'bubble assistant';
+    const img = document.createElement('img');
+    img.src = `data:image/png;base64,${base64}`;
+    img.alt = 'imagem gerada';
+    div.appendChild(img);
+    const wrap = document.getElementById('chat-msgs');
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+</script>
+</body>
+</html>

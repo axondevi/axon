@@ -574,11 +574,22 @@
         ],
         'Criar conteúdo': [
           { name: 'generate_image',       desc: 'Imagem 1024×1024 (Stability SDXL)', cost: '~$0.014' },
+          { name: 'generate_pix',         desc: 'Pix dinâmico no chat (MercadoPago)', cost: 'taxa MP' },
         ],
         'IA': [
           { name: 'embed_text',           desc: 'Embedding 512-dim (Voyage)', cost: '~$0.00005' },
         ],
       };
+
+      // Tools that come PRE-ENABLED in every new template — used to render
+      // a "incluso por padrão" badge so customers don't think they need to
+      // hunt for these. Mirrors src/agents/templates.ts CORE_TOOLS.
+      const CORE_TOOLS_DEFAULT = new Set([
+        'lookup_cep', 'lookup_cnpj', 'current_weather', 'convert_currency',
+        'wikipedia_summary', 'wikipedia_search', 'brasilapi_holidays',
+        'brasilapi_ddd', 'brasilapi_rates', 'crypto_price', 'search_web',
+        'embed_text', 'generate_image', 'generate_pix',
+      ]);
 
       function showToast(msg, kind) {
         const t = document.getElementById('toast');
@@ -1137,14 +1148,18 @@
       function renderTools() {
         const el = document.getElementById('tools-grid');
         const selected = new Set(formState.allowed_tools || []);
-        let html = '';
+        let html = `<div style="margin-bottom:10px;padding:8px 10px;background:rgba(124,92,255,0.06);border:1px solid rgba(124,92,255,0.25);border-radius:6px;font-size:11px;color:var(--text-dim);">
+          <strong style="color:var(--text);">📦 Pacote Axon Pro</strong> — todo agente novo já vem com ${CORE_TOOLS_DEFAULT.size} ferramentas pré-ativadas (consultas BR, busca, financeiro, multimodal). Pinte verde abaixo. Você pode tirar/adicionar manualmente.
+        </div>`;
         for (const [cat, tools] of Object.entries(TOOL_CATALOG)) {
           html += `<div class="tool-cat">${cat}</div>`;
           for (const t of tools) {
             const checked = selected.has(t.name) ? 'checked' : '';
             const costClass = t.cost === '$0' || t.cost === 'free' ? 'cost-free' : 'cost-paid';
             const costLabel = t.cost === 'free' ? 'grátis' : t.cost;
-            html += `<label title="${escape(t.desc)}"><input type="checkbox" data-tool="${t.name}" ${checked} /> <span class="tool-name">${t.name}</span><span class="tool-cost ${costClass}">${costLabel}</span></label>`;
+            const isCore = CORE_TOOLS_DEFAULT.has(t.name);
+            const coreBadge = isCore ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(124,92,255,0.15);color:var(--accent);margin-right:4px;">PRO</span>' : '';
+            html += `<label title="${escape(t.desc)}"><input type="checkbox" data-tool="${t.name}" ${checked} /> ${coreBadge}<span class="tool-name">${t.name}</span><span class="tool-cost ${costClass}">${costLabel}</span></label>`;
           }
         }
         el.innerHTML = html;

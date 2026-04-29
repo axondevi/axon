@@ -30,6 +30,7 @@ import { ownerWhatsapp, publicWebhook as whatsappPublicWebhook } from '~/routes/
 import { ownerContacts } from '~/routes/contacts';
 import { nftMetaRoutes } from '~/routes/nft-metadata';
 import { checkoutRoutes } from '~/routes/checkout';
+import { previewRoutes } from '~/routes/preview';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -129,6 +130,8 @@ app.route('/v1/signup', signupRoutes);
 app.route('/v1/auth/privy', authPrivyRoutes);
 app.route('/v1/subscription', subscriptionPublicRoutes);
 app.route('/v1/agents', agentsPublicRoutes);
+// Preview routes mounted at /v1/agents/* — reuse the same prefix.
+app.route('/v1/agents', previewRoutes);
 app.route('/v1/run', agentRunRoutes);
 // Inbound WhatsApp from Evolution servers — no auth, secret in path is the auth.
 // MUST go before the authed /v1 router for the same reason as /v1/signup.
