@@ -95,6 +95,17 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "personas_order_idx" ON "personas" ("display_order")`);
   await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "persona_id" uuid REFERENCES "personas"("id") ON DELETE SET NULL`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agents_persona_idx" ON "agents" ("persona_id")`);
+
+  // 0012: smart routing — agents that act as a router classify inbound
+  // intent and forward to a specialized agent. routes_to + routed_agent_id
+  // + route_intent are all nullable, so existing rows are unaffected.
+  // Must be in ensureCriticalSchema (not ensureSystemRows) because
+  // SELECT * from agents now references routes_to — without this DDL the
+  // first /v1/agents request would 500 with "column does not exist".
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "routes_to" jsonb`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "routed_agent_id" uuid`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "route_intent" text`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_routed_agent_idx" ON "contact_memory" ("routed_agent_id")`);
 }
 
 export async function ensureSystemRows() {
@@ -247,16 +258,6 @@ export async function ensureSystemRows() {
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_agent_idx" ON "contact_memory" ("agent_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_last_contact_idx" ON "contact_memory" ("last_contact_at" DESC)`);
-
-  // ─── Self-healing schema: smart routing (migration 0012) ───────
-  // Adds the routing surface area without requiring a manual `db:migrate`.
-  // Both columns are nullable, so existing agents/contacts keep working
-  // exactly as before — only the rows that opt in (owner sets routes_to,
-  // intent classifier writes routed_agent_id) feel any change.
-  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "routes_to" jsonb`);
-  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "routed_agent_id" uuid`);
-  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "route_intent" text`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_routed_agent_idx" ON "contact_memory" ("routed_agent_id")`);
 
   // Touch the row so timestamps refresh if someone queries health.
   await db.execute(sql`SELECT 1`);
