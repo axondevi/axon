@@ -336,6 +336,18 @@ app.patch('/:id', async (c) => {
   if (body.ab_split !== undefined) update.abSplit = Math.max(0, Math.min(100, parseInt(body.ab_split, 10) || 0));
   if (body.vanity_domain !== undefined) update.vanityDomain = body.vanity_domain ? String(body.vanity_domain).toLowerCase().trim() : null;
   if (['auto','pt','en','es'].includes(body.ui_language)) update.uiLanguage = body.ui_language;
+  if (body.owner_phone !== undefined) {
+    // Empty string clears it; otherwise normalize to digits-only and validate length.
+    if (body.owner_phone === null || body.owner_phone === '') {
+      update.ownerPhone = null;
+    } else {
+      const digits = String(body.owner_phone).replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 15) {
+        return c.json({ error: 'bad_request', message: 'owner_phone must be 10–15 digits (E.164 without +)' }, 400);
+      }
+      update.ownerPhone = digits;
+    }
+  }
 
   await db.update(agents).set(update).where(eq(agents.id, id));
   return c.json({ ok: true });
