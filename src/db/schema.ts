@@ -8,6 +8,7 @@ import {
   boolean,
   jsonb,
   integer,
+  numeric,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -391,3 +392,38 @@ export const contactMemory = pgTable(
   }),
 );
 export type ContactMemory = typeof contactMemory.$inferSelect;
+
+// ─── Pix Payments (MercadoPago integration) ───────────────────
+// Tracks pending → approved/expired/cancelled lifecycle of Pix charges.
+// When status flips to 'approved', credit() in wallet/service.ts writes
+// the immutable ledger row to `transactions` and updates the wallet
+// balance. This table holds the short-lived QR + correlation state.
+export const pixPayments = pgTable(
+  'pix_payments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mpPaymentId: text('mp_payment_id').notNull(),
+    amountBrl: numeric('amount_brl', { precision: 12, scale: 2 }).notNull(),
+    amountUsdcMicro: bigint('amount_usdc_micro', { mode: 'bigint' }),
+    fxRateBrlPerUsd: numeric('fx_rate_brl_per_usd', { precision: 8, scale: 4 }),
+    status: text('status').notNull().default('pending'),  // pending|approved|rejected|expired|cancelled
+    qrCode: text('qr_code'),
+    qrCodeBase64: text('qr_code_base64'),
+    ticketUrl: text('ticket_url'),
+    approvedAt: timestamp('approved_at'),
+    expiresAt: timestamp('expires_at'),
+    meta: jsonb('meta'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    mpIdIdx: uniqueIndex('pix_mp_id_idx').on(t.mpPaymentId),
+    userIdx: index('pix_user_idx').on(t.userId),
+    statusIdx: index('pix_status_idx').on(t.status),
+    createdIdx: index('pix_created_idx').on(t.createdAt),
+  }),
+);
+export type PixPayment = typeof pixPayments.$inferSelect;

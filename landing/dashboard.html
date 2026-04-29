@@ -1359,7 +1359,7 @@
               <div class="metric-value">${formatUsdc(bal.available_usdc)}<span class="unit">USDC</span></div>
               <div class="metric-sub">
                 ${bal.reserved_usdc === '0.000000' ? 'Nada reservado.' : bal.reserved_usdc + ' reservado'}
-                · <a href="/buy-usdc" style="color: var(--accent-2); text-decoration: none;">Adicionar →</a>
+                · <a href="#" onclick="event.preventDefault(); showPixModal()" style="color: var(--accent-2); text-decoration: none;">💸 Recarregar via Pix →</a>
               </div>
             </div>
             <div class="card">
@@ -3183,6 +3183,203 @@
           });
           pre.appendChild(btn);
         });
+      }
+
+      // ==========================================================
+      // ─── Pix top-up wizard ─────────────────────────────────────
+      // form → generating → qr (with polling) → success
+      let pixState = { step: 'form', pixId: null, pollTimer: null };
+
+      window.showPixModal = () => {
+        pixState = { step: 'form', pixId: null, pollTimer: null };
+        const overlay = document.createElement('div');
+        overlay.id = 'pix-modal';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.innerHTML = '<div id="pix-modal-body" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:520px;width:100%;max-height:92vh;overflow-y:auto;"></div>';
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closePixModal(); });
+        renderPixStep();
+      };
+
+      function closePixModal() {
+        if (pixState.pollTimer) clearInterval(pixState.pollTimer);
+        pixState = { step: 'form', pixId: null, pollTimer: null };
+        const m = document.getElementById('pix-modal');
+        if (m) m.remove();
+      }
+
+      function renderPixStep() {
+        const body = document.getElementById('pix-modal-body');
+        if (!body) return;
+        const closeBtn = '<button onclick="closePixModal()" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>';
+        const header = (title, sub) => `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0 0 4px 0;font-size:18px;">${title}</h2>
+              ${sub ? `<div style="color:var(--text-muted);font-size:12px;">${sub}</div>` : ''}
+            </div>
+            ${closeBtn}
+          </div>
+        `;
+
+        if (pixState.step === 'form') {
+          body.innerHTML = `
+            ${header('Recarregar via Pix', 'Pix instantâneo, confirmação em 2-30s. Saldo cai como USDC na sua wallet.')}
+            <form id="pix-form" style="display:flex;flex-direction:column;gap:14px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+                <span>Valor em reais</span>
+                <div style="display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;">
+                  <span style="color:var(--text-muted);font-size:14px;">R$</span>
+                  <input id="pix-amount" type="number" min="5" max="5000" step="0.01" value="50" required style="background:transparent;border:none;outline:none;color:var(--text);flex:1;font-size:18px;font-weight:600;font-family:inherit;">
+                </div>
+                <span style="color:var(--text-muted);font-size:11px;" id="pix-equiv">≈ <strong style="color:var(--text-dim);">$ … USDC</strong> (cotação ao confirmar)</span>
+              </label>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+                ${[20, 50, 100, 200, 500, 1000].map(v => `<button type="button" onclick="document.getElementById('pix-amount').value=${v};updatePixEquiv()" style="background:var(--bg);border:1px solid var(--border);color:var(--text-dim);padding:6px 8px;border-radius:5px;font-size:12px;cursor:pointer;">R$${v}</button>`).join('')}
+              </div>
+              <div id="pix-error" style="display:none;background:rgba(255,95,87,0.1);border:1px solid rgba(255,95,87,0.3);color:#ff5f57;padding:10px;border-radius:6px;font-size:12px;"></div>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+                <button type="button" onclick="closePixModal()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer;">Cancelar</button>
+                <button type="submit" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Gerar Pix →</button>
+              </div>
+            </form>
+          `;
+          document.getElementById('pix-form').addEventListener('submit', handlePixSubmit);
+          document.getElementById('pix-amount').addEventListener('input', updatePixEquiv);
+          updatePixEquiv();
+        }
+
+        if (pixState.step === 'generating') {
+          body.innerHTML = `
+            ${header('Gerando Pix…', 'Conectando ao MercadoPago.')}
+            <div style="display:flex;flex-direction:column;align-items:center;padding:48px 0;gap:16px;">
+              <div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+              <div style="color:var(--text-muted);font-size:13px;">Geralmente 3-5 segundos…</div>
+            </div>
+            <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+          `;
+        }
+
+        if (pixState.step === 'qr') {
+          const { qrBase64, qrCode, amountBrl, estUsdc, expiresAt } = pixState.pixData || {};
+          const expIso = expiresAt ? new Date(expiresAt) : null;
+          const expStr = expIso ? expIso.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+          body.innerHTML = `
+            ${header('Pague R$' + Number(amountBrl).toFixed(2) + ' por Pix', `Expira às ${expStr} · Você receberá ≈ $${Number(estUsdc).toFixed(2)} USDC ao confirmar`)}
+            ${qrBase64 ? `<img alt="QR Code Pix" src="data:image/png;base64,${qrBase64}" style="width:240px;height:240px;background:white;border-radius:8px;padding:8px;display:block;margin:0 auto;">` : ''}
+            <div style="margin-top:18px;">
+              <div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Ou cole no banco:</div>
+              <div style="display:flex;gap:6px;">
+                <input id="pix-copy" readonly value="${escapeAttr(qrCode || '')}" style="background:var(--bg);border:1px solid var(--border);color:var(--text-dim);padding:8px 10px;border-radius:6px;font-size:11px;font-family:'JetBrains Mono',monospace;flex:1;">
+                <button onclick="(function(b){navigator.clipboard.writeText(document.getElementById('pix-copy').value);b.textContent='✓ copiado';setTimeout(()=>b.textContent='Copiar',1500);})(this)" style="background:var(--accent);color:white;border:none;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">Copiar</button>
+              </div>
+            </div>
+            <div id="pix-poll-status" style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-muted);font-size:12px;">
+              <div style="width:8px;height:8px;border-radius:50%;background:var(--warn);box-shadow:0 0 6px var(--warn);"></div>
+              <span>Aguardando confirmação… <span id="pix-poll-counter">0s</span></span>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+              <button onclick="closePixModal()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Fechar</button>
+            </div>
+          `;
+          startPixPolling();
+        }
+
+        if (pixState.step === 'success') {
+          const { amountBrl, amountUsdc } = pixState.pixData || {};
+          body.innerHTML = `
+            ${header('✅ Pagamento confirmado!', `R$${Number(amountBrl).toFixed(2)} convertidos em ${Number(amountUsdc).toFixed(6)} USDC.`)}
+            <div style="display:flex;flex-direction:column;align-items:center;padding:32px 0;gap:14px;">
+              <div style="width:64px;height:64px;border-radius:50%;background:rgba(74,222,128,0.15);display:flex;align-items:center;justify-content:center;font-size:32px;">✓</div>
+              <div style="color:var(--text);font-size:14px;text-align:center;line-height:1.5;">
+                Saldo já creditado.<br/>Atualize o painel pra ver o novo total.
+              </div>
+            </div>
+            <div style="display:flex;justify-content:center;margin-top:8px;">
+              <button onclick="closePixModal(); renderApp();" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Atualizar painel →</button>
+            </div>
+          `;
+        }
+      }
+
+      function updatePixEquiv() {
+        const v = parseFloat(document.getElementById('pix-amount')?.value || '0');
+        const fx = 5.4;  // mirrors backend default; webhook computes authoritative value
+        const usd = v / fx;
+        const el = document.getElementById('pix-equiv');
+        if (el) el.innerHTML = `≈ <strong style="color:var(--text-dim);">$${usd.toFixed(2)} USDC</strong> (cotação ao confirmar)`;
+      }
+
+      async function handlePixSubmit(e) {
+        e.preventDefault();
+        const amount = parseFloat(document.getElementById('pix-amount').value);
+        if (!Number.isFinite(amount) || amount < 5 || amount > 5000) {
+          showPixError('Valor entre R$5 e R$5000.');
+          return;
+        }
+        pixState.step = 'generating';
+        renderPixStep();
+        try {
+          const r = await api('/v1/checkout/pix', {
+            method: 'POST',
+            body: JSON.stringify({ amount_brl: amount }),
+          });
+          pixState.pixId = r.id;
+          pixState.pixData = {
+            qrBase64: r.qr_code_base64,
+            qrCode: r.qr_code,
+            amountBrl: r.amount_brl,
+            estUsdc: r.estimated_credit_usdc,
+            expiresAt: r.expires_at,
+          };
+          pixState.step = 'qr';
+          renderPixStep();
+        } catch (err) {
+          pixState.step = 'form';
+          renderPixStep();
+          setTimeout(() => showPixError('Falhou: ' + (err.message || err)), 30);
+        }
+      }
+
+      function showPixError(msg) {
+        const box = document.getElementById('pix-error');
+        if (!box) return;
+        box.textContent = msg;
+        box.style.display = 'block';
+      }
+
+      function startPixPolling() {
+        if (pixState.pollTimer) clearInterval(pixState.pollTimer);
+        let elapsed = 0;
+        const intervalMs = 3000;
+        const maxElapsed = 30 * 60; // 30 min — matches Pix expiration
+        pixState.pollTimer = setInterval(async () => {
+          elapsed += intervalMs / 1000;
+          const counter = document.getElementById('pix-poll-counter');
+          if (counter) counter.textContent = `${Math.floor(elapsed)}s`;
+          if (elapsed >= maxElapsed) {
+            clearInterval(pixState.pollTimer);
+            pixState.pollTimer = null;
+            const status = document.getElementById('pix-poll-status');
+            if (status) status.innerHTML = '<span style="color:var(--warn);">⏱ Pix expirou. Gere um novo.</span>';
+            return;
+          }
+          try {
+            const r = await api(`/v1/checkout/pix/${pixState.pixId}`);
+            if (r.status === 'approved') {
+              clearInterval(pixState.pollTimer);
+              pixState.pollTimer = null;
+              pixState.pixData = { ...pixState.pixData, amountUsdc: r.amount_usdc };
+              pixState.step = 'success';
+              renderPixStep();
+            } else if (['rejected', 'cancelled', 'expired'].includes(r.status)) {
+              clearInterval(pixState.pollTimer);
+              pixState.pollTimer = null;
+              const s = document.getElementById('pix-poll-status');
+              if (s) s.innerHTML = `<span style="color:#ff5f57;">⚠ Pagamento ${r.status}. Feche e tente novamente.</span>`;
+            }
+          } catch (_) { /* network blip */ }
+        }, intervalMs);
       }
 
       // ==========================================================

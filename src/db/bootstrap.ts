@@ -39,6 +39,31 @@ export async function ensureCriticalSchema() {
   // number flips the agent into personal-assistant mode for the owner.
   await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "owner_phone" text`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agents_owner_phone_idx" ON "agents" ("owner_phone")`);
+
+  // 0010: pix_payments — Pix lifecycle for MercadoPago integration.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "pix_payments" (
+      "id"                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "user_id"              uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "mp_payment_id"        text NOT NULL,
+      "amount_brl"           numeric(12, 2) NOT NULL,
+      "amount_usdc_micro"    bigint,
+      "fx_rate_brl_per_usd"  numeric(8, 4),
+      "status"               text NOT NULL DEFAULT 'pending',
+      "qr_code"              text,
+      "qr_code_base64"       text,
+      "ticket_url"           text,
+      "approved_at"          timestamp,
+      "expires_at"           timestamp,
+      "meta"                 jsonb,
+      "created_at"           timestamp NOT NULL DEFAULT NOW(),
+      "updated_at"           timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "pix_mp_id_idx" ON "pix_payments" ("mp_payment_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "pix_user_idx" ON "pix_payments" ("user_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "pix_status_idx" ON "pix_payments" ("status")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "pix_created_idx" ON "pix_payments" ("created_at" DESC)`);
 }
 
 export async function ensureSystemRows() {
