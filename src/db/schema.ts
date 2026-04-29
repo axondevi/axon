@@ -219,6 +219,12 @@ export const agents = pgTable(
     // to the system prompt and routes TTS through persona.voice_id_elevenlabs.
     // null = no persona (default Axon behavior).
     personaId: uuid('persona_id'),
+    // Smart routing: when this agent receives the first turn from a contact,
+    // it classifies the intent ('sales' / 'personal' / 'support') and forwards
+    // every subsequent turn to the matching agent's prompt/tools/persona.
+    // Shape: { sales?: uuid, personal?: uuid, support?: uuid }. null = leaf agent
+    // (the routed-to one) or no routing configured.
+    routesTo: jsonb('routes_to'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -387,6 +393,13 @@ export const contactMemory = pgTable(
     firstContactAt: timestamp('first_contact_at').defaultNow().notNull(),
     lastContactAt: timestamp('last_contact_at').defaultNow().notNull(),
 
+    // Smart routing — once classified, this contact uses routedAgentId's
+    // prompt/tools/persona for every subsequent turn. routeIntent is the
+    // verdict that produced the routing (auditable). NULL on contacts that
+    // never went through a router agent.
+    routedAgentId: uuid('routed_agent_id'),
+    routeIntent: text('route_intent'),
+
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -394,6 +407,7 @@ export const contactMemory = pgTable(
     agentPhoneUnique: uniqueIndex('contact_memory_agent_phone_unique').on(t.agentId, t.phone),
     agentIdx: index('contact_memory_agent_idx').on(t.agentId),
     lastContactIdx: index('contact_memory_last_contact_idx').on(t.lastContactAt),
+    routedAgentIdx: index('contact_memory_routed_agent_idx').on(t.routedAgentId),
   }),
 );
 export type ContactMemory = typeof contactMemory.$inferSelect;

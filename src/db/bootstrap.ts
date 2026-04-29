@@ -248,6 +248,16 @@ export async function ensureSystemRows() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_agent_idx" ON "contact_memory" ("agent_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_last_contact_idx" ON "contact_memory" ("last_contact_at" DESC)`);
 
+  // ─── Self-healing schema: smart routing (migration 0012) ───────
+  // Adds the routing surface area without requiring a manual `db:migrate`.
+  // Both columns are nullable, so existing agents/contacts keep working
+  // exactly as before — only the rows that opt in (owner sets routes_to,
+  // intent classifier writes routed_agent_id) feel any change.
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "routes_to" jsonb`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "routed_agent_id" uuid`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "route_intent" text`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_routed_agent_idx" ON "contact_memory" ("routed_agent_id")`);
+
   // Touch the row so timestamps refresh if someone queries health.
   await db.execute(sql`SELECT 1`);
 }

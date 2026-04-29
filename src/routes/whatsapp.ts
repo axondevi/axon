@@ -26,6 +26,9 @@ import {
   recordTurn,
   extractFactsFromTurn,
 } from '~/agents/contact-memory';
+import { pushToBuffer, mergeBufferedText, anyAudio, type BufferedMessage } from '~/whatsapp/buffer';
+import { classifyIntent, pickRoutedAgentId, loadRoutedAgent, type RoutesTo } from '~/agents/intent-router';
+import { contactMemory } from '~/db/schema';
 
 // ─── Owner-authed sub-router (mounted under /v1/agents) ────
 export const ownerWhatsapp = new Hono();
@@ -467,39 +470,104 @@ publicWebhook.post('/:secret', async (c) => {
     }
   }
 
-  // Resolve agent + owner
+  // Resolve agent + owner — needed to compute the session bucket BEFORE
+  // we decide whether to buffer (owner conversations live in their own
+  // bucket so they never get merged with a customer's burst).
   const [a] = await db.select().from(agents).where(eq(agents.id, conn.agentId)).limit(1);
   if (!a || !a.public) return c.json({ ignored: 'agent_inactive' });
-  const [owner] = await db.select().from(users).where(eq(users.id, conn.ownerId)).limit(1);
-  if (!owner) return c.json({ ignored: 'owner_missing' });
 
-  // ─── Owner-mode detection ─────────────────────────────────
-  // If the inbound phone matches the agent's registered owner_phone, the
-  // agent flips from "public persona" (Camila answering customers) to a
-  // "personal assistant" mode for the owner: different system prompt,
-  // unconditional access to power tools (image gen, web search, scrape).
-  // Match is digits-only to be tolerant of formatting differences.
   const inboundDigits = inbound.phone.replace(/\D/g, '');
   const ownerDigits = (a.ownerPhone || '').replace(/\D/g, '');
   const isOwner = ownerDigits.length > 0 && inboundDigits === ownerDigits;
-
-  // Build conversation history from agent_messages keyed by this phone.
-  // Owner conversations get a separate session bucket so the personal-assistant
-  // history doesn't leak into customer-facing turns (and vice-versa).
   const sessionId = isOwner ? `wa-owner:${inbound.phone}` : `wa:${inbound.phone}`;
+
+  // ─── Buffer & debounce ─────────────────────────────────────
+  // Real users hit "send" 2-3 times in a row ("Oi" → "estou procurando" →
+  // "pra minha irmã"). Without buffering, three webhooks fire in parallel,
+  // each reads an empty history, the agent answers "Que bom ter você
+  // aqui!" three times. With a 3s debounce window, all bubbles merge into
+  // ONE LLM turn that sees the full thought.
+  //
+  // We push to the in-memory buffer, return 200 to Evolution immediately,
+  // and let the flush callback do the heavy lifting (history load, LLM
+  // call, image/Pix/voice/text replies). The agent + owner are scoped
+  // into the closure so the callback has everything it needs.
+  pushToBuffer(
+    sessionId,
+    {
+      inbound,
+      inboundText,
+      receivedAt: Date.now(),
+      userSentAudio,
+    },
+    async (_sk, msgs) => {
+      await processBufferedTurn({
+        c,
+        msgs,
+        conn,
+        connApiKey,
+        agent: a,
+        isOwner,
+        sessionId,
+      });
+    },
+  );
+
+  // Webhook always returns 200 immediately — Evolution doesn't need to
+  // wait for the agent. Reply arrives out-of-band over the WhatsApp socket.
+  return c.json({ ok: true, buffered: true });
+});
+
+/**
+ * Process a flushed batch of buffered messages as ONE conversation turn.
+ *
+ * msgs is everything the user typed during the debounce window — usually
+ * 1, sometimes 2-3 bubbles. We merge their text, load history, run the
+ * agent, persist both sides of the turn, and send the reply (image / Pix /
+ * voice / text) using the same channels as the original handler.
+ *
+ * Heavy work happens here, NOT in the webhook handler — so Evolution gets
+ * its 200 back in <100ms even when an LLM call takes 8s.
+ */
+async function processBufferedTurn(opts: {
+  c: any;
+  msgs: BufferedMessage[];
+  conn: typeof whatsappConnections.$inferSelect;
+  connApiKey: string;
+  agent: typeof agents.$inferSelect;
+  isOwner: boolean;
+  sessionId: string;
+}): Promise<void> {
+  const { c, msgs, conn, connApiKey, agent: a, isOwner, sessionId } = opts;
+  if (msgs.length === 0) return;
+
+  // Use the latest message's phone/pushName — they're all from the same
+  // contact (sessionId guarantees that), so any one works. Latest is the
+  // most up-to-date pushName if WhatsApp profile changed.
+  const latest = msgs[msgs.length - 1];
+  const inbound = latest.inbound;
+  const userSentAudio = anyAudio(msgs);
+  const mergedText = mergeBufferedText(msgs);
+
+  const [owner] = await db.select().from(users).where(eq(users.id, a.ownerId)).limit(1);
+  if (!owner) return;
+
+  // Build conversation history. Owner conversations get a separate session
+  // bucket so the personal-assistant history doesn't leak into customer-
+  // facing turns (and vice-versa). The bucket was already chosen by the
+  // caller via sessionId.
   const history = await db
     .select()
     .from(agentMessages)
     .where(and(eq(agentMessages.agentId, a.id), eq(agentMessages.sessionId, sessionId)))
     .orderBy(desc(agentMessages.createdAt))
     .limit(20);
-  // Reverse to chronological + filter to user/assistant
   const priorMessages: ChatMessage[] = history
     .reverse()
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-  const messages: ChatMessage[] = [...priorMessages, { role: 'user', content: inboundText }];
+  const messages: ChatMessage[] = [...priorMessages, { role: 'user', content: mergedText }];
 
   // ─── System prompt assembly ────────────────────────────────
   // Owner mode: replace the public persona with a personal-assistant prompt.
@@ -525,10 +593,6 @@ publicWebhook.post('/:secret', async (c) => {
       `Skip o "||" multi-bolha — fala normal, frase única quando der.`,
     ].join('\n');
   } else {
-    // ─── Contact memory: load before generation ─────────────────
-    // Lazy-create the contact_memory row on first contact. Inject what we
-    // know (name/language/facts/history) into the system prompt so the agent
-    // recognizes the person across sessions and personalizes its reply.
     memory = await getOrCreateMemory(a.id, inbound.phone, inbound.pushName).catch(() => null);
     const memoryContext = memory ? buildMemoryContext(memory) : '';
     augmentedSystemPrompt = memoryContext
@@ -536,9 +600,59 @@ publicWebhook.post('/:secret', async (c) => {
       : a.systemPrompt;
   }
 
+  // ─── Smart routing: classify intent → route to specialized agent ─────
+  // If the connected agent has `routes_to` configured (i.e. acts as a
+  // "front door"), pick a specialized agent based on the customer's intent.
+  // Sticky: once classified, every subsequent turn from this contact uses
+  // the same routed agent (stored in contact_memory.routedAgentId) so we
+  // don't reclassify per turn — the customer's experience stays coherent.
+  //
+  // Owner mode skips routing entirely — when the OWNER is talking, they
+  // get the personal-assistant prompt directly, no triage.
+  let runtimeAgent = a;
+  if (!isOwner && memory && a.routesTo) {
+    let routedId: string | null = null;
+    let intent = (memory.routeIntent as 'sales' | 'personal' | 'support' | 'unknown' | null) || null;
+
+    // Already routed in a previous turn → reuse without reclassifying.
+    if (memory.routedAgentId) {
+      routedId = memory.routedAgentId as string;
+    } else {
+      // First time seeing routing-enabled traffic for this contact: classify
+      // and persist. classifyIntent ~300ms — kept BEFORE runAgent so the
+      // specialized agent's full prompt+persona+tools all take effect on
+      // this very turn (not the next one).
+      intent = await classifyIntent(mergedText);
+      const target = pickRoutedAgentId(a.routesTo as RoutesTo, intent);
+      if (target) {
+        routedId = target;
+        // Fire-and-forget DB update — failure here just means we'll
+        // reclassify next turn, no user-visible impact.
+        db.update(contactMemory)
+          .set({ routedAgentId: target, routeIntent: intent, updatedAt: new Date() })
+          .where(eq(contactMemory.id, memory.id))
+          .catch(() => {});
+      }
+    }
+
+    if (routedId) {
+      const routed = await loadRoutedAgent({ agentId: routedId, ownerId: a.ownerId }).catch(() => null);
+      if (routed) {
+        runtimeAgent = routed;
+        // Re-augment system prompt using the routed agent's prompt — but
+        // KEEP the contact memory context block since memory is keyed on
+        // the original (router) agent's id, not the routed one.
+        const memoryContext = buildMemoryContext(memory);
+        augmentedSystemPrompt = memoryContext
+          ? `${routed.systemPrompt}\n\n## O que você sabe sobre este contato\n${memoryContext}`
+          : routed.systemPrompt;
+      }
+    }
+  }
+
   // Owner gets a superset of tools (image gen + research stack) regardless
   // of the agent's configured allowedTools — those are for the public persona.
-  const baseTools = Array.isArray(a.allowedTools) ? (a.allowedTools as string[]) : [];
+  const baseTools = Array.isArray(runtimeAgent.allowedTools) ? (runtimeAgent.allowedTools as string[]) : [];
   const ownerExtraTools = [
     'generate_image',
     'search_web',
@@ -554,9 +668,8 @@ publicWebhook.post('/:secret', async (c) => {
     ? Array.from(new Set([...baseTools, ...ownerExtraTools]))
     : baseTools;
 
-  // Run the agent (synchronously — Evolution waits up to ~30s)
   c.set('user', owner);
-  c.set('axon:agent_id', a.id);
+  c.set('axon:agent_id', runtimeAgent.id);
 
   let reply: string;
   let images: NonNullable<Awaited<ReturnType<typeof runAgent>>['images']> = [];
@@ -567,11 +680,8 @@ publicWebhook.post('/:secret', async (c) => {
       systemPrompt: augmentedSystemPrompt,
       allowedTools: effectiveTools,
       messages,
-      ownerId: a.ownerId,
-      personaId: a.personaId,
-      // Disable semantic cache: each contact's context is unique. The same
-      // question from Pedro (VIP) vs Maria (new) warrants different replies.
-      // Owner mode is even more dynamic — never cache.
+      ownerId: runtimeAgent.ownerId,
+      personaId: runtimeAgent.personaId,
       enableCache: false,
     });
     reply = result.content || (result.images?.length || result.pixPayments?.length ? '✅' : '🤖 (sem resposta no momento)');
@@ -581,7 +691,7 @@ publicWebhook.post('/:secret', async (c) => {
     // Persist both sides of the turn
     db.insert(agentMessages).values({
       agentId: a.id, sessionId, role: 'user',
-      content: inboundText.slice(0, 4000),
+      content: mergedText.slice(0, 4000),
       visitorIp: 'whatsapp',
     }).catch(() => {});
     db.insert(agentMessages).values({
@@ -590,29 +700,22 @@ publicWebhook.post('/:secret', async (c) => {
       visitorIp: 'whatsapp',
     }).catch(() => {});
 
-    // ─── Memory update (fire-and-forget, no await) ───────────
-    // Extract durable facts from the user's message and bump turn counter.
-    // These run in background so the WhatsApp reply isn't delayed.
     if (memory) {
       void recordTurn(a.id, inbound.phone).catch(() => {});
       void extractFactsFromTurn({
         agentId: a.id,
         phone: inbound.phone,
-        userMessage: inboundText,
+        userMessage: mergedText,
         currentMemory: memory,
       }).catch(() => {});
     }
-  } catch (err: any) {
+  } catch {
     reply = '🤖 Desculpe, tive um problema técnico. Tente de novo em alguns segundos.';
   }
 
-  // Reuse the API key we already decrypted at the top for media re-fetch.
   const apiKey = connApiKey;
 
   // ─── Send any generated images first (out-of-band from text reply) ─
-  // generate_image tool returns base64 PNGs that we deliver via sendMedia,
-  // independent of the text reply. The text reply is the LLM's confirmation
-  // ("Pronto, mandei aí 📸") which arrives right after.
   for (const img of images) {
     await sendMedia({
       instanceUrl: conn.instanceUrl,
@@ -626,14 +729,10 @@ publicWebhook.post('/:secret', async (c) => {
       caption: img.prompt ? img.prompt.slice(0, 700) : '',
       delayMs: 800,
     }).catch(() => {});
-    // Small pause so the image lands before the text bubble
     await new Promise((r) => setTimeout(r, 400));
   }
 
   // ─── Send any Pix payments produced by generate_pix tool ──────────
-  // Two messages per Pix: (1) the QR PNG with caption "R$X — descrição"
-  // (2) the EMV copy-paste string as a plain text bubble so the user
-  // can copy from any banking app on mobile (faster than scanning).
   for (const pix of pixPayments) {
     const captionLines = [
       `💸 *${Number(pix.amountBrl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}*`,
@@ -653,7 +752,6 @@ publicWebhook.post('/:secret', async (c) => {
       delayMs: 800,
     }).catch(() => {});
     await new Promise((r) => setTimeout(r, 600));
-    // Copy-paste EMV — easiest UX on mobile (long-press to copy).
     await sendText({
       instanceUrl: conn.instanceUrl,
       instanceName: conn.instanceName,
@@ -666,30 +764,24 @@ publicWebhook.post('/:secret', async (c) => {
   }
 
   // ─── Reply mode: voice in → voice out (mirror customer's preference) ─
-  // If the customer sent audio AND TTS is configured, synthesize the
-  // reply and send as a voice note. Skip the multi-bubble text fallback
-  // since one audio message already conveys everything (sending text
-  // duplicates the content and feels robotic).
   let textWasReplaced = false;
   if (userSentAudio && reply.trim().length > 0) {
     try {
       const { synthesizeSpeech } = await import('~/voice/elevenlabs');
-      // If the agent has a persona, use ITS voice id — keeps Don Salvatore
-      // sounding deep+Italian and Tia Zélia sounding warm+elderly even when
-      // the same business is set up. Falls back to default voice when null.
       let voiceId: string | undefined;
-      if (a.personaId) {
+      // Use the routed agent's persona when smart routing kicked in — so Tia
+      // Zélia answers with the warm-elderly voice and Don Salvatore with the
+      // deep Italian one, even though the customer reached out to Camila.
+      if (runtimeAgent.personaId) {
         try {
           const { personas } = await import('~/db/schema');
-          const [persona] = await db.select().from(personas).where(eq(personas.id, a.personaId)).limit(1);
+          const [persona] = await db.select().from(personas).where(eq(personas.id, runtimeAgent.personaId)).limit(1);
           voiceId = persona?.voiceIdElevenlabs || undefined;
         } catch {/* fallback to default voice */}
       }
-      // Strip || delimiters and emoji-only phrases — TTS handles plain prose best.
       const ttsText = reply.replace(/\|\|+/g, '. ').slice(0, 600);
       const tts = await synthesizeSpeech({ text: ttsText, voiceId });
       if (tts.ok && tts.audioBytes) {
-        // Convert to base64 for sendMedia
         let bin = '';
         for (let i = 0; i < tts.audioBytes.length; i++) bin += String.fromCharCode(tts.audioBytes[i]);
         const base64 = btoa(bin);
@@ -711,9 +803,7 @@ publicWebhook.post('/:secret', async (c) => {
     }
   }
 
-  // Multi-bubble text reply (when not replaced by voice). Humans don't dump
-  // a paragraph; they send 2-3 short bursts. Agent uses "||" to mark bubble
-  // breaks (taught in the system prompt); fallback splits long replies.
+  // Multi-bubble text reply (when not replaced by voice).
   if (!textWasReplaced) {
     const bubbles = splitReply(reply);
     for (let i = 0; i < bubbles.length; i++) {
@@ -732,9 +822,7 @@ publicWebhook.post('/:secret', async (c) => {
       }
     }
   }
-
-  return c.json({ ok: true });
-});
+}
 
 /**
  * Split an agent reply into 1..N WhatsApp bubbles.

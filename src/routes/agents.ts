@@ -191,6 +191,7 @@ app.get('/', async (c) => {
       hard_cap_usdc: fromMicro(a.hardCap),
       nft_url: nftViewUrlFor(a.id),
       persona_id: a.personaId,
+      routes_to: a.routesTo,
       created_at: a.createdAt,
       updated_at: a.updatedAt,
     })),
@@ -228,6 +229,9 @@ app.get('/:id', async (c) => {
     ui_language: a.uiLanguage,
     public: a.public,
     template: a.template,
+    persona_id: a.personaId,
+    owner_phone: a.ownerPhone,
+    routes_to: a.routesTo,
     created_at: a.createdAt,
     updated_at: a.updatedAt,
   });
@@ -408,6 +412,32 @@ app.patch('/:id', async (c) => {
         return c.json({ error: 'bad_request', message: 'owner_phone must be 10–15 digits (E.164 without +)' }, 400);
       }
       update.ownerPhone = digits;
+    }
+  }
+  if (body.routes_to !== undefined) {
+    // routes_to: { sales?: agentId, personal?: agentId, support?: agentId }
+    // null/empty clears routing — agent goes back to handling everything itself.
+    // Each value MUST point to another agent owned by the same user; we
+    // verify ownership here so a misconfigured routes_to can't leak chats
+    // to another tenant's agent.
+    if (body.routes_to === null || (typeof body.routes_to === 'object' && Object.keys(body.routes_to).length === 0)) {
+      update.routesTo = null;
+    } else if (typeof body.routes_to === 'object') {
+      const wanted = body.routes_to as Record<string, unknown>;
+      const cleaned: Record<string, string> = {};
+      for (const key of ['sales', 'personal', 'support']) {
+        const targetId = wanted[key];
+        if (typeof targetId === 'string' && targetId.length > 0) {
+          const [target] = await db.select().from(agents).where(eq(agents.id, targetId)).limit(1);
+          if (!target || target.ownerId !== user.id) {
+            return c.json({ error: 'bad_request', message: `routes_to.${key} must point to an agent you own` }, 400);
+          }
+          cleaned[key] = targetId;
+        }
+      }
+      update.routesTo = Object.keys(cleaned).length ? cleaned : null;
+    } else {
+      return c.json({ error: 'bad_request', message: 'routes_to must be an object or null' }, 400);
     }
   }
   if (body.persona_id !== undefined || body.persona_slug !== undefined) {
