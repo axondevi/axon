@@ -472,9 +472,15 @@ export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
   bcb_indicator:      { api: 'bcb', endpoint: 'series' },
   ibge_city:          { api: 'ibge', endpoint: 'city' },
   github_user:        { api: 'github', endpoint: 'user' },
+  github_repo:        { api: 'github', endpoint: 'repo' },
   mercadolivre_search: { api: 'mercadolivre', endpoint: 'search' },
   lookup_book:        { api: 'openlibrary', endpoint: 'isbn' },
   npm_package:        { api: 'npm', endpoint: 'package' },
+  camara_proposicoes: { api: 'camara', endpoint: 'proposicoes' },
+  world_holidays:     { api: 'nagerdate', endpoint: 'holidays' },
+  time_zone:          { api: 'timeapi', endpoint: 'current' },
+  dict_define_en:     { api: 'dictionaryapi', endpoint: 'define' },
+  agify_name:         { api: 'agify', endpoint: 'predict' },
   // generate_pix is server-side only — not backed by an upstream API.
   // It calls our internal MercadoPago wrapper via a special handler in
   // src/agents/runtime.ts. We register a dummy mapping so isToolAllowed +

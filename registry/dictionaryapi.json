@@ -1,0 +1,19 @@
+{
+  "slug": "dictionaryapi",
+  "provider": "Free Dictionary API",
+  "category": "Knowledge & Research",
+  "description": "English word definitions, phonetics, examples, synonyms, antonyms. Free, no key. (English only — for PT-BR use translate_text.)",
+  "homepage": "https://dictionaryapi.dev/",
+  "base_url": "https://api.dictionaryapi.dev",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "define": {
+      "method": "GET",
+      "path": "/api/v2/entries/en/:word",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 2592000,
+      "notes": "Definitions, IPA phonetics, audio, examples. Pass :word in lowercase. Returns 404 for unknown words."
+    }
+  }
+}

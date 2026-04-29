@@ -124,10 +124,16 @@ const TOOL_KEYWORDS: Record<string, RegExp> = {
   wikipedia_search:  /pesquisar?\s+(?:na\s+)?wiki/i,
   search_arxiv:      /\barxiv\b|paper\s+sobre|artigo cient[ií]fico/i,
   search_hn:         /hacker news|\bhn\b/i,
-  github_user:       /\bgithub\b|github\.com|@\w+\s+do\s+github/i,
+  github_user:       /(?:perfil|user|usu[aá]rio)\s+(?:do\s+)?github|@[\w\-]+\s+(?:do|no)\s+github/i,
+  github_repo:       /reposit[oó]rio|repo\s+\w+\/\w+|\bgithub\.com\/[\w\-]+\/[\w\-]+/i,
   mercadolivre_search:/mercado livre|\bmlb\b|qual.+pre[çc]o.+ml\b|comprar\s+(?:no\s+)?ml/i,
   lookup_book:       /\bisbn\b|livro\s+\d{10,13}/i,
   npm_package:       /\bnpm\b|pacote\s+(?:do\s+)?node|\@[\w\-]+\/[\w\-]+/i,
+  camara_proposicoes:/c[aâ]mara\s+(?:dos\s+)?deputados|projeto\s+de\s+lei|\bpec\b|proposi[çc][aã]o|tramita[çc][aã]o/i,
+  world_holidays:    /feriado.+(?:no|em|dos?)\s+\w+|public holiday|holidays in|feriados\s+(?:em|de)\s+\w+/i,
+  time_zone:         /que\s+horas?\s+s[aã]o\s+(?:em|na|no|agora)|hora\s+(?:em|de|na|no)\s+\w|fuso\s+hor[aá]rio/i,
+  dict_define_en:    /define\s+\w+|defini[çc][aã]o\s+de\s+\w+\s+em\s+ingl[eê]s|english\s+definition/i,
+  agify_name:        /idade\s+(?:de|do|da)\s+(?:nome|pessoa)|que\s+idade.+nome/i,
 
   // Media + language
   generate_image:    /\b(?:gera|cri[ae]|fa[çc]a|desenh)\s+(?:uma?\s+)?(?:imagem|foto|figura|desenho|ilustra)|\bimagem\s+de\b/i,

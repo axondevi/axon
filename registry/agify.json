@@ -1,0 +1,19 @@
+{
+  "slug": "agify",
+  "provider": "Agify.io",
+  "category": "Knowledge & Research",
+  "description": "Predict the most likely age of a person given their first name. Statistical model from public name registries. Free 100 req/day, no key.",
+  "homepage": "https://agify.io/",
+  "base_url": "https://api.agify.io",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "predict": {
+      "method": "GET",
+      "path": "/",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 2592000,
+      "notes": "Pass name=Pedro&country_id=BR (optional). Returns { name, age, count }. Uses BR-localized data when country_id is given."
+    }
+  }
+}

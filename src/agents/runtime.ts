@@ -330,6 +330,86 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     buildRequest: (a) => ({ params: { name: String(a.name).trim() } }),
   },
 
+  // ─── Câmara dos Deputados ────────────────────────────────────
+  camara_proposicoes: {
+    description: 'Search Brazilian Câmara dos Deputados propositions (PL, PEC, MP, projetos de lei). Pass keyword(s) or specific siglaTipo+numero+ano. Useful for legal/political agents tracking legislation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keywords: { type: 'string', description: 'Keywords to search in propositions (e.g. "imposto renda").' },
+        siglaTipo: { type: 'string', description: 'Optional: PL, PEC, MP, etc.' },
+        numero: { type: 'integer' },
+        ano: { type: 'integer' },
+        itens: { type: 'integer', description: 'Max results (default 10).' },
+      },
+    },
+    buildRequest: (a) => {
+      const params: Record<string, unknown> = { itens: Math.min(a.itens || 10, 50), ordem: 'DESC', ordenarPor: 'id' };
+      if (a.keywords) params.keywords = a.keywords;
+      if (a.siglaTipo) params.siglaTipo = a.siglaTipo;
+      if (a.numero) params.numero = a.numero;
+      if (a.ano) params.ano = a.ano;
+      return { params };
+    },
+  },
+
+  // ─── World holidays ──────────────────────────────────────────
+  world_holidays: {
+    description: 'Public holidays for a country and year. Use ISO country codes: BR (Brasil), US, AR, MX, PT, etc. Returns list with date, local name, English name.',
+    parameters: {
+      type: 'object',
+      properties: {
+        year: { type: 'integer' },
+        countryCode: { type: 'string', description: 'ISO 3166-1 alpha-2 (e.g. BR, US).' },
+      },
+      required: ['year', 'countryCode'],
+    },
+    buildRequest: (a) => ({ params: { year: a.year, countryCode: String(a.countryCode).toUpperCase().slice(0, 2) } }),
+  },
+
+  // ─── Time / timezone ─────────────────────────────────────────
+  time_zone: {
+    description: 'Current time and timezone info for any IANA zone (e.g. "America/Sao_Paulo", "Europe/Lisbon", "Asia/Tokyo"). Useful for scheduling across regions, DST checks.',
+    parameters: { type: 'object', properties: { timeZone: { type: 'string' } }, required: ['timeZone'] },
+    buildRequest: (a) => ({ params: { timeZone: a.timeZone } }),
+  },
+
+  // ─── English dictionary ──────────────────────────────────────
+  dict_define_en: {
+    description: 'English-only dictionary lookup with definitions, phonetics, examples, synonyms. Use for ESL learners, English content review. For Portuguese, use translate_text instead.',
+    parameters: { type: 'object', properties: { word: { type: 'string' } }, required: ['word'] },
+    buildRequest: (a) => ({ params: { word: String(a.word).trim().toLowerCase() } }),
+  },
+
+  // ─── GitHub repo (extends github_user) ───────────────────────
+  github_repo: {
+    description: 'Public GitHub repository metadata — stars, forks, language, license, description. Pass owner and repo name (e.g. owner=anthropics, repo=anthropic-sdk-typescript).',
+    parameters: {
+      type: 'object',
+      properties: { owner: { type: 'string' }, repo: { type: 'string' } },
+      required: ['owner', 'repo'],
+    },
+    buildRequest: (a) => ({ params: { owner: String(a.owner).trim(), repo: String(a.repo).trim() } }),
+  },
+
+  // ─── Name → age estimate ─────────────────────────────────────
+  agify_name: {
+    description: 'Predict likely age of a person given their first name (statistical, BR-localizable). Returns { name, age, count }. Useful for marketing segmentation, fun engagement.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        country_id: { type: 'string', description: 'Optional ISO country code (BR, US, ...) for localized data.' },
+      },
+      required: ['name'],
+    },
+    buildRequest: (a) => {
+      const params: Record<string, unknown> = { name: String(a.name).trim() };
+      if (a.country_id) params.country_id = String(a.country_id).toUpperCase().slice(0, 2);
+      return { params };
+    },
+  },
+
   // ─── Internal Groq-powered tools (no upstream API) ───────────
   // These use llama-3.1-8b-instant directly so they don't add an external
   // dependency. Cost: ~150-300 tokens out per call, well below an LLM-

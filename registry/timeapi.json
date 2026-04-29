@@ -1,0 +1,19 @@
+{
+  "slug": "timeapi",
+  "provider": "TimeAPI.io",
+  "category": "Geo & Maps",
+  "description": "Current time, timezone info, and DST status for any city or coordinate worldwide. Free, no API key.",
+  "homepage": "https://timeapi.io/swagger/index.html",
+  "base_url": "https://timeapi.io",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "current": {
+      "method": "GET",
+      "path": "/api/Time/current/zone",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 60,
+      "notes": "Current time + timezone info by IANA zone (e.g. timeZone=America/Sao_Paulo). Cache 60s — only useful for fresh-ish 'agora' calls."
+    }
+  }
+}
