@@ -371,6 +371,7 @@
             <span><strong>${connLabel}</strong></span>
             ${conn ? `<span style="color:var(--text-muted)">· ${escapeHtml(conn.instance_url || '')}</span>` : ''}
             ${conn ? `<span style="color:var(--text-muted)">· instância: ${escapeHtml(conn.instance_name || '')}</span>` : ''}
+            ${conn && conn.owner_phone ? `<span style="color:var(--accent-2)" title="Quando você manda zap deste número, o agente vira seu assistente pessoal (gera imagens, etc).">· dono: +${escapeHtml(conn.owner_phone)} 👤</span>` : ''}
             ${connectButton}
             <span style="margin-left: ${connectButton ? '12px' : 'auto'}; color: var(--text-muted); font-size: 12px;">
               <span class="refresh-indicator"></span> atualiza a cada ${REFRESH_MS/1000}s
@@ -503,6 +504,7 @@
                   <li><code>instance_url</code>: ex <code>https://evolution.seu-host.com</code></li>
                   <li><code>instance_name</code>: nome da instance no Evolution</li>
                   <li><code>api_key</code>: AUTHENTICATION_API_KEY do servidor</li>
+                  <li><code>owner_phone</code> <em>(opcional)</em>: seu próprio número (DDI+DDD+número, só dígitos, ex <code>5511995432538</code>). Quando você manda zap pro número conectado deste mesmo número, o agente vira seu assistente pessoal — pode pedir <em>"gera uma foto de X"</em> e ele gera + envia pelo zap.</li>
                 </ul>
               </li>
               <li style="margin-bottom:12px;">
@@ -510,7 +512,12 @@
                 <pre style="background:#0a0a0b;border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px;font-size:11px;overflow-x:auto;color:var(--accent-2);">curl -X POST $AXON_BASE/v1/agents/$AGENT_ID/whatsapp \\
   -H "x-api-key: $YOUR_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"instance_url":"https://...","instance_name":"...","api_key":"..."}'</pre>
+  -d '{
+    "instance_url":"https://...",
+    "instance_name":"...",
+    "api_key":"...",
+    "owner_phone":"5511999999999"
+  }'</pre>
                 Axon registra webhook automaticamente. Depois disso, escaneie QR (ou use código de pareamento) na sua instância Evolution.
               </li>
             </ol>

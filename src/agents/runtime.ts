@@ -178,6 +178,29 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     parameters: { type: 'object', properties: { input: { type: 'string' } }, required: ['input'] },
     buildRequest: (a) => ({ body: { input: a.input, model: 'voyage-3-lite' } }),
   },
+  generate_image: {
+    description:
+      'Generate an image from a text prompt (Stable Diffusion XL). The prompt should be in English for best quality — translate user requests to English before calling. Returns a confirmation; the image is delivered to the user separately via the channel (e.g. WhatsApp).',
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Detailed English description of the image.' },
+        width: { type: 'integer', enum: [1024, 1152, 1216, 1344], description: 'Default 1024.' },
+        height: { type: 'integer', enum: [1024, 896, 832, 768], description: 'Default 1024.' },
+      },
+      required: ['prompt'],
+    },
+    buildRequest: (a) => ({
+      body: {
+        text_prompts: [{ text: String(a.prompt || '').slice(0, 2000), weight: 1 }],
+        cfg_scale: 7,
+        steps: 30,
+        width: a.width || 1024,
+        height: a.height || 1024,
+        samples: 1,
+      },
+    }),
+  },
 };
 
 export function buildToolsArray(allowedTools: string[]): any[] {
@@ -209,6 +232,13 @@ interface RunAgentResult {
   cached?: boolean;
   /** Cosine similarity to cached entry (only set if cached=true). */
   cache_similarity?: number;
+  /**
+   * Base64-encoded images produced by tool calls (currently only generate_image
+   * via Stability). Caller (e.g. the WhatsApp webhook) is responsible for
+   * delivering these to the end user — they are NOT inlined into `content`,
+   * which the LLM still sees as plain text.
+   */
+  images?: Array<{ base64: string; mimetype: string; prompt?: string }>;
 }
 
 const MAX_ITERATIONS = 8;
@@ -299,6 +329,7 @@ export async function runAgent(opts: {
   // Convo history with system prompt prepended
   const history: ChatMessage[] = [{ role: 'system', content: fullSystemPrompt }, ...messages];
   const toolCallsExecuted: RunAgentResult['tool_calls_executed'] = [];
+  const generatedImages: NonNullable<RunAgentResult['images']> = [];
   let totalCostMicro = 0n;
 
   const groqKey = upstreamKeyFor('groq');
@@ -365,6 +396,7 @@ export async function runAgent(opts: {
         iterations: iter + 1,
         finish_reason: 'stop',
         total_cost_usdc: (Number(totalCostMicro) / 1_000_000).toFixed(6),
+        ...(generatedImages.length ? { images: generatedImages } : {}),
       };
     }
 
@@ -397,7 +429,37 @@ export async function runAgent(opts: {
         totalCostMicro += BigInt(Math.round(cost * 1_000_000));
         const cloned = upstreamRes.clone();
         const text = await cloned.text();
-        const truncated = text.slice(0, MAX_TOOL_RESULT_CHARS);
+
+        // ─── Special-case: generate_image returns raw base64 PNG(s) which
+        // would (a) blow up the LLM context window and (b) confuse the model
+        // since it can't actually look at the bytes. Extract the artifact(s)
+        // for out-of-band delivery (the WhatsApp webhook will sendMedia them)
+        // and feed the LLM only a short confirmation summary.
+        let truncated = text.slice(0, MAX_TOOL_RESULT_CHARS);
+        if (tc.function.name === 'generate_image' && upstreamRes.ok) {
+          try {
+            const parsed = JSON.parse(text);
+            const artifacts = Array.isArray(parsed?.artifacts) ? parsed.artifacts : [];
+            for (const art of artifacts) {
+              if (art && typeof art.base64 === 'string' && art.base64.length > 0) {
+                generatedImages.push({
+                  base64: art.base64,
+                  mimetype: 'image/png',
+                  prompt: typeof args.prompt === 'string' ? args.prompt : undefined,
+                });
+              }
+            }
+            // Replace the gigantic base64 with a tiny summary the LLM can reason about.
+            truncated = JSON.stringify({
+              ok: true,
+              images_generated: generatedImages.length,
+              note: 'Image(s) will be sent to the user via the channel automatically.',
+            });
+          } catch {
+            // If parsing fails, keep the truncated raw text — better than nothing.
+          }
+        }
+
         toolCallsExecuted.push({
           name: tc.function.name,
           args,
@@ -429,5 +491,6 @@ export async function runAgent(opts: {
     iterations: MAX_ITERATIONS,
     finish_reason: 'max_iterations',
     total_cost_usdc: (Number(totalCostMicro) / 1_000_000).toFixed(6),
+    ...(generatedImages.length ? { images: generatedImages } : {}),
   };
 }

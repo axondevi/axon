@@ -23,6 +23,24 @@ const DEMO_WALLET_INITIAL_MICRO = 100_000_000n;
 /** Daily budget per demo agent in micro-USDC. $10/day = ~1000 conversations. */
 const DEMO_AGENT_DAILY_BUDGET_MICRO = 10_000_000n;
 
+/**
+ * Schema changes that the code DEPENDS ON. These MUST run before the server
+ * starts answering requests, otherwise Drizzle queries that reference newly-
+ * added columns will fail with "column does not exist".
+ *
+ * Keep this function FAST (just DDL, no data) so cold-start stays snappy.
+ * Idempotent — every statement uses IF NOT EXISTS.
+ *
+ * Slow seed work (demo agents, wallet top-up) goes in `ensureSystemRows`
+ * which still runs fire-and-forget after the server is up.
+ */
+export async function ensureCriticalSchema() {
+  // 0009: agents.owner_phone — when set, an inbound WhatsApp message from this
+  // number flips the agent into personal-assistant mode for the owner.
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "owner_phone" text`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agents_owner_phone_idx" ON "agents" ("owner_phone")`);
+}
+
 export async function ensureSystemRows() {
   // ─── X402 anonymous user (legacy) ───────────────────────────
   await db

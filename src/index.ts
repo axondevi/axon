@@ -10,7 +10,7 @@ import { rateLimit } from '~/middleware/rate-limit';
 import { requestId } from '~/middleware/request-id';
 import { watchRegistry } from '~/registry/apis';
 import { x402Middleware } from '~/payment/x402';
-import { ensureSystemRows } from '~/db/bootstrap';
+import { ensureCriticalSchema, ensureSystemRows } from '~/db/bootstrap';
 import { redis } from '~/cache/redis';
 
 import walletRoutes, { admin as adminWalletRoutes } from '~/routes/wallet';
@@ -185,6 +185,16 @@ app.notFound((c) =>
 );
 
 watchRegistry();
+
+// Critical schema DDL — MUST complete before the server answers any request,
+// otherwise Drizzle SELECTs that reference newly-added columns will throw.
+// Awaited at top level so Bun delays starting the listener until the column
+// adds are committed. Fast (<50ms) since it's just IF NOT EXISTS checks.
+await ensureCriticalSchema().catch((err) => {
+  log.error('critical_schema_failed', { error: (err as Error).message });
+  // Re-throw so the deploy fails loudly instead of silently serving broken queries.
+  throw err;
+});
 
 // Bootstrap DB (idempotent). Runs in background so import order isn't
 // blocked on a slow DB connect; the server still answers /health while

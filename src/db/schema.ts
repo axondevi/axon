@@ -210,6 +210,10 @@ export const agents = pgTable(
     vanityDomain: text('vanity_domain'),
     // Auto-detected language for UI strings ('auto' = use browser locale)
     uiLanguage: text('ui_language').notNull().default('auto'),
+    // Owner's WhatsApp number (digits only, e.g. "5511995432538"). When an
+    // inbound message comes from this number, the agent switches to
+    // owner/personal-assistant mode (different persona, broader tool access).
+    ownerPhone: text('owner_phone'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -217,6 +221,7 @@ export const agents = pgTable(
     ownerIdx: index('agents_owner_idx').on(t.ownerId),
     slugIdx: uniqueIndex('agents_slug_idx').on(t.slug),
     vanityIdx: uniqueIndex('agents_vanity_idx').on(t.vanityDomain),
+    ownerPhoneIdx: index('agents_owner_phone_idx').on(t.ownerPhone),
   }),
 );
 

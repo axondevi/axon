@@ -18,7 +18,7 @@ import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { encrypt, decrypt } from '~/lib/crypto';
-import { checkInstance, setWebhook, sendText, extractInbound } from '~/whatsapp/evolution';
+import { checkInstance, setWebhook, sendText, sendMedia, extractInbound } from '~/whatsapp/evolution';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
   getOrCreateMemory,
@@ -54,6 +54,7 @@ ownerWhatsapp.get('/:id/whatsapp', async (c) => {
     status: conn.status,
     last_event_at: conn.lastEventAt,
     webhook_url: webhookUrlFor(c, conn.webhookSecret),
+    owner_phone: a.ownerPhone || null,
   });
 });
 
@@ -74,6 +75,14 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
   const instanceUrl = String(body.instance_url || '').trim().replace(/\/+$/, '');
   const instanceName = String(body.instance_name || '').trim();
   const apiKey = String(body.api_key || '').trim();
+  // Owner phone is optional — but if provided, it MUST be digits only after
+  // normalization (e.g. "+55 (11) 99543-2538" → "5511995432538"). When set,
+  // an inbound match flips the agent to personal-assistant mode.
+  const ownerPhoneRaw = String(body.owner_phone || '').trim();
+  const ownerPhone = ownerPhoneRaw ? ownerPhoneRaw.replace(/\D/g, '') : null;
+  if (ownerPhone && (ownerPhone.length < 10 || ownerPhone.length > 15)) {
+    return c.json({ error: 'bad_request', message: 'owner_phone must be 10–15 digits (E.164 without +)' }, 400);
+  }
   if (!instanceUrl || !instanceName || !apiKey) {
     return c.json({ error: 'bad_request', message: 'instance_url, instance_name, api_key are required' }, 400);
   }
@@ -104,6 +113,15 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
     status: 'connected',
   });
 
+  // Persist owner_phone on the agent (only if the caller provided one — we
+  // never null out a previously-set value when the field is omitted).
+  if (ownerPhone) {
+    await db
+      .update(agents)
+      .set({ ownerPhone, updatedAt: new Date() })
+      .where(eq(agents.id, agentId));
+  }
+
   // 3. Register Axon's webhook on the Evolution instance
   const set = await setWebhook({ instanceUrl, instanceName, apiKey, webhookUrl });
   if (!set.ok) {
@@ -119,6 +137,7 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
       instance_name: instanceName,
       status: probe.status || 'connected',
       webhook_url: webhookUrl,
+      owner_phone: ownerPhone || a.ownerPhone || null,
     },
   });
 });
@@ -171,8 +190,20 @@ publicWebhook.post('/:secret', async (c) => {
   const [owner] = await db.select().from(users).where(eq(users.id, conn.ownerId)).limit(1);
   if (!owner) return c.json({ ignored: 'owner_missing' });
 
-  // Build conversation history from agent_messages keyed by this phone
-  const sessionId = `wa:${inbound.phone}`;
+  // ─── Owner-mode detection ─────────────────────────────────
+  // If the inbound phone matches the agent's registered owner_phone, the
+  // agent flips from "public persona" (Camila answering customers) to a
+  // "personal assistant" mode for the owner: different system prompt,
+  // unconditional access to power tools (image gen, web search, scrape).
+  // Match is digits-only to be tolerant of formatting differences.
+  const inboundDigits = inbound.phone.replace(/\D/g, '');
+  const ownerDigits = (a.ownerPhone || '').replace(/\D/g, '');
+  const isOwner = ownerDigits.length > 0 && inboundDigits === ownerDigits;
+
+  // Build conversation history from agent_messages keyed by this phone.
+  // Owner conversations get a separate session bucket so the personal-assistant
+  // history doesn't leak into customer-facing turns (and vice-versa).
+  const sessionId = isOwner ? `wa-owner:${inbound.phone}` : `wa:${inbound.phone}`;
   const history = await db
     .select()
     .from(agentMessages)
@@ -187,33 +218,79 @@ publicWebhook.post('/:secret', async (c) => {
 
   const messages: ChatMessage[] = [...priorMessages, { role: 'user', content: inbound.text }];
 
-  // ─── Contact memory: load before generation ─────────────────
-  // Lazy-create the contact_memory row on first contact. Inject what we
-  // know (name/language/facts/history) into the system prompt so the agent
-  // recognizes the person across sessions and personalizes its reply.
-  const memory = await getOrCreateMemory(a.id, inbound.phone, inbound.pushName).catch(() => null);
-  const memoryContext = memory ? buildMemoryContext(memory) : '';
-  const augmentedSystemPrompt = memoryContext
-    ? `${a.systemPrompt}\n\n## O que você sabe sobre este contato\n${memoryContext}`
-    : a.systemPrompt;
+  // ─── System prompt assembly ────────────────────────────────
+  // Owner mode: replace the public persona with a personal-assistant prompt.
+  // Customer mode: keep the configured persona + inject contact memory.
+  let augmentedSystemPrompt: string;
+  let memory: Awaited<ReturnType<typeof getOrCreateMemory>> | null = null;
+  if (isOwner) {
+    augmentedSystemPrompt = [
+      `Você é o assistente pessoal de ${a.name ? `"${a.name}"` : 'do dono deste agente'}.`,
+      `Está conversando DIRETAMENTE com o dono (não com um cliente).`,
+      `Trate-o de forma direta, informal, em português. Sem persona de atendimento ao público.`,
+      ``,
+      `Capacidades disponíveis (use à vontade quando ele pedir):`,
+      `- Gerar imagens a partir de descrições (use a tool generate_image; traduza o pedido para inglês detalhado antes de chamar — Stable Diffusion XL responde melhor em inglês).`,
+      `- Pesquisar na web, raspar URLs, buscar Wikipedia/HN.`,
+      `- Consultar CNPJ/CEP, clima, cotações, cripto, datas.`,
+      ``,
+      `Quando ele pedir uma imagem ("gera uma foto de X", "faz uma imagem de Y"):`,
+      `1. Chame generate_image com um prompt em inglês BEM detalhado (estilo, iluminação, composição, qualidade).`,
+      `2. A imagem é entregue automaticamente pelo WhatsApp — você só precisa confirmar em PT-BR ("Pronto, mandei aí 📸").`,
+      `3. NÃO tente descrever pixels nem inventar URLs — só confirme.`,
+      ``,
+      `Skip o "||" multi-bolha — fala normal, frase única quando der.`,
+    ].join('\n');
+  } else {
+    // ─── Contact memory: load before generation ─────────────────
+    // Lazy-create the contact_memory row on first contact. Inject what we
+    // know (name/language/facts/history) into the system prompt so the agent
+    // recognizes the person across sessions and personalizes its reply.
+    memory = await getOrCreateMemory(a.id, inbound.phone, inbound.pushName).catch(() => null);
+    const memoryContext = memory ? buildMemoryContext(memory) : '';
+    augmentedSystemPrompt = memoryContext
+      ? `${a.systemPrompt}\n\n## O que você sabe sobre este contato\n${memoryContext}`
+      : a.systemPrompt;
+  }
+
+  // Owner gets a superset of tools (image gen + research stack) regardless
+  // of the agent's configured allowedTools — those are for the public persona.
+  const baseTools = Array.isArray(a.allowedTools) ? (a.allowedTools as string[]) : [];
+  const ownerExtraTools = [
+    'generate_image',
+    'search_web',
+    'scrape_url',
+    'wikipedia_summary',
+    'lookup_cnpj',
+    'lookup_cep',
+    'current_weather',
+    'crypto_price',
+    'convert_currency',
+  ];
+  const effectiveTools = isOwner
+    ? Array.from(new Set([...baseTools, ...ownerExtraTools]))
+    : baseTools;
 
   // Run the agent (synchronously — Evolution waits up to ~30s)
   c.set('user', owner);
   c.set('axon:agent_id', a.id);
 
   let reply: string;
+  let images: NonNullable<Awaited<ReturnType<typeof runAgent>>['images']> = [];
   try {
     const result = await runAgent({
       c,
       systemPrompt: augmentedSystemPrompt,
-      allowedTools: Array.isArray(a.allowedTools) ? (a.allowedTools as string[]) : [],
+      allowedTools: effectiveTools,
       messages,
       ownerId: a.ownerId,
       // Disable semantic cache: each contact's context is unique. The same
       // question from Pedro (VIP) vs Maria (new) warrants different replies.
+      // Owner mode is even more dynamic — never cache.
       enableCache: false,
     });
-    reply = result.content || '🤖 (sem resposta no momento)';
+    reply = result.content || (result.images?.length ? '✅' : '🤖 (sem resposta no momento)');
+    images = result.images || [];
 
     // Persist both sides of the turn
     db.insert(agentMessages).values({
@@ -249,6 +326,27 @@ publicWebhook.post('/:secret', async (c) => {
     apiKey = decrypt(conn.apiKey);
   } catch {
     return c.json({ ignored: 'cannot_decrypt_key' });
+  }
+
+  // ─── Send any generated images first (out-of-band from text reply) ─
+  // generate_image tool returns base64 PNGs that we deliver via sendMedia,
+  // independent of the text reply. The text reply is the LLM's confirmation
+  // ("Pronto, mandei aí 📸") which arrives right after.
+  for (const img of images) {
+    await sendMedia({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey,
+      number: inbound.phone,
+      base64Data: img.base64,
+      mediatype: 'image',
+      mimetype: img.mimetype || 'image/png',
+      fileName: 'gerada.png',
+      caption: img.prompt ? img.prompt.slice(0, 700) : '',
+      delayMs: 800,
+    }).catch(() => {});
+    // Small pause so the image lands before the text bubble
+    await new Promise((r) => setTimeout(r, 400));
   }
 
   // Multi-bubble: humans don't dump a paragraph; they send 2-3 short bursts.

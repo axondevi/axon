@@ -136,6 +136,72 @@ export async function sendText(opts: {
 }
 
 /**
+ * Send a media message (image, document, video, audio) on the instance.
+ *
+ * Accepts either a public URL (`media`) or raw base64 (`base64Data`, no data:
+ * prefix). Caption is optional. Evolution's `/message/sendMedia/{instance}`
+ * endpoint handles MIME detection from the file extension or base64 prefix.
+ *
+ * For image generation flows (Stability returns base64), pass `base64Data`.
+ * For shared external assets, pass `media` (URL).
+ */
+export async function sendMedia(opts: {
+  instanceUrl: string;
+  instanceName: string;
+  apiKey: string;
+  number: string;
+  /** Public URL — used if base64Data is not provided. */
+  media?: string;
+  /** Raw base64 (no `data:image/...;base64,` prefix). */
+  base64Data?: string;
+  /** 'image' | 'document' | 'video' | 'audio' */
+  mediatype?: 'image' | 'document' | 'video' | 'audio';
+  /** MIME (e.g. 'image/png'). Defaults to image/png when mediatype=image. */
+  mimetype?: string;
+  /** Filename Evolution will attach (helps Whatsapp display). */
+  fileName?: string;
+  caption?: string;
+  delayMs?: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!opts.media && !opts.base64Data) {
+    return { ok: false, error: 'sendMedia: must provide media (URL) or base64Data' };
+  }
+  const mediatype = opts.mediatype || 'image';
+  const mimetype = opts.mimetype || (mediatype === 'image' ? 'image/png' : 'application/octet-stream');
+  const body: Record<string, unknown> = {
+    number: opts.number,
+    mediatype,
+    mimetype,
+    caption: opts.caption ?? '',
+    fileName: opts.fileName || (mediatype === 'image' ? 'image.png' : 'file'),
+    delay: opts.delayMs ?? 1200,
+  };
+  // Evolution accepts either { media: <url> } or { media: <base64> }.
+  // Most builds expect raw base64 in the `media` field; some require
+  // `mediaMessage.media`. We use the top-level `media` form which works on
+  // Evolution v2.x (the build used in production per project memory).
+  body.media = opts.base64Data || opts.media;
+  try {
+    const res = await evoFetch(
+      opts.instanceUrl,
+      `/message/sendMedia/${encodeURIComponent(opts.instanceName)}`,
+      {
+        method: 'POST',
+        apiKey: opts.apiKey,
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, error: `sendMedia ${res.status}: ${text.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+/**
  * Extract a plain user message from an Evolution `messages.upsert` event.
  * Handles `conversation` (plain text) and `extendedTextMessage.text` (replies/quotes/forwards).
  * Skips media-only messages, reactions, edits, and our own outgoing messages.
