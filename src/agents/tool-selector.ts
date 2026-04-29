@@ -134,6 +134,21 @@ const TOOL_KEYWORDS: Record<string, RegExp> = {
   time_zone:         /que\s+horas?\s+s[aã]o\s+(?:em|na|no|agora)|hora\s+(?:em|de|na|no)\s+\w|fuso\s+hor[aá]rio/i,
   dict_define_en:    /define\s+\w+|defini[çc][aã]o\s+de\s+\w+\s+em\s+ingl[eê]s|english\s+definition/i,
   agify_name:        /idade\s+(?:de|do|da)\s+(?:nome|pessoa)|que\s+idade.+nome/i,
+  // Sub-endpoints (granular alternatives)
+  list_banks_br:     /lista\s+(?:de\s+)?todos?\s+(?:os\s+)?bancos|todos\s+os\s+bancos\s+brasileiros/i,
+  fipe_brands:       /marcas\s+(?:da\s+)?fipe|lista\s+(?:de\s+)?marcas\s+(?:de\s+)?(?:carro|moto|veiculo)/i,
+  github_search_repos:/(?:procur|busca|search).+(?:repos?|github)|melhores\s+repos|repos[ií]t[oó]rios?\s+sobre/i,
+  ibge_states:       /lista\s+(?:de\s+)?estados\s+(?:do\s+)?brasil|todos\s+os\s+estados\s+(?:brasileiros)?|27 estados/i,
+  ibge_cities_search:/lista\s+(?:de\s+)?(?:todas\s+)?(?:as\s+)?cidades|todos\s+os\s+munic[ií]pios|5570/i,
+  book_search:       /(?:procur|busca)\s+(?:um\s+)?livro|livro\s+(?:do|de|sobre)\s+\w/i,
+  reverse_geocode:   /coordenadas?\s+(?:para|->|virar)\s+endere[çc]o|que\s+endere[çc]o\s+[eé]\s+(?:essa|essas|esse)|reverse\s+geocod/i,
+  mercadolivre_item: /detalhe\s+(?:do\s+)?(?:item|produto)\s+(?:do\s+)?ml|MLB\d{8,}/i,
+  wikipedia_related: /(?:p[aá]ginas?|artigos?)\s+relacionad|(?:see\s+also|veja\s+tamb[eé]m).+wiki/i,
+  // New no-key APIs
+  reddit_search:     /\breddit\b|subreddit|\br\/[\w]+/i,
+  stackoverflow_search:/stack\s*overflow|\bstackoverflow\b|\bSO\b\s+(?:question|pergunta)/i,
+  wikidata_search:   /wikidata|\bq\d{4,}\b\s|knowledge\s+graph|grafo\s+de\s+conhecimento/i,
+  wttr_weather:      /wttr|previs[aã]o\s+r[aá]pida|clima\s+(?:r[aá]pido|simples)/i,
 
   // Media + language
   generate_image:    /\b(?:gera|cri[ae]|fa[çc]a|desenh)\s+(?:uma?\s+)?(?:imagem|foto|figura|desenho|ilustra)|\bimagem\s+de\b/i,

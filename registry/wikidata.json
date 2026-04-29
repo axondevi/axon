@@ -1,0 +1,19 @@
+{
+  "slug": "wikidata",
+  "provider": "Wikidata",
+  "category": "Knowledge & Research",
+  "description": "Wikidata REST API — structured knowledge graph queries. Free, no key. Supplements Wikipedia with machine-readable facts (entities, properties).",
+  "homepage": "https://www.wikidata.org/wiki/Wikidata:Data_access",
+  "base_url": "https://www.wikidata.org",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "search-entity": {
+      "method": "GET",
+      "path": "/w/api.php",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 86400,
+      "notes": "Search entities by label. Pass action=wbsearchentities&search=<query>&language=pt&format=json&origin=*. Returns Q-ids and descriptions."
+    }
+  }
+}

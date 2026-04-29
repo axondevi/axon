@@ -1,0 +1,19 @@
+{
+  "slug": "wttr",
+  "provider": "wttr.in",
+  "category": "Geo & Maps",
+  "description": "wttr.in console-style weather. Plain text or JSON, no API key, friendly aliases (cities, airports, IATAs, '@username' for current location).",
+  "homepage": "https://wttr.in/",
+  "base_url": "https://wttr.in",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "json": {
+      "method": "GET",
+      "path": "/:location",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 600,
+      "notes": "Pass :location as city name, IATA airport, or coords. Returns multi-day weather + current conditions. Use ?format=j1 for compact JSON."
+    }
+  }
+}

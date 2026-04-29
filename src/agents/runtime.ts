@@ -410,6 +410,173 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     },
   },
 
+  // ─── Sub-endpoints of existing providers (already in registry) ──
+
+  /** Full list of Brazilian banks (FEBRABAN-registered). Heavy — only call
+   *  when the user wants the whole list, not for one bank lookup. */
+  list_banks_br: {
+    description: 'List ALL Brazilian banks (200+ institutions). Returns code, name, ispb, fullName. Use only when the user asks for the full list — for one bank, use lookup_bank instead.',
+    parameters: { type: 'object', properties: {} },
+    buildRequest: () => ({ params: {} }),
+  },
+
+  /** FIPE brand list per vehicle type. Required step BEFORE lookup_fipe to
+   *  get the codigoFipe (you need brand → model → year → codigo chain). */
+  fipe_brands: {
+    description: 'List FIPE brands (marcas) for a vehicle type. tipoVeiculo: 1=carros, 2=motos, 3=caminhões. Use this to find a brand id, then chain to model/year/code lookup.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tipoVeiculo: { type: 'integer', enum: [1, 2, 3], description: '1=carros, 2=motos, 3=caminhões.' },
+      },
+      required: ['tipoVeiculo'],
+    },
+    buildRequest: (a) => ({ params: { tipoVeiculo: a.tipoVeiculo } }),
+  },
+
+  github_search_repos: {
+    description: 'Search public GitHub repositories. Build queries like "react language:typescript stars:>10000" or "claude api topic:llm". Sort by stars (default), forks, updated.',
+    parameters: {
+      type: 'object',
+      properties: {
+        q: { type: 'string', description: 'GitHub search query.' },
+        sort: { type: 'string', enum: ['stars', 'forks', 'updated'], description: 'Default stars.' },
+        per_page: { type: 'integer', description: 'Default 10, max 30.' },
+      },
+      required: ['q'],
+    },
+    buildRequest: (a) => ({
+      params: { q: a.q, sort: a.sort || 'stars', order: 'desc', per_page: Math.min(a.per_page || 10, 30) },
+    }),
+  },
+
+  ibge_states: {
+    description: 'List all 27 Brazilian states (and DF). Returns id, sigla (UF), nome, region. Useful for dropdowns, region grouping, validation.',
+    parameters: { type: 'object', properties: {} },
+    buildRequest: () => ({ params: {} }),
+  },
+
+  ibge_cities_search: {
+    description: 'Full list of all 5,570 Brazilian municipalities. HEAVY (~600KB). Prefer ibge_city by id when possible. Use when needing to grep multiple cities at once.',
+    parameters: { type: 'object', properties: {} },
+    buildRequest: () => ({ params: {} }),
+  },
+
+  book_search: {
+    description: 'Search books by title, author, subject. Returns title, authors, first publish year, ISBNs, OL key. Useful for libraries, bookstores, research.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'integer', description: 'Default 10, max 50.' },
+      },
+      required: ['query'],
+    },
+    buildRequest: (a) => ({ params: { q: a.query, limit: Math.min(a.limit || 10, 50) } }),
+  },
+
+  reverse_geocode: {
+    description: 'Reverse geocoding — convert lat/lon coordinates back to a formatted address. Pair with route_distance results for human-readable trip endpoints.',
+    parameters: {
+      type: 'object',
+      properties: { lat: { type: 'number' }, lon: { type: 'number' } },
+      required: ['lat', 'lon'],
+    },
+    buildRequest: (a) => ({
+      params: { lat: a.lat, lon: a.lon, format: 'json', addressdetails: 1, zoom: 18 },
+    }),
+  },
+
+  mercadolivre_item: {
+    description: 'Detailed Mercado Livre item by id (MLB1234567890). Use AFTER mercadolivre_search to get full description, seller stats, shipping options.',
+    parameters: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Item id, e.g. MLB1234567890.' } },
+      required: ['id'],
+    },
+    buildRequest: (a) => ({ params: { id: String(a.id).trim() } }),
+  },
+
+  wikipedia_related: {
+    description: 'Up to 20 pages related to a Wikipedia article. Useful for "see also" workflows, knowledge graph traversal, finding adjacent topics.',
+    parameters: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
+    buildRequest: (a) => ({ params: { title: String(a.title).replace(/ /g, '_') } }),
+  },
+
+  // ─── New free APIs (no key) ──────────────────────────────────
+
+  reddit_search: {
+    description: 'Search Reddit posts across all subreddits. Returns title, subreddit, score, author, permalink. Useful for sentiment, trends, real-user feedback on products/topics.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        sort: { type: 'string', enum: ['relevance', 'hot', 'top', 'new'], description: 'Default relevance.' },
+        limit: { type: 'integer', description: 'Default 10, max 25.' },
+      },
+      required: ['query'],
+    },
+    buildRequest: (a) => ({
+      params: { q: a.query, sort: a.sort || 'relevance', limit: Math.min(a.limit || 10, 25) },
+    }),
+  },
+
+  stackoverflow_search: {
+    description: 'Search Stack Overflow questions. Returns title, score, view count, has-accepted-answer, link. Useful for technical Q&A, debugging help, documentation lookups.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        tags: { type: 'string', description: 'Optional tag filter (e.g. "python;django").' },
+        pagesize: { type: 'integer', description: 'Default 5, max 30.' },
+      },
+      required: ['query'],
+    },
+    buildRequest: (a) => {
+      const params: Record<string, unknown> = {
+        q: a.query,
+        site: 'stackoverflow',
+        order: 'desc',
+        sort: 'votes',
+        pagesize: Math.min(a.pagesize || 5, 30),
+      };
+      if (a.tags) params.tagged = String(a.tags).replace(/,/g, ';');
+      return { params };
+    },
+  },
+
+  wikidata_search: {
+    description: 'Search Wikidata entities (people, places, concepts). Returns Q-ids and short descriptions. Use to disambiguate names ("which Donald?") or find structured facts complementing Wikipedia.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        language: { type: 'string', description: 'Default pt.' },
+      },
+      required: ['query'],
+    },
+    buildRequest: (a) => ({
+      params: {
+        action: 'wbsearchentities',
+        search: a.query,
+        language: a.language || 'pt',
+        format: 'json',
+        origin: '*',
+        limit: 8,
+      },
+    }),
+  },
+
+  wttr_weather: {
+    description: 'Quick weather lookup via wttr.in. Pass any city name, airport (IATA), or "@username" for self-located. Returns multi-day forecast in JSON. Lighter than current_weather, no key.',
+    parameters: {
+      type: 'object',
+      properties: { location: { type: 'string', description: 'City, airport code, or coords "lat,lon".' } },
+      required: ['location'],
+    },
+    buildRequest: (a) => ({ params: { location: String(a.location).trim(), format: 'j1' } }),
+  },
+
   // ─── Internal Groq-powered tools (no upstream API) ───────────
   // These use llama-3.1-8b-instant directly so they don't add an external
   // dependency. Cost: ~150-300 tokens out per call, well below an LLM-
