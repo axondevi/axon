@@ -687,16 +687,17 @@
         // confusing.
         if (!KEY) {
           alert('Pra usar a persona ' + p.name + ' você precisa fazer login primeiro. Use o botão "Use my key" no banner amarelo acima OU crie uma conta.');
-          // Scroll to the login banner so they see what to do next.
           var banner = document.getElementById('login-banner');
           if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
-        showBuilder({
-          name: '',
-          slug: '',
-          description: `Agente com a persona ${p.name}`,
-          system_prompt: `Você é um assistente útil. Use as ferramentas quando relevantes.`,
+        // The function is openBuilder (not showBuilder — that was a typo
+        // that made the click silently fail).
+        openBuilder({
+          name: p.name,
+          slug: p.slug + '-' + Math.random().toString(36).slice(2, 6),
+          description: 'Agente com a persona ' + p.name,
+          system_prompt: 'Você é um assistente útil. Use as ferramentas quando relevantes.',
           allowed_tools: [
             'lookup_cep','lookup_cnpj','current_weather','convert_currency',
             'wikipedia_summary','wikipedia_search','brasilapi_holidays',
@@ -705,8 +706,17 @@
           ],
           primary_color: p.avatar_color_primary,
           welcome_message: p.sample_greeting,
+          quick_prompts: [],
           public: true,
           pay_mode: 'owner',  // WhatsApp requires owner-paid
+          budget_per_session_usdc: '0.50',
+          hard_cap_usdc: '2.00',
+          daily_budget_usdc: '5.00',
+          tier_required: 'free',
+          ui_language: 'auto',
+          vanity_domain: '',
+          system_prompt_b: '',
+          ab_split: 0,
           persona_slug: p.slug,
           persona_id: p.id,
         });
