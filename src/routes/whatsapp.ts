@@ -18,7 +18,7 @@ import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { encrypt, decrypt } from '~/lib/crypto';
-import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, deleteInstance, extractInbound } from '~/whatsapp/evolution';
+import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound } from '~/whatsapp/evolution';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
   getOrCreateMemory,
@@ -397,6 +397,76 @@ publicWebhook.post('/:secret', async (c) => {
   const inbound = extractInbound(payload);
   if (!inbound) return c.json({ ignored: 'unsupported_event' });
 
+  // ─── Decode the API key once, reused for media fetch + reply ───────
+  let connApiKey: string;
+  try {
+    connApiKey = decrypt(conn.apiKey);
+  } catch {
+    return c.json({ ignored: 'cannot_decrypt_key' });
+  }
+
+  // ─── Media inbound: image / audio → describe / transcribe ───────────
+  // The text the agent will see in `inbound.text` gets enriched here:
+  //   image → "[CLIENTE ENVIOU FOTO] <description>. Caption: <caption>"
+  //   audio → "[CLIENTE ENVIOU ÁUDIO] <transcript>"
+  // The agent then responds normally to that enriched text.
+  let inboundText = inbound.text;
+  let userSentAudio = false;
+  if (inbound.kind === 'image' && inbound.messageKey && inbound.messageRaw) {
+    try {
+      const media = await fetchMessageMedia({
+        instanceUrl: conn.instanceUrl,
+        instanceName: conn.instanceName,
+        apiKey: connApiKey,
+        message: inbound.messageRaw,
+        messageKey: inbound.messageKey,
+      });
+      if (media.ok && media.bytes && media.mimeType) {
+        const { describeImage } = await import('~/llm/vision');
+        const desc = await describeImage({
+          imageBytes: media.bytes,
+          mimeType: media.mimeType,
+          contextHint: inbound.text || undefined,
+        });
+        if (desc.ok && desc.description) {
+          inboundText = `[CLIENTE ENVIOU FOTO]\nDescrição automática: ${desc.description}` +
+            (inbound.text ? `\nLegenda do cliente: "${inbound.text}"` : '');
+        } else {
+          inboundText = inbound.text ||
+            '[CLIENTE ENVIOU FOTO mas não consegui processar a imagem agora — peça pra ele descrever ou tentar de novo.]';
+        }
+      }
+    } catch {
+      inboundText = inbound.text || '[CLIENTE ENVIOU FOTO — não consegui baixar.]';
+    }
+  }
+  if (inbound.kind === 'audio' && inbound.messageKey && inbound.messageRaw) {
+    userSentAudio = true;
+    try {
+      const media = await fetchMessageMedia({
+        instanceUrl: conn.instanceUrl,
+        instanceName: conn.instanceName,
+        apiKey: connApiKey,
+        message: inbound.messageRaw,
+        messageKey: inbound.messageKey,
+      });
+      if (media.ok && media.bytes && media.mimeType) {
+        const { transcribeAudio } = await import('~/voice/deepgram');
+        const tr = await transcribeAudio({
+          audioBytes: media.bytes,
+          mimeType: media.mimeType,
+        });
+        if (tr.ok && tr.transcript) {
+          inboundText = `[CLIENTE ENVIOU ÁUDIO]\nTranscrição: "${tr.transcript}"`;
+        } else {
+          inboundText = '[CLIENTE ENVIOU ÁUDIO mas não consegui transcrever — peça pra ele escrever ou tentar de novo.]';
+        }
+      }
+    } catch {
+      inboundText = '[CLIENTE ENVIOU ÁUDIO — não consegui baixar.]';
+    }
+  }
+
   // Resolve agent + owner
   const [a] = await db.select().from(agents).where(eq(agents.id, conn.agentId)).limit(1);
   if (!a || !a.public) return c.json({ ignored: 'agent_inactive' });
@@ -429,7 +499,7 @@ publicWebhook.post('/:secret', async (c) => {
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-  const messages: ChatMessage[] = [...priorMessages, { role: 'user', content: inbound.text }];
+  const messages: ChatMessage[] = [...priorMessages, { role: 'user', content: inboundText }];
 
   // ─── System prompt assembly ────────────────────────────────
   // Owner mode: replace the public persona with a personal-assistant prompt.
@@ -510,7 +580,7 @@ publicWebhook.post('/:secret', async (c) => {
     // Persist both sides of the turn
     db.insert(agentMessages).values({
       agentId: a.id, sessionId, role: 'user',
-      content: inbound.text.slice(0, 4000),
+      content: inboundText.slice(0, 4000),
       visitorIp: 'whatsapp',
     }).catch(() => {});
     db.insert(agentMessages).values({
@@ -527,7 +597,7 @@ publicWebhook.post('/:secret', async (c) => {
       void extractFactsFromTurn({
         agentId: a.id,
         phone: inbound.phone,
-        userMessage: inbound.text,
+        userMessage: inboundText,
         currentMemory: memory,
       }).catch(() => {});
     }
@@ -535,13 +605,8 @@ publicWebhook.post('/:secret', async (c) => {
     reply = '🤖 Desculpe, tive um problema técnico. Tente de novo em alguns segundos.';
   }
 
-  // Send the reply back via Evolution
-  let apiKey: string;
-  try {
-    apiKey = decrypt(conn.apiKey);
-  } catch {
-    return c.json({ ignored: 'cannot_decrypt_key' });
-  }
+  // Reuse the API key we already decrypted at the top for media re-fetch.
+  const apiKey = connApiKey;
 
   // ─── Send any generated images first (out-of-band from text reply) ─
   // generate_image tool returns base64 PNGs that we deliver via sendMedia,
@@ -599,28 +664,60 @@ publicWebhook.post('/:secret', async (c) => {
     await new Promise((r) => setTimeout(r, 400));
   }
 
-  // Multi-bubble: humans don't dump a paragraph; they send 2-3 short bursts.
-  // Agent uses "||" to mark bubble breaks (taught in the system prompt).
-  // If the agent forgot, fall back to splitting long replies on sentence boundaries.
-  const bubbles = splitReply(reply);
-  for (let i = 0; i < bubbles.length; i++) {
-    const part = bubbles[i];
-    // Typing simulation scaled to message length — ~30 chars/sec, capped at 3s.
-    // Subsequent bubbles get a slightly longer delay to feel like the person is
-    // composing the next thought (not robotically firing them off).
-    const typingMs = Math.min(800 + part.length * 35, 3000) + i * 300;
-    await sendText({
-      instanceUrl: conn.instanceUrl,
-      instanceName: conn.instanceName,
-      apiKey,
-      number: inbound.phone,
-      text: part,
-      delayMs: typingMs,
-    });
-    // Small pause between bubbles (in addition to typing delay) so they
-    // arrive separately on the recipient's screen.
-    if (i < bubbles.length - 1) {
-      await new Promise((r) => setTimeout(r, 600));
+  // ─── Reply mode: voice in → voice out (mirror customer's preference) ─
+  // If the customer sent audio AND TTS is configured, synthesize the
+  // reply and send as a voice note. Skip the multi-bubble text fallback
+  // since one audio message already conveys everything (sending text
+  // duplicates the content and feels robotic).
+  let textWasReplaced = false;
+  if (userSentAudio && reply.trim().length > 0) {
+    try {
+      const { synthesizeSpeech } = await import('~/voice/elevenlabs');
+      // Strip || delimiters and emoji-only phrases — TTS handles plain prose best.
+      const ttsText = reply.replace(/\|\|+/g, '. ').slice(0, 600);
+      const tts = await synthesizeSpeech({ text: ttsText });
+      if (tts.ok && tts.audioBytes) {
+        // Convert to base64 for sendMedia
+        let bin = '';
+        for (let i = 0; i < tts.audioBytes.length; i++) bin += String.fromCharCode(tts.audioBytes[i]);
+        const base64 = btoa(bin);
+        await sendMedia({
+          instanceUrl: conn.instanceUrl,
+          instanceName: conn.instanceName,
+          apiKey,
+          number: inbound.phone,
+          base64Data: base64,
+          mediatype: 'audio',
+          mimetype: 'audio/mpeg',
+          fileName: 'voz.mp3',
+          delayMs: 800,
+        }).catch(() => {});
+        textWasReplaced = true;
+      }
+    } catch {
+      // TTS failed → fall through to text bubbles below.
+    }
+  }
+
+  // Multi-bubble text reply (when not replaced by voice). Humans don't dump
+  // a paragraph; they send 2-3 short bursts. Agent uses "||" to mark bubble
+  // breaks (taught in the system prompt); fallback splits long replies.
+  if (!textWasReplaced) {
+    const bubbles = splitReply(reply);
+    for (let i = 0; i < bubbles.length; i++) {
+      const part = bubbles[i];
+      const typingMs = Math.min(800 + part.length * 35, 3000) + i * 300;
+      await sendText({
+        instanceUrl: conn.instanceUrl,
+        instanceName: conn.instanceName,
+        apiKey,
+        number: inbound.phone,
+        text: part,
+        delayMs: typingMs,
+      });
+      if (i < bubbles.length - 1) {
+        await new Promise((r) => setTimeout(r, 600));
+      }
     }
   }
 

@@ -394,11 +394,87 @@ export async function sendMedia(opts: {
 }
 
 /**
- * Extract a plain user message from an Evolution `messages.upsert` event.
- * Handles `conversation` (plain text) and `extendedTextMessage.text` (replies/quotes/forwards).
- * Skips media-only messages, reactions, edits, and our own outgoing messages.
+ * Download attached media (image / audio / document / video) from an
+ * Evolution `messages.upsert` payload.
+ *
+ * Evolution v2.x exposes a base64 endpoint that re-fetches the media for
+ * a given message ID — `POST /chat/getBase64FromMediaMessage/:instance`
+ * with the message key. We use that because the inbound webhook does NOT
+ * include the media bytes by default (only metadata + URL) — keeps the
+ * webhook payload small even for big videos.
+ *
+ * Returns raw bytes + MIME so callers (Vision, STT) can process directly.
  */
-export function extractInbound(payload: any): { phone: string; text: string; pushName: string } | null {
+export async function fetchMessageMedia(opts: {
+  instanceUrl: string;
+  instanceName: string;
+  apiKey: string;
+  /** The full data.message object from the inbound payload. */
+  message: any;
+  /** The data.key.id from the inbound payload. */
+  messageKey: any;
+}): Promise<{ ok: boolean; bytes?: Uint8Array; mimeType?: string; error?: string }> {
+  try {
+    const res = await evoFetch(
+      opts.instanceUrl,
+      `/chat/getBase64FromMediaMessage/${encodeURIComponent(opts.instanceName)}`,
+      {
+        method: 'POST',
+        apiKey: opts.apiKey,
+        body: JSON.stringify({
+          message: { key: opts.messageKey, message: opts.message },
+          convertToMp4: false,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, error: `getBase64 ${res.status}: ${text.slice(0, 200)}` };
+    }
+    const data: any = await res.json().catch(() => ({}));
+    const b64: string | undefined = data?.base64 || data?.media || data?.fileBase64;
+    const mimeType: string | undefined =
+      data?.mimetype || data?.mediaType || 'application/octet-stream';
+    if (!b64) {
+      return { ok: false, error: `no base64 in response: ${JSON.stringify(data).slice(0, 160)}` };
+    }
+    // Strip optional `data:image/...;base64,` prefix
+    const cleanB64 = b64.startsWith('data:') ? b64.split(',', 2)[1] : b64;
+    const binary = atob(cleanB64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return { ok: true, bytes, mimeType };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+/**
+ * Extract a plain user message from an Evolution `messages.upsert` event.
+ *
+ * Returns:
+ * - kind:'text'  — plain text or extended text reply
+ * - kind:'image' — photo with optional caption (text = caption, may be empty)
+ * - kind:'audio' — voice/audio message (text = '' since there's nothing to read)
+ * - null         — group chats, our own sends, reactions, edits, unsupported
+ *
+ * Caller decides how to handle each kind: text → straight to LLM,
+ * image → Vision describes → inject as text, audio → STT transcribes →
+ * inject as text. All paths reach runAgent() the same way.
+ *
+ * `messageKey` + `messageRaw` are returned so callers can re-fetch the
+ * media bytes via fetchMessageMedia() — Evolution doesn't include the
+ * raw bytes in webhook payloads to keep them small.
+ */
+export interface InboundMessage {
+  phone: string;
+  pushName: string;
+  kind: 'text' | 'image' | 'audio';
+  text: string;                  // caption for media, transcript-target empty for audio
+  messageKey?: any;              // for media re-fetch
+  messageRaw?: any;              // for media re-fetch
+}
+export function extractInbound(payload: any): InboundMessage | null {
   if (!payload) return null;
   const event = payload.event || payload.type;
   if (event !== 'messages.upsert' && event !== 'MESSAGES_UPSERT') return null;
@@ -408,11 +484,43 @@ export function extractInbound(payload: any): { phone: string; text: string; pus
   if (!remote || remote.endsWith('@g.us')) return null;  // skip group chats for now
   const phone = remote.split('@')[0];
   const m = data.message || {};
-  const text =
+  const messageKey = data.key;
+
+  // Text message — fastest path, no media re-fetch needed.
+  const plainText =
     (typeof m.conversation === 'string' && m.conversation) ||
     (typeof m.extendedTextMessage?.text === 'string' && m.extendedTextMessage.text) ||
-    (typeof m.imageMessage?.caption === 'string' && m.imageMessage.caption) ||
     null;
-  if (!text) return null;
-  return { phone, text, pushName: data.pushName || '' };
+  if (plainText) {
+    return { phone, pushName: data.pushName || '', kind: 'text', text: plainText };
+  }
+
+  // Image message — caption is optional. Even without caption, we still
+  // process it (Vision describes "received a photo without caption").
+  if (m.imageMessage) {
+    return {
+      phone,
+      pushName: data.pushName || '',
+      kind: 'image',
+      text: typeof m.imageMessage.caption === 'string' ? m.imageMessage.caption : '',
+      messageKey,
+      messageRaw: m,
+    };
+  }
+
+  // Audio / voice messages (PTT = "push-to-talk"). Caption is rare but
+  // possible (some clients allow it).
+  if (m.audioMessage) {
+    return {
+      phone,
+      pushName: data.pushName || '',
+      kind: 'audio',
+      text: typeof m.audioMessage.caption === 'string' ? m.audioMessage.caption : '',
+      messageKey,
+      messageRaw: m,
+    };
+  }
+
+  // Reactions, edits, stickers, locations, contacts — drop for now.
+  return null;
 }
