@@ -650,7 +650,7 @@
       async function loadPersonas() {
         if (personasCache) return; // already loaded
         try {
-          const r = await fetch(API_BASE + '/v1/personas');
+          const r = await fetch(BASE + '/v1/personas');
           const d = await r.json();
           personasCache = d.data || [];
           const grid = document.getElementById('persona-grid');
@@ -660,7 +660,7 @@
           }
           grid.innerHTML = personasCache.map((p) => `
             <div class="tpl-card" style="--tc: ${p.avatar_color_primary};padding:0;overflow:hidden;cursor:pointer;" data-persona="${p.slug}" onclick="selectPersona('${p.slug}')">
-              <img src="${API_BASE}${p.avatar_url}?size=400&name=0" alt="${escape(p.name)}" style="width:100%;aspect-ratio:1;display:block;">
+              <img src="${BASE}${p.avatar_url}?size=400&name=0" alt="${escape(p.name)}" style="width:100%;aspect-ratio:1;display:block;">
               <div style="padding:14px 16px;">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
                   <h3 style="margin:0;font-size:16px;font-weight:700;">${escape(p.emoji)} ${escape(p.name)}</h3>
