@@ -82,57 +82,75 @@ export const TOOL_CATEGORIES: Record<string, string[]> = {
 const ALWAYS_ON: string[] = ['search_web', 'generate_pix'];
 
 /**
- * Keyword-based quick heuristic. Returns the categories that obviously
- * apply to the message, or [] if nothing matches.
+ * Tool-level keyword patterns. Each entry: tool name → regex.
+ * When a regex matches, that EXACT tool is picked (not the whole category).
  *
- * Brazilian keywords are intentional (target market is BR).
+ * The goal is to send the LLM the smallest possible tool set so the prompt
+ * stays cheap. "qual banco código 260?" should pick lookup_bank ONLY, not
+ * the 9 br_data tools.
+ *
+ * Patterns are intentionally specific — false positives waste tokens, but
+ * false negatives just fall through to the LLM classifier (still safe).
  */
-function quickPickCategories(text: string): string[] {
-  const t = text.toLowerCase();
-  const picked = new Set<string>();
+const TOOL_KEYWORDS: Record<string, RegExp> = {
+  // Brazilian data — granular per tool
+  lookup_cep:        /\bcep\b\s*\d{5}|c[oó]digo postal|qual o cep|busca cep|consulta cep/i,
+  lookup_cnpj:       /\bcnpj\b|raz[aã]o social|s[oó]cios?\s+da\s+empresa|empresa\s+\d{2}\.\d{3}/i,
+  lookup_bank:       /(c[oó]digo|n[uú]mero|cod\.)\s+(do\s+)?banco|banco\s+\d{3}|qual banco|banco\s+(itau|nubank|caixa|bradesco|santander|inter)|febraban/i,
+  lookup_fipe:       /fipe|tabela fipe|valor (do|de) (carro|ve[ií]culo|moto|caminhao)|pre[çc]o (do|de) (carro|ve[ií]culo|moto)/i,
+  ibge_city:         /\bibge\b|c[oó]digo de m[uú]nic[ií]pio|c[oó]digo ibge|m[uú]nic[ií]pio\s+\d{6,7}/i,
+  brasilapi_holidays:/feriad/i,
+  brasilapi_rates:   /selic|cdi|ipca|igp.?m|taxa b[aá]sica/i,
+  brasilapi_ddd:     /\bddd\s+\d{2}|\bddd\b\s+(de|do)/i,
+  bcb_indicator:     /(s[eé]rie|hist[oó]rico)\s+(da\s+)?(selic|ipca|cdi|d[oó]lar|ptax)|bacen|banco central|sgs/i,
 
-  // BR data: CEP/CNPJ/banco/empresa/feriado
-  if (
-    /\bcep\b|cnpj|empresa|raz[aã]o social|s[oó]cios?|banco|c[oó]digo do banco|nubank|ita[uú]|bradesco|santander|caixa|brasilapi|fipe|carro|moto|placa|ve[ií]culo|feriado|s[eê]lic|ipca|cdi|igpm|m[uú]nic[ií]pio|ibge|ddd \d/.test(t)
-  ) {
-    picked.add('br_data');
-  }
-
-  // Geo / location / logistics
-  if (
-    /\bclima\b|tempo|chuva|temperatura|previs[aã]o|grau|coordenada|latitude|longitude|endere[çc]o|rota|distancia|distância|trajeto|frete|entrega|km\b|quilometro|cidade|capital de|pa[ií]s\b|estado de\b/.test(t)
-  ) {
-    picked.add('geo');
-  }
+  // Geo & weather
+  current_weather:   /(?:clima|tempo|temperatura|chuva|chovendo|cal[oô]r|frio)\s+(?:em|de|na|no|hoje|agora)|qual\s+(?:o\s+)?clima/i,
+  weather_forecast:  /previs[aã]o\s+(?:do\s+)?tempo|previs[aã]o\s+(?:para|amanh[aã]|semana)/i,
+  geocode_address:   /coordenada|latitude|longitude|geocod|localiza[çc][aã]o\s+(?:de|do|da)\s+\w/i,
+  route_distance:    /\bdist[aâ]ncia\b|trajeto|rota\s+(?:de|entre)|tempo\s+de\s+(?:carro|via|trajet)|\bkm\b\s+(?:de|at[ée])/i,
+  lookup_country:    /capital de|popula[çc][aã]o de\s+\w|qual a moeda de|fronteiras de/i,
+  lookup_ip:         /\bip\b\s+\d|geolocaliza|de onde [eé] (esse|este) ip/i,
 
   // Finance
-  if (
-    /\bd[oó]lar|euro|libra|real\b|cota[çc][aã]o|conversão|converter|c[aâ]mbio|currency|moeda|bitcoin|crypto|ethereum|solana|eth\b|btc\b|usdc|usdt/.test(t)
-  ) {
-    picked.add('finance');
-  }
+  convert_currency:  /\b(?:converter|cota[çc][aã]o|c[aâ]mbio|d[oó]lar|euro|libra|peso\s+argentino|peso\s+chileno)\b|quanto\s+(?:[eé]|vale|est[aá])/i,
+  crypto_price:      /\b(bitcoin|btc|ethereum|eth|solana|sol\b|usdc|usdt|cripto|cryptocurrency)\b/i,
 
-  // Search / knowledge
-  if (
-    /\bpesquis|procura|busca|google|wikipedia|wiki|arxiv|paper|cient[íi]fic|hacker news|github|repos?[íi]t[oó]rio|c[oó]digo aberto|website|http|url|link/.test(t)
-  ) {
-    picked.add('search');
-  }
+  // Search
+  search_web:        /\b(?:procur|pesquis|busca|googl|encontre|qual\s+o\s+melhor|me\s+ach)/i,
+  scrape_url:        /\b(?:leia|ler|conte[uú]do|baix|scrape)\s+(?:o\s+)?(?:link|url|site|p[aá]gina)|https?:\/\//i,
+  summarize_url:     /\bresum(?:e|a|ir)\s+(?:essa|esse|este|esta)?\s*(?:url|link|p[aá]gina|artigo|texto)/i,
+  wikipedia_summary: /wikip[eé]dia|biografia de|quem (?:foi|[eé])/i,
+  wikipedia_search:  /pesquisar?\s+(?:na\s+)?wiki/i,
+  search_arxiv:      /\barxiv\b|paper\s+sobre|artigo cient[ií]fico/i,
+  search_hn:         /hacker news|\bhn\b/i,
+  github_user:       /\bgithub\b|github\.com|@\w+\s+do\s+github/i,
+  mercadolivre_search:/mercado livre|\bmlb\b|qual.+pre[çc]o.+ml\b|comprar\s+(?:no\s+)?ml/i,
+  lookup_book:       /\bisbn\b|livro\s+\d{10,13}/i,
+  npm_package:       /\bnpm\b|pacote\s+(?:do\s+)?node|\@[\w\-]+\/[\w\-]+/i,
 
-  // Media generation
-  if (
-    /\b(gere|gera|fa[çc]a|cri[ae])\s+(uma?\s+)?(imagem|foto|figura|desenho|ilustra)/.test(t)
-  ) {
-    picked.add('media');
-  }
+  // Media + language
+  generate_image:    /\b(?:gera|cri[ae]|fa[çc]a|desenh)\s+(?:uma?\s+)?(?:imagem|foto|figura|desenho|ilustra)|\bimagem\s+de\b/i,
+  translate_text:    /\btraduz(?:ir|a)?\b|\btranslate\b|para\s+(?:o\s+)?ingl[eê]s|para\s+(?:o\s+)?espanhol/i,
+  detect_language:   /qual\s+idioma|qual\s+(?:[eé]\s+)?(?:a\s+)?l[ií]ngua\s+(?:de|desse|deste|dessa|desta)/i,
 
-  // Payment intent
-  if (
-    /\b(pagar|pagamento|pix|gerar pix|cobran[çc]a|pagar o|pago|cobrar)\b|como (eu )?pago/.test(t)
-  ) {
-    picked.add('payment');
-  }
+  // Payment
+  generate_pix:      /\b(?:gera|cri[ae])\s+(?:um\s+)?pix|cobr(?:ar|an[çc]a)|como\s+(?:eu\s+)?pago|forma\s+de\s+pagamento|quero\s+pagar/i,
+};
 
+/**
+ * Keyword-based quick heuristic. Returns the SPECIFIC tools (not categories)
+ * that obviously apply to the message, or [] if nothing matches.
+ *
+ * Granular by design — picking 1-2 tools beats picking 9 because of token
+ * overhead. Brazilian Portuguese keywords are intentional (target market).
+ */
+function quickPickTools(text: string): string[] {
+  const t = text.toLowerCase();
+  const picked = new Set<string>();
+  for (const [tool, pattern] of Object.entries(TOOL_KEYWORDS)) {
+    if (pattern.test(t)) picked.add(tool);
+  }
   return Array.from(picked);
 }
 
@@ -225,22 +243,28 @@ export async function pickToolsForTurn(opts: {
     return { tools: onlyAlwaysOn, categories: [], usedLLM: false };
   }
 
-  // Phase 1: keyword heuristic (free)
-  let categories = quickPickCategories(messageText);
+  // Phase 1: keyword heuristic — picks SPECIFIC tools, not categories.
+  // For the 80% case (one obvious intent like "qual banco código 260"),
+  // this nails 1-2 tools without spending an LLM call.
+  const directTools = quickPickTools(messageText);
   let usedLLM = false;
+  let categories: string[] = [];
 
-  // Phase 2: LLM fallback when keywords didn't pick anything definitive
-  if (categories.length === 0 && !opts.skipLLM) {
+  // Build the wanted-tools set
+  const wanted = new Set<string>(directTools);
+
+  // Phase 2: LLM fallback ONLY when keywords didn't pick anything. The
+  // classifier still returns categories (cheaper prompt), and we expand
+  // those into their tools — wider than ideal but it's a fallback.
+  if (directTools.length === 0 && !opts.skipLLM) {
     categories = await classifyWithLLM(messageText);
     usedLLM = true;
+    for (const cat of categories) {
+      for (const t of TOOL_CATEGORIES[cat] || []) wanted.add(t);
+    }
   }
 
-  // Build the tool set: union of (a) tools from picked categories, (b)
-  // always-on tools, intersected with what the agent has enabled.
-  const wanted = new Set<string>();
-  for (const cat of categories) {
-    for (const t of TOOL_CATEGORIES[cat] || []) wanted.add(t);
-  }
+  // Always-on safety net (search_web fallback + generate_pix flow)
   for (const t of ALWAYS_ON) wanted.add(t);
 
   let tools = availableTools.filter((t) => wanted.has(t));
@@ -248,7 +272,7 @@ export async function pickToolsForTurn(opts: {
   // Safety net: if narrowing left us with literally nothing the agent
   // can reach for, return the full set rather than tying its hands.
   // This happens if (e.g.) the agent has only `lookup_cnpj` enabled but
-  // the classifier picked "geo" — the agent would have nothing to use.
+  // the classifier picked geo — the agent would have nothing to use.
   if (tools.length === 0) {
     tools = availableTools.slice();
   }
