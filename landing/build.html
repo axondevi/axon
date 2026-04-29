@@ -682,6 +682,16 @@
         // Select persona — opens the builder modal pre-filled, fresh agent.
         const p = (personasCache || []).find((x) => x.slug === slug);
         if (!p) return;
+        // Need to be logged in to actually save an agent. Be loud about it
+        // so the click doesn't feel broken — the previous silent no-op was
+        // confusing.
+        if (!KEY) {
+          alert('Pra usar a persona ' + p.name + ' você precisa fazer login primeiro. Use o botão "Use my key" no banner amarelo acima OU crie uma conta.');
+          // Scroll to the login banner so they see what to do next.
+          var banner = document.getElementById('login-banner');
+          if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
         showBuilder({
           name: '',
           slug: '',
