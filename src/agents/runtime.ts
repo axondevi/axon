@@ -22,6 +22,7 @@ import { TOOL_TO_AXON } from '~/agents/templates';
 import { upstreamKeyFor } from '~/config';
 import { checkCache, storeInCache } from '~/agents/knowledge-cache';
 import { pickToolsForTurn } from '~/agents/tool-selector';
+import { chatCompletionWithFallback } from '~/llm/fallback';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -796,41 +797,19 @@ export async function runAgent(opts: {
   const generatedPixPayments: NonNullable<RunAgentResult['pixPayments']> = [];
   let totalCostMicro = 0n;
 
-  const groqKey = upstreamKeyFor('groq');
-  if (!groqKey) {
-    throw new Error('UPSTREAM_KEY_GROQ not configured — agent runtime needs Groq');
-  }
+  // Provider cascade — Groq (best tool calls) → Gemini (great + 1500/day
+  // free) → Cohere (text fallback). When one rate-limits, the next picks
+  // up; on a fresh rolling-window reset the cooldown clears. See
+  // src/llm/fallback.ts for the exact cooldown logic.
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    // Direct Groq call (we already paid the wallet via /v1/run gate)
-    const llmReq: any = {
-      model: 'llama-3.3-70b-versatile',
-      messages: history,
+    const llmResult = await chatCompletionWithFallback({
+      messages: history as any,
+      tools: tools.length ? tools : undefined,
       max_tokens: 4096,
       temperature: 0.3,
-    };
-    if (tools.length) {
-      llmReq.tools = tools;
-      llmReq.tool_choice = 'auto';
-    }
-
-    const llmRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + groqKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify(llmReq),
     });
-
-    if (!llmRes.ok) {
-      const text = await llmRes.text().catch(() => '');
-      let parsed: any = null;
-      try { parsed = JSON.parse(text); } catch {}
-      const m = (parsed && (parsed.message || (parsed.error && parsed.error.message))) || `groq ${llmRes.status}`;
-      throw new Error(m);
-    }
-    const llmJson = await llmRes.json();
-    const choice = llmJson.choices?.[0];
-    if (!choice) throw new Error('No response from model');
-    const msg: ChatMessage = choice.message ?? {};
+    const msg: ChatMessage = (llmResult.message as ChatMessage) ?? {};
 
     history.push(msg);
 

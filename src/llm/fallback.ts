@@ -1,0 +1,233 @@
+/**
+ * LLM provider cascade with auto-fallback on rate limit.
+ *
+ * Why this exists:
+ * Groq's free tier hits a daily 100k-token cap easily once an agent runs
+ * any non-trivial traffic. When the cap hits, every turn 500s with
+ * "rate limit reached" — the user-facing experience is total failure.
+ *
+ * This module wraps the Groq call in a cascade — Groq → Gemini → Cohere
+ * (each only used if its UPSTREAM_KEY_* env is set). When a provider hits
+ * rate-limit, we mark it cooled-down (60s for short windows, 1h for the
+ * daily TPD ceiling) and use the next one. Subsequent turns skip the
+ * cooled provider until cooldown expires.
+ *
+ * The PC Agent project uses an identical pattern (Groq → Gemini → Cohere
+ * → Ollama). The Axon variant is server-side, no Ollama, but the
+ * underlying robustness goal is the same.
+ *
+ * All providers respond in OpenAI chat-completions schema (model, messages,
+ * tools, tool_calls, choices[0].message). Gemini exposes an OpenAI-compat
+ * endpoint and Cohere too — so the request body and response parsing stay
+ * identical across providers.
+ */
+import { upstreamKeyFor } from '~/config';
+
+export interface LLMRequest {
+  /** Pre-built history (system + user/assistant/tool turns). */
+  messages: Array<{ role: string; content?: string | null; tool_calls?: any; tool_call_id?: string }>;
+  /** OpenAI-shaped tools array, or undefined if the agent has none. */
+  tools?: any[];
+  max_tokens?: number;
+  temperature?: number;
+}
+
+export interface LLMResponse {
+  /** Provider that actually answered (for telemetry / debugging). */
+  provider: string;
+  /** OpenAI-shaped raw choices[0].message. */
+  message: any;
+  /** Whatever the upstream returned for finish_reason. */
+  finish_reason?: string;
+}
+
+interface ProviderConfig {
+  name: string;
+  /** Full chat-completions URL. All providers we use expose OAI-compatible /chat/completions. */
+  endpoint: string;
+  /** Slug passed to upstreamKeyFor — must match an env UPSTREAM_KEY_* */
+  keySlug: string;
+  /** Model id the provider expects. */
+  model: string;
+  /** True if the provider supports tool_calls reliably. Cohere, for
+   *  example, often returns empty `acao` when many tools are exposed —
+   *  flag false and the cascade will skip it for tool-using turns. */
+  supportsTools: boolean;
+}
+
+/**
+ * Provider order: best-tool-call to last-resort.
+ *
+ * Groq llama-3.3-70b: rock-solid tool calls, free tier with hard daily cap.
+ * Gemini 2.5 Flash:   excellent tool calls, 1500 req/day free.
+ * Cohere command-r-plus: generous free tier, BUT often emits empty action
+ *                       when tools are present — last resort.
+ */
+const PROVIDERS: ProviderConfig[] = [
+  {
+    name: 'groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    keySlug: 'groq',
+    model: 'llama-3.3-70b-versatile',
+    supportsTools: true,
+  },
+  {
+    name: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    keySlug: 'gemini',
+    model: 'gemini-2.5-flash',
+    supportsTools: true,
+  },
+  {
+    name: 'cohere',
+    endpoint: 'https://api.cohere.com/compatibility/v1/chat/completions',
+    keySlug: 'cohere',
+    model: 'command-r-plus-08-2024',
+    // Tool-call reliability is poor with many tools — the smart selector
+    // already narrows the catalog, but Cohere still mis-emits `acao: ""`
+    // sometimes. Keep it as text-fallback only.
+    supportsTools: false,
+  },
+];
+
+/**
+ * Module-level cooldowns. Map<providerName, expiry-epoch-ms>.
+ * In-memory only — clears on restart, which is fine: a fresh deploy
+ * effectively resets the rolling window guesses.
+ */
+const cooldowns = new Map<string, number>();
+
+function isCooled(name: string): boolean {
+  const until = cooldowns.get(name);
+  return typeof until === 'number' && Date.now() < until;
+}
+
+function setCooldown(name: string, ms: number): void {
+  cooldowns.set(name, Date.now() + ms);
+}
+
+/**
+ * Detect the kind of rate-limit error in the upstream response so we can
+ * pick the right cooldown duration. TPD (per-day) errors are "wait an
+ * hour". TPM (per-minute) are "wait a minute". Anything else = 60s.
+ *
+ * Returns ms to sleep, or 0 if the error is not a rate limit.
+ */
+function rateLimitCooldownMs(status: number, body: string): number {
+  // 429 is the canonical rate-limit code, but Groq sometimes returns 503
+  // with the same message shape under capacity pressure.
+  if (status !== 429 && status !== 503) return 0;
+  const lc = body.toLowerCase();
+  if (lc.includes('tokens per day') || lc.includes(' tpd ')) return 60 * 60 * 1000;
+  if (lc.includes('tokens per minute') || lc.includes(' tpm ')) return 60 * 1000;
+  if (lc.includes('rate limit') || lc.includes('quota')) return 60 * 1000;
+  return 60 * 1000;  // unknown 429/503 — short cooldown is safer than skipping
+}
+
+/**
+ * Send the chat-completions request through the first available provider
+ * that isn't currently rate-limited. Throws if every configured provider
+ * is exhausted.
+ */
+export async function chatCompletionWithFallback(req: LLMRequest): Promise<LLMResponse> {
+  const wantsTools = (req.tools?.length ?? 0) > 0;
+  const candidates = PROVIDERS.filter((p) => {
+    if (!upstreamKeyFor(p.keySlug)) return false;     // no key configured
+    if (isCooled(p.name)) return false;                // cooling down
+    if (wantsTools && !p.supportsTools) return false;  // can't run this turn
+    return true;
+  });
+
+  if (candidates.length === 0) {
+    // Edge case: every provider cooled or none configured. Fall back to
+    // any-key-set provider (ignore cooldown) so we at least try — better
+    // a likely 429 than a hard fail.
+    const anyConfigured = PROVIDERS.filter((p) => upstreamKeyFor(p.keySlug));
+    if (anyConfigured.length === 0) {
+      throw new Error('No LLM provider configured (set UPSTREAM_KEY_GROQ at minimum)');
+    }
+    candidates.push(...anyConfigured);
+  }
+
+  let lastError = '';
+  for (const provider of candidates) {
+    const apiKey = upstreamKeyFor(provider.keySlug)!;
+    const body: Record<string, unknown> = {
+      model: provider.model,
+      messages: req.messages,
+      max_tokens: req.max_tokens ?? 4096,
+      temperature: req.temperature ?? 0.3,
+    };
+    if (req.tools?.length && provider.supportsTools) {
+      body.tools = req.tools;
+      body.tool_choice = 'auto';
+    }
+
+    try {
+      const res = await fetch(provider.endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        const json: any = await res.json();
+        const choice = json.choices?.[0];
+        if (!choice) {
+          lastError = `${provider.name}: no choices in response`;
+          continue;
+        }
+        return {
+          provider: provider.name,
+          message: choice.message ?? {},
+          finish_reason: choice.finish_reason,
+        };
+      }
+
+      // Non-OK — rate limit? cooldown the provider and continue cascade.
+      const text = await res.text().catch(() => '');
+      const cooldownMs = rateLimitCooldownMs(res.status, text);
+      if (cooldownMs > 0) {
+        setCooldown(provider.name, cooldownMs);
+        lastError = `${provider.name} rate-limited (${res.status})`;
+        continue;
+      }
+
+      // Other 4xx/5xx: short cooldown, try next.
+      setCooldown(provider.name, 30 * 1000);
+      lastError = `${provider.name} ${res.status}: ${text.slice(0, 200)}`;
+    } catch (err: any) {
+      // Network / timeout — same as 5xx, short cooldown and try next.
+      setCooldown(provider.name, 30 * 1000);
+      lastError = `${provider.name} fetch failed: ${err.message || String(err)}`;
+    }
+  }
+
+  throw new Error(
+    `All LLM providers exhausted. Last error: ${lastError || '(none)'}`,
+  );
+}
+
+/**
+ * Test helper — clear all cooldowns. Production code never calls this.
+ */
+export function _resetCooldowns(): void {
+  cooldowns.clear();
+}
+
+/**
+ * Snapshot of provider state for /health-style endpoints.
+ */
+export function providerStatus(): Array<{ name: string; configured: boolean; cooledForMs: number }> {
+  return PROVIDERS.map((p) => {
+    const until = cooldowns.get(p.name) || 0;
+    return {
+      name: p.name,
+      configured: !!upstreamKeyFor(p.keySlug),
+      cooledForMs: Math.max(0, until - Date.now()),
+    };
+  });
+}
