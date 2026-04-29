@@ -20,4 +20,9 @@
 /restaurante      /niche?tipo=restaurante      200
 /loja             /niche?tipo=loja             200
 
+# /personas was standalone but duplicated the "🎭 Personas" tab in /build.
+# Send users there with the tab pre-selected via hash; build.html JS reads
+# location.hash to switch tabs on load.
+/personas         /build#personas              301
+
 /*    /404.html    404

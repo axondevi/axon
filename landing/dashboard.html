@@ -153,6 +153,93 @@
       }
       .empty { color: var(--text-muted); text-align: center; padding: 40px; font-size: 14px; }
 
+      /* Next-action hero — surfaces the single most relevant CTA based
+         on the user's current state (no agent → create; agent w/o WA →
+         connect; connected w/o msgs → share; with msgs → see chat). */
+      .next-action {
+        background: linear-gradient(135deg, rgba(124, 92, 255, 0.14), rgba(25, 213, 198, 0.06));
+        border: 1px solid rgba(124, 92, 255, 0.32);
+        border-radius: 14px;
+        padding: 22px 24px;
+        margin-bottom: 24px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .next-action::before {
+        content: "";
+        position: absolute;
+        top: 0; right: 0;
+        width: 240px; height: 240px;
+        background: radial-gradient(circle, rgba(124, 92, 255, 0.18), transparent 70%);
+        pointer-events: none;
+      }
+      @media (max-width: 640px) {
+        .next-action { grid-template-columns: 1fr; }
+      }
+      .next-action .ttl {
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        line-height: 1.3;
+        position: relative;
+      }
+      .next-action .sub {
+        font-size: 14px;
+        color: var(--text-dim);
+        margin-top: 6px;
+        line-height: 1.5;
+        position: relative;
+      }
+      .next-action .cta {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #0a0a0b;
+        padding: 13px 22px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 14px;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: transform 0.15s, box-shadow 0.15s;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .next-action .cta:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 24px rgba(124, 92, 255, 0.3);
+      }
+      .next-action .link-row {
+        display: flex; gap: 8px; margin-top: 12px;
+        position: relative;
+      }
+      .next-action .link-row input {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--text);
+        font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+        min-width: 0;
+      }
+      .next-action .link-row button {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: var(--text);
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
       /* Deposit hero */
       .deposit-hero {
         display: grid;
@@ -862,6 +949,90 @@
 
       function formatUsdc(s) { return Number(s).toFixed(4); }
 
+      /**
+       * Surfaces a single action-oriented hero at the top of the panel
+       * based on the user's current state. The goal: a freshly-logged-in
+       * customer should know in one glance what to do next, without
+       * scanning a wall of metrics.
+       *
+       * Decision tree (short-circuit at the first match):
+       *   1. No agents          → "Create your first agent"
+       *   2. Agent without WA   → "Connect to WhatsApp"
+       *   3. Agent w/ WA, 0 msg → "Share the public link"
+       *   4. Agent with traffic → "Already attending — keep tuning"
+       *
+       * The first agent in the list drives steps 2-4. Multi-agent
+       * accounts can still see all agents in the regular list below.
+       */
+      async function renderNextAction(agents) {
+        const wrap = document.getElementById('next-action-hero');
+        if (!wrap) return;
+
+        // 1 — No agents yet
+        if (!agents || agents.length === 0) {
+          wrap.innerHTML = `
+            <div class="next-action">
+              <div>
+                <div class="ttl">🚀 Crie seu primeiro agente</div>
+                <div class="sub">Pega um template (clínica, restaurante, loja, pet shop...), ajusta nome e prompt. Sai funcionando em ~60 segundos.</div>
+              </div>
+              <a class="cta" href="/build">Forjar agente →</a>
+            </div>`;
+          return;
+        }
+
+        // From here, all branches reference the first agent.
+        const a = agents[0];
+
+        // 2 — Has agent but no WhatsApp connection
+        const conn = await api(`/v1/agents/${a.id}/whatsapp`).catch(() => ({ connected: false }));
+        if (!conn || !conn.connected) {
+          wrap.innerHTML = `
+            <div class="next-action">
+              <div>
+                <div class="ttl">📱 Conecte ${escapeHtml(a.name)} ao WhatsApp</div>
+                <div class="sub">Seu agente está pronto. Conecta o número e ele atende automaticamente cada mensagem que chega.</div>
+              </div>
+              <a class="cta" href="/build?edit=${encodeURIComponent(a.id)}">Conectar agora →</a>
+            </div>`;
+          return;
+        }
+
+        // 3 — Connected, but no contacts yet → push for sharing
+        const contactsRes = await api(`/v1/agents/${a.id}/contacts?limit=10`).catch(() => ({ contacts: [] }));
+        const contacts = contactsRes.contacts || [];
+        if (contacts.length === 0) {
+          const publicUrl = `${location.origin}/agent/${a.slug}`;
+          wrap.innerHTML = `
+            <div class="next-action">
+              <div>
+                <div class="ttl">🎉 ${escapeHtml(a.name)} está no ar — agora compartilhe</div>
+                <div class="sub">Cole o link no Instagram, no rodapé do site, no cartão de visita. Quem clicar começa a conversar.</div>
+                <div class="link-row">
+                  <input id="na-link" readonly value="${escapeHtml(publicUrl)}" />
+                  <button onclick="navigator.clipboard.writeText('${publicUrl.replace(/'/g, "\\'")}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='📋 Copiar', 1500);">📋 Copiar</button>
+                </div>
+              </div>
+              <a class="cta" href="/agent-preview/${encodeURIComponent(a.slug)}">Pré-visualizar →</a>
+            </div>`;
+          return;
+        }
+
+        // 4 — Has traffic → celebrate + push to manage
+        wrap.innerHTML = `
+          <div class="next-action">
+            <div>
+              <div class="ttl">✨ ${escapeHtml(a.name)} está atendendo (${contacts.length} contato${contacts.length > 1 ? 's' : ''})</div>
+              <div class="sub">Continue ajustando o prompt conforme percebe o que clientes mais perguntam, ou crie um segundo agente pra outra vertical.</div>
+            </div>
+            <a class="cta" href="/whatsapp">Ver conversas →</a>
+          </div>`;
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+      }
+
       // Render the user's owned agents card — rich per-agent management UI.
       // For each agent, also fetches WhatsApp connection status + contact count
       // in parallel so the card shows real-time channel state.
@@ -1217,6 +1388,7 @@
           </header>
           <div class="container">
             <h1>Painel</h1>
+            <div id="next-action-hero"></div>
             <div id="deposit-hero-wrap"></div>
             <div class="grid" id="metrics">Carregando…</div>
             <div class="section">
@@ -1305,6 +1477,13 @@
 
           // ---- Your agents ----
           renderMyAgents(myAgents.data || []);
+
+          // ---- Next action hero (above-the-fold guidance) ----
+          // Picks the single most relevant CTA based on what the user
+          // hasn't done yet: no agent → create; agent w/o WhatsApp →
+          // connect; connected w/o messages → share; with messages →
+          // continue managing.
+          renderNextAction(myAgents.data || []);
 
           // ---- Tier badge ----
           if (sub) {

@@ -405,7 +405,10 @@
           <div class="field">
             <label for="b-prompt">Prompt do agente <span class="info-tip" data-tip="Define personalidade, regras e papel do agente. Ex: 'Você é a Camila, recepcionista da clínica X. Seja calorosa, mensagens curtas...'">?</span></label>
             <textarea id="b-prompt" placeholder="Você é uma assistente prestativa. Use ferramentas quando relevante…"></textarea>
-            <div class="hint">Suporta Markdown. O bloco "## Language" e a lista de ferramentas são anexados automaticamente.</div>
+            <div class="hint">
+              Suporta Markdown. O bloco "## Language" e a lista de ferramentas são anexados automaticamente.
+              · <a href="#personas" onclick="document.querySelector('.tab-bar button[data-tab=&quot;personas&quot;]')?.click(); return false;" style="color: var(--accent-2);">🎭 Aplicar uma persona pronta</a>
+            </div>
           </div>
 
           <div class="field">
@@ -720,6 +723,16 @@
           if (b.dataset.tab === 'personas') loadPersonas();
         });
       });
+
+      // Allow deep-linking to a specific tab via #hash. /personas redirects
+      // here with #personas so the "🎭 Personas" tab is pre-selected. Also
+      // supports manual links from index.html or wherever else.
+      (function syncTabFromHash() {
+        const hash = (location.hash || '').replace('#', '');
+        if (!hash) return;
+        const target = document.querySelector(`.tab-bar button[data-tab="${hash}"]`);
+        if (target) target.click();
+      })();
 
       // ── Personas ──────────────────────────────────────────────────────
       let personasCache = null;
