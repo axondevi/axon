@@ -221,6 +221,38 @@ export async function createInstance(opts: {
 }
 
 /**
+ * Delete an Evolution instance (cleanup when an agent is disconnected/deleted).
+ *
+ * Best-effort: returns ok:false on any error but never throws. Caller should
+ * proceed with DB cleanup regardless — a stale Evolution instance is wasted
+ * resources but won't break anything else.
+ *
+ * Some Evolution v2 builds require disconnecting (logout) BEFORE delete to
+ * release the WhatsApp session cleanly. We try delete-only first since most
+ * builds handle the implicit logout themselves.
+ */
+export async function deleteInstance(opts: {
+  instanceUrl: string;
+  instanceName: string;
+  apiKey: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await evoFetch(
+      opts.instanceUrl,
+      `/instance/delete/${encodeURIComponent(opts.instanceName)}`,
+      { method: 'DELETE', apiKey: opts.apiKey },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, error: `delete ${res.status}: ${text.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+/**
  * Trigger pairing on an Evolution instance — returns QR code + pairing code.
  *
  * Called when the instance is in `close`/`connecting` state (not yet paired

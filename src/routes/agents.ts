@@ -9,11 +9,13 @@
 import { Hono } from 'hono';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '~/db';
-import { agents, requests, agentMessages, users, wallets } from '~/db/schema';
+import { agents, requests, agentMessages, users, wallets, whatsappConnections } from '~/db/schema';
 import { Errors } from '~/lib/errors';
+import { decrypt } from '~/lib/crypto';
 import { AGENT_TEMPLATES, getTemplate } from '~/agents/templates';
 import { getCacheStats } from '~/agents/knowledge-cache';
 import { mintAgentNft, buildMetadataUrl, isNftEnabled } from '~/nft/agent-nft';
+import { deleteInstance } from '~/whatsapp/evolution';
 import { fromMicro, toMicro } from '~/wallet/service';
 import { effectiveTier, type Tier } from '~/subscription';
 
@@ -538,6 +540,42 @@ app.get('/:id/messages', async (c) => {
 app.delete('/:id', async (c) => {
   const user = c.get('user') as { id: string };
   const id = c.req.param('id');
+
+  // Ownership check + connection lookup BEFORE deleting the agent. Once the
+  // agent row is gone, the FK CASCADE drops whatsapp_connections — so we
+  // need the URL/instance/key in hand to clean up the Evolution-side
+  // resources. Doing this in-process (not as a background job) so that
+  // operator gets immediate feedback on the disconnect, even if Evolution
+  // is slow.
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+
+  const [conn] = await db
+    .select()
+    .from(whatsappConnections)
+    .where(eq(whatsappConnections.agentId, id))
+    .limit(1);
+
+  if (conn) {
+    try {
+      const apiKey = decrypt(conn.apiKey);
+      // Best-effort. Failing here would leak the Evolution instance, but
+      // failing-closed (refusing the agent delete) would leave the user
+      // unable to clean up their own data — worse trade-off.
+      await deleteInstance({
+        instanceUrl: conn.instanceUrl,
+        instanceName: conn.instanceName,
+        apiKey,
+      });
+    } catch {
+      // decrypt failure or network error — proceed with agent delete anyway.
+    }
+  }
+
   const result = await db
     .delete(agents)
     .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)))

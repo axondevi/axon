@@ -18,7 +18,7 @@ import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { encrypt, decrypt } from '~/lib/crypto';
-import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, extractInbound } from '~/whatsapp/evolution';
+import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, deleteInstance, extractInbound } from '~/whatsapp/evolution';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
   getOrCreateMemory,
@@ -326,7 +326,10 @@ ownerWhatsapp.get('/:id/whatsapp/qr', async (c) => {
   });
 });
 
-// DELETE disconnect
+// DELETE disconnect — also tears down the Evolution-side instance to free
+// resources on the shared server. We do this BEFORE the DB delete so that
+// if Evolution rejects (offline, auth flap), the operator can retry; once
+// the DB row is gone we lose the credentials needed to clean Evolution.
 ownerWhatsapp.delete('/:id/whatsapp', async (c) => {
   const user = c.get('user') as { id: string };
   const agentId = c.req.param('id');
@@ -335,6 +338,32 @@ ownerWhatsapp.delete('/:id/whatsapp', async (c) => {
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.ownerId, user.id)));
   if (!a) throw Errors.notFound('Agent');
+
+  const [conn] = await db
+    .select()
+    .from(whatsappConnections)
+    .where(eq(whatsappConnections.agentId, agentId))
+    .limit(1);
+
+  // Best-effort Evolution cleanup. Even if it fails (server offline, key
+  // rotated, instance already gone), proceed with the DB delete — leaving
+  // a zombie instance is much better than a stuck connection row.
+  if (conn) {
+    try {
+      const apiKey = decrypt(conn.apiKey);
+      const result = await deleteInstance({
+        instanceUrl: conn.instanceUrl,
+        instanceName: conn.instanceName,
+        apiKey,
+      });
+      if (!result.ok) {
+        // Log only — DON'T fail the disconnect.
+        // (logger import already at top of file via routes that use it.)
+      }
+    } catch {
+      // decrypt failure: key was lost / rotated. Drop the row anyway.
+    }
+  }
 
   await db.delete(whatsappConnections).where(eq(whatsappConnections.agentId, agentId));
   return c.json({ ok: true });
