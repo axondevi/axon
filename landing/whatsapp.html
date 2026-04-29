@@ -490,7 +490,9 @@
           alert('Selecione um agente no menu acima antes de conectar.');
           return;
         }
-        connectWizardState = { step: 'form', pollTimer: null, agentId: state.selectedAgentId };
+        // Default = auto-provision: open modal, immediately fire /auto, show QR.
+        // BYO Evolution remains accessible via "Modo avançado" link in the form.
+        connectWizardState = { step: 'connecting', pollTimer: null, agentId: state.selectedAgentId, mode: 'auto' };
         const overlay = document.createElement('div');
         overlay.id = 'connect-modal';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
@@ -500,7 +502,38 @@
           if (e.target === overlay) closeConnectModal();
         });
         renderConnectStep();
+        // Kick off auto-provision in the background. If it fails (server not
+        // configured / network error), fall back to manual form.
+        autoProvisionConnection();
       };
+
+      async function autoProvisionConnection() {
+        try {
+          const r = await api(`/v1/agents/${connectWizardState.agentId}/whatsapp/auto`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+          });
+          const conn = r.connection || {};
+          connectWizardState.pairingData = { qr: conn.qr_base64, pairing: conn.pairing_code };
+          connectWizardState.step = 'pairing';
+          renderConnectStep();
+        } catch (err) {
+          // Server not configured for auto-provision → fall back to manual form.
+          // 503 means feature unavailable; other errors might be transient.
+          const msg = (err.message || '').toLowerCase();
+          if (msg.includes('auto_provision_unavailable') || msg.includes('503')) {
+            connectWizardState.mode = 'manual';
+            connectWizardState.step = 'form';
+            renderConnectStep();
+            setTimeout(() => showCwError('Auto-provisão indisponível neste servidor. Use o modo manual abaixo.'), 30);
+          } else {
+            connectWizardState.mode = 'manual';
+            connectWizardState.step = 'form';
+            renderConnectStep();
+            setTimeout(() => showCwError('Falhou: ' + (err.message || err) + '. Tente o modo manual.'), 30);
+          }
+        }
+      }
 
       function closeConnectModal() {
         if (connectWizardState.pollTimer) clearInterval(connectWizardState.pollTimer);
@@ -524,8 +557,11 @@
         `;
 
         if (connectWizardState.step === 'form') {
+          const subtitle = connectWizardState.mode === 'auto'
+            ? 'Auto-provisão indisponível. Use suas credenciais Evolution.'
+            : 'Modo avançado: conecte seu próprio servidor Evolution API.';
           body.innerHTML = `
-            ${header('Conectar WhatsApp', 'Você precisa de uma instância Evolution API (mesmo principio do Z-API). 30s pra conectar.')}
+            ${header('Conectar WhatsApp', subtitle)}
             <form id="cw-form" style="display:flex;flex-direction:column;gap:12px;">
               <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
                 <span>URL da Evolution <span style="color:var(--text-muted);font-size:11px;">(ex: https://evolution-api-feirinha.onrender.com)</span></span>
@@ -563,8 +599,9 @@
         }
 
         if (connectWizardState.step === 'connecting') {
+          const isAuto = connectWizardState.mode === 'auto';
           body.innerHTML = `
-            ${header('Conectando ao Evolution…', 'Validando credenciais e registrando webhook.')}
+            ${header(isAuto ? 'Preparando WhatsApp…' : 'Conectando ao Evolution…', isAuto ? 'Estamos criando seu canal exclusivo. Em segundos.' : 'Validando credenciais e registrando webhook.')}
             <div style="display:flex;flex-direction:column;align-items:center;padding:48px 0;gap:16px;">
               <div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
               <div style="color:var(--text-muted);font-size:13px;">Geralmente leva 5-10 segundos…</div>

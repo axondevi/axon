@@ -136,6 +136,91 @@ export async function sendText(opts: {
 }
 
 /**
+ * Provision a fresh Evolution instance on the SHARED Axon Evolution server.
+ *
+ * Returns the per-instance API key (`hash`) which we store encrypted on the
+ * whatsapp_connections row. Subsequent calls (sendText, sendMedia, status
+ * check, webhook config) authenticate with that per-instance key — NOT the
+ * global one — so customer instances are isolated even on a shared server.
+ *
+ * Evolution v2.3.7 also returns the FIRST QR right in this response with a
+ * `data:image/png;base64,` prefix, so callers don't need a follow-up
+ * /instance/connect roundtrip for the initial pairing.
+ *
+ * Naming convention: `axon-<userIdPrefix>-<base36ts>` keeps it human-readable
+ * for ops while staying unique.
+ */
+export async function createInstance(opts: {
+  /** Shared Axon Evolution server URL (env: AXON_EVOLUTION_URL). */
+  serverUrl: string;
+  /** Global server API key (env: AXON_EVOLUTION_API_KEY). Used ONLY for create. */
+  globalApiKey: string;
+  /** Instance name to register — must be globally unique on this server. */
+  instanceName: string;
+  /** Optional webhook URL to register at the same time (saves a roundtrip). */
+  webhookUrl?: string;
+}): Promise<{
+  ok: boolean;
+  /** Per-instance API key — encrypt + store in whatsapp_connections.api_key. */
+  apiKey?: string;
+  instanceName?: string;
+  instanceId?: string;
+  /** First QR base64 (without data: prefix — caller handles rendering). */
+  qrBase64?: string;
+  /** Pix-style 8-char pairing code (only set when phoneNumber was passed). */
+  pairingCode?: string;
+  error?: string;
+}> {
+  try {
+    const body: Record<string, unknown> = {
+      instanceName: opts.instanceName,
+      qrcode: true,
+      integration: 'WHATSAPP-BAILEYS',
+    };
+    if (opts.webhookUrl) {
+      // Evolution v2 inline-webhook format. Some builds want flat keys, others
+      // a nested object — sending both keeps us forward-compatible.
+      body.webhook = {
+        enabled: true,
+        url: opts.webhookUrl,
+        events: ['MESSAGES_UPSERT'],
+        webhookByEvents: false,
+        webhookBase64: false,
+      };
+    }
+    const res = await evoFetch(opts.serverUrl, '/instance/create', {
+      method: 'POST',
+      apiKey: opts.globalApiKey,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, error: `createInstance ${res.status}: ${text.slice(0, 240)}` };
+    }
+    const data: any = await res.json().catch(() => ({}));
+
+    // QR base64 sometimes comes with `data:image/png;base64,` prefix — strip it
+    // so callers can prepend a consistent prefix themselves.
+    let qrBase64: string | undefined =
+      data?.qrcode?.base64 || data?.qrcode?.code || undefined;
+    if (typeof qrBase64 === 'string' && qrBase64.startsWith('data:image/')) {
+      qrBase64 = qrBase64.split(',', 2)[1];
+    }
+
+    return {
+      ok: true,
+      apiKey: data?.hash,
+      instanceName: data?.instance?.instanceName || opts.instanceName,
+      instanceId: data?.instance?.instanceId,
+      qrBase64,
+      pairingCode: data?.qrcode?.pairingCode || undefined,
+    };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+/**
  * Trigger pairing on an Evolution instance — returns QR code + pairing code.
  *
  * Called when the instance is in `close`/`connecting` state (not yet paired
@@ -179,12 +264,17 @@ export async function connectInstance(opts: {
     const data: any = await res.json().catch(() => ({}));
 
     // Normalize across the two known response shapes.
-    const qrBase64 =
+    let qrBase64: string | undefined =
       (typeof data?.code === 'string' && data.code) ||
       (typeof data?.base64 === 'string' && data.base64) ||
       (typeof data?.qrcode?.code === 'string' && data.qrcode.code) ||
       (typeof data?.qrcode?.base64 === 'string' && data.qrcode.base64) ||
       undefined;
+    // Some Evolution versions prefix with `data:image/png;base64,` — strip it
+    // so the caller can render the raw base64 consistently.
+    if (typeof qrBase64 === 'string' && qrBase64.startsWith('data:image/')) {
+      qrBase64 = qrBase64.split(',', 2)[1];
+    }
 
     const pairingCode =
       (typeof data?.pairingCode === 'string' && data.pairingCode) ||

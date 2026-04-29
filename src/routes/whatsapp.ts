@@ -18,7 +18,7 @@ import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { encrypt, decrypt } from '~/lib/crypto';
-import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, extractInbound } from '~/whatsapp/evolution';
+import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, extractInbound } from '~/whatsapp/evolution';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
   getOrCreateMemory,
@@ -166,6 +166,111 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
       // Only present when not yet paired. Frontend renders QR PNG via:
       //   <img src="data:image/png;base64,${qr_base64}">
       // and shows pairing_code as the "Connect by phone" alternative.
+      qr_base64: qrBase64,
+      pairing_code: pairingCode,
+    },
+  });
+});
+
+// ─── Auto-provision ──────────────────────────────────────────
+// Creates a fresh Evolution instance on the SHARED Axon Evolution server
+// (no customer credentials needed). Customer just clicks "Connect WhatsApp",
+// scans the returned QR — done. The hard parts (instance creation, webhook
+// registration, per-instance API key encryption) all happen server-side.
+//
+// Requires AXON_EVOLUTION_URL + AXON_EVOLUTION_API_KEY to be configured.
+// Falls back to BYO mode (existing POST /:id/whatsapp) when those are unset.
+ownerWhatsapp.post('/:id/whatsapp/auto', async (c) => {
+  const user = c.get('user') as { id: string };
+  const agentId = c.req.param('id');
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, user.id)));
+  if (!a) throw Errors.notFound('Agent');
+  if (a.payMode !== 'owner') {
+    return c.json({ error: 'wrong_pay_mode', message: 'WhatsApp connections require pay_mode=owner.' }, 400);
+  }
+
+  const sharedUrl = (process.env.AXON_EVOLUTION_URL || '').trim().replace(/\/+$/, '');
+  const sharedKey = (process.env.AXON_EVOLUTION_API_KEY || '').trim();
+  if (!sharedUrl || !sharedKey) {
+    return c.json({
+      error: 'auto_provision_unavailable',
+      message: 'Axon Evolution server not configured. Use the manual flow with your own Evolution credentials.',
+    }, 503);
+  }
+
+  const body = await c.req.json().catch(() => ({} as any));
+  const ownerPhoneRaw = String(body.owner_phone || '').trim();
+  const ownerPhone = ownerPhoneRaw ? ownerPhoneRaw.replace(/\D/g, '') : null;
+  if (ownerPhone && (ownerPhone.length < 10 || ownerPhone.length > 15)) {
+    return c.json({ error: 'bad_request', message: 'owner_phone must be 10–15 digits' }, 400);
+  }
+
+  // Generate a unique instance name: axon-<userId-prefix>-<base36ts>.
+  // Keep it under 60 chars (Evolution limit) and DNS-safe (no dots/spaces).
+  const instanceName = `axon-${user.id.slice(0, 8)}-${Date.now().toString(36)}`;
+  const secret = randomBytes(24).toString('hex');
+  const webhookUrl = webhookUrlFor(c, secret);
+
+  // 1. Create instance on shared server (returns per-instance api key + first QR).
+  const created = await createInstance({
+    serverUrl: sharedUrl,
+    globalApiKey: sharedKey,
+    instanceName,
+    webhookUrl,
+  });
+  if (!created.ok || !created.apiKey) {
+    return c.json({ error: 'create_failed', message: created.error || 'unknown' }, 502);
+  }
+
+  // 2. Persist the connection. Use per-instance api key (created.apiKey),
+  // NOT the global key — instance-isolated even on shared server.
+  const encrypted = encrypt(created.apiKey);
+  await db.delete(whatsappConnections).where(eq(whatsappConnections.agentId, agentId));
+  await db.insert(whatsappConnections).values({
+    agentId,
+    ownerId: user.id,
+    instanceUrl: sharedUrl,
+    instanceName: created.instanceName!,
+    apiKey: encrypted,
+    webhookSecret: secret,
+    status: 'connected',
+  });
+
+  if (ownerPhone) {
+    await db
+      .update(agents)
+      .set({ ownerPhone, updatedAt: new Date() })
+      .where(eq(agents.id, agentId));
+  }
+
+  // 3. If createInstance didn't return a QR (rare), fall back to /instance/connect.
+  let qrBase64 = created.qrBase64;
+  let pairingCode = created.pairingCode;
+  if (!qrBase64 && !pairingCode) {
+    const conn = await connectInstance({
+      instanceUrl: sharedUrl,
+      instanceName: created.instanceName!,
+      apiKey: created.apiKey,
+      phoneNumber: ownerPhone || undefined,
+    });
+    if (conn.ok) {
+      qrBase64 = conn.qrBase64;
+      pairingCode = conn.pairingCode;
+    }
+  }
+
+  return c.json({
+    ok: true,
+    auto_provisioned: true,
+    connection: {
+      instance_url: sharedUrl,
+      instance_name: created.instanceName,
+      status: 'connecting',
+      webhook_url: webhookUrl,
+      owner_phone: ownerPhone || a.ownerPhone || null,
       qr_base64: qrBase64,
       pairing_code: pairingCode,
     },
