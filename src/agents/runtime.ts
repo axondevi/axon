@@ -201,6 +201,20 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
       },
     }),
   },
+  generate_pix: {
+    description:
+      'Generate a Brazilian Pix payment for the customer to pay in-chat. Returns the QR code and copy-paste string. The QR is delivered automatically via WhatsApp; you only need to confirm to the customer. Use ONLY when the customer explicitly wants to pay (asked "como pago?", "quero comprar", etc).',
+    parameters: {
+      type: 'object',
+      properties: {
+        amount_brl: { type: 'number', description: 'Amount in Brazilian Reais (e.g. 49.90).' },
+        description: { type: 'string', description: 'Short description shown on the customer\'s banking app (e.g. "Hambúrguer + batata + refri").' },
+      },
+      required: ['amount_brl', 'description'],
+    },
+    // No buildRequest — generate_pix is intercepted server-side and routed to
+    // our internal MercadoPago wrapper, NOT to handleCall.
+  },
 };
 
 export function buildToolsArray(allowedTools: string[]): any[] {
@@ -239,6 +253,20 @@ interface RunAgentResult {
    * which the LLM still sees as plain text.
    */
   images?: Array<{ base64: string; mimetype: string; prompt?: string }>;
+  /**
+   * Pix payments produced by `generate_pix` tool calls. Same out-of-band
+   * delivery pattern as images — the WhatsApp webhook sends the QR PNG via
+   * sendMedia plus the copy-paste EMV string as a text bubble. Multiple
+   * QRs in one turn are theoretically possible but rare.
+   */
+  pixPayments?: Array<{
+    qrCode: string;             // EMV copy-paste string
+    qrCodeBase64: string;       // PNG image base64
+    amountBrl: number;
+    description: string;
+    expiresAt?: string;
+    mpId?: string;
+  }>;
 }
 
 const MAX_ITERATIONS = 8;
@@ -330,6 +358,7 @@ export async function runAgent(opts: {
   const history: ChatMessage[] = [{ role: 'system', content: fullSystemPrompt }, ...messages];
   const toolCallsExecuted: RunAgentResult['tool_calls_executed'] = [];
   const generatedImages: NonNullable<RunAgentResult['images']> = [];
+  const generatedPixPayments: NonNullable<RunAgentResult['pixPayments']> = [];
   let totalCostMicro = 0n;
 
   const groqKey = upstreamKeyFor('groq');
@@ -397,6 +426,7 @@ export async function runAgent(opts: {
         finish_reason: 'stop',
         total_cost_usdc: (Number(totalCostMicro) / 1_000_000).toFixed(6),
         ...(generatedImages.length ? { images: generatedImages } : {}),
+        ...(generatedPixPayments.length ? { pixPayments: generatedPixPayments } : {}),
       };
     }
 
@@ -407,10 +437,52 @@ export async function runAgent(opts: {
       let args: any;
       try { args = JSON.parse(tc.function.arguments || '{}'); } catch { args = {}; }
 
+      // ─── Special-case: generate_pix ─────────────────────────────────
+      // Doesn't go through handleCall (no upstream API in the registry).
+      // Calls our internal MercadoPago wrapper, persists a pix_payments row
+      // (so the existing webhook flow credits the owner when paid), and
+      // surfaces the QR for out-of-band delivery (similar to generate_image).
+      if (tc.function.name === 'generate_pix') {
+        const pixResult = await executePixTool({ args, ownerId, agentId });
+        if (pixResult.ok) {
+          generatedPixPayments.push(pixResult.payment!);
+          history.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify({
+              ok: true,
+              amount_brl: pixResult.payment!.amountBrl,
+              description: pixResult.payment!.description,
+              note: 'Pix QR will be delivered to the customer automatically. Confirm in PT-BR.',
+            }),
+          });
+          toolCallsExecuted.push({ name: 'generate_pix', args, ok: true, cost_usdc: '0' });
+        } else {
+          history.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify({ error: pixResult.error }),
+          });
+          toolCallsExecuted.push({
+            name: 'generate_pix', args, ok: false, cost_usdc: '0', error: pixResult.error,
+          });
+        }
+        continue;
+      }
+
       const upstream = TOOL_TO_AXON[tc.function.name];
       const def = SERVER_TOOLS[tc.function.name];
       if (!upstream || !def) {
         const err = `Tool '${tc.function.name}' is not server-runnable.`;
+        toolCallsExecuted.push({ name: tc.function.name, args, ok: false, cost_usdc: '0', error: err });
+        history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: err }) });
+        continue;
+      }
+      // The internal __internal__ marker means "registered for buildToolsArray
+      // but not a real upstream call" — should have been handled above; if we
+      // get here, the tool name has no special branch and is misconfigured.
+      if (upstream.api === '__internal__') {
+        const err = `Tool '${tc.function.name}' is internal-only and has no executor.`;
         toolCallsExecuted.push({ name: tc.function.name, args, ok: false, cost_usdc: '0', error: err });
         history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: err }) });
         continue;
@@ -492,5 +564,107 @@ export async function runAgent(opts: {
     finish_reason: 'max_iterations',
     total_cost_usdc: (Number(totalCostMicro) / 1_000_000).toFixed(6),
     ...(generatedImages.length ? { images: generatedImages } : {}),
+    ...(generatedPixPayments.length ? { pixPayments: generatedPixPayments } : {}),
   };
+}
+
+/**
+ * Executes the generate_pix tool: creates a real Pix payment via MercadoPago,
+ * persists a pix_payments row (so the existing /v1/webhooks/mercadopago flow
+ * credits the agent owner when the customer pays), and returns the QR data
+ * for out-of-band delivery on the channel (WhatsApp / web).
+ *
+ * Owner-funded: the Pix is created under the agent OWNER's pix_payments row,
+ * with metadata noting the source ('chat_generated') and agent_id. When the
+ * customer pays via Pix, MP webhook → credit() → owner's USDC wallet bumps.
+ *
+ * Lazy-imports MP wrapper + DB so we don't pay the import cost on every
+ * agent run that doesn't use Pix (most of them).
+ */
+async function executePixTool(opts: {
+  args: any;
+  ownerId: string;
+  agentId?: string;
+}): Promise<{
+  ok: boolean;
+  payment?: NonNullable<RunAgentResult['pixPayments']>[number];
+  error?: string;
+}> {
+  const amount = Number(opts.args?.amount_brl);
+  const description = String(opts.args?.description || '').slice(0, 200);
+  if (!Number.isFinite(amount) || amount < 0.5 || amount > 5000) {
+    return { ok: false, error: 'amount_brl must be between 0.50 and 5000' };
+  }
+  if (!description) {
+    return { ok: false, error: 'description is required' };
+  }
+
+  try {
+    const { createPixPayment } = await import('~/payment/mercadopago');
+    const { db: dbm } = await import('~/db');
+    const { pixPayments, users } = await import('~/db/schema');
+    const { eq: eqm } = await import('drizzle-orm');
+
+    // Pre-create row to use as MP external_reference (correlates the webhook).
+    const [row] = await dbm
+      .insert(pixPayments)
+      .values({
+        userId: opts.ownerId,
+        mpPaymentId: 'pending',
+        amountBrl: amount.toFixed(2),
+        status: 'pending',
+        meta: {
+          source: 'chat_generated',
+          agent_id: opts.agentId ?? null,
+          description,
+        },
+      })
+      .returning();
+
+    // Owner email is required by MP for any Pix. Fall back to a deterministic
+    // synthetic if the user has none — works fine, MP only validates format.
+    const [owner] = await dbm.select().from(users).where(eqm(users.id, opts.ownerId)).limit(1);
+    const payerEmail = owner?.email || `${opts.ownerId}@axon.user`;
+
+    const result = await createPixPayment({
+      amountBrl: amount,
+      externalReference: row.id,
+      description: `Axon · ${description}`.slice(0, 200),
+      payerEmail,
+      idempotencyKey: row.id,
+      expiresInMinutes: 30,
+    });
+
+    if (!result.ok) {
+      // Roll back the placeholder row so we don't leak orphaned pending rows.
+      await dbm.delete(pixPayments).where(eqm(pixPayments.id, row.id));
+      return { ok: false, error: result.error };
+    }
+
+    await dbm
+      .update(pixPayments)
+      .set({
+        mpPaymentId: result.mpId!,
+        qrCode: result.qrCode,
+        qrCodeBase64: result.qrCodeBase64,
+        ticketUrl: result.ticketUrl,
+        expiresAt: result.expiresAt ? new Date(result.expiresAt) : null,
+        updatedAt: new Date(),
+      })
+      .where(eqm(pixPayments.id, row.id));
+
+    return {
+      ok: true,
+      payment: {
+        qrCode: result.qrCode!,
+        qrCodeBase64: result.qrCodeBase64!,
+        amountBrl: amount,
+        description,
+        expiresAt: result.expiresAt,
+        mpId: result.mpId,
+      },
+    };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
 }

@@ -23,6 +23,60 @@ export interface AgentTemplate {
   quickPrompts: string[];
 }
 
+/**
+ * Tools enabled by default in EVERY agent template — the "Axon baseline".
+ *
+ * Rationale: customers should not need to think about which capabilities to
+ * turn on. Every agent should arrive plug-and-play with the bread-and-butter
+ * Brazilian SMB tools (CEP, CNPJ, clima, fx) plus the cross-cutting helpers
+ * (Wikipedia, web search) plus image generation (because "the agent that
+ * also generates images" is a marquee selling point).
+ *
+ * All tools here are either FREE (BrasilAPI, OpenWeather free, Frankfurter,
+ * Wikipedia, CoinGecko) or pennies per call (Stability $0.012, Tavily $0.005,
+ * Voyage embeddings $0.00002/token). The hard_cap_micro on each agent caps
+ * total daily spend so this baseline can never blow up the wallet.
+ *
+ * Specialty templates (e.g. legal, market research) layer on top via spread:
+ *   tools: [...CORE_TOOLS, 'search_arxiv', 'exa_search', ...]
+ *
+ * The new generate_pix tool (added by the chat-Pix feature) is included so
+ * any agent — atendente, recepcionista, vendedor — can charge customers in-
+ * conversation without the owner having to wire it up.
+ */
+export const CORE_TOOLS: string[] = [
+  'lookup_cep',
+  'lookup_cnpj',
+  'current_weather',
+  'convert_currency',
+  'wikipedia_summary',
+  'wikipedia_search',
+  'brasilapi_holidays',
+  'brasilapi_ddd',
+  'brasilapi_rates',
+  'crypto_price',
+  'search_web',
+  'embed_text',
+  'generate_image',
+  'generate_pix',
+];
+
+/**
+ * Default Axon "soul" prompt fragment — appended to every template's system
+ * prompt at template instantiation. Keeps key Axon behaviors consistent
+ * (memory recall, time-aware greetings, transparency on tool use) so the
+ * customer doesn't have to manually wire these in.
+ */
+export const AXON_SOUL_PROMPT = `\n\n## Como eu (Axon) trabalho
+- Cumprimento o cliente pelo primeiro nome quando souber (lembro entre conversas).
+- Saudação adequada à hora do Brasil: "bom dia" / "boa tarde" / "boa noite".
+- Quando uso uma ferramenta, anuncio brevemente o que estou fazendo ("buscando CEP…", "gerando imagem…").
+- Se o cliente mandar foto, descrevo o que vejo e respondo a pergunta sobre ela.
+- Se o cliente mandar áudio, transcrevo e respondo no formato preferido (texto ou áudio).
+- Posso gerar Pix dinâmico (\`generate_pix\`) quando alguém quer pagar — o QR é entregue automaticamente.
+- Posso gerar imagens (\`generate_image\`) — descrevo o pedido em inglês detalhado pra Stability XL.
+- NÃO repito tabela de capacidades a menos que perguntado — use só quando faz sentido.`;
+
 export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'ecommerce-br',
@@ -32,7 +86,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     category: 'E-commerce',
     monthly_price_brl: 199,
     target: 'Lojas Shopify / Loja Integrada / Nuvemshop',
-    tools: ['lookup_cnpj', 'lookup_cep', 'scrape_url', 'search_web', 'convert_currency', 'get_datetime', 'calculate'],
+    tools: [...CORE_TOOLS, 'scrape_url', 'get_datetime', 'calculate'],
     primaryColor: '#22c55e',
     systemPrompt:
 `Você é um atendente virtual de loja online brasileira. Responda em português brasileiro de forma calorosa e direta.
@@ -60,7 +114,7 @@ Estilo: amigável, objetivo, sem rodeios. Use emoji moderadamente. Sempre ofere�
     category: 'Consultoria',
     monthly_price_brl: 349,
     target: 'Consultorias pequenas, analistas autônomos, M&A boutiques',
-    tools: ['lookup_cnpj', 'brasilapi_rates', 'search_web', 'wikipedia_search', 'wikipedia_summary', 'search_hn', 'scrape_url', 'exa_search'],
+    tools: [...CORE_TOOLS, 'search_hn', 'scrape_url', 'exa_search'],
     primaryColor: '#3b82f6',
     systemPrompt:
 `Você é um analista de mercado especializado no Brasil. Responda em português com rigor analítico, mas sem jargão desnecessário.
@@ -88,7 +142,7 @@ Use tabelas markdown pra comparativos. Use bullets pra listas de pontos.`,
     category: 'Jurídico',
     monthly_price_brl: 499,
     target: 'Escritórios advocacia tributária, contadores, sócios independentes',
-    tools: ['lookup_cnpj', 'brasilapi_rates', 'brasilapi_holidays', 'brasilapi_ddd', 'search_arxiv', 'search_web', 'scrape_url', 'wikipedia_summary', 'calculate', 'get_datetime'],
+    tools: [...CORE_TOOLS, 'search_arxiv', 'scrape_url', 'calculate', 'get_datetime'],
     primaryColor: '#f59e0b',
     systemPrompt:
 `Você é assistente jurídico-fiscal brasileiro. Tom: técnico, preciso, formal mas claro.
@@ -116,7 +170,7 @@ Sempre cite a fonte (URL ou documento). Para cálculos, mostre passo a passo. Le
     category: 'Research',
     monthly_price_brl: 399,
     target: 'Pesquisadores, mestrandos, doutorandos, R&D de empresas',
-    tools: ['search_arxiv', 'wikipedia_summary', 'wikipedia_search', 'scrape_url', 'exa_search', 'search_web', 'embed_text', 'calculate', 'run_js'],
+    tools: [...CORE_TOOLS, 'search_arxiv', 'scrape_url', 'exa_search', 'calculate', 'run_js'],
     primaryColor: '#8b5cf6',
     systemPrompt:
 `You are a research analyst. Default to English unless the user writes in another language; mirror their language.
@@ -144,7 +198,7 @@ Always cite sources inline as [Author Year](url) and list them at the end. For p
     category: 'Marketing',
     monthly_price_brl: 249,
     target: 'Social media managers, agências pequenas, criadores solo',
-    tools: ['generate_image', 'search_web', 'scrape_url', 'wikipedia_summary', 'search_hn', 'get_datetime'],
+    tools: [...CORE_TOOLS, 'scrape_url', 'search_hn', 'get_datetime'],
     primaryColor: '#ec4899',
     systemPrompt:
 `Você é assistente de criação de conteúdo. Mistura pesquisa de tendência + escrita + geração de imagem.
@@ -172,7 +226,7 @@ Para batches (5 posts do mês), faça uma tabela com: data, tema, copy, hashtags
     category: 'Imobiliário',
     monthly_price_brl: 299,
     target: 'Imobiliárias boutique, corretores autônomos, plataformas regionais',
-    tools: ['lookup_cep', 'scrape_url', 'weather_forecast', 'current_weather', 'search_web', 'lookup_country', 'convert_currency', 'calculate'],
+    tools: [...CORE_TOOLS, 'scrape_url', 'weather_forecast', 'lookup_country', 'calculate'],
     primaryColor: '#0ea5e9',
     systemPrompt:
 `Você é assistente de imobiliária no Brasil. Tom: consultivo, confiável, sem ser vendedor agressivo.
@@ -201,7 +255,7 @@ Sempre pergunte 2-3 perguntas qualificadoras antes de dar recomendação (orçam
     category: 'Finanças',
     monthly_price_brl: 199,
     target: 'Investidores varejo BR, traders amadores, finance creators',
-    tools: ['crypto_price', 'convert_currency', 'brasilapi_rates', 'search_web', 'search_hn', 'calculate', 'wikipedia_summary'],
+    tools: [...CORE_TOOLS, 'search_hn', 'calculate'],
     primaryColor: '#eab308',
     systemPrompt:
 `Você é concierge financeiro com foco em cripto e mercado brasileiro. Responda em PT-BR.
@@ -229,7 +283,7 @@ Calcule retorno comparativo (BTC vs CDI por exemplo) sempre que pedido. Mostre e
     category: 'Saúde',
     monthly_price_brl: 249,
     target: 'Clínicas, consultórios, dentistas, fisioterapeutas',
-    tools: ['lookup_cep', 'get_datetime', 'brasilapi_holidays', 'calculate'],
+    tools: [...CORE_TOOLS, 'get_datetime', 'calculate'],
     primaryColor: '#06b6d4',
     systemPrompt:
 `Você é a recepcionista virtual da clínica. Tom: acolhedor, profissional, calmo. Português brasileiro coloquial.
@@ -260,7 +314,7 @@ Encerre cada resposta com próximo passo claro: "Quer que eu agende?" ou "Posso 
     category: 'Alimentação',
     monthly_price_brl: 199,
     target: 'Restaurantes, lanchonetes, pizzarias, deliveries pequenos',
-    tools: ['lookup_cep', 'get_datetime', 'calculate', 'brasilapi_holidays'],
+    tools: [...CORE_TOOLS, 'get_datetime', 'calculate'],
     primaryColor: '#f97316',
     systemPrompt:
 `Você é o atendente virtual do restaurante. Tom: simpático, ágil, com humor leve. Português brasileiro do dia-a-dia.
@@ -294,7 +348,7 @@ ATENÇÃO: Não invente itens fora do cardápio. Se cliente pedir algo que não 
     category: 'Quickstart',
     monthly_price_brl: 99,
     target: 'Quem está começando — primeiro agente sem complicação',
-    tools: ['get_datetime', 'calculate'],
+    tools: [...CORE_TOOLS, 'get_datetime', 'calculate'],
     primaryColor: '#a855f7',
     systemPrompt:
 `Você é um assistente virtual treinado pelo dono do negócio. Responda em português brasileiro de forma direta e amigável.
@@ -352,6 +406,11 @@ export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
   search_arxiv:       { api: 'arxiv', endpoint: 'search' },
   embed_text:         { api: 'voyage', endpoint: 'embeddings' },
   generate_image:     { api: 'stability', endpoint: 'generate-xl' },
+  // generate_pix is server-side only — not backed by an upstream API.
+  // It calls our internal MercadoPago wrapper via a special handler in
+  // src/agents/runtime.ts. We register a dummy mapping so isToolAllowed +
+  // buildToolsArray accept the name.
+  generate_pix:       { api: '__internal__', endpoint: 'generate_pix' },
 };
 
 /** Returns true if `(api, endpoint)` is the backing pair of a tool in `allowed`. */

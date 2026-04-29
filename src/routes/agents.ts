@@ -12,7 +12,7 @@ import { db } from '~/db';
 import { agents, requests, agentMessages, users, wallets, whatsappConnections } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { decrypt } from '~/lib/crypto';
-import { AGENT_TEMPLATES, getTemplate } from '~/agents/templates';
+import { AGENT_TEMPLATES, getTemplate, AXON_SOUL_PROMPT } from '~/agents/templates';
 import { getCacheStats } from '~/agents/knowledge-cache';
 import { mintAgentNft, buildMetadataUrl, isNftEnabled } from '~/nft/agent-nft';
 import { deleteInstance } from '~/whatsapp/evolution';
@@ -248,7 +248,11 @@ app.post('/', async (c) => {
     seed = {
       name: t.name,
       description: t.description,
-      systemPrompt: t.systemPrompt,
+      // Append the Axon "soul" — memory recall, time-aware greetings, tool
+      // transparency, vision/audio/pix awareness — to every template-cloned
+      // agent. Keeps cross-agent behavior consistent so customers don't have
+      // to manually wire these in.
+      systemPrompt: t.systemPrompt + AXON_SOUL_PROMPT,
       allowedTools: t.tools,
       primaryColor: t.primaryColor,
       welcomeMessage: t.welcomeMessage,

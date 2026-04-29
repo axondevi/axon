@@ -490,6 +490,7 @@ publicWebhook.post('/:secret', async (c) => {
 
   let reply: string;
   let images: NonNullable<Awaited<ReturnType<typeof runAgent>>['images']> = [];
+  let pixPayments: NonNullable<Awaited<ReturnType<typeof runAgent>>['pixPayments']> = [];
   try {
     const result = await runAgent({
       c,
@@ -502,8 +503,9 @@ publicWebhook.post('/:secret', async (c) => {
       // Owner mode is even more dynamic — never cache.
       enableCache: false,
     });
-    reply = result.content || (result.images?.length ? '✅' : '🤖 (sem resposta no momento)');
+    reply = result.content || (result.images?.length || result.pixPayments?.length ? '✅' : '🤖 (sem resposta no momento)');
     images = result.images || [];
+    pixPayments = result.pixPayments || [];
 
     // Persist both sides of the turn
     db.insert(agentMessages).values({
@@ -559,6 +561,41 @@ publicWebhook.post('/:secret', async (c) => {
       delayMs: 800,
     }).catch(() => {});
     // Small pause so the image lands before the text bubble
+    await new Promise((r) => setTimeout(r, 400));
+  }
+
+  // ─── Send any Pix payments produced by generate_pix tool ──────────
+  // Two messages per Pix: (1) the QR PNG with caption "R$X — descrição"
+  // (2) the EMV copy-paste string as a plain text bubble so the user
+  // can copy from any banking app on mobile (faster than scanning).
+  for (const pix of pixPayments) {
+    const captionLines = [
+      `💸 *${Number(pix.amountBrl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}*`,
+      pix.description,
+      pix.expiresAt ? `Expira em 30 minutos.` : '',
+    ].filter(Boolean).join('\n');
+    await sendMedia({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey,
+      number: inbound.phone,
+      base64Data: pix.qrCodeBase64,
+      mediatype: 'image',
+      mimetype: 'image/png',
+      fileName: 'pix.png',
+      caption: captionLines.slice(0, 700),
+      delayMs: 800,
+    }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 600));
+    // Copy-paste EMV — easiest UX on mobile (long-press to copy).
+    await sendText({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey,
+      number: inbound.phone,
+      text: `Pix copia-e-cola:\n\`\`\`${pix.qrCode}\`\`\``,
+      delayMs: 600,
+    }).catch(() => {});
     await new Promise((r) => setTimeout(r, 400));
   }
 
