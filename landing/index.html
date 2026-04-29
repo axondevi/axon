@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -158,24 +158,20 @@
           <div class="logos-header">
             <span class="eyebrow" id="apis-eyebrow">
               <span class="dot"></span>
-              Loading live catalog…
+              Carregando catálogo…
             </span>
-            <h2>Your agent talks to all of them through one endpoint.</h2>
-            <p class="logos-sub">Tap any API to see endpoints, pricing, and a ready-to-paste curl call.</p>
+            <h2>Seu agente fala com todas elas por um único endpoint.</h2>
+            <p class="logos-sub">Clique numa categoria pra abrir. Toque em qualquer API pra ver endpoints, preço e exemplo de chamada.</p>
           </div>
-          <div class="logo-grid" id="logo-grid" role="list">
-            <div class="logo-card skeleton" aria-hidden="true"></div>
-            <div class="logo-card skeleton" aria-hidden="true"></div>
-            <div class="logo-card skeleton" aria-hidden="true"></div>
-            <div class="logo-card skeleton" aria-hidden="true"></div>
+          <div class="api-cats" id="api-cats" role="list">
             <div class="logo-card skeleton" aria-hidden="true"></div>
             <div class="logo-card skeleton" aria-hidden="true"></div>
             <div class="logo-card skeleton" aria-hidden="true"></div>
             <div class="logo-card skeleton" aria-hidden="true"></div>
           </div>
           <p class="logo-grid-error" id="logo-grid-error" hidden>
-            Live catalog is waking up. Meanwhile, browse the
-            <a href="https://github.com/axondevi/axon/tree/main/registry" target="_blank" rel="noopener">registry on GitHub →</a>
+            Catálogo demorou pra responder. Enquanto isso, navegue no
+            <a href="https://github.com/axondevi/axon/tree/main/registry" target="_blank" rel="noopener">registry no GitHub →</a>
           </p>
         </div>
       </section>
@@ -653,9 +649,49 @@
       (function () {
         var API_BASE = 'https://axon-kedb.onrender.com';
         var REGISTRY_URL = 'https://github.com/axondevi/axon/blob/main/registry/';
-        var grid = document.getElementById('logo-grid');
+        var grid = document.getElementById('api-cats');
         var eyebrow = document.getElementById('apis-eyebrow');
         var errorEl = document.getElementById('logo-grid-error');
+
+        // Wide registry categories collapse into 8 user-facing groups so
+        // the section stops looking like a wall of cards. Anything not
+        // matched falls under "Utilitários" so nothing disappears.
+        var CATEGORY_MAP = {
+          'Brazil & LatAm Data':  { id: 'br',      title: '🇧🇷 Dados brasileiros',          order: 1 },
+          'Geo & Weather':        { id: 'geo',     title: '🌍 Geo & Clima',                order: 2 },
+          'Geography & Reference':{ id: 'geo',     title: '🌍 Geo & Clima',                order: 2 },
+          'Weather & Geo':        { id: 'geo',     title: '🌍 Geo & Clima',                order: 2 },
+          'Finance & Markets':    { id: 'finance', title: '💰 Finanças & Mercado',         order: 3 },
+          'Blockchain Data':      { id: 'finance', title: '💰 Finanças & Mercado',         order: 3 },
+          'Web Intelligence':     { id: 'search',  title: '🔍 Busca & Web',                order: 4 },
+          'News & Social':        { id: 'search',  title: '🔍 Busca & Web',                order: 4 },
+          'Knowledge & Research': { id: 'know',    title: '📚 Conhecimento & Pesquisa',    order: 5 },
+          'Documents':            { id: 'know',    title: '📚 Conhecimento & Pesquisa',    order: 5 },
+          'LLM':                  { id: 'ai',      title: '🤖 IA & Modelos',               order: 6 },
+          'AI & ML':              { id: 'ai',      title: '🤖 IA & Modelos',               order: 6 },
+          'Voice':                { id: 'voice',   title: '🎙️ Voz & Áudio',                order: 7 },
+          'Speech & Audio':       { id: 'voice',   title: '🎙️ Voz & Áudio',                order: 7 },
+          'Translation':          { id: 'voice',   title: '🎙️ Voz & Áudio',                order: 7 },
+          'Enrichment':           { id: 'utils',   title: '🧰 Utilitários & Enrichment',   order: 8 },
+          'Social':               { id: 'utils',   title: '🧰 Utilitários & Enrichment',   order: 8 },
+          'Agent Memory':         { id: 'utils',   title: '🧰 Utilitários & Enrichment',   order: 8 },
+        };
+
+        // Resolve a logo URL for a provider by stripping homepage to its
+        // bare domain and asking Google's favicon service. Falls back to a
+        // text monogram when homepage is missing or invalid.
+        function logoFor(api) {
+          try {
+            if (!api.homepage) return null;
+            var u = new URL(api.homepage);
+            var host = u.hostname.replace(/^www\./, '').replace(/^docs\./, '').replace(/^api\./, '');
+            return 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(host) + '&sz=64';
+          } catch (e) { return null; }
+        }
+
+        function monogram(name) {
+          return String(name || '?').trim().charAt(0).toUpperCase();
+        }
         var modal = document.getElementById('api-modal');
         var lastFocused = null;
 
@@ -740,30 +776,75 @@
         function renderGrid(apis) {
           if (!apis || !apis.length) return showError();
           apis.sort(function (a, b) { return a.provider.localeCompare(b.provider); });
-          grid.innerHTML = '';
-          errorEl.hidden = true;
+
+          // Bucket each API into a user-facing group via CATEGORY_MAP.
+          // Unknown registry categories fall under "utils" so nothing
+          // disappears.
+          var groups = {};
           for (var i = 0; i < apis.length; i++) {
             var api = apis[i];
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'logo-card logo-card-button';
-            btn.setAttribute('data-slug', api.slug);
-            btn.setAttribute('aria-label', api.provider + ' — ' + (api.category || ''));
-            btn.innerHTML =
-              '<strong>' + escapeHtml(api.provider) + '</strong>' +
-              '<span>' + escapeHtml(api.category || '') + '</span>';
-            btn.addEventListener('click', (function (slug) {
-              return function () { openModal(slug); };
-            })(api.slug));
-            grid.appendChild(btn);
+            var meta = CATEGORY_MAP[api.category] || { id: 'utils', title: '🧰 Utilitários & Enrichment', order: 8 };
+            if (!groups[meta.id]) groups[meta.id] = { meta: meta, items: [] };
+            groups[meta.id].items.push(api);
           }
-          eyebrow.innerHTML = '<span class="dot"></span>' + apis.length + ' APIs live, more every week';
+          var groupList = Object.values(groups).sort(function (a, b) { return a.meta.order - b.meta.order; });
+
+          grid.innerHTML = '';
+          errorEl.hidden = true;
+          for (var g = 0; g < groupList.length; g++) {
+            var group = groupList[g];
+            var details = document.createElement('details');
+            details.className = 'api-cat';
+            // Open only the first category by default — keeps the page
+            // scannable but lets curious visitors explore everything.
+            if (g === 0) details.setAttribute('open', '');
+
+            var summary = document.createElement('summary');
+            summary.className = 'api-cat-summary';
+            summary.innerHTML =
+              '<span class="api-cat-title" translate="no">' + escapeHtml(group.meta.title) + '</span>' +
+              '<span class="api-cat-count">' + group.items.length + ' APIs</span>' +
+              '<span class="api-cat-chevron" aria-hidden="true">▾</span>';
+            details.appendChild(summary);
+
+            var inner = document.createElement('div');
+            inner.className = 'api-cat-grid';
+            for (var j = 0; j < group.items.length; j++) {
+              var a2 = group.items[j];
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'api-tile';
+              btn.setAttribute('data-slug', a2.slug);
+              btn.setAttribute('aria-label', a2.provider + ' — ' + (a2.category || ''));
+              btn.setAttribute('translate', 'no');
+
+              var logoUrl = logoFor(a2);
+              var iconHtml = logoUrl
+                ? '<img class="api-tile-logo" src="' + escapeHtml(logoUrl) + '" alt="" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'api-tile-logo fallback\',textContent:\'' + monogram(a2.provider) + '\'}));" />'
+                : '<div class="api-tile-logo fallback">' + monogram(a2.provider) + '</div>';
+
+              btn.innerHTML =
+                iconHtml +
+                '<div class="api-tile-text">' +
+                  '<strong>' + escapeHtml(a2.provider) + '</strong>' +
+                  '<span>' + escapeHtml(a2.description || a2.category || '') + '</span>' +
+                '</div>';
+              btn.addEventListener('click', (function (slug) {
+                return function () { openModal(slug); };
+              })(a2.slug));
+              inner.appendChild(btn);
+            }
+            details.appendChild(inner);
+            grid.appendChild(details);
+          }
+
+          eyebrow.innerHTML = '<span class="dot"></span><span translate="no">' + apis.length + '</span> APIs disponíveis · novas toda semana';
         }
 
         function showError() {
           grid.innerHTML = '';
           errorEl.hidden = false;
-          eyebrow.innerHTML = '<span class="dot"></span>27+ APIs live, more every week';
+          eyebrow.innerHTML = '<span class="dot"></span>27+ APIs disponíveis · novas toda semana';
         }
 
         var __staticDetails = null;
