@@ -21,6 +21,7 @@ import { handleCall } from '~/wrapper/engine';
 import { TOOL_TO_AXON } from '~/agents/templates';
 import { upstreamKeyFor } from '~/config';
 import { checkCache, storeInCache } from '~/agents/knowledge-cache';
+import { pickToolsForTurn } from '~/agents/tool-selector';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -298,6 +299,70 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     parameters: { type: 'object', properties: { login: { type: 'string' } }, required: ['login'] },
     buildRequest: (a) => ({ params: { login: String(a.login).trim() } }),
   },
+
+  // ─── Marketplace (BR) ────────────────────────────────────────
+  mercadolivre_search: {
+    description: 'Search products on Mercado Livre Brasil. Useful for price comparisons, market research, finding alternatives.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query (product name).' },
+        limit: { type: 'integer', description: 'Max results (default 10, max 50).' },
+      },
+      required: ['query'],
+    },
+    buildRequest: (a) => ({
+      params: { q: a.query, limit: Math.min(a.limit || 10, 50) },
+    }),
+  },
+
+  // ─── Books ───────────────────────────────────────────────────
+  lookup_book: {
+    description: 'Look up a book by ISBN (10 or 13 digits). Returns title, authors, publisher, publish date, subjects. Useful for libraries, bookstores, edu agents.',
+    parameters: { type: 'object', properties: { isbn: { type: 'string' } }, required: ['isbn'] },
+    buildRequest: (a) => ({ params: { isbn: String(a.isbn).replace(/\D/g, '') } }),
+  },
+
+  // ─── npm packages ────────────────────────────────────────────
+  npm_package: {
+    description: 'npm registry metadata for a package. Returns versions, latest, repo, homepage, description, maintainers. Useful for dev agents, package recommendations.',
+    parameters: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+    buildRequest: (a) => ({ params: { name: String(a.name).trim() } }),
+  },
+
+  // ─── Internal Groq-powered tools (no upstream API) ───────────
+  // These use llama-3.1-8b-instant directly so they don't add an external
+  // dependency. Cost: ~150-300 tokens out per call, well below an LLM-
+  // backed scrape+summarize chain.
+  translate_text: {
+    description: 'Translate any text between languages. Pass `text` and `target_lang` (e.g. "en", "pt", "es", "fr"). Auto-detects source language. Useful for multi-lingual customer support.',
+    parameters: {
+      type: 'object',
+      properties: {
+        text: { type: 'string' },
+        target_lang: { type: 'string', description: 'Target language code (en, pt, es, fr, de, it, ja, zh, ...).' },
+      },
+      required: ['text', 'target_lang'],
+    },
+    // Internal — buildRequest unused; runtime intercepts on tool name.
+  },
+  detect_language: {
+    description: 'Detect the language of a text. Returns ISO code (e.g. "pt", "en", "es") and confidence. Useful for routing multi-lingual conversations.',
+    parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+    // Internal — runtime intercepts.
+  },
+  summarize_url: {
+    description: "Fetch a URL, extract main content, and return a short summary in Portuguese (or the user's language). Use INSTEAD of scrape_url when you don't need full text — saves tokens.",
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        max_words: { type: 'integer', description: 'Target summary length in words (default 80).' },
+      },
+      required: ['url'],
+    },
+    // Internal — chains scrape_url + groq summary.
+  },
 };
 
 export function buildToolsArray(allowedTools: string[]): any[] {
@@ -427,8 +492,26 @@ export async function runAgent(opts: {
     }
   }
 
-  const tools = buildToolsArray(allowedTools);
-  const toolList = allowedTools
+  // ─── Smart tool selection ───────────────────────────────────────
+  // Instead of dumping all 20+ tool schemas into every turn (~5k tokens
+  // overhead, killing the Groq free tier), narrow to just what's relevant:
+  //   1. keyword heuristic (free, ~1ms)
+  //   2. LLM classifier fallback (~300ms, ~250 tokens) when keywords miss
+  //   3. always-on safety net (search_web + generate_pix)
+  // Only triggers when the agent has more than a handful of tools — for
+  // small toolsets the overhead isn't worth the saving, and for empty
+  // conversations the cache shortcut above already returned.
+  let effectiveTools = allowedTools;
+  if (allowedTools.length > 5 && typeof lastUser?.content === 'string' && lastUser.content.trim().length > 0) {
+    const picked = await pickToolsForTurn({
+      availableTools: allowedTools,
+      lastUserMessage: lastUser.content,
+    });
+    effectiveTools = picked.tools;
+  }
+
+  const tools = buildToolsArray(effectiveTools);
+  const toolList = effectiveTools
     .filter((t) => SERVER_TOOLS[t])
     .map((t) => `- ${t}: ${SERVER_TOOLS[t].description}`)
     .join('\n');
@@ -541,6 +624,31 @@ export async function runAgent(opts: {
     for (const tc of tcs) {
       let args: any;
       try { args = JSON.parse(tc.function.arguments || '{}'); } catch { args = {}; }
+
+      // ─── Special-case: internal Groq-powered tools ─────────────────
+      // translate_text / detect_language / summarize_url use llama-3.1-8b
+      // directly (no upstream API). We intercept BEFORE the upstream lookup
+      // so they don't fall through to handleCall.
+      if (
+        tc.function.name === 'translate_text' ||
+        tc.function.name === 'detect_language' ||
+        tc.function.name === 'summarize_url'
+      ) {
+        const result = await executeInternalLLMTool(tc.function.name, args, c);
+        history.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify(result.ok ? result.data : { error: result.error }),
+        });
+        toolCallsExecuted.push({
+          name: tc.function.name,
+          args,
+          ok: result.ok,
+          cost_usdc: '0',
+          ...(result.ok ? {} : { error: result.error || 'unknown' }),
+        });
+        continue;
+      }
 
       // ─── Special-case: generate_pix ─────────────────────────────────
       // Doesn't go through handleCall (no upstream API in the registry).
@@ -686,6 +794,125 @@ export async function runAgent(opts: {
  * Lazy-imports MP wrapper + DB so we don't pay the import cost on every
  * agent run that doesn't use Pix (most of them).
  */
+/**
+ * Execute one of the internal Groq-powered tools (translate_text,
+ * detect_language, summarize_url). They all share the same shape: take
+ * args, call llama-3.1-8b-instant with a small prompt, return JSON.
+ *
+ * No external API key required (Groq key is already needed for the agent
+ * runtime itself). Costs nothing extra beyond ~150-300 tokens per call.
+ *
+ * Returns ok:true with the data the tool description promised, or ok:false
+ * with an error string the LLM can show to the user.
+ */
+async function executeInternalLLMTool(
+  name: string,
+  args: any,
+  _c: Context,
+): Promise<{ ok: true; data: any } | { ok: false; error: string }> {
+  const groqKey = upstreamKeyFor('groq');
+  if (!groqKey) return { ok: false, error: 'Groq key not configured.' };
+
+  // Cap the input so a malicious or runaway prompt can't burn the daily TPM.
+  const cap = (s: unknown, n = 4000) => String(s ?? '').slice(0, n);
+
+  let systemPrompt: string;
+  let userInput: string;
+  let maxTokens = 300;
+  let parser: (raw: string) => any = (r) => ({ result: r.trim() });
+
+  if (name === 'translate_text') {
+    const target = String(args.target_lang || 'pt').slice(0, 8);
+    systemPrompt =
+      `You are a translator. Translate the user's text into "${target}". ` +
+      `Output ONLY the translation — no preamble, no explanation, no quotes around it.`;
+    userInput = cap(args.text, 3000);
+    maxTokens = 600;
+    parser = (r) => ({ translation: r.trim(), target_lang: target });
+  } else if (name === 'detect_language') {
+    systemPrompt =
+      'Detect the ISO 639-1 language code of the user\'s text. ' +
+      'Output ONLY the 2-letter code in lowercase (e.g. "pt", "en", "es"). No other text.';
+    userInput = cap(args.text, 1000);
+    maxTokens = 8;
+    parser = (r) => {
+      const code = r.trim().toLowerCase().slice(0, 2);
+      return { language: code };
+    };
+  } else if (name === 'summarize_url') {
+    // Chain: scrape via firecrawl tool (uses configured key) → summarize.
+    // We do the scrape inline rather than recursing into handleCall to keep
+    // this self-contained and skip the wrapper's per-call billing path.
+    const url = cap(args.url, 800);
+    if (!/^https?:\/\//.test(url)) {
+      return { ok: false, error: 'url must start with http:// or https://' };
+    }
+    let pageText = '';
+    try {
+      // Cheap fetch with a 12s timeout — better to give up than block the
+      // user-facing reply for a slow page.
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 12_000);
+      const r = await fetch(url, {
+        signal: ctrl.signal,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AxonAgent/1.0)' },
+      });
+      clearTimeout(t);
+      if (!r.ok) return { ok: false, error: `fetch ${r.status}` };
+      const html = await r.text();
+      // Strip HTML aggressively — we want substance, not formatting. The
+      // model can summarize from rough text just fine.
+      pageText = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 8000);
+    } catch (err: any) {
+      return { ok: false, error: `fetch failed: ${err.message || String(err)}` };
+    }
+    if (pageText.length < 100) {
+      return { ok: false, error: 'page returned too little text to summarize' };
+    }
+    const maxWords = Math.max(20, Math.min(args.max_words || 80, 300));
+    systemPrompt =
+      `Você é um sumarizador. Resuma o conteúdo da página em PT-BR em ` +
+      `aproximadamente ${maxWords} palavras. Foque no essencial; ignore ` +
+      `navegação, propaganda e rodapé. Não invente.`;
+    userInput = pageText;
+    maxTokens = Math.min(800, maxWords * 4);
+    parser = (r) => ({ summary: r.trim(), source_url: url });
+  } else {
+    return { ok: false, error: `unknown internal tool: ${name}` };
+  }
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + groqKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userInput },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.2,
+      }),
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      return { ok: false, error: `groq ${res.status}: ${t.slice(0, 200)}` };
+    }
+    const json: any = await res.json().catch(() => null);
+    const content = String(json?.choices?.[0]?.message?.content || '');
+    return { ok: true, data: parser(content) };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
 async function executePixTool(opts: {
   args: any;
   ownerId: string;

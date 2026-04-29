@@ -472,11 +472,19 @@ export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
   bcb_indicator:      { api: 'bcb', endpoint: 'series' },
   ibge_city:          { api: 'ibge', endpoint: 'city' },
   github_user:        { api: 'github', endpoint: 'user' },
+  mercadolivre_search: { api: 'mercadolivre', endpoint: 'search' },
+  lookup_book:        { api: 'openlibrary', endpoint: 'isbn' },
+  npm_package:        { api: 'npm', endpoint: 'package' },
   // generate_pix is server-side only — not backed by an upstream API.
   // It calls our internal MercadoPago wrapper via a special handler in
   // src/agents/runtime.ts. We register a dummy mapping so isToolAllowed +
   // buildToolsArray accept the name.
   generate_pix:       { api: '__internal__', endpoint: 'generate_pix' },
+  // Three more "internal" tools that use Groq llama-3.1-8b-instant directly
+  // (no upstream API). The runtime has special-case handlers for these.
+  translate_text:     { api: '__internal__', endpoint: 'translate_text' },
+  detect_language:    { api: '__internal__', endpoint: 'detect_language' },
+  summarize_url:      { api: '__internal__', endpoint: 'summarize_url' },
 };
 
 /** Returns true if `(api, endpoint)` is the backing pair of a tool in `allowed`. */

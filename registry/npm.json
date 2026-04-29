@@ -1,0 +1,19 @@
+{
+  "slug": "npm",
+  "provider": "npm Registry",
+  "category": "Knowledge & Research",
+  "description": "Public npm registry — package metadata, version info, dependency tree. No auth required.",
+  "homepage": "https://registry.npmjs.org/",
+  "base_url": "https://registry.npmjs.org",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "package": {
+      "method": "GET",
+      "path": "/:name",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 3600,
+      "notes": "Full metadata for a package by name (e.g. 'react', '@anthropic-ai/sdk'). Returns versions, dist-tags, maintainers, repo, homepage, description."
+    }
+  }
+}

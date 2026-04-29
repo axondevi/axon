@@ -1,0 +1,27 @@
+{
+  "slug": "mercadolivre",
+  "provider": "Mercado Livre",
+  "category": "E-commerce",
+  "description": "Public Mercado Livre search API — query products across BR/AR/MX marketplaces. Free, no auth required for product search and item lookup.",
+  "homepage": "https://api.mercadolibre.com/sites/MLB/search",
+  "base_url": "https://api.mercadolibre.com",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "search": {
+      "method": "GET",
+      "path": "/sites/MLB/search",
+      "price_usd": 0.0003,
+      "markup_pct": 30,
+      "cache_ttl": 600,
+      "notes": "Search products on Mercado Livre Brasil (MLB). Pass q=<query> and optional limit (default 10). Returns titles, prices, condition, seller, thumbnails."
+    },
+    "item": {
+      "method": "GET",
+      "path": "/items/:id",
+      "price_usd": 0.0003,
+      "markup_pct": 30,
+      "cache_ttl": 1800,
+      "notes": "Item details by Mercado Livre id (e.g. MLB1234567890). Used after search to get full description and seller stats."
+    }
+  }
+}

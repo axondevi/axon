@@ -601,13 +601,21 @@
           { name: 'search_web',           desc: 'Pesquisa web (Tavily)', cost: '~$0.005' },
           { name: 'exa_search',           desc: 'Busca neural (Exa)', cost: '~$0.005' },
           { name: 'scrape_url',           desc: 'URL → markdown (Firecrawl)', cost: '~$0.002' },
+          { name: 'summarize_url',        desc: 'Resumir URL em PT-BR', cost: 'free' },
           { name: 'search_hn',            desc: 'Hacker News search', cost: 'free' },
           { name: 'github_user',          desc: 'Perfil público GitHub', cost: 'free' },
+          { name: 'mercadolivre_search',  desc: 'Buscar produtos no ML Brasil', cost: 'free' },
+          { name: 'npm_package',          desc: 'Info de pacote npm', cost: 'free' },
         ],
         'Conhecimento': [
           { name: 'wikipedia_summary',    desc: 'Resumo de artigo Wikipedia', cost: 'free' },
           { name: 'wikipedia_search',     desc: 'Pesquisar Wikipedia', cost: 'free' },
           { name: 'search_arxiv',         desc: '2.4M papers científicos', cost: 'free' },
+          { name: 'lookup_book',          desc: 'Livro por ISBN (Open Library)', cost: 'free' },
+        ],
+        'Linguagem (interno)': [
+          { name: 'translate_text',       desc: 'Tradução entre idiomas (interno)', cost: 'free' },
+          { name: 'detect_language',      desc: 'Detectar idioma do texto', cost: 'free' },
         ],
         'Local — sem custo': [
           { name: 'calculate',            desc: 'Avaliar expressão matemática', cost: '$0' },

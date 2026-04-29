@@ -1,0 +1,27 @@
+{
+  "slug": "openlibrary",
+  "provider": "Open Library",
+  "category": "Knowledge & Research",
+  "description": "Open Library — free book metadata across 30M+ books. ISBN/title/author lookup, no API key required.",
+  "homepage": "https://openlibrary.org/developers/api",
+  "base_url": "https://openlibrary.org",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "isbn": {
+      "method": "GET",
+      "path": "/isbn/:isbn.json",
+      "price_usd": 0.0001,
+      "markup_pct": 30,
+      "cache_ttl": 2592000,
+      "notes": "Book lookup by ISBN-10 or ISBN-13. Returns title, authors, publisher, publish date, subjects, cover."
+    },
+    "search": {
+      "method": "GET",
+      "path": "/search.json",
+      "price_usd": 0.0002,
+      "markup_pct": 30,
+      "cache_ttl": 3600,
+      "notes": "Search across title/author/subject. Pass q=<query> and optional limit (default 10)."
+    }
+  }
+}
