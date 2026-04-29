@@ -50,6 +50,30 @@ previewRoutes.get('/:slug/preview', async (c) => {
   const [a] = await db.select().from(agents).where(eq(agents.slug, slug)).limit(1);
   if (!a || !a.public) throw Errors.notFound('Agent');
 
+  // Load persona if attached — gives the preview UI a separate brand layer
+  // (avatar, sample greeting, tone) on top of the agent's role.
+  let personaInfo: any = null;
+  if (a.personaId) {
+    const { personas } = await import('~/db/schema');
+    const [p] = await db.select().from(personas).where(eq(personas.id, a.personaId)).limit(1);
+    if (p) {
+      personaInfo = {
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        tagline: p.tagline,
+        emoji: p.emoji,
+        tone_description: p.toneDescription,
+        sample_greeting: p.sampleGreeting,
+        sample_signoff: p.sampleSignoff,
+        avatar_url: `/v1/personas/${p.slug}/avatar.svg`,
+        avatar_color_primary: p.avatarColorPrimary,
+        avatar_color_secondary: p.avatarColorSecondary,
+        has_voice: !!p.voiceIdElevenlabs,
+      };
+    }
+  }
+
   const tools = Array.isArray(a.allowedTools) ? (a.allowedTools as string[]) : [];
 
   // Group tools by capability category for the badge cloud.
@@ -87,6 +111,7 @@ previewRoutes.get('/:slug/preview', async (c) => {
     welcome_message: a.welcomeMessage,
     quick_prompts: a.quickPrompts,
     ui_language: a.uiLanguage,
+    persona: personaInfo,
     capabilities: {
       memory_per_contact: true,        // contact_memory always on
       semantic_cache: true,             // agent_cache always on
@@ -178,6 +203,7 @@ capacidade".`;
       allowedTools: Array.isArray(a.allowedTools) ? (a.allowedTools as string[]) : [],
       messages,
       ownerId: a.ownerId,
+      personaId: a.personaId,
       enableCache: false,
     });
     return c.json({

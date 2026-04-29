@@ -190,6 +190,7 @@ app.get('/', async (c) => {
       budget_per_session_usdc: fromMicro(a.budgetPerSession),
       hard_cap_usdc: fromMicro(a.hardCap),
       nft_url: nftViewUrlFor(a.id),
+      persona_id: a.personaId,
       created_at: a.createdAt,
       updated_at: a.updatedAt,
     })),
@@ -261,6 +262,23 @@ app.post('/', async (c) => {
     };
   }
 
+  // Optional persona — accept either UUID (persona_id) or slug (persona_slug).
+  // We resolve the slug here so the insert always stores the canonical id.
+  let personaId: string | null = null;
+  if (body.persona_id || body.persona_slug) {
+    const { personas } = await import('~/db/schema');
+    if (body.persona_id) {
+      const [p] = await db.select().from(personas).where(eq(personas.id, String(body.persona_id))).limit(1);
+      personaId = p?.id ?? null;
+    } else if (body.persona_slug) {
+      const [p] = await db.select().from(personas).where(eq(personas.slug, String(body.persona_slug))).limit(1);
+      personaId = p?.id ?? null;
+    }
+    if (!personaId) {
+      throw Errors.badRequest(`Unknown persona: ${body.persona_id || body.persona_slug}`);
+    }
+  }
+
   const insert = {
     ownerId: user.id,
     slug,
@@ -282,6 +300,7 @@ app.post('/', async (c) => {
     uiLanguage: ['auto','pt','en','es'].includes(body.ui_language) ? body.ui_language : 'auto',
     public: body.public !== false,
     template: seed.template ?? body.template ?? null,
+    personaId,
   };
 
   // Enforce tier gate on the OWNER (current user). If they pick a
@@ -389,6 +408,25 @@ app.patch('/:id', async (c) => {
         return c.json({ error: 'bad_request', message: 'owner_phone must be 10–15 digits (E.164 without +)' }, 400);
       }
       update.ownerPhone = digits;
+    }
+  }
+  if (body.persona_id !== undefined || body.persona_slug !== undefined) {
+    if (body.persona_id === null || body.persona_id === '' || body.persona_slug === null || body.persona_slug === '') {
+      update.personaId = null;  // Detach persona — agent reverts to default behavior.
+    } else {
+      const { personas } = await import('~/db/schema');
+      let resolved: string | null = null;
+      if (body.persona_id) {
+        const [p] = await db.select().from(personas).where(eq(personas.id, String(body.persona_id))).limit(1);
+        resolved = p?.id ?? null;
+      } else if (body.persona_slug) {
+        const [p] = await db.select().from(personas).where(eq(personas.slug, String(body.persona_slug))).limit(1);
+        resolved = p?.id ?? null;
+      }
+      if (!resolved) {
+        return c.json({ error: 'bad_request', message: `Unknown persona` }, 400);
+      }
+      update.personaId = resolved;
     }
   }
 

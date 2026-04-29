@@ -357,11 +357,20 @@
 
       <div class="tab-bar">
         <button class="active" data-tab="templates">Modelos prontos</button>
+        <button data-tab="personas">🎭 Personas</button>
         <button data-tab="mine">My agents (<span id="mine-count">0</span>)</button>
       </div>
 
       <div class="panel active" id="panel-templates">
         <div class="tpl-grid" id="tpl-grid">Loading templates…</div>
+      </div>
+
+      <div class="panel" id="panel-personas">
+        <p style="color:var(--text-dim);font-size:14px;margin:0 0 16px;">
+          Personas dão <strong style="color:var(--text);">caráter</strong> ao seu agente. Mesmas ferramentas, vibes únicas.
+          Escolha uma e ela fica colada nesse agente — afeta vocabulário, tom e até a voz nos áudios.
+        </p>
+        <div class="tpl-grid" id="persona-grid">Loading personas…</div>
       </div>
 
       <div class="panel" id="panel-mine">
@@ -621,6 +630,7 @@
         budget_per_session_usdc: '0.50', hard_cap_usdc: '2.00',
         pay_mode: 'visitor', daily_budget_usdc: '5.00',
         tier_required: 'free', ui_language: 'auto', vanity_domain: '',
+        persona_id: null, persona_slug: null,
       };
 
       // ── Tabs ──────────────────────────────────────────────────────────
@@ -631,8 +641,66 @@
           document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
           document.getElementById('panel-' + b.dataset.tab).classList.add('active');
           if (b.dataset.tab === 'mine') loadMyAgents();
+          if (b.dataset.tab === 'personas') loadPersonas();
         });
       });
+
+      // ── Personas ──────────────────────────────────────────────────────
+      let personasCache = null;
+      async function loadPersonas() {
+        if (personasCache) return; // already loaded
+        try {
+          const r = await fetch(API_BASE + '/v1/personas');
+          const d = await r.json();
+          personasCache = d.data || [];
+          const grid = document.getElementById('persona-grid');
+          if (personasCache.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted)">Nenhuma persona disponível ainda.</p>';
+            return;
+          }
+          grid.innerHTML = personasCache.map((p) => `
+            <div class="tpl-card" style="--tc: ${p.avatar_color_primary};padding:0;overflow:hidden;cursor:pointer;" data-persona="${p.slug}" onclick="selectPersona('${p.slug}')">
+              <img src="${API_BASE}${p.avatar_url}?size=400&name=0" alt="${escape(p.name)}" style="width:100%;aspect-ratio:1;display:block;">
+              <div style="padding:14px 16px;">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                  <h3 style="margin:0;font-size:16px;font-weight:700;">${escape(p.emoji)} ${escape(p.name)}</h3>
+                  ${p.premium ? '<span style="background:rgba(255,184,0,0.15);color:#ffb800;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;">PREMIUM</span>' : '<span style="background:rgba(74,222,128,0.1);color:#4ade80;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;">GRÁTIS</span>'}
+                </div>
+                <p style="margin:0 0 8px;color:var(--text-dim);font-size:12px;">${escape(p.tagline || '')}</p>
+                <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text);font-style:italic;margin-bottom:10px;">"${escape(p.sample_greeting || '')}"</div>
+                <button class="btn primary" style="width:100%;font-size:13px;" type="button">Usar essa persona →</button>
+              </div>
+            </div>
+          `).join('');
+        } catch (e) {
+          document.getElementById('persona-grid').innerHTML =
+            `<p style="color:#f87171">Could not load personas: ${e.message}</p>`;
+        }
+      }
+
+      window.selectPersona = (slug) => {
+        // Select persona — opens the builder modal pre-filled, fresh agent.
+        const p = (personasCache || []).find((x) => x.slug === slug);
+        if (!p) return;
+        showBuilder({
+          name: '',
+          slug: '',
+          description: `Agente com a persona ${p.name}`,
+          system_prompt: `Você é um assistente útil. Use as ferramentas quando relevantes.`,
+          allowed_tools: [
+            'lookup_cep','lookup_cnpj','current_weather','convert_currency',
+            'wikipedia_summary','wikipedia_search','brasilapi_holidays',
+            'brasilapi_ddd','brasilapi_rates','crypto_price','search_web',
+            'embed_text','generate_image','generate_pix',
+          ],
+          primary_color: p.avatar_color_primary,
+          welcome_message: p.sample_greeting,
+          public: true,
+          pay_mode: 'owner',  // WhatsApp requires owner-paid
+          persona_slug: p.slug,
+          persona_id: p.id,
+        });
+      };
 
       // ── Templates ─────────────────────────────────────────────────────
       async function loadTemplates() {
@@ -1280,6 +1348,9 @@
             vanity_domain: formState.vanity_domain || null,
             system_prompt_b: formState.system_prompt_b || null,
             ab_split: formState.ab_split,
+            // Persona is optional. Backend resolves slug → id on save.
+            ...(formState.persona_slug ? { persona_slug: formState.persona_slug } : {}),
+            ...(formState.persona_id && !formState.persona_slug ? { persona_id: formState.persona_id } : {}),
           };
           let createdAgent = null;
           if (editingAgentId) {

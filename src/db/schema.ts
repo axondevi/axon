@@ -215,6 +215,10 @@ export const agents = pgTable(
     // inbound message comes from this number, the agent switches to
     // owner/personal-assistant mode (different persona, broader tool access).
     ownerPhone: text('owner_phone'),
+    // Optional persona — when set, runtime prepends persona.prompt_fragment
+    // to the system prompt and routes TTS through persona.voice_id_elevenlabs.
+    // null = no persona (default Axon behavior).
+    personaId: uuid('persona_id'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -223,6 +227,7 @@ export const agents = pgTable(
     slugIdx: uniqueIndex('agents_slug_idx').on(t.slug),
     vanityIdx: uniqueIndex('agents_vanity_idx').on(t.vanityDomain),
     ownerPhoneIdx: index('agents_owner_phone_idx').on(t.ownerPhone),
+    personaIdx: index('agents_persona_idx').on(t.personaId),
   }),
 );
 
@@ -427,3 +432,40 @@ export const pixPayments = pgTable(
   }),
 );
 export type PixPayment = typeof pixPayments.$inferSelect;
+
+// ─── Personas (AI characters) ───────────────────────────────────
+// Personas overlay on top of every agent: same tools, same business
+// context, totally different *vibe*. Tia Zélia warm vs Don Salvatore
+// dramatic vs Mestra Yobá zen — each a distinct voice for the same
+// underlying capabilities. Owners pick one at agent creation; runtime
+// prepends prompt_fragment to the system prompt and routes TTS through
+// voice_id_elevenlabs.
+export const personas = pgTable(
+  'personas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    tagline: text('tagline'),
+    emoji: text('emoji'),
+    toneDescription: text('tone_description').notNull(),
+    promptFragment: text('prompt_fragment').notNull(),
+    sampleGreeting: text('sample_greeting'),
+    sampleSignoff: text('sample_signoff'),
+    voiceIdElevenlabs: text('voice_id_elevenlabs'),
+    avatarColorPrimary: text('avatar_color_primary').notNull().default('#7c5cff'),
+    avatarColorSecondary: text('avatar_color_secondary').notNull().default('#19d5c6'),
+    premium: boolean('premium').notNull().default(false),
+    monthlyPriceBrl: integer('monthly_price_brl').notNull().default(0),
+    active: boolean('active').notNull().default(true),
+    displayOrder: integer('display_order').notNull().default(100),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex('personas_slug_idx').on(t.slug),
+    activeIdx: index('personas_active_idx').on(t.active),
+    orderIdx: index('personas_order_idx').on(t.displayOrder),
+  }),
+);
+export type Persona = typeof personas.$inferSelect;

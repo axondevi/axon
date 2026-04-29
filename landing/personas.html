@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personas · Axon</title>
+<meta name="description" content="Escolha a persona do seu agente: Tia Zélia carinhosa, Don Salvatore charmoso, Cabra da Peste direto. Mesmas ferramentas, vibes únicas.">
+<meta property="og:title" content="Personas Axon — escolha o caráter do seu bot">
+<meta property="og:description" content="8 personagens únicos pra dar voz e personalidade ao seu agente WhatsApp.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --bg-elev: #111114;
+    --bg-card: #16161a;
+    --bg-hover: #1c1c22;
+    --border: #25252b;
+    --text: #eeeef0;
+    --text-dim: #9a9aa4;
+    --text-muted: #6a6a76;
+    --accent: #7c5cff;
+    --accent-2: #19d5c6;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  a { color: var(--accent-2); text-decoration: none; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .hero h1 {
+    font-size: 42px;
+    letter-spacing: -0.02em;
+    margin: 0 0 12px;
+    background: linear-gradient(135deg, var(--text), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero p { font-size: 18px; color: var(--text-dim); max-width: 720px; margin: 0 auto; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 8px 24px rgba(124,92,255,0.15);
+  }
+  .card .avatar { width: 100%; aspect-ratio: 1; display: block; }
+  .card .body { padding: 18px 20px; flex: 1; display: flex; flex-direction: column; }
+  .card h3 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .card .tagline { color: var(--text-dim); font-size: 13px; margin: 0 0 12px; }
+  .card .tone {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin: 0 0 14px;
+    line-height: 1.5;
+    flex: 1;
+  }
+  .card .greeting {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--text);
+    font-style: italic;
+    margin-bottom: 14px;
+  }
+  .card .greeting::before { content: '"'; opacity: 0.4; }
+  .card .greeting::after { content: '"'; opacity: 0.4; }
+  .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
+  .badge {
+    padding: 3px 8px;
+    background: rgba(124,92,255,0.1);
+    border: 1px solid rgba(124,92,255,0.25);
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge.voice { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.25); color: #4ade80; }
+  .badge.free { background: rgba(25,213,198,0.08); border-color: rgba(25,213,198,0.25); color: var(--accent-2); }
+
+  .cta-btn {
+    display: block;
+    text-align: center;
+    background: var(--accent);
+    color: white;
+    padding: 11px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: filter 0.15s;
+  }
+  .cta-btn:hover { filter: brightness(1.15); }
+
+  .nav-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 13px;
+    text-decoration: none;
+    margin-bottom: 24px;
+  }
+  .nav-back:hover { color: var(--text); }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
+  .footer-strip {
+    margin-top: 48px;
+    background: linear-gradient(135deg, rgba(124,92,255,0.08), rgba(25,213,198,0.04));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+  }
+  .footer-strip h3 { margin: 0 0 4px; font-size: 18px; }
+  .footer-strip p { margin: 0; color: var(--text-dim); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="nav-back" href="/dashboard">← Painel</a>
+
+  <div class="hero">
+    <h1>Escolha a persona do seu agente</h1>
+    <p>
+      Mesmas ferramentas, vibes únicas. <strong style="color:var(--text);">Don Salvatore</strong> e
+      <strong style="color:var(--text);">Tia Zélia</strong> resolvem o mesmo problema — só que com
+      personalidades muito diferentes. Pensa qual representa melhor seu negócio.
+    </p>
+  </div>
+
+  <div id="grid" class="grid">
+    <div class="empty" style="grid-column:1/-1;">Carregando personas…</div>
+  </div>
+
+  <div class="footer-strip">
+    <div>
+      <h3>Cliente seu chega no WhatsApp e o agente responde com ESSA voz.</h3>
+      <p>Crie um agente, escolha a persona, conecte WhatsApp em 1 click. Cada conversa custa centavos.</p>
+    </div>
+    <a class="cta-btn" href="/build">Criar agente →</a>
+  </div>
+</div>
+
+<script>
+  const API_BASE = window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : 'https://axon-kedb.onrender.com';
+
+  async function load() {
+    try {
+      const res = await fetch(`${API_BASE}/v1/personas`);
+      const data = await res.json();
+      render(data.data || []);
+    } catch (e) {
+      document.getElementById('grid').innerHTML =
+        `<div class="empty" style="grid-column:1/-1;">Erro ao carregar: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function render(personas) {
+    if (personas.length === 0) {
+      document.getElementById('grid').innerHTML =
+        `<div class="empty" style="grid-column:1/-1;">Nenhuma persona disponível ainda.</div>`;
+      return;
+    }
+    document.getElementById('grid').innerHTML = personas.map(p => `
+      <div class="card">
+        <img class="avatar" src="${API_BASE}${p.avatar_url}?size=400&name=0" alt="Avatar de ${escapeAttr(p.name)}" loading="lazy">
+        <div class="body">
+          <h3>${p.emoji} ${escapeHtml(p.name)}</h3>
+          <p class="tagline">${escapeHtml(p.tagline || '')}</p>
+          <p class="tone">${escapeHtml(p.tone_description)}</p>
+          <div class="greeting">${escapeHtml(p.sample_greeting || '')}</div>
+          <div class="badges">
+            <span class="badge free">${p.premium ? 'Premium' : 'Grátis'}</span>
+            <span class="badge voice">🎙 voz própria</span>
+          </div>
+          <a class="cta-btn" href="/build?persona=${encodeURIComponent(p.slug)}">Usar ${escapeHtml(p.name)} →</a>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  load();
+</script>
+</body>
+</html>

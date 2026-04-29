@@ -289,8 +289,30 @@ export async function runAgent(opts: {
   agentId?: string;
   /** When false, skip cache lookup/store. Useful for "force fresh" debug. */
   enableCache?: boolean;
+  /** Optional persona id — when set, persona.prompt_fragment is prepended
+   *  to the systemPrompt. Lazy-loaded once per call. */
+  personaId?: string | null;
 }): Promise<RunAgentResult> {
-  const { c, systemPrompt, allowedTools, messages, ownerId, agentId, enableCache = true } = opts;
+  const { c, allowedTools, messages, ownerId, agentId, enableCache = true } = opts;
+  let { systemPrompt } = opts;
+
+  // ─── Persona loading ─────────────────────────────────────────────
+  // If the agent has a persona attached, fetch its prompt_fragment and
+  // prepend it BEFORE the rest of the system prompt. The fragment defines
+  // the character; the existing systemPrompt has the role/business rules.
+  // Done as a lazy import so non-persona runs (older agents) don't pay
+  // the cost of importing the personas schema at all.
+  if (opts.personaId) {
+    try {
+      const { db: dbm } = await import('~/db');
+      const { personas } = await import('~/db/schema');
+      const { eq: eqm } = await import('drizzle-orm');
+      const [persona] = await dbm.select().from(personas).where(eqm(personas.id, opts.personaId)).limit(1);
+      if (persona) {
+        systemPrompt = persona.promptFragment + '\n\n' + systemPrompt;
+      }
+    } catch {/* persona load failed — continue with bare systemPrompt */}
+  }
 
   // ─── KNOWLEDGE CACHE: try to short-circuit before calling LLM ─────────
   // Only cache when:

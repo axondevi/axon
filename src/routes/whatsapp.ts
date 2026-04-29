@@ -568,6 +568,7 @@ publicWebhook.post('/:secret', async (c) => {
       allowedTools: effectiveTools,
       messages,
       ownerId: a.ownerId,
+      personaId: a.personaId,
       // Disable semantic cache: each contact's context is unique. The same
       // question from Pedro (VIP) vs Maria (new) warrants different replies.
       // Owner mode is even more dynamic — never cache.
@@ -673,9 +674,20 @@ publicWebhook.post('/:secret', async (c) => {
   if (userSentAudio && reply.trim().length > 0) {
     try {
       const { synthesizeSpeech } = await import('~/voice/elevenlabs');
+      // If the agent has a persona, use ITS voice id — keeps Don Salvatore
+      // sounding deep+Italian and Tia Zélia sounding warm+elderly even when
+      // the same business is set up. Falls back to default voice when null.
+      let voiceId: string | undefined;
+      if (a.personaId) {
+        try {
+          const { personas } = await import('~/db/schema');
+          const [persona] = await db.select().from(personas).where(eq(personas.id, a.personaId)).limit(1);
+          voiceId = persona?.voiceIdElevenlabs || undefined;
+        } catch {/* fallback to default voice */}
+      }
       // Strip || delimiters and emoji-only phrases — TTS handles plain prose best.
       const ttsText = reply.replace(/\|\|+/g, '. ').slice(0, 600);
-      const tts = await synthesizeSpeech({ text: ttsText });
+      const tts = await synthesizeSpeech({ text: ttsText, voiceId });
       if (tts.ok && tts.audioBytes) {
         // Convert to base64 for sendMedia
         let bin = '';

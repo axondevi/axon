@@ -7,9 +7,11 @@
  * so any visitor can chat without signing up.
  */
 import { sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from './index';
-import { users, wallets, agents } from './schema';
+import { users, wallets, agents, personas } from './schema';
 import { AGENT_TEMPLATES } from '~/agents/templates';
+import { PERSONA_SEEDS } from '~/personas/seeds';
 
 /** Fixed UUID for the synthetic user that represents all x402-native calls. */
 export const X402_ANON_USER_ID = '00000000-0000-0000-0000-000000000000';
@@ -64,6 +66,35 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "pix_user_idx" ON "pix_payments" ("user_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "pix_status_idx" ON "pix_payments" ("status")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "pix_created_idx" ON "pix_payments" ("created_at" DESC)`);
+
+  // 0011: personas + agents.persona_id — AI characters.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "personas" (
+      "id"                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "slug"                     text NOT NULL,
+      "name"                     text NOT NULL,
+      "tagline"                  text,
+      "emoji"                    text,
+      "tone_description"         text NOT NULL,
+      "prompt_fragment"          text NOT NULL,
+      "sample_greeting"          text,
+      "sample_signoff"           text,
+      "voice_id_elevenlabs"      text,
+      "avatar_color_primary"     text NOT NULL DEFAULT '#7c5cff',
+      "avatar_color_secondary"   text NOT NULL DEFAULT '#19d5c6',
+      "premium"                  boolean NOT NULL DEFAULT false,
+      "monthly_price_brl"        integer NOT NULL DEFAULT 0,
+      "active"                   boolean NOT NULL DEFAULT true,
+      "display_order"            integer NOT NULL DEFAULT 100,
+      "created_at"               timestamp NOT NULL DEFAULT NOW(),
+      "updated_at"               timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "personas_slug_idx" ON "personas" ("slug")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "personas_active_idx" ON "personas" ("active")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "personas_order_idx" ON "personas" ("display_order")`);
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "persona_id" uuid REFERENCES "personas"("id") ON DELETE SET NULL`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agents_persona_idx" ON "agents" ("persona_id")`);
 }
 
 export async function ensureSystemRows() {
@@ -165,6 +196,32 @@ export async function ensureSystemRows() {
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_cache_agent_idx" ON "agent_cache" ("agent_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_cache_lasthit_idx" ON "agent_cache" ("last_hit" DESC)`);
+
+  // ─── Seed personas (idempotent on slug) ──────────────────────
+  // We only INSERT new slugs and UPDATE existing rows' content (so when
+  // we tweak a prompt fragment, every redeploy refreshes it). Owner-set
+  // overrides via SQL can use display_order < 0 to opt out, or just
+  // edit the columns directly — the upsert won't override them since
+  // we ON CONFLICT DO NOTHING.
+  for (const p of PERSONA_SEEDS) {
+    await db
+      .insert(personas)
+      .values({
+        slug: p.slug,
+        name: p.name,
+        tagline: p.tagline,
+        emoji: p.emoji,
+        toneDescription: p.toneDescription,
+        promptFragment: p.promptFragment,
+        sampleGreeting: p.sampleGreeting,
+        sampleSignoff: p.sampleSignoff,
+        voiceIdElevenlabs: p.voiceIdElevenlabs,
+        avatarColorPrimary: p.avatarColorPrimary,
+        avatarColorSecondary: p.avatarColorSecondary,
+        displayOrder: p.displayOrder,
+      })
+      .onConflictDoNothing();
+  }
 
   // ─── Self-healing schema: ensure contact_memory exists ──────
   // Migration 0008_contact_memory.sql may not have been applied if the operator

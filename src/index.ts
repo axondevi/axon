@@ -31,6 +31,7 @@ import { ownerContacts } from '~/routes/contacts';
 import { nftMetaRoutes } from '~/routes/nft-metadata';
 import { checkoutRoutes } from '~/routes/checkout';
 import { previewRoutes } from '~/routes/preview';
+import { personaRoutes } from '~/routes/personas';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -139,6 +140,8 @@ app.route('/v1/webhooks/whatsapp', whatsappPublicWebhook);
 // Public NFT metadata — fetched by marketplaces (OpenSea, Basescan) at the
 // tokenURI of every minted agent NFT. Must be unauthenticated.
 app.route('/agent-meta', nftMetaRoutes);
+// Public personas API — gallery + avatar SVGs.
+app.route('/v1/personas', personaRoutes);
 
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();
