@@ -28,6 +28,7 @@ import agentsRoutes, { publicRoutes as agentsPublicRoutes } from '~/routes/agent
 import agentRunRoutes from '~/routes/agent-run';
 import { ownerWhatsapp, publicWebhook as whatsappPublicWebhook } from '~/routes/whatsapp';
 import { ownerContacts } from '~/routes/contacts';
+import { nftMetaRoutes } from '~/routes/nft-metadata';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
@@ -131,6 +132,9 @@ app.route('/v1/run', agentRunRoutes);
 // Inbound WhatsApp from Evolution servers — no auth, secret in path is the auth.
 // MUST go before the authed /v1 router for the same reason as /v1/signup.
 app.route('/v1/webhooks/whatsapp', whatsappPublicWebhook);
+// Public NFT metadata — fetched by marketplaces (OpenSea, Basescan) at the
+// tokenURI of every minted agent NFT. Must be unauthenticated.
+app.route('/agent-meta', nftMetaRoutes);
 
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();

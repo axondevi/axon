@@ -146,6 +146,25 @@ publicRoutes.get('/by-domain/:domain', async (c) => {
 // ============ Authed routes (mounted under /v1) ============
 const app = new Hono();
 
+/**
+ * Build the public NFT view URL for an agent. Shape depends on NFT_RPC_URL:
+ * - sepolia → sepolia.basescan.org
+ * - else    → basescan.org (mainnet)
+ *
+ * Returns null when NFT is disabled (no contract configured) so the dashboard
+ * can omit the badge entirely.
+ */
+function nftViewUrlFor(agentId: string): string | null {
+  const contract = process.env.NFT_CONTRACT_ADDRESS;
+  if (!contract || !isNftEnabled()) return null;
+  const isSepolia = /sepolia/i.test(process.env.NFT_RPC_URL || '');
+  const explorer = isSepolia ? 'https://sepolia.basescan.org' : 'https://basescan.org';
+  // tokenId derived deterministically from UUID (matches uuidToTokenId in agent-nft.ts).
+  const tokenIdHex = agentId.replace(/-/g, '');
+  const tokenIdDec = BigInt('0x' + tokenIdHex).toString();
+  return `${explorer}/nft/${contract}/${tokenIdDec}`;
+}
+
 // List my agents
 app.get('/', async (c) => {
   const user = c.get('user') as { id: string };
@@ -168,6 +187,7 @@ app.get('/', async (c) => {
       daily_budget_usdc: fromMicro(a.dailyBudgetMicro),
       budget_per_session_usdc: fromMicro(a.budgetPerSession),
       hard_cap_usdc: fromMicro(a.hardCap),
+      nft_url: nftViewUrlFor(a.id),
       created_at: a.createdAt,
       updated_at: a.updatedAt,
     })),
