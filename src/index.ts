@@ -40,7 +40,13 @@ const app = new Hono();
 
 // Request ID first so all subsequent middleware + logs see it.
 app.use('*', requestId);
-app.use('*', secureHeaders());
+// secureHeaders defaults Cross-Origin-Resource-Policy to 'same-origin', which
+// silently blocks <img> loads of our public assets (persona avatars, NFT
+// metadata) from the Cloudflare Pages frontend on a different domain. Set
+// to 'cross-origin' globally — CORS still gates who can READ data via fetch.
+app.use('*', secureHeaders({
+  crossOriginResourcePolicy: 'cross-origin',
+}));
 // CORS: lock to configured frontend origins in prod. Pre-flight + credentials
 // are restricted to known hosts so browser-side session theft is not possible.
 const allowedOrigins = env.CORS_ALLOWED_ORIGINS;
