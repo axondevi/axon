@@ -244,6 +244,33 @@ app.post('/mercadopago', async (c) => {
       amountBrl: payment.amountBrl,
       amountUsdc: usdcDecimal.toFixed(6),
     });
+
+    // Confirmation email — fire-and-forget. Need to look up the user's email
+    // and current balance for the email body. Failures here NEVER undo the
+    // credit (it's already committed), they just mean the user doesn't get
+    // an email.
+    void (async () => {
+      try {
+        const { users, wallets: walletsTable } = await import('~/db/schema');
+        const { sendEmail } = await import('~/email/client');
+        const { pixApprovedEmail } = await import('~/email/templates');
+        const { fromMicro: fromMicroFn } = await import('~/wallet/service');
+        const [u] = await dbm.select().from(users).where(eqm(users.id, row.userId)).limit(1);
+        if (!u || !u.email) return;
+        const [w] = await dbm.select().from(walletsTable).where(eqm(walletsTable.userId, row.userId)).limit(1);
+        const newBal = w ? fromMicroFn(w.balanceMicro) : usdcDecimal.toFixed(6);
+        const t = pixApprovedEmail({
+          amountBrl: Number(payment.amountBrl),
+          amountUsdc: usdcDecimal.toFixed(6),
+          newBalanceUsdc: newBal,
+          mpId: String(payment.mpId),
+        });
+        await sendEmail({ to: u.email, subject: t.subject, html: t.html, text: t.text, tag: 'pix_approved' });
+      } catch (err) {
+        log.warn('mp_pix_email_failed', { pixId: row.id, error: err instanceof Error ? err.message : String(err) });
+      }
+    })();
+
     return c.json({ ok: true, status: 'approved' });
   }
 

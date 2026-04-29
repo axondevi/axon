@@ -311,6 +311,23 @@ app.post('/', async (c) => {
       }
     }
 
+    // Confirmation email — fire-and-forget. Looks up the user's email lazily
+    // (the auth middleware only injects {id, tier, ...}, not always email).
+    void (async () => {
+      try {
+        const [u] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+        if (!u || !u.email) return;
+        const { sendEmail } = await import('~/email/client');
+        const { agentCreatedEmail } = await import('~/email/templates');
+        const t = agentCreatedEmail({
+          agentName: created.name,
+          agentSlug: created.slug,
+          nftUrl: nftViewUrlFor(created.id),
+        });
+        await sendEmail({ to: u.email, subject: t.subject, html: t.html, text: t.text, tag: 'agent_created' });
+      } catch {/* email is best-effort */}
+    })();
+
     return c.json({
       ok: true,
       id: created.id,

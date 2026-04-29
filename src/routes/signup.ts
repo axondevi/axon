@@ -188,6 +188,25 @@ app.post('/', ipRateLimit, async (c) => {
     ip: getClientIp(c),
   });
 
+  // Welcome email — fire-and-forget, never block the signup response on it.
+  // Lazy-imported so test envs without RESEND_API_KEY don't pull the module
+  // until first real signup call.
+  void (async () => {
+    try {
+      const { sendEmail } = await import('~/email/client');
+      const { welcomeEmail } = await import('~/email/templates');
+      const t = welcomeEmail({
+        email,
+        apiKey: rawKey,
+        bonusUsdc: SIGNUP_BONUS_USDC,
+        depositAddress: deposit.address,
+      });
+      await sendEmail({ to: email, subject: t.subject, html: t.html, text: t.text, tag: 'welcome' });
+    } catch (err) {
+      log.warn('signup.email_failed', { email, error: err instanceof Error ? err.message : String(err) });
+    }
+  })();
+
   return c.json(
     {
       user_id: userId,
