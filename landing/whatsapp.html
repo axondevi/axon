@@ -518,9 +518,17 @@
           connectWizardState.step = 'pairing';
           renderConnectStep();
         } catch (err) {
-          // Server not configured for auto-provision → fall back to manual form.
-          // 503 means feature unavailable; other errors might be transient.
           const msg = (err.message || '').toLowerCase();
+          // Wrong pay_mode = the agent is set to "visitor pays" but WhatsApp
+          // visitors are anonymous (no API key) so the owner has to pay for
+          // their conversations. We can fix this in one click instead of
+          // throwing the user back to the form with a cryptic 400.
+          if (msg.includes('wrong_pay_mode') || msg.includes('require pay_mode=owner')) {
+            connectWizardState.step = 'pay-mode-fix';
+            renderConnectStep();
+            return;
+          }
+          // Auto-provision feature not configured on this server → manual form.
           if (msg.includes('auto_provision_unavailable') || msg.includes('503')) {
             connectWizardState.mode = 'manual';
             connectWizardState.step = 'form';
@@ -534,6 +542,32 @@
           }
         }
       }
+
+      // One-click pay_mode flip — turns visitor-pays agents into owner-pays
+      // (required for WhatsApp since visitors are anon contacts). Then retries
+      // the auto-provision flow so the user lands on the QR screen seamlessly.
+      window.fixPayModeAndRetry = async () => {
+        const body = document.getElementById('connect-modal-body');
+        if (body) {
+          const btn = document.getElementById('cw-fix-btn');
+          if (btn) { btn.disabled = true; btn.textContent = 'Mudando…'; }
+        }
+        try {
+          await api(`/v1/agents/${connectWizardState.agentId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ pay_mode: 'owner' }),
+          });
+          // Retry auto-provision now that pay_mode is correct.
+          connectWizardState.step = 'connecting';
+          connectWizardState.mode = 'auto';
+          renderConnectStep();
+          autoProvisionConnection();
+        } catch (err) {
+          const btn = document.getElementById('cw-fix-btn');
+          if (btn) { btn.disabled = false; btn.textContent = 'Mudar para modo dono e tentar de novo'; }
+          alert('Falhou ao mudar pay_mode: ' + (err.message || err));
+        }
+      };
 
       function closeConnectModal() {
         if (connectWizardState.pollTimer) clearInterval(connectWizardState.pollTimer);
@@ -607,6 +641,21 @@
               <div style="color:var(--text-muted);font-size:13px;">Geralmente leva 5-10 segundos…</div>
             </div>
             <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+          `;
+        }
+
+        if (connectWizardState.step === 'pay-mode-fix') {
+          body.innerHTML = `
+            ${header('Esse agente está em modo cliente paga', 'Pra ativar WhatsApp, ele precisa estar em modo dono paga.')}
+            <div style="background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.3);border-radius:8px;padding:16px;margin-bottom:18px;font-size:13px;line-height:1.6;color:var(--text-dim);">
+              <strong style="color:var(--text);">Por que isso?</strong><br/>
+              No WhatsApp, quem manda zap é um número anônimo — seu agente não sabe quem é nem tem como cobrar dele. Por isso, o dono (você) cobre as conversas WhatsApp da sua wallet USDC.<br/><br/>
+              <strong style="color:var(--text);">Quanto custa?</strong> Cada turno (mensagem do cliente + resposta do agente) custa entre <strong style="color:var(--accent-2);">$0,001 e $0,005</strong> dependendo das ferramentas usadas. Tu controla o teto diário (default: $5/dia) em <a href="/build" style="color:var(--accent-2);text-decoration:none;">/build</a>.
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+              <button onclick="closeConnectModal()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer;">Cancelar</button>
+              <button id="cw-fix-btn" onclick="fixPayModeAndRetry()" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Mudar para modo dono e tentar de novo →</button>
+            </div>
           `;
         }
 
