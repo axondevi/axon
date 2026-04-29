@@ -86,10 +86,16 @@ export async function mintAgentNft(params: MintParams): Promise<MintResult> {
       return { ok: false, reason: 'viem_missing' };
     }
 
+    // Auto-detect Base mainnet vs Base Sepolia from the RPC URL.
+    // The wrong chainId on a tx makes the RPC reject with cryptic
+    // "Missing or invalid parameters" — easy to miss without this branch.
+    const isSepolia = /sepolia/i.test(rpcUrl);
+    const chain = isSepolia ? baseChain.baseSepolia : baseChain.base;
+
     const minterAccount = accounts.privateKeyToAccount(minterKey as `0x${string}`);
     const walletClient = viem.createWalletClient({
       account: minterAccount,
-      chain: baseChain.base,
+      chain,
       transport: viem.http(rpcUrl),
     });
 
