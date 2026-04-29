@@ -139,14 +139,25 @@ export async function chatCompletionWithFallback(req: LLMRequest): Promise<LLMRe
   });
 
   if (candidates.length === 0) {
-    // Edge case: every provider cooled or none configured. Fall back to
-    // any-key-set provider (ignore cooldown) so we at least try — better
-    // a likely 429 than a hard fail.
+    // Edge case: every tool-capable provider cooled or none configured.
+    // Fall back to any-key-set provider (ignore cooldown) so we at least
+    // try — better a likely 429 than a hard fail.
     const anyConfigured = PROVIDERS.filter((p) => upstreamKeyFor(p.keySlug));
     if (anyConfigured.length === 0) {
       throw new Error('No LLM provider configured (set UPSTREAM_KEY_GROQ at minimum)');
     }
     candidates.push(...anyConfigured);
+  }
+
+  // Last-resort tier: if the user wants tools but the only provider left
+  // standing is text-only (Cohere), push it onto the cascade tail with
+  // tools STRIPPED. The agent will respond as best it can without tool
+  // access — degraded but not dead. Better than 500.
+  if (wantsTools) {
+    const textOnlySurvivors = PROVIDERS.filter(
+      (p) => upstreamKeyFor(p.keySlug) && !p.supportsTools && !isCooled(p.name) && !candidates.includes(p),
+    );
+    candidates.push(...textOnlySurvivors);
   }
 
   let lastError = '';
@@ -158,6 +169,9 @@ export async function chatCompletionWithFallback(req: LLMRequest): Promise<LLMRe
       max_tokens: req.max_tokens ?? 4096,
       temperature: req.temperature ?? 0.3,
     };
+    // Only attach tools if BOTH the request wants them AND the provider
+    // supports them. This handles the text-only fallback path where Cohere
+    // gets the request without tools to keep it from emitting empty action.
     if (req.tools?.length && provider.supportsTools) {
       body.tools = req.tools;
       body.tool_choice = 'auto';
