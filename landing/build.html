@@ -577,6 +577,9 @@
         'Dados / Consulta BR': [
           { name: 'lookup_cnpj',          desc: 'Empresa brasileira por CNPJ', cost: 'free' },
           { name: 'lookup_cep',           desc: 'CEP brasileiro → endereço', cost: 'free' },
+          { name: 'lookup_bank',          desc: 'Banco BR por código (001, 341, 260)', cost: 'free' },
+          { name: 'lookup_fipe',          desc: 'Preço FIPE de carro/moto', cost: 'free' },
+          { name: 'ibge_city',            desc: 'Município IBGE por código', cost: 'free' },
           { name: 'current_weather',      desc: 'Clima atual (OpenWeather)', cost: '~$0.0005' },
           { name: 'weather_forecast',     desc: 'Previsão multi-dia (Open-Meteo)', cost: 'free' },
           { name: 'lookup_ip',            desc: 'Geolocalização de IP', cost: '~$0.0005' },
@@ -584,6 +587,11 @@
           { name: 'brasilapi_holidays',   desc: 'Feriados nacionais BR', cost: 'free' },
           { name: 'brasilapi_rates',      desc: 'Selic/CDI/IPCA atuais', cost: 'free' },
           { name: 'brasilapi_ddd',        desc: 'DDD → estado + cidades', cost: 'free' },
+          { name: 'bcb_indicator',        desc: 'Série temporal Bacen (Selic, IPCA, USD)', cost: 'free' },
+        ],
+        'Geo / Logística': [
+          { name: 'geocode_address',      desc: 'Endereço → coordenadas (OpenStreetMap)', cost: 'free' },
+          { name: 'route_distance',       desc: 'Distância e tempo de carro entre 2 pontos', cost: 'free' },
         ],
         'Finanças': [
           { name: 'convert_currency',     desc: 'Conversão FX (Frankfurter)', cost: 'free' },
@@ -594,6 +602,7 @@
           { name: 'exa_search',           desc: 'Busca neural (Exa)', cost: '~$0.005' },
           { name: 'scrape_url',           desc: 'URL → markdown (Firecrawl)', cost: '~$0.002' },
           { name: 'search_hn',            desc: 'Hacker News search', cost: 'free' },
+          { name: 'github_user',          desc: 'Perfil público GitHub', cost: 'free' },
         ],
         'Conhecimento': [
           { name: 'wikipedia_summary',    desc: 'Resumo de artigo Wikipedia', cost: 'free' },
@@ -618,10 +627,11 @@
       // a "incluso por padrão" badge so customers don't think they need to
       // hunt for these. Mirrors src/agents/templates.ts CORE_TOOLS.
       const CORE_TOOLS_DEFAULT = new Set([
-        'lookup_cep', 'lookup_cnpj', 'current_weather', 'convert_currency',
+        'lookup_cep', 'lookup_cnpj', 'lookup_bank', 'current_weather', 'convert_currency',
         'wikipedia_summary', 'wikipedia_search', 'brasilapi_holidays',
         'brasilapi_ddd', 'brasilapi_rates', 'crypto_price', 'search_web',
         'embed_text', 'generate_image', 'generate_pix',
+        'geocode_address', 'route_distance', 'bcb_indicator', 'ibge_city',
       ]);
 
       function showToast(msg, kind) {
@@ -727,10 +737,11 @@
           description: 'Agente com a persona ' + p.name,
           system_prompt: 'Você é um assistente útil. Use as ferramentas quando relevantes.',
           allowed_tools: [
-            'lookup_cep','lookup_cnpj','current_weather','convert_currency',
+            'lookup_cep','lookup_cnpj','lookup_bank','current_weather','convert_currency',
             'wikipedia_summary','wikipedia_search','brasilapi_holidays',
             'brasilapi_ddd','brasilapi_rates','crypto_price','search_web',
             'embed_text','generate_image','generate_pix',
+            'geocode_address','route_distance','bcb_indicator','ibge_city',
           ],
           primary_color: p.avatar_color_primary,
           welcome_message: p.sample_greeting,

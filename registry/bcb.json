@@ -1,0 +1,19 @@
+{
+  "slug": "bcb",
+  "provider": "Banco Central do Brasil",
+  "category": "Brazil & LatAm Data",
+  "description": "Time-series of every macroeconomic indicator the Bacen publishes — Selic, IPCA, dólar, IOF, taxa de câmbio. Public, no key required.",
+  "homepage": "https://dadosabertos.bcb.gov.br/",
+  "base_url": "https://api.bcb.gov.br",
+  "auth": { "type": "none" },
+  "endpoints": {
+    "series": {
+      "method": "GET",
+      "path": "/dados/serie/bcdata.sgs.:codigo/dados/ultimos/:n",
+      "price_usd": 0.0005,
+      "markup_pct": 30,
+      "cache_ttl": 3600,
+      "notes": "Last N points of a Bacen time series. :codigo is the SGS code (Selic=11, IPCA=433, dólar PTAX venda=1)."
+    }
+  }
+}

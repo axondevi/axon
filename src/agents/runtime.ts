@@ -215,6 +215,89 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     // No buildRequest — generate_pix is intercepted server-side and routed to
     // our internal MercadoPago wrapper, NOT to handleCall.
   },
+
+  // ─── Brazilian financial data ─────────────────────────────────
+  lookup_bank: {
+    description: 'Look up a Brazilian bank by 3-digit FEBRABAN code (e.g. 001=Banco do Brasil, 341=Itaú, 260=Nubank).',
+    parameters: { type: 'object', properties: { code: { type: 'string' } }, required: ['code'] },
+    buildRequest: (a) => ({ params: { code: String(a.code).replace(/\D/g, '').padStart(3, '0') } }),
+  },
+  lookup_fipe: {
+    description: 'Get FIPE-table price for a Brazilian vehicle (cars, motorcycles, trucks). Pass the FIPE code obtained from the brand/model lookup. Useful for used-vehicle pricing, insurance quotes, dealership negotiation.',
+    parameters: { type: 'object', properties: { codigoFipe: { type: 'string', description: 'FIPE code, format like "001004-9".' } }, required: ['codigoFipe'] },
+    buildRequest: (a) => ({ params: { codigoFipe: String(a.codigoFipe).trim() } }),
+  },
+
+  // ─── Geo & maps (free, no key) ────────────────────────────────
+  geocode_address: {
+    description: 'Convert a free-form address (e.g. "Av Paulista 1578, São Paulo") into coordinates and a normalized address. Useful for delivery range, store proximity, mapping pins.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Free-form address — street, number, city, state.' },
+        limit: { type: 'integer', description: 'Max results (default 1).' },
+      },
+      required: ['query'],
+    },
+    buildRequest: (a) => ({
+      params: { q: a.query, format: 'json', limit: a.limit || 1, addressdetails: 1 },
+    }),
+  },
+  route_distance: {
+    description: 'Compute driving distance and duration between two addresses or coordinate pairs. Pass origin and destination as either coords ("lon,lat") or full addresses. Useful for delivery fee, ETA, trip planning. Returns distance in km and duration in minutes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        from_lon: { type: 'number', description: 'Origin longitude.' },
+        from_lat: { type: 'number', description: 'Origin latitude.' },
+        to_lon: { type: 'number', description: 'Destination longitude.' },
+        to_lat: { type: 'number', description: 'Destination latitude.' },
+      },
+      required: ['from_lon', 'from_lat', 'to_lon', 'to_lat'],
+    },
+    buildRequest: (a) => ({
+      // OSRM expects coordinates baked into the path (`/route/v1/driving/lon1,lat1;lon2,lat2`)
+      // — substitutePath() resolves :coordinates from this single param.
+      params: {
+        coordinates: `${a.from_lon},${a.from_lat};${a.to_lon},${a.to_lat}`,
+        overview: 'false',
+      },
+    }),
+  },
+
+  // ─── Macroeconomic indicators ────────────────────────────────
+  bcb_indicator: {
+    description: 'Fetch the most recent N data points of a Banco Central time series. Common SGS codes: Selic=11, IPCA=433, USD/BRL PTAX (venda)=1, IGP-M=189, CDI=12. Use for financial advice, contract adjustments, debt calc.',
+    parameters: {
+      type: 'object',
+      properties: {
+        codigo: { type: 'string', description: 'SGS code (e.g. "11" for Selic).' },
+        n: { type: 'integer', description: 'Number of recent points to fetch (default 12).' },
+      },
+      required: ['codigo'],
+    },
+    buildRequest: (a) => ({
+      params: {
+        codigo: String(a.codigo).replace(/\D/g, ''),
+        n: a.n || 12,
+        formato: 'json',
+      },
+    }),
+  },
+
+  // ─── IBGE (Brazilian municipalities & states) ────────────────
+  ibge_city: {
+    description: 'Get IBGE data for a Brazilian municipality by its 7-digit code (e.g. 3550308 = São Paulo). Returns name, microregion, mesoregion, state. Use for regional analysis, demographic context, address validation.',
+    parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    buildRequest: (a) => ({ params: { id: String(a.id).replace(/\D/g, '') } }),
+  },
+
+  // ─── GitHub ──────────────────────────────────────────────────
+  github_user: {
+    description: "Public GitHub profile by login. Returns name, bio, followers, public repos, location. Useful for developer outreach, recruiter agents, OSS-aware support.",
+    parameters: { type: 'object', properties: { login: { type: 'string' } }, required: ['login'] },
+    buildRequest: (a) => ({ params: { login: String(a.login).trim() } }),
+  },
 };
 
 export function buildToolsArray(allowedTools: string[]): any[] {

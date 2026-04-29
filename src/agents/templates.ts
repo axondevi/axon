@@ -47,6 +47,7 @@ export interface AgentTemplate {
 export const CORE_TOOLS: string[] = [
   'lookup_cep',
   'lookup_cnpj',
+  'lookup_bank',
   'current_weather',
   'convert_currency',
   'wikipedia_summary',
@@ -59,6 +60,11 @@ export const CORE_TOOLS: string[] = [
   'embed_text',
   'generate_image',
   'generate_pix',
+  // New free tools — broadly useful so we ship them by default
+  'geocode_address',
+  'route_distance',
+  'bcb_indicator',
+  'ibge_city',
 ];
 
 /**
@@ -441,6 +447,8 @@ export function getTemplate(id: string): AgentTemplate | undefined {
 export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
   lookup_cnpj:        { api: 'brasilapi', endpoint: 'cnpj' },
   lookup_cep:         { api: 'brasilapi', endpoint: 'cep' },
+  lookup_bank:        { api: 'brasilapi', endpoint: 'bank' },
+  lookup_fipe:        { api: 'brasilapi', endpoint: 'fipe-price' },
   current_weather:    { api: 'openweather', endpoint: 'current' },
   weather_forecast:   { api: 'open-meteo', endpoint: 'forecast' },
   lookup_ip:          { api: 'ipinfo', endpoint: 'lookup' },
@@ -459,6 +467,11 @@ export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
   search_arxiv:       { api: 'arxiv', endpoint: 'search' },
   embed_text:         { api: 'voyage', endpoint: 'embeddings' },
   generate_image:     { api: 'stability', endpoint: 'generate-xl' },
+  geocode_address:    { api: 'nominatim', endpoint: 'search' },
+  route_distance:     { api: 'osrm', endpoint: 'route' },
+  bcb_indicator:      { api: 'bcb', endpoint: 'series' },
+  ibge_city:          { api: 'ibge', endpoint: 'city' },
+  github_user:        { api: 'github', endpoint: 'user' },
   // generate_pix is server-side only — not backed by an upstream API.
   // It calls our internal MercadoPago wrapper via a special handler in
   // src/agents/runtime.ts. We register a dummy mapping so isToolAllowed +
