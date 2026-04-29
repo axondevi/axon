@@ -473,6 +473,30 @@
           </div>
 
           <details style="margin-bottom:18px;">
+            <summary style="cursor:pointer; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); padding:8px 0;">🎯 Roteamento — encaminhar conversa pro agente certo</summary>
+            <div style="padding:12px 0 4px;">
+              <div class="hint" style="margin-bottom:12px;">
+                Use este agente como uma "porta de entrada" — ele classifica a intenção do cliente (vendas, pessoal, suporte) e passa a conversa pro agente especializado correspondente. A escolha fica salva por contato (sticky), então só classifica uma vez.
+              </div>
+              <div class="field">
+                <label for="b-route-sales">Quando o cliente quer COMPRAR <span class="info-tip" data-tip="Cliente perguntou preço, produto, frete, formas de pagamento? Roteia pra esse agente vendedor.">?</span></label>
+                <select id="b-route-sales"><option value="">— Não rotear (atender direto) —</option></select>
+                <div class="hint">Selecione o agente que cuida de vendas (ex: Atendente E-commerce BR).</div>
+              </div>
+              <div class="field">
+                <label for="b-route-personal">Quando o cliente quer CONVERSAR / pedir conselho <span class="info-tip" data-tip="Cliente busca atendimento humano, conselho, conversa informal? Roteia pra um agente com persona empática.">?</span></label>
+                <select id="b-route-personal"><option value="">— Não rotear (atender direto) —</option></select>
+                <div class="hint">Selecione o agente pessoal/empático (ex: Tia Zélia, Mestra Yobá).</div>
+              </div>
+              <div class="field">
+                <label for="b-route-support">Quando o cliente tem PROBLEMA com pedido / suporte <span class="info-tip" data-tip="Cliente reclamando de pedido, problema técnico, devolução? Roteia pra um agente de suporte.">?</span></label>
+                <select id="b-route-support"><option value="">— Não rotear (atender direto) —</option></select>
+                <div class="hint">Selecione o agente de suporte. Se vazio, ele mesmo atende esse caso.</div>
+              </div>
+            </div>
+          </details>
+
+          <details style="margin-bottom:18px;">
             <summary style="cursor:pointer; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); padding:8px 0;">A/B test prompts (advanced)</summary>
             <div style="padding:12px 0 4px;">
               <div class="field">
@@ -631,6 +655,10 @@
         pay_mode: 'visitor', daily_budget_usdc: '5.00',
         tier_required: 'free', ui_language: 'auto', vanity_domain: '',
         persona_id: null, persona_slug: null,
+        // Smart routing: each value is the target agent's id, or '' (no routing).
+        // When at least one is set, the agent acts as a "front door" — first
+        // turn classifies, then sticks the customer on the routed agent.
+        routes_to: { sales: '', personal: '', support: '' },
       };
 
       // ── Tabs ──────────────────────────────────────────────────────────
@@ -838,6 +866,11 @@
             tier_required: a.tier_required || 'free',
             ui_language: a.ui_language || 'auto',
             vanity_domain: a.vanity_domain || '',
+            routes_to: {
+              sales: (a.routes_to && a.routes_to.sales) || '',
+              personal: (a.routes_to && a.routes_to.personal) || '',
+              support: (a.routes_to && a.routes_to.support) || '',
+            },
           }, id);
         } catch (e) { showToast(e.message, 'error'); }
       };
@@ -1222,8 +1255,55 @@
         renderTools();
         renderQuickPrompts();
         renderPreview();
+        renderRoutingDropdowns();
         document.getElementById('builder').dataset.open = '1';
         document.body.style.overflow = 'hidden';
+      }
+
+      // Populate the three routing dropdowns with the user's other agents.
+      // Excludes the agent currently being edited (an agent can't route to
+      // itself — would loop forever) and any agent that already routes_to
+      // somewhere else (chained routing isn't supported and reads as a bug).
+      async function renderRoutingDropdowns() {
+        const sel = (id) => document.getElementById(id);
+        const elSales = sel('b-route-sales');
+        const elPersonal = sel('b-route-personal');
+        const elSupport = sel('b-route-support');
+        if (!elSales || !elPersonal || !elSupport) return;
+
+        // Pull the user's agents — same call the dashboard uses
+        let agents = [];
+        try {
+          const r = await api('/v1/agents');
+          agents = (r.data || []).filter((a) => a.id !== editingAgentId);
+        } catch {
+          // Logged-out preview / API down — leave dropdowns with the empty option only
+          return;
+        }
+
+        const optionsHtml = ['<option value="">— Não rotear (atender direto) —</option>']
+          .concat(agents.map((a) => `<option value="${a.id}">${escape(a.name)} <span style="color:#888">(${a.slug})</span></option>`))
+          .join('');
+        // innerHTML accepts the <option> serialization despite the inline span
+        // — browsers strip the span and keep just the text, which is what we want.
+        elSales.innerHTML = optionsHtml.replace(/<span[^>]*>|<\/span>/g, '');
+        elPersonal.innerHTML = elSales.innerHTML;
+        elSupport.innerHTML = elSales.innerHTML;
+
+        const r = formState.routes_to || {};
+        elSales.value = r.sales || '';
+        elPersonal.value = r.personal || '';
+        elSupport.value = r.support || '';
+
+        // Bind change → formState (idempotent — re-binds when modal reopens)
+        const bind = (el, key) => {
+          el.onchange = () => {
+            formState.routes_to = { ...(formState.routes_to || {}), [key]: el.value || '' };
+          };
+        };
+        bind(elSales, 'sales');
+        bind(elPersonal, 'personal');
+        bind(elSupport, 'support');
       }
 
       function closeBuilder() {
@@ -1371,6 +1451,16 @@
             // Persona is optional. Backend resolves slug → id on save.
             ...(formState.persona_slug ? { persona_slug: formState.persona_slug } : {}),
             ...(formState.persona_id && !formState.persona_slug ? { persona_id: formState.persona_id } : {}),
+            // Smart routing — strip empty values; if all empty, send null
+            // so the backend clears any prior routing config.
+            routes_to: (() => {
+              const r = formState.routes_to || {};
+              const cleaned = {};
+              for (const k of ['sales', 'personal', 'support']) {
+                if (r[k]) cleaned[k] = r[k];
+              }
+              return Object.keys(cleaned).length ? cleaned : null;
+            })(),
           };
           let createdAgent = null;
           if (editingAgentId) {
