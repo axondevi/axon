@@ -478,69 +478,245 @@
         `;
       }
 
-      // ─── Connect WhatsApp modal ────────────────────────────
+      // ─── Connect WhatsApp wizard ───────────────────────────
+      // 4-state machine inside one modal: form → connecting → pairing → paired.
+      // Polls /v1/agents/:id/whatsapp every 3s during pairing to detect when
+      // the user successfully scans the QR / enters the pairing code.
+      // Aborts after 90s if not paired (user can retry).
+      let connectWizardState = { step: 'form', pollTimer: null, agentId: null };
+
       window.showConnectModal = () => {
+        if (!state.selectedAgentId) {
+          alert('Selecione um agente no menu acima antes de conectar.');
+          return;
+        }
+        connectWizardState = { step: 'form', pollTimer: null, agentId: state.selectedAgentId };
         const overlay = document.createElement('div');
         overlay.id = 'connect-modal';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
-        overlay.innerHTML = `
-          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:32px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-              <h2 style="margin:0;font-size:20px;">Conectar WhatsApp em 3 passos</h2>
-              <button onclick="document.getElementById('connect-modal').remove()" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;">×</button>
-            </div>
-
-            <div style="margin-bottom:20px;padding:16px;background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.2);border-radius:8px;font-size:13px;">
-              <strong>O que você precisa antes:</strong> uma instância <a href="https://github.com/EvolutionAPI/evolution-api" target="_blank" style="color:var(--accent-2);">Evolution API</a> rodando (gerenciada ou self-hosted) + 1 número WhatsApp livre pra usar como bot.
-            </div>
-
-            <ol style="padding-left:20px;line-height:1.7;font-size:14px;">
-              <li style="margin-bottom:12px;">
-                <strong>Crie um agente</strong> em <a href="/build" style="color:var(--accent-2);">/build</a> com pay_mode = <code>owner</code> (você paga as conversas).
-              </li>
-              <li style="margin-bottom:12px;">
-                <strong>Pegue suas credenciais Evolution:</strong>
-                <ul style="margin-top:6px;padding-left:18px;color:var(--text-dim);font-size:13px;">
-                  <li><code>instance_url</code>: ex <code>https://evolution.seu-host.com</code></li>
-                  <li><code>instance_name</code>: nome da instance no Evolution</li>
-                  <li><code>api_key</code>: AUTHENTICATION_API_KEY do servidor</li>
-                  <li><code>owner_phone</code> <em>(opcional)</em>: seu próprio número (DDI+DDD+número, só dígitos, ex <code>5511995432538</code>). Quando você manda zap pro número conectado deste mesmo número, o agente vira seu assistente pessoal — pode pedir <em>"gera uma foto de X"</em> e ele gera + envia pelo zap.</li>
-                </ul>
-              </li>
-              <li style="margin-bottom:12px;">
-                <strong>Conecte via API ou CLI</strong> (passe o agent_id criado):
-                <pre style="background:#0a0a0b;border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px;font-size:11px;overflow-x:auto;color:var(--accent-2);">curl -X POST $AXON_BASE/v1/agents/$AGENT_ID/whatsapp \\
-  -H "x-api-key: $YOUR_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "instance_url":"https://...",
-    "instance_name":"...",
-    "api_key":"...",
-    "owner_phone":"5511999999999"
-  }'</pre>
-                Axon registra webhook automaticamente. Depois disso, escaneie QR (ou use código de pareamento) na sua instância Evolution.
-              </li>
-            </ol>
-
-            <p style="margin-top:20px;font-size:13px;color:var(--text-dim);">
-              <strong style="color:var(--text);">Ainda não tem Evolution?</strong> Opções:<br/>
-              • <strong>Z-API</strong> (R$99/mês, BR-friendly) — z-api.io<br/>
-              • <strong>Evolution Cloud</strong> (€9/mês oficial) — evolution-api.com<br/>
-              • <strong>Self-hosted</strong> grátis em VPS — github.com/EvolutionAPI/evolution-api<br/>
-              • <strong>Render free tier</strong> ⚠️ não funciona pra produção (hiberna)
-            </p>
-
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
-              <button onclick="document.getElementById('connect-modal').remove()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;">Fechar</button>
-              <a href="/build" style="background:var(--accent);color:white;border:none;padding:8px 16px;border-radius:6px;font-size:13px;text-decoration:none;font-weight:600;">Criar agente primeiro →</a>
-            </div>
-          </div>
-        `;
+        overlay.innerHTML = '<div id="connect-modal-body" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto;"></div>';
         document.body.appendChild(overlay);
         overlay.addEventListener('click', (e) => {
-          if (e.target === overlay) overlay.remove();
+          if (e.target === overlay) closeConnectModal();
         });
+        renderConnectStep();
       };
+
+      function closeConnectModal() {
+        if (connectWizardState.pollTimer) clearInterval(connectWizardState.pollTimer);
+        connectWizardState = { step: 'form', pollTimer: null, agentId: null };
+        const m = document.getElementById('connect-modal');
+        if (m) m.remove();
+      }
+
+      function renderConnectStep() {
+        const body = document.getElementById('connect-modal-body');
+        if (!body) return;
+        const closeBtn = '<button onclick="closeConnectModal()" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>';
+        const header = (title, sub) => `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0 0 4px 0;font-size:18px;">${title}</h2>
+              ${sub ? `<div style="color:var(--text-muted);font-size:12px;">${sub}</div>` : ''}
+            </div>
+            ${closeBtn}
+          </div>
+        `;
+
+        if (connectWizardState.step === 'form') {
+          body.innerHTML = `
+            ${header('Conectar WhatsApp', 'Você precisa de uma instância Evolution API (mesmo principio do Z-API). 30s pra conectar.')}
+            <form id="cw-form" style="display:flex;flex-direction:column;gap:12px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+                <span>URL da Evolution <span style="color:var(--text-muted);font-size:11px;">(ex: https://evolution-api-feirinha.onrender.com)</span></span>
+                <input id="cw-url" type="url" required placeholder="https://..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;font-family:inherit;">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+                <span>Nome da instância <span style="color:var(--text-muted);font-size:11px;">(o "instance name" no painel da Evolution)</span></span>
+                <input id="cw-name" type="text" required placeholder="ex: minha-empresa" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;font-family:inherit;">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+                <span>API Key da Evolution <span style="color:var(--text-muted);font-size:11px;">(AUTHENTICATION_API_KEY do servidor)</span></span>
+                <input id="cw-key" type="password" required placeholder="••••••••••••••••" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace;">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
+                <span>Seu número <em style="color:var(--text-muted);font-weight:400;font-size:11px;">(opcional — modo dono)</em></span>
+                <input id="cw-phone" type="tel" placeholder="5511999999999" pattern="[0-9]{10,15}" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace;">
+                <span style="color:var(--text-muted);font-size:11px;">Quando você mandar zap deste número pro bot, ele vira seu assistente pessoal (gera imagens, etc). DDI+DDD+número, só dígitos.</span>
+              </label>
+              <div id="cw-error" style="display:none;background:rgba(255,95,87,0.1);border:1px solid rgba(255,95,87,0.3);color:#ff5f57;padding:10px;border-radius:6px;font-size:12px;"></div>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+                <button type="button" onclick="closeConnectModal()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer;">Cancelar</button>
+                <button type="submit" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Conectar →</button>
+              </div>
+            </form>
+            <details style="margin-top:14px;font-size:12px;color:var(--text-muted);">
+              <summary style="cursor:pointer;">Não tem Evolution? Ver opções de servidor</summary>
+              <div style="margin-top:8px;padding-left:8px;line-height:1.6;">
+                • <strong>Z-API</strong> — z-api.io (BR, R$99/mês, simples)<br/>
+                • <strong>Evolution Cloud</strong> — evolution-api.com (€9/mês oficial)<br/>
+                • <strong>Self-hosted</strong> — github.com/EvolutionAPI/evolution-api (grátis, em VPS)
+              </div>
+            </details>
+          `;
+          document.getElementById('cw-form').addEventListener('submit', handleConnectSubmit);
+        }
+
+        if (connectWizardState.step === 'connecting') {
+          body.innerHTML = `
+            ${header('Conectando ao Evolution…', 'Validando credenciais e registrando webhook.')}
+            <div style="display:flex;flex-direction:column;align-items:center;padding:48px 0;gap:16px;">
+              <div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+              <div style="color:var(--text-muted);font-size:13px;">Geralmente leva 5-10 segundos…</div>
+            </div>
+            <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+          `;
+        }
+
+        if (connectWizardState.step === 'pairing') {
+          const { qr, pairing } = connectWizardState.pairingData || {};
+          const qrImg = qr
+            ? `<img alt="QR Code" src="data:image/png;base64,${qr}" style="width:240px;height:240px;background:white;border-radius:8px;padding:8px;display:block;margin:0 auto;">`
+            : '<div style="width:240px;height:240px;display:flex;align-items:center;justify-content:center;border:2px dashed var(--border);border-radius:8px;color:var(--text-muted);font-size:12px;text-align:center;padding:16px;margin:0 auto;">QR não disponível agora — use o código de pareamento ↓</div>';
+          const pairingDisplay = pairing
+            ? pairing.replace(/(.{4})/g, '$1-').replace(/-$/, '')
+            : null;
+          body.innerHTML = `
+            ${header('Escaneie o QR ou use o código', 'Abra WhatsApp → Aparelhos conectados → Conectar aparelho.')}
+            ${qrImg}
+            ${pairingDisplay ? `
+              <div style="margin-top:18px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;text-align:center;">
+                <div style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Ou use código de pareamento</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:22px;letter-spacing:0.15em;color:var(--accent-2);font-weight:600;">${pairingDisplay}</div>
+                <div style="color:var(--text-muted);font-size:11px;margin-top:6px;">No WhatsApp: "Conectar com número" → digite esse código</div>
+              </div>
+            ` : ''}
+            <div id="cw-poll-status" style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-muted);font-size:12px;">
+              <div style="width:8px;height:8px;border-radius:50%;background:var(--warn);box-shadow:0 0 6px var(--warn);"></div>
+              <span>Aguardando você parear no celular… <span id="cw-poll-counter">0s</span></span>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;">
+              <button onclick="refreshConnectQR()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">↻ Atualizar QR</button>
+              <button onclick="closeConnectModal()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Cancelar</button>
+            </div>
+          `;
+          startConnectPolling();
+        }
+
+        if (connectWizardState.step === 'paired') {
+          body.innerHTML = `
+            ${header('✅ WhatsApp conectado!', 'O bot já está pronto pra receber mensagens.')}
+            <div style="display:flex;flex-direction:column;align-items:center;padding:32px 0;gap:14px;">
+              <div style="width:64px;height:64px;border-radius:50%;background:rgba(37,211,102,0.15);display:flex;align-items:center;justify-content:center;font-size:32px;">✓</div>
+              <div style="color:var(--text);font-size:14px;text-align:center;line-height:1.5;">
+                Mande qualquer mensagem pro número conectado<br/>
+                pra testar a resposta automática.
+              </div>
+            </div>
+            <div style="display:flex;justify-content:center;margin-top:8px;">
+              <button onclick="closeConnectModal(); loadAgentData(); render();" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Fechar e voltar →</button>
+            </div>
+          `;
+        }
+      }
+
+      async function handleConnectSubmit(e) {
+        e.preventDefault();
+        const url = document.getElementById('cw-url').value.trim().replace(/\/+$/, '');
+        const name = document.getElementById('cw-name').value.trim();
+        const apiKey = document.getElementById('cw-key').value.trim();
+        const phone = document.getElementById('cw-phone').value.replace(/\D/g, '');
+        const errBox = document.getElementById('cw-error');
+        errBox.style.display = 'none';
+
+        // Client-side validation
+        if (!/^https?:\/\//.test(url)) { showCwError('URL precisa começar com http:// ou https://'); return; }
+        if (!name || name.length < 2) { showCwError('Nome da instância obrigatório.'); return; }
+        if (!apiKey || apiKey.length < 8) { showCwError('API Key parece inválida.'); return; }
+        if (phone && (phone.length < 10 || phone.length > 15)) { showCwError('Número precisa ter 10–15 dígitos (com DDI+DDD).'); return; }
+
+        connectWizardState.step = 'connecting';
+        renderConnectStep();
+
+        try {
+          const r = await api(`/v1/agents/${connectWizardState.agentId}/whatsapp`, {
+            method: 'POST',
+            body: JSON.stringify({
+              instance_url: url,
+              instance_name: name,
+              api_key: apiKey,
+              ...(phone ? { owner_phone: phone } : {}),
+            }),
+          });
+          const conn = r.connection || {};
+          // If already paired (status=open) and no QR returned, jump straight to success.
+          const isOpen = ['open', 'connected'].includes(String(conn.status || '').toLowerCase());
+          if (isOpen && !conn.qr_base64 && !conn.pairing_code) {
+            connectWizardState.step = 'paired';
+          } else {
+            connectWizardState.pairingData = { qr: conn.qr_base64, pairing: conn.pairing_code };
+            connectWizardState.step = 'pairing';
+          }
+          renderConnectStep();
+        } catch (err) {
+          // Reset to form so user can fix and retry.
+          connectWizardState.step = 'form';
+          renderConnectStep();
+          // showError after re-render so the error box exists in DOM.
+          setTimeout(() => showCwError('Falhou: ' + (err.message || err)), 30);
+        }
+      }
+
+      function showCwError(msg) {
+        const box = document.getElementById('cw-error');
+        if (!box) return;
+        box.textContent = msg;
+        box.style.display = 'block';
+      }
+
+      window.refreshConnectQR = async () => {
+        try {
+          const r = await api(`/v1/agents/${connectWizardState.agentId}/whatsapp/qr`);
+          if (r.paired) {
+            connectWizardState.step = 'paired';
+            renderConnectStep();
+            return;
+          }
+          connectWizardState.pairingData = { qr: r.qr_base64, pairing: r.pairing_code };
+          renderConnectStep();
+        } catch (err) {
+          showCwError('Falha ao atualizar QR: ' + err.message);
+        }
+      };
+
+      function startConnectPolling() {
+        if (connectWizardState.pollTimer) clearInterval(connectWizardState.pollTimer);
+        let elapsed = 0;
+        const intervalMs = 3000;
+        const maxElapsed = 90; // seconds
+        connectWizardState.pollTimer = setInterval(async () => {
+          elapsed += intervalMs / 1000;
+          const counter = document.getElementById('cw-poll-counter');
+          if (counter) counter.textContent = `${Math.floor(elapsed)}s`;
+          if (elapsed >= maxElapsed) {
+            clearInterval(connectWizardState.pollTimer);
+            connectWizardState.pollTimer = null;
+            const status = document.getElementById('cw-poll-status');
+            if (status) status.innerHTML = '<span style="color:var(--warn);">⏱ Tempo esgotado. Clique "↻ Atualizar QR" e tente de novo.</span>';
+            return;
+          }
+          try {
+            const r = await api(`/v1/agents/${connectWizardState.agentId}/whatsapp`);
+            const isOpen = r.connected && ['open', 'connected'].includes(String(r.status || '').toLowerCase());
+            if (isOpen) {
+              clearInterval(connectWizardState.pollTimer);
+              connectWizardState.pollTimer = null;
+              connectWizardState.step = 'paired';
+              renderConnectStep();
+            }
+          } catch (_) { /* network blip — keep polling */ }
+        }, intervalMs);
+      }
 
       function renderChat() {
         if (!state.selectedPhone) return '';

@@ -18,7 +18,7 @@ import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { encrypt, decrypt } from '~/lib/crypto';
-import { checkInstance, setWebhook, sendText, sendMedia, extractInbound } from '~/whatsapp/evolution';
+import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, extractInbound } from '~/whatsapp/evolution';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
   getOrCreateMemory,
@@ -130,6 +130,31 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
     return c.json({ error: 'webhook_register_failed', message: set.error || 'Could not register webhook' }, 502);
   }
 
+  // ─── Pairing: if instance is not yet open, fetch QR + pairing code ─
+  // The probe runs before this — its `status` tells us the state. We
+  // tolerate "open" / "connected" interchangeably across Evolution versions.
+  // For "close" / "connecting" / unknown, we proactively fetch the pairing
+  // material so the dashboard can show it without a 2nd round-trip.
+  const isOpen = ['open', 'connected'].includes((probe.status || '').toLowerCase());
+  let qrBase64: string | undefined;
+  let pairingCode: string | undefined;
+  if (!isOpen) {
+    const conn = await connectInstance({
+      instanceUrl,
+      instanceName,
+      apiKey,
+      // Pass owner phone if provided — Evolution uses it to format the
+      // pairing code request when the user wants the "pair by number" flow.
+      phoneNumber: ownerPhone || undefined,
+    });
+    if (conn.ok) {
+      qrBase64 = conn.qrBase64;
+      pairingCode = conn.pairingCode;
+    }
+    // Don't fail the whole request if pairing fetch failed — owner can hit
+    // GET /:id/whatsapp/qr to retry.
+  }
+
   return c.json({
     ok: true,
     connection: {
@@ -138,7 +163,61 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
       status: probe.status || 'connected',
       webhook_url: webhookUrl,
       owner_phone: ownerPhone || a.ownerPhone || null,
+      // Only present when not yet paired. Frontend renders QR PNG via:
+      //   <img src="data:image/png;base64,${qr_base64}">
+      // and shows pairing_code as the "Connect by phone" alternative.
+      qr_base64: qrBase64,
+      pairing_code: pairingCode,
     },
+  });
+});
+
+// GET QR + pairing code on demand (for refresh after timeout, or for
+// re-pairing without re-saving credentials). Owner-only.
+ownerWhatsapp.get('/:id/whatsapp/qr', async (c) => {
+  const user = c.get('user') as { id: string };
+  const agentId = c.req.param('id');
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, user.id)));
+  if (!a) throw Errors.notFound('Agent');
+
+  const [conn] = await db
+    .select()
+    .from(whatsappConnections)
+    .where(eq(whatsappConnections.agentId, agentId))
+    .limit(1);
+  if (!conn) return c.json({ error: 'no_connection' }, 404);
+
+  let apiKey: string;
+  try { apiKey = decrypt(conn.apiKey); }
+  catch { return c.json({ error: 'cannot_decrypt' }, 500); }
+
+  // Probe first — if already paired, no QR needed.
+  const probe = await checkInstance({
+    instanceUrl: conn.instanceUrl,
+    instanceName: conn.instanceName,
+    apiKey,
+  });
+  if (probe.ok && ['open', 'connected'].includes((probe.status || '').toLowerCase())) {
+    return c.json({ status: probe.status, paired: true });
+  }
+
+  const result = await connectInstance({
+    instanceUrl: conn.instanceUrl,
+    instanceName: conn.instanceName,
+    apiKey,
+    phoneNumber: a.ownerPhone || undefined,
+  });
+  if (!result.ok) {
+    return c.json({ error: 'pairing_fetch_failed', message: result.error }, 502);
+  }
+  return c.json({
+    status: probe.status || 'unknown',
+    paired: false,
+    qr_base64: result.qrBase64,
+    pairing_code: result.pairingCode,
   });
 });
 

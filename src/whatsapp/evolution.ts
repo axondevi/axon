@@ -136,6 +136,76 @@ export async function sendText(opts: {
 }
 
 /**
+ * Trigger pairing on an Evolution instance — returns QR code + pairing code.
+ *
+ * Called when the instance is in `close`/`connecting` state (not yet paired
+ * to a phone). Evolution v2 has two response shapes we tolerate:
+ *
+ *   v2.x newer:  { code: "<base64-png>", pairingCode: "ABCD1234", count: 1 }
+ *   v2.x older:  { qrcode: { code: "<base64-png>", pairingCode: "..." } }
+ *
+ * The `code` field is a **PNG image as base64** (not a string for QR libs).
+ * Caller renders it as `<img src="data:image/png;base64,${code}">` directly.
+ *
+ * pairingCode is the 8-digit "Connect with phone number" alternative —
+ * easier on mobile because no camera is needed (entered in WhatsApp UI).
+ *
+ * No-op if the instance is already paired (state=open) — Evolution returns
+ * empty/redundant data. Caller should checkInstance() first when in doubt.
+ */
+export async function connectInstance(opts: {
+  instanceUrl: string;
+  instanceName: string;
+  apiKey: string;
+  /** Optional: phone number (digits only) to pre-fill pairing code request. */
+  phoneNumber?: string;
+}): Promise<{
+  ok: boolean;
+  qrBase64?: string;
+  pairingCode?: string;
+  error?: string;
+}> {
+  try {
+    const path = `/instance/connect/${encodeURIComponent(opts.instanceName)}` +
+      (opts.phoneNumber ? `?number=${encodeURIComponent(opts.phoneNumber)}` : '');
+    const res = await evoFetch(opts.instanceUrl, path, {
+      method: 'GET',
+      apiKey: opts.apiKey,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, error: `connect ${res.status}: ${text.slice(0, 240)}` };
+    }
+    const data: any = await res.json().catch(() => ({}));
+
+    // Normalize across the two known response shapes.
+    const qrBase64 =
+      (typeof data?.code === 'string' && data.code) ||
+      (typeof data?.base64 === 'string' && data.base64) ||
+      (typeof data?.qrcode?.code === 'string' && data.qrcode.code) ||
+      (typeof data?.qrcode?.base64 === 'string' && data.qrcode.base64) ||
+      undefined;
+
+    const pairingCode =
+      (typeof data?.pairingCode === 'string' && data.pairingCode) ||
+      (typeof data?.qrcode?.pairingCode === 'string' && data.qrcode.pairingCode) ||
+      undefined;
+
+    if (!qrBase64 && !pairingCode) {
+      // Either misconfig or already paired — surface the raw payload to help debug.
+      return {
+        ok: false,
+        error: `Evolution connect returned no qr/pairing. Raw: ${JSON.stringify(data).slice(0, 200)}`,
+      };
+    }
+
+    return { ok: true, qrBase64, pairingCode };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+/**
  * Send a media message (image, document, video, audio) on the instance.
  *
  * Accepts either a public URL (`media`) or raw base64 (`base64Data`, no data:
