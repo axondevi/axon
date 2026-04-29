@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tia Zélia · Agente nível 4 — Axon</title>
+<style>
+  /* ─── Reset + tokens ───────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #e8e8ee;
+    background: radial-gradient(1200px 800px at 70% -10%, rgba(245, 158, 11, 0.18), transparent 60%),
+                radial-gradient(900px 700px at 10% 110%, rgba(124, 92, 255, 0.20), transparent 60%),
+                #0a0a0f;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  :root {
+    --persona-primary: #f59e0b;       /* Tia Zélia gold */
+    --persona-secondary: #fb923c;
+    --bg-card: rgba(255, 255, 255, 0.04);
+    --bg-card-strong: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.15);
+    --text: #f5f5fa;
+    --text-dim: #a8a8b8;
+    --text-faint: #6c6c7c;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --rare-common: #94a3b8;
+    --rare-uncommon: #4ade80;
+    --rare-rare: #60a5fa;
+    --rare-epic: #c084fc;
+    --rare-legendary: #fbbf24;
+  }
+
+  /* ─── Layout ───────────────────────────────────────────────── */
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+  .topbar a {
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+  }
+  .topbar a:hover { background: var(--bg-card); color: var(--text); }
+  .brand { font-weight: 700; color: var(--text); letter-spacing: -0.01em; font-size: 16px; }
+  .brand span { color: var(--persona-primary); }
+
+  /* ─── Hero card ────────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 146, 60, 0.04));
+    border: 1px solid rgba(245, 158, 11, 0.30);
+    border-radius: 24px;
+    padding: 32px;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(600px 300px at 100% 0%, rgba(245, 158, 11, 0.18), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 180px 1fr auto;
+    gap: 28px;
+    align-items: center;
+    position: relative;
+  }
+  @media (max-width: 720px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 20px; text-align: center; }
+  }
+  .avatar-wrap {
+    position: relative;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: conic-gradient(from 180deg, var(--persona-primary), var(--persona-secondary), var(--persona-primary));
+    padding: 4px;
+    margin: 0 auto;
+  }
+  .avatar {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: #1a1a2e;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 88px;
+    overflow: hidden;
+  }
+  .level-badge {
+    position: absolute; bottom: 4px; right: 4px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #1a1a2e;
+    border: 3px solid #0a0a0f;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 22px;
+    box-shadow: 0 4px 16px rgba(251, 191, 36, 0.4);
+  }
+  .level-badge::before { content: "Nv"; font-size: 10px; opacity: 0.6; margin-right: 2px; }
+
+  .hero-info h1 {
+    margin: 0 0 6px;
+    font-size: 38px;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  .hero-info .slug {
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+  }
+  .persona-tag {
+    display: inline-flex; align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 6px 12px;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--persona-primary);
+    font-weight: 600;
+  }
+  .xp-bar {
+    margin-top: 18px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    height: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .xp-bar-fill {
+    width: 64%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--persona-secondary), var(--persona-primary));
+    border-radius: 999px;
+    position: relative;
+  }
+  .xp-bar-fill::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: shimmer 2.5s infinite;
+  }
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .xp-text { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .xp-text strong { color: var(--persona-primary); }
+
+  .actions {
+    display: flex; flex-direction: column; gap: 8px;
+    min-width: 180px;
+  }
+  @media (max-width: 720px) {
+    .actions { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  }
+  .btn {
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-card-strong);
+    color: var(--text);
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.12); transform: translateY(-1px); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--persona-primary), var(--persona-secondary));
+    color: #1a1a2e;
+    border: none;
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.30);
+  }
+  .btn-primary:hover { box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  /* ─── Stats grid ───────────────────────────────────────────── */
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-faint);
+    margin: 32px 0 16px;
+    font-weight: 700;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  .stat {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    transition: border-color 0.2s;
+  }
+  .stat:hover { border-color: var(--border-strong); }
+  .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    margin-top: 6px;
+    letter-spacing: -0.02em;
+  }
+  .stat-trend { font-size: 12px; margin-top: 4px; color: var(--text-dim); }
+  .trend-up { color: var(--good); }
+
+  /* ─── Super powers (tools) ─────────────────────────────────── */
+  .powers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .power {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    transition: all 0.15s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .power:hover { transform: translateY(-2px); border-color: var(--border-strong); background: var(--bg-card-strong); }
+  .power::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, var(--rarity-color, transparent) 0%, transparent 60%);
+    opacity: 0.08;
+    pointer-events: none;
+  }
+  .power-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--rarity-color, var(--border));
+    flex-shrink: 0;
+  }
+  .power-info { flex: 1; min-width: 0; }
+  .power-name {
+    font-size: 14px; font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .power-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+  .power-rarity {
+    position: absolute; top: 8px; right: 10px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--rarity-color);
+    font-weight: 700;
+    opacity: 0.85;
+  }
+  .power-empty {
+    background: transparent;
+    border: 1.5px dashed var(--border);
+    color: var(--text-faint);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 80px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .power-empty:hover { border-color: var(--persona-primary); color: var(--persona-primary); }
+
+  /* ─── Activity feed ────────────────────────────────────────── */
+  .activity {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 4px;
+  }
+  .activity-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .activity-row + .activity-row { border-top: 1px solid var(--border); }
+  .activity-row:hover { background: var(--bg-card-strong); }
+  .activity-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .activity-text { font-size: 13px; }
+  .activity-text strong { color: var(--text); }
+  .activity-text span { color: var(--text-dim); }
+  .activity-time {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  /* ─── Sidebar info (NFT, market) ───────────────────────────── */
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-top: 32px;
+  }
+  @media (max-width: 720px) { .footer-grid { grid-template-columns: 1fr; } }
+
+  .market-card {
+    background: linear-gradient(135deg, rgba(124, 92, 255, 0.10), rgba(192, 132, 252, 0.05));
+    border: 1px solid rgba(124, 92, 255, 0.25);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .market-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #c084fc;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .market-price {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .market-price small { font-size: 14px; color: var(--text-dim); font-weight: 500; }
+  .market-info {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 8px 0 16px;
+    line-height: 1.5;
+  }
+
+  .ownership {
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    padding: 16px;
+    border-top: 1px dashed var(--border);
+    margin-top: 32px;
+  }
+  .ownership a {
+    color: var(--text-dim);
+    text-decoration: underline;
+    text-decoration-color: var(--text-faint);
+  }
+  .ownership a:hover { color: var(--persona-primary); }
+
+  /* ─── Modal stub for "trocar poderes" ──────────────────────── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: none;
+    z-index: 100;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: #14141d;
+    border: 1px solid var(--border-strong);
+    border-radius: 20px;
+    padding: 28px;
+    max-width: 520px;
+    width: 100%;
+  }
+  .modal h2 { margin: 0 0 8px; font-size: 22px; }
+  .modal p { color: var(--text-dim); font-size: 14px; margin: 0 0 20px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="topbar">
+    <div class="brand">axon<span>·</span> seus agentes</div>
+    <div>
+      <a href="/explore">Explorar</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/build">Forjar agente</a>
+    </div>
+  </div>
+
+  <!-- Hero card with avatar, name, level, persona, XP -->
+  <div class="hero">
+    <div class="hero-grid">
+      <div class="avatar-wrap">
+        <div class="avatar">👵</div>
+        <div class="level-badge">4</div>
+      </div>
+
+      <div class="hero-info">
+        <h1>Tia Zélia · Pet Carinhoso</h1>
+        <div class="slug">/agent/tia-pet-carinhoso</div>
+        <div class="persona-tag">
+          🌾 Persona Tia Zélia · Calor maternal
+        </div>
+        <div class="xp-bar"><div class="xp-bar-fill"></div></div>
+        <div class="xp-text">
+          <strong>1.847 XP</strong> · faltam <strong>653 XP</strong> pro nível 5 (desbloqueia 1 super-poder épico)
+        </div>
+      </div>
+
+      <div class="actions">
+        <a href="#" class="btn btn-primary">💬 Conversar</a>
+        <a href="#" class="btn">⚙️ Forjar mais</a>
+        <a href="#" class="btn btn-ghost">🔄 Trocar / vender</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats: o que torna o agente VALIOSO no marketplace -->
+  <div class="section-title">Histórico que vale dinheiro</div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Clientes atendidos</div>
+      <div class="stat-value">1.247</div>
+      <div class="stat-trend trend-up">↗ +83 esta semana</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Satisfação</div>
+      <div class="stat-value">94<span style="font-size:18px;color:var(--text-dim)">%</span></div>
+      <div class="stat-trend">média de 4,7★</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Vendas fechadas</div>
+      <div class="stat-value">38</div>
+      <div class="stat-trend trend-up">R$ 12.480 em vendas</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Tempo médio</div>
+      <div class="stat-value">2,3<span style="font-size:18px;color:var(--text-dim)">s</span></div>
+      <div class="stat-trend">resposta humana</div>
+    </div>
+  </div>
+
+  <!-- Super powers (tools) - este é o "deck" do agente -->
+  <div class="section-title">Super-poderes equipados (5 / 8)</div>
+  <div class="powers-grid">
+    <div class="power" style="--rarity-color: var(--rare-common)">
+      <div class="power-icon">📍</div>
+      <div class="power-info">
+        <div class="power-name">Cartógrafo de CEP</div>
+        <div class="power-desc">Calcula entrega em qualquer endereço BR</div>
+      </div>
+      <div class="power-rarity">comum</div>
+    </div>
+
+    <div class="power" style="--rarity-color: var(--rare-uncommon)">
+      <div class="power-icon">🌧️</div>
+      <div class="power-info">
+        <div class="power-name">Mestre do Clima</div>
+        <div class="power-desc">Avisa cliente se vai chover na hora do passeio</div>
+      </div>
+      <div class="power-rarity">incomum</div>
+    </div>
+
+    <div class="power" style="--rarity-color: var(--rare-rare)">
+      <div class="power-icon">🛒</div>
+      <div class="power-info">
+        <div class="power-name">Caçador de Preço</div>
+        <div class="power-desc">Pesquisa Mercado Livre em tempo real</div>
+      </div>
+      <div class="power-rarity">raro</div>
+    </div>
+
+    <div class="power" style="--rarity-color: var(--rare-epic)">
+      <div class="power-icon">🎨</div>
+      <div class="power-info">
+        <div class="power-name">Pintor Visual</div>
+        <div class="power-desc">Gera fotos do produto em qualquer ângulo</div>
+      </div>
+      <div class="power-rarity">épico</div>
+    </div>
+
+    <div class="power" style="--rarity-color: var(--rare-legendary)">
+      <div class="power-icon">💸</div>
+      <div class="power-info">
+        <div class="power-name">Pix Instantâneo</div>
+        <div class="power-desc">Cobra cliente direto pelo chat — QR + cópia</div>
+      </div>
+      <div class="power-rarity">lendário</div>
+    </div>
+
+    <button class="power power-empty" onclick="openForge()">
+      <div>+ Equipar mais 3 poderes</div>
+    </button>
+  </div>
+
+  <!-- Activity feed - prova social que sustenta o valor do NFT -->
+  <div class="section-title">Conquistas recentes</div>
+  <div class="activity">
+    <div class="activity-row">
+      <div class="activity-icon">🏆</div>
+      <div class="activity-text">
+        <strong>1.000 atendimentos</strong> <span>· conquista desbloqueada</span>
+      </div>
+      <div class="activity-time">há 3 dias</div>
+    </div>
+    <div class="activity-row">
+      <div class="activity-icon">⭐</div>
+      <div class="activity-text">
+        <strong>Cliente novo Maria</strong> <span>deixou avaliação 5★ · "atendimento espetacular"</span>
+      </div>
+      <div class="activity-time">há 12h</div>
+    </div>
+    <div class="activity-row">
+      <div class="activity-icon">💸</div>
+      <div class="activity-text">
+        <strong>R$ 286 em vendas</strong> <span>via Pix instantâneo no chat</span>
+      </div>
+      <div class="activity-time">hoje</div>
+    </div>
+    <div class="activity-row">
+      <div class="activity-icon">📈</div>
+      <div class="activity-text">
+        <strong>Subiu pro nível 4</strong> <span>· desbloqueou poder Pintor Visual</span>
+      </div>
+      <div class="activity-time">há 5 dias</div>
+    </div>
+  </div>
+
+  <!-- Footer: marketplace card + ownership note -->
+  <div class="footer-grid">
+    <div class="activity">
+      <div class="activity-row" style="grid-template-columns: 32px 1fr;">
+        <div class="activity-icon">🤝</div>
+        <div class="activity-text">
+          <strong>Esse agente já é seu.</strong>
+          <span> Use à vontade, equipe poderes novos, ou venda quando achar que vale.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="market-card">
+      <div class="market-title">⚡ valor de mercado estimado</div>
+      <div class="market-price">R$ 890<small> · ou trocar</small></div>
+      <div class="market-info">
+        Baseado em 1.247 atendimentos, 94% satisfação, 38 vendas. Outros donos pagam até <strong>4× o preço de criação</strong> por agentes assim — porque vem treinado.
+      </div>
+      <a href="#" class="btn btn-primary" style="width: 100%;">Listar no marketplace</a>
+    </div>
+  </div>
+
+  <div class="ownership">
+    🔒 Você é dono do token #1247 · <a href="#">ver no Basescan</a> · transferência leva ~3 segundos quando você quiser vender
+  </div>
+
+</div>
+
+<!-- Stub modal for "Forjar mais" -->
+<div class="modal-backdrop" id="forge" onclick="this.classList.remove('open')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>🔨 Forja de poderes</h2>
+    <p>Escolha 3 dos 28 super-poderes disponíveis. Comuns são grátis, raros desbloqueados a cada nível, lendários requerem nível 7+.</p>
+    <a href="#" class="btn btn-primary" style="width:100%">Abrir forja completa</a>
+  </div>
+</div>
+
+<script>
+  function openForge() {
+    document.getElementById('forge').classList.add('open');
+  }
+  // Tilt effect on hero (subtle)
+  const hero = document.querySelector('.hero');
+  hero.addEventListener('mousemove', (e) => {
+    const rect = hero.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    hero.style.transform = `perspective(1200px) rotateY(${x * 1.5}deg) rotateX(${-y * 1.2}deg)`;
+  });
+  hero.addEventListener('mouseleave', () => { hero.style.transform = ''; });
+  hero.style.transition = 'transform 0.3s ease';
+</script>
+
+</body>
+</html>
