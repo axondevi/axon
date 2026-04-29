@@ -1625,6 +1625,31 @@
         } catch (e) {}
       }
 
+      // ── Auto-load persona via URL param (?persona=<slug>) ──────────
+      // Vindo da galeria /personas ou de qualquer outro lugar — abre o
+      // builder já com a persona selecionada e CORE_TOOLS pré-marcado.
+      function maybeAutoLoadPersona() {
+        try {
+          var p = new URLSearchParams(window.location.search);
+          var slug = p.get('persona');
+          if (!slug || !KEY) return;
+          // Switch to personas tab so context is visible
+          var personasBtn = document.querySelector('.tab-bar button[data-tab="personas"]');
+          if (personasBtn) personasBtn.click();
+          // Wait for personas to load, then open builder with this slug.
+          var tries = 0;
+          var interval = setInterval(function () {
+            tries++;
+            if (personasCache && personasCache.length > 0) {
+              clearInterval(interval);
+              if (typeof selectPersona === 'function') selectPersona(slug);
+            } else if (tries > 30) {
+              clearInterval(interval);
+            }
+          }, 200);
+        } catch (e) {}
+      }
+
       // ── Init ─────────────────────────────────────────────────────────
       if (!KEY) {
         document.getElementById('login-banner').style.display = '';
@@ -1633,6 +1658,7 @@
       if (KEY) loadMyAgents();
       maybeAutoLoadEdit();
       maybeAutoLoadTemplate();
+      maybeAutoLoadPersona();
     </script>
   </body>
 </html>

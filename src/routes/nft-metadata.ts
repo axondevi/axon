@@ -66,5 +66,8 @@ nftMetaRoutes.get('/:slugJson', async (c) => {
   if (!meta) return c.json({ error: 'not_found' }, 404);
   // 1h cache + revalidation: agents rarely change, marketplaces hammer this.
   c.header('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+  // Cross-origin: marketplaces (OpenSea, Basescan) on different domains
+  // need to fetch metadata. Override secureHeaders default.
+  c.header('Cross-Origin-Resource-Policy', 'cross-origin');
   return c.json(meta);
 });

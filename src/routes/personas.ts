@@ -84,5 +84,10 @@ personaRoutes.get('/:slug/avatar.svg', async (c) => {
 
   c.header('Content-Type', 'image/svg+xml');
   c.header('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+  // Override the default secureHeaders 'same-origin' policy — avatars are
+  // public marketing assets that load from Cloudflare Pages and the personas
+  // gallery on any domain. Without this header the browser silently blocks
+  // the <img> request and the avatar shows as a black square.
+  c.header('Cross-Origin-Resource-Policy', 'cross-origin');
   return c.body(svg);
 });

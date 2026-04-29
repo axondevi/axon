@@ -202,7 +202,7 @@
       return;
     }
     document.getElementById('grid').innerHTML = personas.map(p => `
-      <div class="card">
+      <a class="card" href="/build?persona=${encodeURIComponent(p.slug)}" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;cursor:pointer;">
         <img class="avatar" src="${API_BASE}${p.avatar_url}?size=400&name=0" alt="Avatar de ${escapeAttr(p.name)}" loading="lazy">
         <div class="body">
           <h3>${p.emoji} ${escapeHtml(p.name)}</h3>
@@ -213,9 +213,9 @@
             <span class="badge free">${p.premium ? 'Premium' : 'Grátis'}</span>
             <span class="badge voice">🎙 voz própria</span>
           </div>
-          <a class="cta-btn" href="/build?persona=${encodeURIComponent(p.slug)}">Usar ${escapeHtml(p.name)} →</a>
+          <span class="cta-btn">Usar ${escapeHtml(p.name)} →</span>
         </div>
-      </div>
+      </a>
     `).join('');
   }
 
