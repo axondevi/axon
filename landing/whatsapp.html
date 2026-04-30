@@ -347,12 +347,21 @@
 
       function renderApp() {
         const conn = state.whatsappConn;
-        const connDot = !conn ? 'red' : (conn.status === 'open' || conn.status === 'connected' ? 'green' : 'yellow');
+        // Three visual states:
+        //   no conn      → red dot, "+ Conectar" button (provisions new instance)
+        //   pending pair → yellow dot, "📱 Continuar pareamento" (resumes existing instance, NO new provision)
+        //   paired       → green dot, no button
+        const isPending = !!(conn && conn.pending_pairing);
+        const isPaired = !!(conn && !conn.pending_pairing && (conn.status === 'open' || conn.status === 'connected'));
+        const connDot = !conn ? 'red' : (isPaired ? 'green' : 'yellow');
         const connLabel = !conn ? 'sem conexão WhatsApp neste agente' :
-          conn.status === 'open' || conn.status === 'connected' ? 'WhatsApp conectado' :
+          isPaired ? 'WhatsApp conectado' :
+          isPending ? 'aguardando você escanear o QR' :
           conn.status || 'desconhecido';
         const connectButton = !conn
           ? '<button onclick="showConnectModal()" style="margin-left:auto;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;">+ Conectar WhatsApp</button>'
+          : isPending
+          ? '<button onclick="resumePairing()" style="margin-left:auto;background:var(--warn);color:#000;border:none;padding:6px 12px;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;">📱 Continuar pareamento</button>'
           : '';
 
         document.getElementById('app').innerHTML = `
@@ -890,9 +899,45 @@
           api(`/v1/agents/${state.selectedAgentId}/whatsapp`).catch(() => ({ connected: false })),
         ]);
         state.contacts = contacts.contacts || [];
-        state.whatsappConn = conn.connected ? conn : null;
+        // Keep the conn object whenever an Evolution row exists — that way
+        // we can distinguish "row exists but not yet paired" (pending_pairing)
+        // from "no row at all" (clean slate). Only null out when truly absent.
+        state.whatsappConn = (conn.connected || conn.pending_pairing) ? conn : null;
         if (state.selectedPhone) await loadContactDetails();
       }
+
+      // Open the pairing modal for an EXISTING Evolution instance (no new
+      // provision). Uses the QR + pairing_code that GET already returned, or
+      // falls back to /whatsapp/qr to fetch a fresh one.
+      window.resumePairing = async () => {
+        if (!state.whatsappConn) return;
+        connectWizardState = {
+          step: 'pairing',
+          pollTimer: null,
+          agentId: state.selectedAgentId,
+          mode: 'auto',
+          pairingData: {
+            qr: state.whatsappConn.qr_base64,
+            pairing: state.whatsappConn.pairing_code,
+          },
+        };
+        const overlay = document.createElement('div');
+        overlay.id = 'connect-modal';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.innerHTML = '<div id="connect-modal-body" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto;"></div>';
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeConnectModal(); });
+
+        // If GET didn't include the QR (e.g. Evolution flap), fetch it.
+        if (!connectWizardState.pairingData.qr && !connectWizardState.pairingData.pairing) {
+          try {
+            const r = await api(`/v1/agents/${state.selectedAgentId}/whatsapp/qr`);
+            connectWizardState.pairingData = { qr: r.qr_base64, pairing: r.pairing_code };
+          } catch { /* fall through — UI will show "QR não disponível" placeholder */ }
+        }
+        renderConnectStep();
+        startConnectPolling();
+      };
 
       async function loadContactDetails() {
         if (!state.selectedAgentId || !state.selectedPhone) return;

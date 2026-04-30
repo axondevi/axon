@@ -1170,7 +1170,7 @@
         overlay.appendChild(card);
 
         if (conn.connected) {
-          // Already connected → show status + disconnect button
+          // Already PAIRED → show status + disconnect button
           card.innerHTML = renderWaConnectedView(agentId, agentName, conn);
           card.querySelector('[data-act="close"]').onclick = closeOverlay;
           const disconnectBtn = card.querySelector('[data-act="disconnect"]');
@@ -1192,9 +1192,83 @@
           return;
         }
 
-        // Not connected → show the simple QR Code flow
+        if (conn.pending_pairing) {
+          // Instance EXISTS but WhatsApp not yet paired → resume the QR view
+          // WITHOUT re-provisioning. The GET response usually includes the QR
+          // already; if not, fetch it via /whatsapp/qr.
+          await resumePairing(card, agentId, agentName, closeOverlay, conn);
+          return;
+        }
+
+        // No connection row at all → fresh provision (creates new Evolution instance)
         await launchQrFlow(card, agentId, agentName, closeOverlay);
       };
+
+      // Resume pairing for an already-provisioned-but-unpaired instance.
+      // Skips POST /whatsapp/auto so we don't create a duplicate instance.
+      async function resumePairing(card, agentId, agentName, closeOverlay, conn) {
+        let qr = conn.qr_base64 || '';
+        let pairing = conn.pairing_code || '';
+        if (!qr && !pairing) {
+          card.innerHTML = renderWaQrLoading(agentName);
+          try {
+            const r = await api(`/v1/agents/${agentId}/whatsapp/qr`);
+            if (r.paired) {
+              onWaConnected(card, closeOverlay);
+              return;
+            }
+            qr = r.qr_base64 || '';
+            pairing = r.pairing_code || '';
+          } catch (e) {
+            card.innerHTML = renderWaError(agentName, 'Não consegui buscar o QR da instância existente: ' + (e.message || ''));
+            card.querySelector('[data-act="close"]').onclick = closeOverlay;
+            card.querySelector('[data-act="retry"]').onclick = () => resumePairing(card, agentId, agentName, closeOverlay, conn);
+            card.querySelector('[data-act="advanced"]').onclick = () => renderAdvancedForm(card, agentId, agentName, closeOverlay);
+            return;
+          }
+        }
+
+        if (!qr && !pairing) {
+          card.innerHTML = renderWaError(agentName, 'A instância existe mas o servidor não retornou QR. Pode estar pareando — tente atualizar.');
+          card.querySelector('[data-act="close"]').onclick = closeOverlay;
+          card.querySelector('[data-act="retry"]').onclick = () => resumePairing(card, agentId, agentName, closeOverlay, conn);
+          card.querySelector('[data-act="advanced"]').onclick = () => renderAdvancedForm(card, agentId, agentName, closeOverlay);
+          return;
+        }
+
+        card.innerHTML = renderWaQrView(agentName, qr, pairing);
+        card.querySelector('[data-act="close"]').onclick = closeOverlay;
+        const advBtn = card.querySelector('[data-act="show-advanced"]');
+        if (advBtn) advBtn.onclick = () => {
+          if (window.__waModalState.pollHandle) {
+            clearInterval(window.__waModalState.pollHandle);
+            window.__waModalState.pollHandle = null;
+          }
+          renderAdvancedForm(card, agentId, agentName, closeOverlay);
+        };
+        const refreshBtn = card.querySelector('[data-act="refresh-qr"]');
+        if (refreshBtn) refreshBtn.onclick = async () => {
+          refreshBtn.disabled = true;
+          refreshBtn.textContent = 'Atualizando…';
+          try {
+            const r = await api(`/v1/agents/${agentId}/whatsapp/qr`);
+            if (r.paired) {
+              onWaConnected(card, closeOverlay);
+              return;
+            }
+            const img = card.querySelector('#wa-qr-img');
+            if (img && r.qr_base64) img.src = `data:image/png;base64,${r.qr_base64}`;
+            const code = card.querySelector('#wa-pairing-code');
+            if (code && r.pairing_code) code.textContent = r.pairing_code;
+          } catch (e) {
+            window.AxonUI && AxonUI.toast('Falha ao atualizar QR: ' + e.message, { type: 'error' });
+          } finally {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = '🔄 Atualizar QR';
+          }
+        };
+        startConnectionPolling(agentId, () => onWaConnected(card, closeOverlay));
+      }
 
       /**
        * QR Code flow — the simple path most customers see.

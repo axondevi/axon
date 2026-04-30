@@ -34,6 +34,22 @@ import { contactMemory } from '~/db/schema';
 export const ownerWhatsapp = new Hono();
 
 // GET current connection
+//
+// "connected" here means BOTH of:
+//   1. there is a whatsapp_connections row (an Evolution instance was provisioned)
+//   2. that Evolution instance has finished pairing with WhatsApp (state="open")
+//
+// Provisioning the instance and pairing the phone are TWO separate steps —
+// the row exists immediately after auto-provision, but `state` only flips
+// to "open" once the customer scans the QR. Returning connected:true based
+// purely on row existence makes the dashboard claim "WhatsApp connected"
+// before the QR was scanned, hiding the actual pairing UI.
+//
+// We probe Evolution every GET to surface the live state. If the row
+// exists but the instance isn't paired yet, return:
+//   { connected:false, pending_pairing:true, instance_*, qr_base64?, pairing_code? }
+// so the frontend can jump straight to the QR view without re-provisioning
+// (which would create a duplicate instance).
 ownerWhatsapp.get('/:id/whatsapp', async (c) => {
   const user = c.get('user') as { id: string };
   const agentId = c.req.param('id');
@@ -50,14 +66,65 @@ ownerWhatsapp.get('/:id/whatsapp', async (c) => {
     .limit(1);
   if (!conn) return c.json({ connected: false });
 
+  // Probe Evolution for the live state. If we can't decrypt or reach it,
+  // fall back to the stored status so we don't break the UI on a transient
+  // outage — the customer will see whatever the last-known state was.
+  let liveState: string | null = null;
+  let qrBase64: string | undefined;
+  let pairingCode: string | undefined;
+  try {
+    const apiKey = decrypt(conn.apiKey);
+    const probe = await checkInstance({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey,
+    });
+    if (probe.ok) {
+      liveState = (probe.status || '').toLowerCase();
+      // If not yet paired, eagerly fetch the QR so the frontend doesn't
+      // need a 2nd roundtrip to /qr — saves ~300ms of perceived latency.
+      if (liveState && !['open', 'connected'].includes(liveState)) {
+        const conn2 = await connectInstance({
+          instanceUrl: conn.instanceUrl,
+          instanceName: conn.instanceName,
+          apiKey,
+          phoneNumber: a.ownerPhone || undefined,
+        }).catch(() => ({ ok: false } as const));
+        if (conn2.ok) {
+          qrBase64 = conn2.qrBase64;
+          pairingCode = conn2.pairingCode;
+        }
+      }
+    }
+  } catch {
+    // decrypt or network failure — keep liveState null, fall through to
+    // stored status so the dashboard isn't blank on a brief Evolution flap.
+  }
+
+  // Persist status drift so subsequent GETs don't re-pay the probe cost
+  // unnecessarily for already-stable states (open ↔ connected).
+  const isPaired = liveState
+    ? ['open', 'connected'].includes(liveState)
+    : ['connected', 'open'].includes((conn.status || '').toLowerCase());
+  const newStatus = isPaired ? 'connected' : (liveState || conn.status || 'connecting');
+  if (liveState && newStatus !== conn.status) {
+    db.update(whatsappConnections)
+      .set({ status: newStatus, updatedAt: new Date() })
+      .where(eq(whatsappConnections.id, conn.id))
+      .catch(() => {});
+  }
+
   return c.json({
-    connected: true,
+    connected: isPaired,
+    pending_pairing: !isPaired,
     instance_url: conn.instanceUrl,
     instance_name: conn.instanceName,
-    status: conn.status,
+    status: newStatus,
     last_event_at: conn.lastEventAt,
     webhook_url: webhookUrlFor(c, conn.webhookSecret),
     owner_phone: a.ownerPhone || null,
+    qr_base64: qrBase64,
+    pairing_code: pairingCode,
   });
 });
 
