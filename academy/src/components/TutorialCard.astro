@@ -13,20 +13,22 @@ interface Props {
 
 const { title, description, url, category, difficulty, timeMinutes, lang = 'pt-BR', tags = [], featured = false } = Astro.props;
 
-const flagEmoji = lang === 'pt-BR' ? '🇧🇷' : '🌐';
+// Text label replaces the flag emoji that used to lead the category row.
+// Compact 2-letter code is unambiguous and doesn't depend on emoji rendering.
+const langLabel = lang === 'pt-BR' ? 'PT-BR' : 'EN';
 ---
 
 <a href={url} class:list={['tut-card', { featured }]}>
   {featured && <div class="tut-badge">Em destaque</div>}
   <div class="tut-cat">
-    <span class="tut-lang">{flagEmoji}</span>
+    <span class="tut-lang">{langLabel}</span>
     <span class="tut-category">{category}</span>
   </div>
   <h3 class="tut-title">{title}</h3>
   <p class="tut-desc">{description}</p>
   <div class="tut-meta">
-    <span>⏱ {timeMinutes} min</span>
-    <span>◆ {difficulty}</span>
+    <span>{timeMinutes} min</span>
+    <span>{difficulty}</span>
   </div>
   {tags.length > 0 && (
     <div class="tut-tags">
@@ -87,6 +89,16 @@ const flagEmoji = lang === 'pt-BR' ? '🇧🇷' : '🌐';
     color: var(--accent-2);
     margin-bottom: 0.75rem;
     font-weight: 600;
+  }
+
+  .tut-lang {
+    background: rgba(124, 92, 255, 0.12);
+    color: var(--accent-1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
   }
 
   .tut-title {

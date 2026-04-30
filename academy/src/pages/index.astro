@@ -12,13 +12,20 @@ const recent = allTutorials
 const guides = await getCollection('guides');
 const recipes = await getCollection('recipes');
 
-const categoryLabels: Record<string, { label: string; desc: string; icon: string; slug: string }> = {
-  agents: { label: 'Agentes', desc: 'Construindo agentes IA do zero ao deploy', icon: '◆', slug: 'agents' },
-  apis: { label: 'APIs', desc: 'Integrando e comparando provedores', icon: '⚡', slug: 'apis' },
-  production: { label: 'Produção', desc: 'Deploy, escala, custo, observabilidade', icon: '▲', slug: 'production' },
-  brazil: { label: 'Brasil', desc: 'Dados BR, PIX, LGPD em IA', icon: '🇧🇷', slug: 'brazil' },
-  concepts: { label: 'Conceitos', desc: 'x402, MCP, embeddings — o que importa', icon: '📚', slug: 'concepts' },
-  integration: { label: 'Integrações', desc: 'LangChain, CrewAI, Vercel AI SDK', icon: '⚙', slug: 'integration' },
+// Real Unsplash photos replace the emoji/glyph icons that used to lead
+// each category card. Width 600×400 cropped — small enough to load fast,
+// big enough to look sharp on retina. The card layout below uses the
+// image as a hero strip on top instead of a tiny inline icon.
+const IMG = (id: string) =>
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=600&h=400&q=80`;
+
+const categoryLabels: Record<string, { label: string; desc: string; image: string; slug: string }> = {
+  agents:      { label: 'Agentes',     desc: 'Construindo agentes IA do zero ao deploy', image: IMG('1677442136019-21780ecad995'), slug: 'agents' },
+  apis:        { label: 'APIs',        desc: 'Integrando e comparando provedores',       image: IMG('1518770660439-4636190af475'), slug: 'apis' },
+  production:  { label: 'Produção',    desc: 'Deploy, escala, custo, observabilidade',   image: IMG('1591808216268-ce0b82787efe'), slug: 'production' },
+  brazil:      { label: 'Brasil',      desc: 'Dados BR, PIX, LGPD em IA',                image: IMG('1483728642387-6c3bdd6c93e5'), slug: 'brazil' },
+  concepts:    { label: 'Conceitos',   desc: 'x402, MCP, embeddings — o que importa',    image: IMG('1481627834876-b7833e8f5570'), slug: 'concepts' },
+  integration: { label: 'Integrações', desc: 'LangChain, CrewAI, Vercel AI SDK',         image: IMG('1582719508461-905c673771fd'), slug: 'integration' },
 };
 ---
 
@@ -76,9 +83,11 @@ const categoryLabels: Record<string, { label: string; desc: string; icon: string
       <div class="cat-grid">
         {Object.values(categoryLabels).map(cat => (
           <a href={`/learn/tutorials?category=${cat.slug}`} class="cat-card">
-            <div class="cat-icon">{cat.icon}</div>
-            <h3>{cat.label}</h3>
-            <p>{cat.desc}</p>
+            <div class="cat-photo" style={`background-image: url('${cat.image}')`}></div>
+            <div class="cat-body">
+              <h3>{cat.label}</h3>
+              <p>{cat.desc}</p>
+            </div>
           </a>
         ))}
       </div>
@@ -90,7 +99,7 @@ const categoryLabels: Record<string, { label: string; desc: string; icon: string
     <section class="section">
       <div class="container">
         <div class="section-head">
-          <h2 class="section-title">✨ Em destaque</h2>
+          <h2 class="section-title">Em destaque</h2>
         </div>
         <div class="tut-grid">
           {featured.map(t => (
@@ -140,16 +149,20 @@ const categoryLabels: Record<string, { label: string; desc: string; icon: string
     <div class="container">
       <div class="two-col">
         <div class="teaser-card">
-          <div class="teaser-icon">📖</div>
-          <h3>{guides.length} Guias Conceituais</h3>
-          <p>Entenda <strong>x402</strong>, <strong>MCP</strong>, embeddings e arquitetura sem código — pra decidir melhor antes de construir.</p>
-          <a href="/learn/guides" class="btn btn-secondary">Ver guias →</a>
+          <div class="teaser-photo" style={`background-image: url('${IMG('1532153975070-2e9ab71f1b14')}')`}></div>
+          <div class="teaser-body">
+            <h3>{guides.length} Guias Conceituais</h3>
+            <p>Entenda <strong>x402</strong>, <strong>MCP</strong>, embeddings e arquitetura sem código — pra decidir melhor antes de construir.</p>
+            <a href="/learn/guides" class="btn btn-secondary">Ver guias →</a>
+          </div>
         </div>
         <div class="teaser-card">
-          <div class="teaser-icon">⚡</div>
-          <h3>{recipes.length} Recipes (Cookbook)</h3>
-          <p>Snippets curtos que resolvem problemas específicos. Copy, paste, rode. Sem teoria.</p>
-          <a href="/learn/recipes" class="btn btn-secondary">Ver recipes →</a>
+          <div class="teaser-photo" style={`background-image: url('${IMG('1555066931-4365d14bab8c')}')`}></div>
+          <div class="teaser-body">
+            <h3>{recipes.length} Recipes (Cookbook)</h3>
+            <p>Snippets curtos que resolvem problemas específicos. Copy, paste, rode. Sem teoria.</p>
+            <a href="/learn/recipes" class="btn btn-secondary">Ver recipes →</a>
+          </div>
         </div>
       </div>
     </div>
@@ -331,13 +344,16 @@ const categoryLabels: Record<string, { label: string; desc: string; icon: string
   }
 
   .cat-card {
-    padding: 1.5rem;
+    padding: 0;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     text-decoration: none;
     color: inherit;
     transition: all 0.2s;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .cat-card:hover {
@@ -346,10 +362,17 @@ const categoryLabels: Record<string, { label: string; desc: string; icon: string
     text-decoration: none;
   }
 
-  .cat-icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    color: var(--accent-1);
+  .cat-photo {
+    width: 100%;
+    height: 110px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--bg-primary);
+  }
+
+  .cat-body {
+    padding: 1.1rem 1.25rem 1.3rem;
+    flex: 1;
   }
 
   .cat-card h3 {
@@ -378,16 +401,24 @@ const categoryLabels: Record<string, { label: string; desc: string; icon: string
   }
 
   .teaser-card {
-    padding: 2rem;
+    padding: 0;
     background: var(--bg-primary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    text-align: center;
+    text-align: left;
+    overflow: hidden;
   }
 
-  .teaser-icon {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
+  .teaser-photo {
+    width: 100%;
+    height: 160px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--bg-secondary);
+  }
+
+  .teaser-body {
+    padding: 1.5rem 2rem 2rem;
   }
 
   .teaser-card h3 {
