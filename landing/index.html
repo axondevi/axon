@@ -29,16 +29,99 @@
     />
     <link rel="stylesheet" href="styles.css" />
     <style>
+      /* Vertical niche cards on the homepage — photos replace emoji
+         icons so the cards feel real and product-aware. Uses Unsplash
+         CDN URLs (free hot-link, lazy-loaded). When a photo fails to
+         load (slow connection / blocked), onerror hides the wrapper
+         and the card collapses to text-only — never broken layout. */
+      .niche-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.18s ease, border-color 0.18s ease;
+        display: flex;
+        flex-direction: column;
+      }
+      .niche-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+      }
+      /* Per-card accent color via data-accent attribute */
+      .niche-card[data-accent="#06b6d4"]:hover { border-color: #06b6d4; }
+      .niche-card[data-accent="#f97316"]:hover { border-color: #f97316; }
+      .niche-card[data-accent="#22c55e"]:hover { border-color: #22c55e; }
+      .niche-card-photo {
+        aspect-ratio: 16 / 9;
+        background: linear-gradient(135deg, rgba(124,92,255,0.08), rgba(25,213,198,0.04));
+        overflow: hidden;
+        position: relative;
+      }
+      .niche-card-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: transform 0.4s ease;
+      }
+      .niche-card:hover .niche-card-photo img { transform: scale(1.04); }
+      .niche-card-body {
+        padding: 20px 22px 22px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .niche-card-body h3 {
+        margin: 0 0 8px;
+        color: var(--text);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .niche-card-body p {
+        margin: 0 0 14px;
+        color: var(--text-dim);
+        font-size: 14px;
+        line-height: 1.5;
+        flex: 1;
+      }
+      .niche-card-cta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .niche-cta-test {
+        background: #22c55e;
+        color: #fff;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .niche-cta-test:hover { background: #16a34a; color: #fff; }
+      .niche-cta-price {
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid;
+      }
+      .niche-card[data-accent="#06b6d4"] .niche-cta-price { color: #06b6d4; border-color: #06b6d4; }
+      .niche-card[data-accent="#f97316"] .niche-cta-price { color: #f97316; border-color: #f97316; }
+      .niche-card[data-accent="#22c55e"] .niche-cta-price { color: #22c55e; border-color: #22c55e; }
+
       /* index-specific mobile polish (styles.css covers most) */
       @media (max-width: 500px) {
         .success-modal { padding: 12px !important; }
         .success-modal-inner { padding: 24px 18px !important; margin: 16px auto !important; max-width: calc(100vw - 24px) !important; }
         .success-modal-inner h2 { font-size: 22px !important; }
         .success-modal-inner input[readonly] { font-size: 12px; word-break: break-all; }
-        .niche-card { padding: 18px 14px !important; }
-        .niche-card h3 { font-size: 18px !important; }
-        .niche-cta-row { flex-direction: column; gap: 8px; }
-        .niche-cta-row a { width: 100%; }
+        .niche-card-body { padding: 16px 18px 18px; }
+        .niche-card-body h3 { font-size: 17px; }
+        .niche-card-cta { flex-direction: column; gap: 8px; }
+        .niche-card-cta a { width: 100%; text-align: center; }
         .api-grid { grid-template-columns: 1fr 1fr !important; }
       }
       @media (max-width: 380px) {
@@ -121,37 +204,58 @@
             <h2 style="margin-top: 16px;" data-pt="Tem um negócio? Crie seu agente em 5 minutos." data-en="Got a business? Build your agent in 5 minutes.">Tem um negócio? Crie seu agente em 5 minutos.</h2>
             <p style="color: var(--text-dim); max-width: 600px; margin: 12px auto 0;" data-pt="Templates prontos pro seu segmento. Linguagem coloquial BR. Sem código. Sem TI. Funciona no WhatsApp." data-en="Ready templates for your niche. Casual BR Portuguese. No code. No IT. Works on WhatsApp.">Templates prontos pro seu segmento. Linguagem coloquial BR. Sem código. Sem TI. Funciona no WhatsApp.</p>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px;">
-            <div style="padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); transition: all 0.2s;" onmouseover="this.style.borderColor='#06b6d4'" onmouseout="this.style.borderColor=''">
-              <div style="font-size: 36px; margin-bottom: 12px;">🏥</div>
-              <h3 style="margin: 0 0 8px; color: var(--text); font-size: 18px;" data-pt="Pra clínicas e consultórios" data-en="For clinics & medical offices">Pra clínicas e consultórios</h3>
-              <p style="margin: 0 0 12px; color: var(--text-dim); font-size: 14px; line-height: 1.5;" data-pt="Recepcionista virtual 24h: agenda, valores, urgências." data-en="24/7 virtual receptionist: scheduling, prices, urgencies.">Recepcionista virtual 24h: agenda, valores, urgências.</p>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-                <a href="/agent/demo-recepcionista-clinica-br" style="background:#22c55e;color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;" data-pt="💬 Testar grátis" data-en="💬 Try for free">💬 Testar grátis</a>
-                <a href="/clinica" style="border:1px solid #06b6d4;color:#06b6d4;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">R$249/mês →</a>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px;" class="niche-grid">
+            <!-- CLÍNICA -->
+            <div class="niche-card" data-accent="#06b6d4">
+              <div class="niche-card-photo">
+                <img src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=300&q=80"
+                     alt="Recepção de clínica médica" loading="lazy" decoding="async"
+                     onerror="this.style.display='none'" />
+              </div>
+              <div class="niche-card-body">
+                <h3 data-pt="Pra clínicas e consultórios" data-en="For clinics & medical offices">Pra clínicas e consultórios</h3>
+                <p data-pt="Recepcionista virtual 24h: agenda, valores, urgências." data-en="24/7 virtual receptionist: scheduling, prices, urgencies.">Recepcionista virtual 24h: agenda, valores, urgências.</p>
+                <div class="niche-card-cta">
+                  <a href="/agent/demo-recepcionista-clinica-br" class="niche-cta-test" data-pt="Testar grátis" data-en="Try for free">Testar grátis</a>
+                  <a href="/clinica" class="niche-cta-price">R$249/mês →</a>
+                </div>
               </div>
             </div>
-            <div style="padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); transition: all 0.2s;" onmouseover="this.style.borderColor='#f97316'" onmouseout="this.style.borderColor=''">
-              <div style="font-size: 36px; margin-bottom: 12px;">🍽️</div>
-              <h3 style="margin: 0 0 8px; color: var(--text); font-size: 18px;" data-pt="Pra restaurantes e deliveries" data-en="For restaurants & delivery">Pra restaurantes e deliveries</h3>
-              <p style="margin: 0 0 12px; color: var(--text-dim); font-size: 14px; line-height: 1.5;" data-pt="Cardápio, pedidos, taxa de entrega — tudo no WhatsApp." data-en="Menu, orders, delivery fees — all on WhatsApp.">Cardápio, pedidos, taxa de entrega — tudo no WhatsApp.</p>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-                <a href="/agent/demo-restaurante-br" style="background:#22c55e;color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;" data-pt="💬 Testar grátis" data-en="💬 Try for free">💬 Testar grátis</a>
-                <a href="/restaurante" style="border:1px solid #f97316;color:#f97316;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">R$199/mês →</a>
+            <!-- RESTAURANTE -->
+            <div class="niche-card" data-accent="#f97316">
+              <div class="niche-card-photo">
+                <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=300&q=80"
+                     alt="Mesa de restaurante com pratos" loading="lazy" decoding="async"
+                     onerror="this.style.display='none'" />
+              </div>
+              <div class="niche-card-body">
+                <h3 data-pt="Pra restaurantes e deliveries" data-en="For restaurants & delivery">Pra restaurantes e deliveries</h3>
+                <p data-pt="Cardápio, pedidos, taxa de entrega — tudo no WhatsApp." data-en="Menu, orders, delivery fees — all on WhatsApp.">Cardápio, pedidos, taxa de entrega — tudo no WhatsApp.</p>
+                <div class="niche-card-cta">
+                  <a href="/agent/demo-restaurante-br" class="niche-cta-test" data-pt="Testar grátis" data-en="Try for free">Testar grátis</a>
+                  <a href="/restaurante" class="niche-cta-price">R$199/mês →</a>
+                </div>
               </div>
             </div>
-            <div style="padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); transition: all 0.2s;" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor=''">
-              <div style="font-size: 36px; margin-bottom: 12px;">🛒</div>
-              <h3 style="margin: 0 0 8px; color: var(--text); font-size: 18px;" data-pt="Pra lojas online" data-en="For online stores">Pra lojas online</h3>
-              <p style="margin: 0 0 12px; color: var(--text-dim); font-size: 14px; line-height: 1.5;" data-pt="Frete por CEP, comparação, política de troca — 24h." data-en="Shipping by ZIP, comparison, return policy — 24/7.">Frete por CEP, comparação, política de troca — 24h.</p>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-                <a href="/agent/demo-ecommerce-br" style="background:#22c55e;color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;" data-pt="💬 Testar grátis" data-en="💬 Try for free">💬 Testar grátis</a>
-                <a href="/loja" style="border:1px solid #22c55e;color:#22c55e;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">R$199/mês →</a>
+            <!-- LOJA -->
+            <div class="niche-card" data-accent="#22c55e">
+              <div class="niche-card-photo">
+                <img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=300&q=80"
+                     alt="Caixas de envio de e-commerce" loading="lazy" decoding="async"
+                     onerror="this.style.display='none'" />
+              </div>
+              <div class="niche-card-body">
+                <h3 data-pt="Pra lojas online" data-en="For online stores">Pra lojas online</h3>
+                <p data-pt="Frete por CEP, comparação, política de troca — 24h." data-en="Shipping by ZIP, comparison, return policy — 24/7.">Frete por CEP, comparação, política de troca — 24h.</p>
+                <div class="niche-card-cta">
+                  <a href="/agent/demo-ecommerce-br" class="niche-cta-test" data-pt="Testar grátis" data-en="Try for free">Testar grátis</a>
+                  <a href="/loja" class="niche-cta-price">R$199/mês →</a>
+                </div>
               </div>
             </div>
           </div>
           <div style="text-align: center; margin-top: 24px;">
-            <a href="/explore" style="color: var(--text-dim); font-size: 13px;">💬 Ver todos os 10 demos disponíveis pra testar →</a>
+            <a href="/explore" style="color: var(--text-dim); font-size: 13px;" data-pt="Ver todos os 10 demos disponíveis pra testar →" data-en="See all 10 available demos to try →">Ver todos os 10 demos disponíveis pra testar →</a>
           </div>
         </div>
       </section>
