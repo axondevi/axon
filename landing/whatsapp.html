@@ -306,7 +306,16 @@
             state.apiKey = '';
             render();
           }
-          throw new Error(`${r.status} ${r.statusText}`);
+          // Read the JSON body so callers can branch on `error` codes
+          // (wrong_pay_mode, auto_provision_unavailable, etc) and show
+          // the human `message` instead of a bare "400". Falls back to
+          // statusText when the body isn't JSON.
+          const body = await r.json().catch(() => ({}));
+          const parts = [String(r.status)];
+          if (body && body.error) parts.push(body.error);
+          if (body && body.message) parts.push(body.message);
+          else if (r.statusText) parts.push(r.statusText);
+          throw new Error(parts.join(' '));
         }
         return r.json();
       }
