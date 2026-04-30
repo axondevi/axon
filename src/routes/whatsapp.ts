@@ -593,11 +593,21 @@ async function processBufferedTurn(opts: {
       `Skip o "||" multi-bolha — fala normal, frase única quando der.`,
     ].join('\n');
   } else {
-    memory = await getOrCreateMemory(a.id, inbound.phone, inbound.pushName).catch(() => null);
+    // WhatsApp inbound has no URL ?ref=, so first-touch attribution can
+    // only come from a different channel (web /agent/:slug?ref=...). Pass
+    // null here — getOrCreateMemory keeps any earlier attribution intact.
+    memory = await getOrCreateMemory(a.id, inbound.phone, inbound.pushName, null).catch(() => null);
     const memoryContext = memory ? buildMemoryContext(memory) : '';
     augmentedSystemPrompt = memoryContext
       ? `${a.systemPrompt}\n\n## O que você sabe sobre este contato\n${memoryContext}`
       : a.systemPrompt;
+
+    // Affiliate payout (fire-and-forget). Idempotent — if already paid
+    // or no referrer, this is a single SELECT and returns immediately.
+    if (memory && a.affiliateEnabled && a.affiliatePayoutMicro > 0n && memory.referredByUserId && !memory.affiliatePaidAt) {
+      const { payoutAffiliateIfPending } = await import('~/affiliates');
+      void payoutAffiliateIfPending({ agentId: a.id, contactId: memory.id }).catch(() => {});
+    }
   }
 
   // ─── Smart routing: classify intent → route to specialized agent ─────

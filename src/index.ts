@@ -35,6 +35,7 @@ import { personaRoutes } from '~/routes/personas';
 import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
+import { affiliateRoutes } from '~/routes/affiliate';
 
 const app = new Hono();
 
@@ -162,6 +163,7 @@ v1.route('/agents', ownerWhatsapp);  // adds /v1/agents/:id/whatsapp under same 
 v1.route('/agents', ownerContacts);  // adds /v1/agents/:id/contacts/* under same auth
 v1.route('/checkout', checkoutRoutes);  // POST /v1/checkout/pix + status polling
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
+v1.route('/affiliate', affiliateRoutes);  // earnings + agent list for referrers
 app.route('/v1', v1);
 
 // ─── Webhooks (signature-verified, no auth middleware) ──

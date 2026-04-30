@@ -225,6 +225,13 @@ export const agents = pgTable(
     // Shape: { sales?: uuid, personal?: uuid, support?: uuid }. null = leaf agent
     // (the routed-to one) or no routing configured.
     routesTo: jsonb('routes_to'),
+    // Affiliate program (off-chain MVP). When enabled, anyone who brings a
+    // new contact in via /agent/:slug?ref=<axon_user_id> earns
+    // `affiliate_payout_micro` USDC the first time that contact engages.
+    // The payout is a DB-level wallet transfer: debit owner, credit
+    // affiliate, both in one transaction. No smart contract yet.
+    affiliateEnabled: boolean('affiliate_enabled').notNull().default(false),
+    affiliatePayoutMicro: bigint('affiliate_payout_micro', { mode: 'bigint' }).notNull().default(0n),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -400,6 +407,13 @@ export const contactMemory = pgTable(
     routedAgentId: uuid('routed_agent_id'),
     routeIntent: text('route_intent'),
 
+    // Affiliate attribution. Set on first contact creation when the
+    // visitor arrived via /agent/:slug?ref=<axon_user_id>. The referenced
+    // user gets paid `agents.affiliate_payout_micro` once `affiliate_paid_at`
+    // flips from NULL to a timestamp (idempotent — never double-pay).
+    referredByUserId: uuid('referred_by_user_id'),
+    affiliatePaidAt: timestamp('affiliate_paid_at'),
+
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -408,6 +422,7 @@ export const contactMemory = pgTable(
     agentIdx: index('contact_memory_agent_idx').on(t.agentId),
     lastContactIdx: index('contact_memory_last_contact_idx').on(t.lastContactAt),
     routedAgentIdx: index('contact_memory_routed_agent_idx').on(t.routedAgentId),
+    referredByIdx: index('contact_memory_referred_by_idx').on(t.referredByUserId),
   }),
 );
 export type ContactMemory = typeof contactMemory.$inferSelect;

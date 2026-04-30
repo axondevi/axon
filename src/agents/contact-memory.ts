@@ -60,6 +60,10 @@ export async function getOrCreateMemory(
   agentId: string,
   phone: string,
   pushName?: string,
+  /** Optional referrer user id resolved from a `?ref=` link. Stored on
+   *  first creation only (existing contacts keep their original or null
+   *  attribution — no re-attribution after the fact). */
+  referredByUserId?: string | null,
 ): Promise<ContactMemory> {
   const [existing] = await db
     .select()
@@ -74,6 +78,7 @@ export async function getOrCreateMemory(
       agentId,
       phone,
       displayName: pushName?.slice(0, 100) || null,
+      referredByUserId: referredByUserId || null,
     })
     .onConflictDoNothing({
       target: [contactMemory.agentId, contactMemory.phone],

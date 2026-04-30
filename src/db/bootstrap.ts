@@ -106,6 +106,16 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "routed_agent_id" uuid`);
   await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "route_intent" text`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_routed_agent_idx" ON "contact_memory" ("routed_agent_id")`);
+
+  // 0013: affiliate program (off-chain MVP). Same idempotency pattern as
+  // 0012 — both are SELECT-* paths. Owner toggles `affiliate_enabled` and
+  // sets `affiliate_payout_micro` (USDC micro-units) per qualified new
+  // contact. contact_memory tracks who referred + when paid (idempotent).
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "affiliate_enabled" boolean NOT NULL DEFAULT false`);
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "affiliate_payout_micro" bigint NOT NULL DEFAULT 0`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "referred_by_user_id" uuid`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "affiliate_paid_at" timestamp`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_referred_by_idx" ON "contact_memory" ("referred_by_user_id") WHERE "referred_by_user_id" IS NOT NULL`);
 }
 
 export async function ensureSystemRows() {

@@ -490,6 +490,29 @@
           </div>
 
           <details style="margin-bottom:18px;">
+            <summary style="cursor:pointer; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); padding:8px 0;">🤝 Afiliados — pagar quem trouxer cliente</summary>
+            <div style="padding:12px 0 4px;">
+              <div class="hint" style="margin-bottom:12px;">
+                Quando ativado, qualquer pessoa pode pegar um link da sua página pública (em /afiliados) e divulgar. Cada novo contato que chegar pelo link e usar o agente uma vez gera um pagamento direto da sua carteira pra carteira do indicador. Tudo em USDC, instantâneo.
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label for="b-aff-on">Ativar programa de afiliados</label>
+                  <select id="b-aff-on">
+                    <option value="false">Desativado</option>
+                    <option value="true">Ativado</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="b-aff-payout">Quanto pagar por contato (USDC)</label>
+                  <input type="number" id="b-aff-payout" step="0.01" min="0" max="5" value="0.20" />
+                  <div class="hint">Sugestão: $0.10 a $0.50 por novo contato. Sai do seu saldo Axon.</div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details style="margin-bottom:18px;">
             <summary style="cursor:pointer; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); padding:8px 0;">🎯 Roteamento — encaminhar conversa pro agente certo</summary>
             <div style="padding:12px 0 4px;">
               <div class="hint" style="margin-bottom:12px;">
@@ -714,6 +737,9 @@
         // When at least one is set, the agent acts as a "front door" — first
         // turn classifies, then sticks the customer on the routed agent.
         routes_to: { sales: '', personal: '', support: '' },
+        // Affiliate program — owner pays referrers per qualified contact
+        affiliate_enabled: false,
+        affiliate_payout_usdc: '0.20',
       };
 
       // ── Tabs ──────────────────────────────────────────────────────────
@@ -937,6 +963,8 @@
               personal: (a.routes_to && a.routes_to.personal) || '',
               support: (a.routes_to && a.routes_to.support) || '',
             },
+            affiliate_enabled: !!a.affiliate_enabled,
+            affiliate_payout_usdc: a.affiliate_payout_usdc || '0.20',
           }, id);
         } catch (e) { showToast(e.message, 'error'); }
       };
@@ -1318,6 +1346,10 @@
         document.getElementById('b-vanity').value = formState.vanity_domain || '';
         document.getElementById('b-prompt-b').value = formState.system_prompt_b || '';
         document.getElementById('b-ab').value = formState.ab_split || 0;
+        const affOnEl = document.getElementById('b-aff-on');
+        const affPayoutEl = document.getElementById('b-aff-payout');
+        if (affOnEl) affOnEl.value = String(!!formState.affiliate_enabled);
+        if (affPayoutEl) affPayoutEl.value = formState.affiliate_payout_usdc || '0.20';
         renderTools();
         renderQuickPrompts();
         renderPreview();
@@ -1477,6 +1509,17 @@
         });
       });
 
+      // Affiliate inputs are only present when the modal is open, so bind
+      // them lazily via event delegation. Same idea as the routing dropdowns.
+      document.addEventListener('change', (e) => {
+        if (e.target && e.target.id === 'b-aff-on') {
+          formState.affiliate_enabled = e.target.value === 'true';
+        }
+        if (e.target && e.target.id === 'b-aff-payout') {
+          formState.affiliate_payout_usdc = e.target.value;
+        }
+      });
+
       document.getElementById('b-cancel').addEventListener('click', closeBuilder);
       document.getElementById('builder').addEventListener('click', (e) => {
         if (e.target.id === 'builder') closeBuilder();
@@ -1527,6 +1570,10 @@
               }
               return Object.keys(cleaned).length ? cleaned : null;
             })(),
+            // Affiliate program — keep flat so the backend PATCH handler
+            // (src/routes/agents.ts) can validate each field independently.
+            affiliate_enabled: !!formState.affiliate_enabled,
+            affiliate_payout_usdc: formState.affiliate_payout_usdc || '0',
           };
           let createdAgent = null;
           if (editingAgentId) {

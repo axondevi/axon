@@ -268,6 +268,19 @@
       const _qsSlug = _qs.get('slug');
       const _pathMatch = location.pathname.match(/\/agent\/([^/?#]+)/);
       const slug = _qsSlug || (_pathMatch && _pathMatch[1]);
+
+      // Affiliate attribution. ?ref=<axon_user_id> in the link assigns
+      // commission to that user when this contact engages with the agent.
+      // Persist in sessionStorage so refreshes don't lose attribution and
+      // every backend call can include it without the visitor seeing the
+      // long URL after the first load.
+      const _qsRef = _qs.get('ref');
+      if (_qsRef && /^[0-9a-f-]{32,40}$/i.test(_qsRef)) {
+        try { sessionStorage.setItem('axon.agent.ref:' + slug, _qsRef); } catch {}
+      }
+      const affiliateRef = (() => {
+        try { return sessionStorage.getItem('axon.agent.ref:' + slug) || null; } catch { return null; }
+      })();
       // ?embed=1 → tighter chrome for floating-widget hosts
       if (_qs.get('embed') === '1') document.body.classList.add('embed-mode');
       if (!slug) {

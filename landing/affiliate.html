@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Afiliados · Axon</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  .aff-page { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+  .aff-hero {
+    background: linear-gradient(135deg, rgba(124,92,255,0.10), rgba(25,213,198,0.04));
+    border: 1px solid rgba(124,92,255,0.30);
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 28px;
+  }
+  .aff-hero h1 { font-size: clamp(26px, 4vw, 36px); margin: 0 0 8px; letter-spacing: -0.02em; }
+  .aff-hero p { color: var(--text-dim); font-size: 14px; margin: 0; line-height: 1.55; max-width: 640px; }
+
+  .aff-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .summ-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .summ-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+  .summ-value {
+    font-size: 28px;
+    font-weight: 800;
+    margin-top: 6px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .summ-value small { font-size: 14px; color: var(--text-dim); font-weight: 500; }
+
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin: 32px 0 12px;
+  }
+
+  .agents-list { display: grid; gap: 10px; }
+  .agent-row {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+  }
+  @media (max-width: 640px) {
+    .agent-row { grid-template-columns: 1fr; gap: 12px; }
+  }
+  .agent-name {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .agent-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .agent-reward {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-2);
+    background: rgba(25,213,198,0.10);
+    padding: 6px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .agent-link-btn {
+    background: var(--accent);
+    color: #0a0a0b;
+    border: 0;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .agent-link-btn:hover { transform: translateY(-1px); }
+
+  .recent-list { display: grid; gap: 8px; }
+  .recent-row {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .recent-row .paid {
+    color: var(--accent-2);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .recent-row .pending {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .recent-row .when { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+    background: var(--bg-card);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+
+  .login-prompt {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+  }
+  .login-prompt a {
+    color: var(--accent-2);
+    font-weight: 600;
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="container nav-inner">
+    <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+    <nav class="nav-links">
+      <a href="/explore" data-pt="Explorar" data-en="Explore">Explorar</a>
+      <a href="/build" data-pt="Criar" data-en="Build">Criar</a>
+      <a href="/dashboard" data-pt="Painel" data-en="Dashboard">Painel</a>
+      <a href="/affiliate" aria-current="page" data-pt="Afiliados" data-en="Affiliate">Afiliados</a>
+      <a href="/upgrade" data-pt="Planos" data-en="Plans">Planos</a>
+      <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
+        <span data-active="pt">🇧🇷 PT</span>
+        <span data-active="en">🇺🇸 EN</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main class="aff-page">
+  <div class="aff-hero">
+    <h1 data-pt="Afiliados — ganhe USDC indicando agentes" data-en="Affiliates — earn USDC by referring agents">Afiliados — ganhe USDC indicando agentes</h1>
+    <p data-pt="Pegue o link de qualquer agente abaixo, compartilhe onde quiser. Sempre que alguém chega via seu link e usa o agente pela primeira vez, você ganha USDC direto na sua carteira Axon. Tudo automático — pago em segundos, sem nota fiscal, sem chargeback." data-en="Grab the link of any agent below and share it anywhere. Whenever someone arrives via your link and engages the agent for the first time, you earn USDC straight into your Axon wallet. All automatic — paid in seconds, no invoice, no chargeback.">
+      Pegue o link de qualquer agente abaixo, compartilhe onde quiser. Sempre que alguém chega via seu link e usa o agente pela primeira vez, você ganha USDC direto na sua carteira Axon. Tudo automático — pago em segundos, sem nota fiscal, sem chargeback.
+    </p>
+  </div>
+
+  <div id="state-area">
+    <div class="empty-state" data-pt="Carregando…" data-en="Loading…">Carregando…</div>
+  </div>
+</main>
+
+<link rel="stylesheet" href="/_i18n.css" />
+<script src="/_i18n.js" defer></script>
+<script>
+(async function () {
+  const STORAGE_KEY = 'axon.dashboard.key';
+  const BASE = localStorage.getItem('axon.baseUrl') || 'https://axon-kedb.onrender.com';
+  const apiKey = localStorage.getItem(STORAGE_KEY);
+
+  if (!apiKey) {
+    document.getElementById('state-area').innerHTML = `
+      <div class="login-prompt">
+        <p data-pt="Você precisa estar logado pra ver seus ganhos como afiliado." data-en="You need to be logged in to see your affiliate earnings.">
+          Você precisa estar logado pra ver seus ganhos como afiliado.
+        </p>
+        <p style="margin-top:14px;">
+          <a href="/dashboard" data-pt="Entrar no painel →" data-en="Sign in →">Entrar no painel →</a>
+        </p>
+      </div>
+    `;
+    if (window.AxonI18n) window.AxonI18n.apply();
+    return;
+  }
+
+  async function fetchJson(path) {
+    const r = await fetch(BASE + path, { headers: { 'x-api-key': apiKey } });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+    return r.json();
+  }
+
+  function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copiado';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  try {
+    const [stats, agents] = await Promise.all([
+      fetchJson('/v1/affiliate/stats'),
+      fetchJson('/v1/affiliate/agents'),
+    ]);
+
+    const totalUsdc = stats.total_earned_usdc || '0.000000';
+    const payoutsCount = stats.payouts_count || 0;
+    const recent = stats.recent_contacts || [];
+    const offers = agents.data || [];
+
+    const summary = `
+      <div class="aff-summary">
+        <div class="summ-card">
+          <div class="summ-label" data-pt="Total ganho" data-en="Total earned">Total ganho</div>
+          <div class="summ-value">$${parseFloat(totalUsdc).toFixed(4)}<small> USDC</small></div>
+        </div>
+        <div class="summ-card">
+          <div class="summ-label" data-pt="Contatos pagos" data-en="Paid referrals">Contatos pagos</div>
+          <div class="summ-value">${payoutsCount}</div>
+        </div>
+        <div class="summ-card">
+          <div class="summ-label" data-pt="Agentes ativos" data-en="Active agents">Agentes ativos</div>
+          <div class="summ-value">${offers.length}</div>
+        </div>
+      </div>
+    `;
+
+    const agentsHtml = offers.length === 0
+      ? `<div class="empty-state" data-pt="Nenhum agente está pagando comissão de afiliado agora. Volte depois — donos de agente ativam essa opção pra ganhar mais visibilidade." data-en="No agent is paying affiliate commission right now. Check back later — agent owners enable this to gain visibility.">Nenhum agente está pagando comissão de afiliado agora. Volte depois — donos de agente ativam essa opção pra ganhar mais visibilidade.</div>`
+      : `<div class="agents-list">
+          ${offers.map((a) => {
+            const fullLink = location.origin + a.affiliate_link;
+            return `
+              <div class="agent-row">
+                <div>
+                  <div class="agent-name">${escapeHtml(a.name)}</div>
+                  <div class="agent-desc">${escapeHtml(a.description || '')}</div>
+                </div>
+                <div class="agent-reward">+$${parseFloat(a.reward_usdc).toFixed(2)} <span data-pt="por contato" data-en="per referral">por contato</span></div>
+                <button class="agent-link-btn" onclick="(${copyText.toString()})('${fullLink}', this)" data-pt="Copiar link" data-en="Copy link">Copiar link</button>
+              </div>
+            `;
+          }).join('')}
+        </div>`;
+
+    const recentHtml = recent.length === 0
+      ? `<div class="empty-state" data-pt="Nenhum contato indicado ainda. Cole o link em qualquer rede e os primeiros começam a aparecer." data-en="No referrals yet. Drop your link anywhere and the first contacts will start showing up.">Nenhum contato indicado ainda. Cole o link em qualquer rede e os primeiros começam a aparecer.</div>`
+      : `<div class="recent-list">
+          ${recent.map((r) => {
+            const when = new Date(r.first_contact_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+            const status = r.paid
+              ? `<span class="paid">✓ <span data-pt="pago" data-en="paid">pago</span> $${parseFloat(r.reward_usdc).toFixed(2)}</span>`
+              : `<span class="pending"><span data-pt="aguardando" data-en="pending">aguardando</span></span>`;
+            return `
+              <div class="recent-row">
+                <div>
+                  <strong>${escapeHtml(r.agent_name)}</strong>
+                  <span style="color:var(--text-muted);font-size:11px;margin-left:6px;">/${escapeHtml(r.agent_slug)}</span>
+                </div>
+                ${status}
+                <span class="when">${when}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>`;
+
+    document.getElementById('state-area').innerHTML = `
+      ${summary}
+      <div class="section-title" data-pt="🎯 Agentes pagando agora" data-en="🎯 Agents paying now">🎯 Agentes pagando agora</div>
+      ${agentsHtml}
+      <div class="section-title" data-pt="📊 Seus contatos recentes" data-en="📊 Your recent referrals">📊 Seus contatos recentes</div>
+      ${recentHtml}
+    `;
+
+    if (window.AxonI18n) window.AxonI18n.apply();
+  } catch (err) {
+    document.getElementById('state-area').innerHTML = `
+      <div class="empty-state" style="border-color:#f87171;color:#f87171;">
+        Erro: ${escapeHtml(err.message)}
+      </div>
+    `;
+  }
+})();
+</script>
+
+</body>
+</html>

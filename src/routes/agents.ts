@@ -232,6 +232,8 @@ app.get('/:id', async (c) => {
     persona_id: a.personaId,
     owner_phone: a.ownerPhone,
     routes_to: a.routesTo,
+    affiliate_enabled: a.affiliateEnabled,
+    affiliate_payout_usdc: (Number(a.affiliatePayoutMicro) / 1_000_000).toFixed(6),
     created_at: a.createdAt,
     updated_at: a.updatedAt,
   });
@@ -413,6 +415,19 @@ app.patch('/:id', async (c) => {
       }
       update.ownerPhone = digits;
     }
+  }
+  if (body.affiliate_enabled !== undefined) {
+    update.affiliateEnabled = !!body.affiliate_enabled;
+  }
+  if (body.affiliate_payout_usdc !== undefined) {
+    // USDC value comes as a string (e.g. "0.20"). Convert to micro-USDC,
+    // clamp to a reasonable range so the owner can't accidentally configure
+    // an absurd payout (the form validates too but defense in depth).
+    const v = parseFloat(String(body.affiliate_payout_usdc));
+    if (!isFinite(v) || v < 0 || v > 5) {
+      return c.json({ error: 'bad_request', message: 'affiliate_payout_usdc must be between 0 and 5' }, 400);
+    }
+    update.affiliatePayoutMicro = BigInt(Math.round(v * 1_000_000));
   }
   if (body.routes_to !== undefined) {
     // routes_to: { sales?: agentId, personal?: agentId, support?: agentId }
