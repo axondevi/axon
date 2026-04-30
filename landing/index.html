@@ -764,25 +764,41 @@
         // Wide registry categories collapse into 8 user-facing groups so
         // the section stops looking like a wall of cards. Anything not
         // matched falls under "Utilitários" so nothing disappears.
+        // Each group has a real photo (Unsplash CDN, 64×64 cropped) used
+        // as the section icon — replaces the emoji that came before.
+        var IMG = function (id) {
+          return 'https://images.unsplash.com/photo-' + id +
+                 '?auto=format&fit=crop&w=80&h=80&q=80';
+        };
+        var CAT = {
+          br:      { id: 'br',      title: 'Dados brasileiros',          order: 1, image: IMG('1601581875309-fafbf2d3ed3a') }, /* brazilian flag */
+          geo:     { id: 'geo',     title: 'Geo & Clima',                 order: 2, image: IMG('1457369804613-52c61a468e7d') }, /* world map */
+          finance: { id: 'finance', title: 'Finanças & Mercado',          order: 3, image: IMG('1611974789855-9c2a0a7236a3') }, /* stock charts */
+          search:  { id: 'search',  title: 'Busca & Web',                 order: 4, image: IMG('1488229297570-58520851e868') }, /* magnifying glass */
+          know:    { id: 'know',    title: 'Conhecimento & Pesquisa',     order: 5, image: IMG('1481627834876-b7833e8f5570') }, /* books */
+          ai:      { id: 'ai',      title: 'IA & Modelos',                order: 6, image: IMG('1677442136019-21780ecad995') }, /* AI tech */
+          voice:   { id: 'voice',   title: 'Voz & Áudio',                 order: 7, image: IMG('1590602847861-f357a9332bbc') }, /* microphone */
+          utils:   { id: 'utils',   title: 'Utilitários & Enrichment',    order: 8, image: IMG('1581094794329-c8112a89af12') }, /* tools */
+        };
         var CATEGORY_MAP = {
-          'Brazil & LatAm Data':  { id: 'br',      title: '🇧🇷 Dados brasileiros',          order: 1 },
-          'Geo & Weather':        { id: 'geo',     title: '🌍 Geo & Clima',                order: 2 },
-          'Geography & Reference':{ id: 'geo',     title: '🌍 Geo & Clima',                order: 2 },
-          'Weather & Geo':        { id: 'geo',     title: '🌍 Geo & Clima',                order: 2 },
-          'Finance & Markets':    { id: 'finance', title: '💰 Finanças & Mercado',         order: 3 },
-          'Blockchain Data':      { id: 'finance', title: '💰 Finanças & Mercado',         order: 3 },
-          'Web Intelligence':     { id: 'search',  title: '🔍 Busca & Web',                order: 4 },
-          'News & Social':        { id: 'search',  title: '🔍 Busca & Web',                order: 4 },
-          'Knowledge & Research': { id: 'know',    title: '📚 Conhecimento & Pesquisa',    order: 5 },
-          'Documents':            { id: 'know',    title: '📚 Conhecimento & Pesquisa',    order: 5 },
-          'LLM':                  { id: 'ai',      title: '🤖 IA & Modelos',               order: 6 },
-          'AI & ML':              { id: 'ai',      title: '🤖 IA & Modelos',               order: 6 },
-          'Voice':                { id: 'voice',   title: '🎙️ Voz & Áudio',                order: 7 },
-          'Speech & Audio':       { id: 'voice',   title: '🎙️ Voz & Áudio',                order: 7 },
-          'Translation':          { id: 'voice',   title: '🎙️ Voz & Áudio',                order: 7 },
-          'Enrichment':           { id: 'utils',   title: '🧰 Utilitários & Enrichment',   order: 8 },
-          'Social':               { id: 'utils',   title: '🧰 Utilitários & Enrichment',   order: 8 },
-          'Agent Memory':         { id: 'utils',   title: '🧰 Utilitários & Enrichment',   order: 8 },
+          'Brazil & LatAm Data':  CAT.br,
+          'Geo & Weather':        CAT.geo,
+          'Geography & Reference':CAT.geo,
+          'Weather & Geo':        CAT.geo,
+          'Finance & Markets':    CAT.finance,
+          'Blockchain Data':      CAT.finance,
+          'Web Intelligence':     CAT.search,
+          'News & Social':        CAT.search,
+          'Knowledge & Research': CAT.know,
+          'Documents':            CAT.know,
+          'LLM':                  CAT.ai,
+          'AI & ML':              CAT.ai,
+          'Voice':                CAT.voice,
+          'Speech & Audio':       CAT.voice,
+          'Translation':          CAT.voice,
+          'Enrichment':           CAT.utils,
+          'Social':               CAT.utils,
+          'Agent Memory':         CAT.utils,
         };
 
         // Resolve a logo URL for a provider by stripping homepage to its
@@ -909,7 +925,15 @@
 
             var summary = document.createElement('summary');
             summary.className = 'api-cat-summary';
+            // Real photo thumb replaces the emoji that used to lead the
+            // title. Loaded async/lazy so the page paints fast even on a
+            // slow connection. onerror falls back to a hidden image so a
+            // dead URL doesn't leave a broken-image icon.
+            var iconHtml = group.meta.image
+              ? '<img class="api-cat-icon" src="' + escapeHtml(group.meta.image) + '" alt="" loading="lazy" decoding="async" onerror="this.style.display=\'none\'" />'
+              : '';
             summary.innerHTML =
+              iconHtml +
               '<span class="api-cat-title" translate="no">' + escapeHtml(group.meta.title) + '</span>' +
               '<span class="api-cat-count">' + group.items.length + ' APIs</span>' +
               '<span class="api-cat-chevron" aria-hidden="true">▾</span>';
