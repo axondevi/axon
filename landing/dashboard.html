@@ -1246,6 +1246,20 @@
           }
           renderAdvancedForm(card, agentId, agentName, closeOverlay);
         };
+        const resetBtn = card.querySelector('[data-act="reset-instance"]');
+        if (resetBtn) resetBtn.onclick = async () => {
+          if (!confirm('Apagar essa instância do WhatsApp e gerar uma nova?\n\nUse isso se o QR não está funcionando.')) return;
+          if (window.__waModalState.pollHandle) {
+            clearInterval(window.__waModalState.pollHandle);
+            window.__waModalState.pollHandle = null;
+          }
+          resetBtn.disabled = true;
+          resetBtn.textContent = 'Apagando…';
+          try {
+            await api(`/v1/agents/${agentId}/whatsapp`, { method: 'DELETE' });
+          } catch { /* may already be gone — proceed */ }
+          launchQrFlow(card, agentId, agentName, closeOverlay);
+        };
         const refreshBtn = card.querySelector('[data-act="refresh-qr"]');
         if (refreshBtn) refreshBtn.onclick = async () => {
           refreshBtn.disabled = true;
@@ -1326,6 +1340,20 @@
             window.__waModalState.pollHandle = null;
           }
           renderAdvancedForm(card, agentId, agentName, closeOverlay);
+        };
+        const resetBtn = card.querySelector('[data-act="reset-instance"]');
+        if (resetBtn) resetBtn.onclick = async () => {
+          if (!confirm('Apagar essa instância do WhatsApp e gerar uma nova?\n\nUse isso se o QR não está funcionando.')) return;
+          if (window.__waModalState.pollHandle) {
+            clearInterval(window.__waModalState.pollHandle);
+            window.__waModalState.pollHandle = null;
+          }
+          resetBtn.disabled = true;
+          resetBtn.textContent = 'Apagando…';
+          try {
+            await api(`/v1/agents/${agentId}/whatsapp`, { method: 'DELETE' });
+          } catch { /* may already be gone — proceed */ }
+          launchQrFlow(card, agentId, agentName, closeOverlay);
         };
         const refreshBtn = card.querySelector('[data-act="refresh-qr"]');
         if (refreshBtn) refreshBtn.onclick = async () => {
@@ -1519,7 +1547,10 @@
           <style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}</style>
 
           <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap;">
-            <button data-act="refresh-qr" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 14px;border-radius:6px;font-size:12px;cursor:pointer;">🔄 Atualizar QR</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button data-act="refresh-qr" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 14px;border-radius:6px;font-size:12px;cursor:pointer;">🔄 Atualizar QR</button>
+              <button data-act="reset-instance" style="background:transparent;border:1px solid rgba(255,95,87,0.4);color:#ff5f57;padding:9px 14px;border-radius:6px;font-size:12px;cursor:pointer;" title="Apaga essa instância e gera uma nova">🗑️ Recomeçar</button>
+            </div>
             <div style="font-size:11px;color:var(--text-muted);">
               Já tem servidor Evolution?
               <button data-act="show-advanced" style="background:none;border:none;color:var(--accent-2);font-size:11px;cursor:pointer;text-decoration:underline;padding:0;">Modo avançado</button>

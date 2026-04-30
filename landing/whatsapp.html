@@ -699,9 +699,12 @@
               <div style="width:8px;height:8px;border-radius:50%;background:var(--warn);box-shadow:0 0 6px var(--warn);"></div>
               <span>Aguardando você parear no celular… <span id="cw-poll-counter">0s</span></span>
             </div>
-            <div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;">
-              <button onclick="refreshConnectQR()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">↻ Atualizar QR</button>
-              <button onclick="closeConnectModal()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Cancelar</button>
+            <div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;flex-wrap:wrap;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button onclick="refreshConnectQR()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">↻ Atualizar QR</button>
+                <button onclick="resetWaInstance()" title="Apaga essa instância e gera uma nova" style="background:transparent;border:1px solid rgba(255,95,87,0.4);color:#ff5f57;padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">🗑️ Recomeçar</button>
+              </div>
+              <button onclick="closeConnectModal()" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Fechar</button>
             </div>
           `;
           startConnectPolling();
@@ -777,6 +780,25 @@
         box.textContent = msg;
         box.style.display = 'block';
       }
+
+      // Wipe the current Evolution instance and start the auto-provision flow
+      // from scratch. Useful when an instance is wedged or the QR went stale.
+      window.resetWaInstance = async () => {
+        if (!confirm('Apagar essa instância e gerar uma nova?\n\nUse isso se o QR não está funcionando.')) return;
+        if (connectWizardState.pollTimer) {
+          clearInterval(connectWizardState.pollTimer);
+          connectWizardState.pollTimer = null;
+        }
+        try {
+          await api(`/v1/agents/${connectWizardState.agentId}/whatsapp`, { method: 'DELETE' });
+        } catch { /* may already be gone */ }
+        // Re-run auto-provision from the connecting step
+        connectWizardState.step = 'connecting';
+        connectWizardState.mode = 'auto';
+        connectWizardState.pairingData = null;
+        renderConnectStep();
+        autoProvisionConnection();
+      };
 
       window.refreshConnectQR = async () => {
         try {
