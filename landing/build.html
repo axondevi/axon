@@ -45,16 +45,28 @@
       }
       .tpl-card {
         background: var(--bg-elev); border: 1px solid var(--border);
-        border-radius: 12px; padding: 20px;
+        border-radius: 12px; padding: 0;
         cursor: pointer;
         transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
         position: relative; overflow: hidden;
-      }
-      .tpl-card::before {
-        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-        background: var(--tc, var(--accent));
+        display: flex; flex-direction: column;
       }
       .tpl-card:hover { transform: translateY(-2px); border-color: var(--tc, var(--accent)); box-shadow: 0 12px 32px rgba(0,0,0,0.2); }
+      .tpl-card .tpl-photo {
+        width: 100%; height: 130px;
+        background: linear-gradient(135deg, var(--tc, var(--accent)) 0%, rgba(0,0,0,0.4) 100%);
+        background-size: cover; background-position: center;
+        position: relative;
+      }
+      .tpl-card .tpl-photo::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 100%);
+      }
+      .tpl-card .tpl-body { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; }
+      .tpl-card .tpl-photo-fallback {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        font-size: 48px;
+      }
       .tpl-emoji { font-size: 28px; line-height: 1; margin-bottom: 10px; display: block; }
       .tpl-card h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
       .tpl-card .tpl-cat {
@@ -851,18 +863,27 @@
             grid.innerHTML = '<p style="color: var(--text-muted)">No templates available.</p>';
             return;
           }
-          grid.innerHTML = d.templates.map((t) => `
+          grid.innerHTML = d.templates.map((t) => {
+            // Real photo when we have one (Unsplash CDN, fast loading);
+            // emoji fallback for any template that hasn't been assigned a
+            // photo yet — keeps backwards compat without a build break.
+            const photo = t.image_url
+              ? `<div class="tpl-photo" style="background-image:url('${t.image_url}')"></div>`
+              : `<div class="tpl-photo"><span class="tpl-photo-fallback">${t.emoji}</span></div>`;
+            return `
             <div class="tpl-card" style="--tc: ${t.primary_color}" data-id="${t.id}">
-              <span class="tpl-emoji">${t.emoji}</span>
-              <span class="tpl-cat">${t.category}</span>
-              <h3>${escape(t.name)}</h3>
-              <p class="tpl-desc">${escape(t.description)}</p>
-              <div class="tpl-meta">
-                <span>${t.tool_count} tools · ${escape(t.target.split(',')[0])}</span>
-                <span class="tpl-price">R$${t.monthly_price_brl}/mo</span>
+              ${photo}
+              <div class="tpl-body">
+                <span class="tpl-cat">${t.category}</span>
+                <h3>${escape(t.name)}</h3>
+                <p class="tpl-desc">${escape(t.description)}</p>
+                <div class="tpl-meta">
+                  <span>${t.tool_count} tools · ${escape(t.target.split(',')[0])}</span>
+                  <span class="tpl-price">R$${t.monthly_price_brl}/mo</span>
+                </div>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
           grid.querySelectorAll('.tpl-card').forEach((card) => {
             card.addEventListener('click', () => useTemplate(card.dataset.id));
           });

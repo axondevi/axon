@@ -41,6 +41,7 @@ publicRoutes.get('/templates', (c) => {
       id: t.id,
       name: t.name,
       emoji: t.emoji,
+      image_url: t.imageUrl,
       description: t.description,
       category: t.category,
       target: t.target,
