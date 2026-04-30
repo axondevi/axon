@@ -146,9 +146,29 @@
     </header>
 
     <main class="container up-wrap">
-      <h1 data-pt="Escolha seu plano" data-en="Choose your plan">Escolha seu plano</h1>
-      <p class="lede" data-pt="Pague em USDC da sua carteira Axon. Sem cartão, sem fatura mensal — um débito direto por período de 30 dias." data-en="Pay in USDC from your Axon wallet. No credit card, no monthly invoice — a direct debit for a 30-day period.">Pague em USDC da sua carteira Axon. Sem cartão, sem fatura mensal — um débito direto por período de 30 dias.</p>
-      <p class="pitch" data-pt="Cada plano destrava capacidade real pro seu agente: quantos clientes simultâneos consegue atender, e quanto economiza em taxas por chamada. Cancele a hora que quiser." data-en="Each plan unlocks real capacity for your agent: how many simultaneous customers it can handle, and how much you save in per-call fees. Cancel anytime.">Cada plano destrava <strong>capacidade real</strong> pro seu agente: quantos clientes simultâneos consegue atender, e quanto economiza em taxas por chamada. Cancele a hora que quiser.</p>
+      <h1 data-pt="Como o Axon cobra" data-en="How Axon charges">Como o Axon cobra</h1>
+      <p class="lede" data-pt="Você paga só pelas APIs que usar — centavos por chamada, em USDC. O plano abaixo é opcional e dá desconto na taxa de gateway." data-en="You only pay for the APIs you use — pennies per call, in USDC. The plans below are optional and discount the gateway fee.">Você paga só pelas APIs que usar — centavos por chamada, em USDC. O plano abaixo é opcional e dá desconto na taxa de gateway.</p>
+
+      <!-- Two distinct usage paths so the visitor can see themselves -->
+      <div class="usage-paths" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0 32px;">
+        <div style="background:linear-gradient(135deg,rgba(124,92,255,0.08),transparent);border:1px solid rgba(124,92,255,0.30);border-radius:12px;padding:20px;">
+          <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:8px;" data-pt="Caminho 1 · com agente" data-en="Path 1 · with agent">Caminho 1 · com agente</div>
+          <h3 style="margin:0 0 10px;font-size:18px;letter-spacing:-0.01em;" data-pt="Tem negócio? Cria um atendente IA." data-en="Got a business? Build an AI assistant.">Tem negócio? Cria um atendente IA.</h3>
+          <p style="margin:0 0 14px;color:var(--text-dim);font-size:13px;line-height:1.55;" data-pt="Cria agente em 5 minutos, conecta no WhatsApp, atende 24h. Você paga só pelas APIs que ele consome (média ~R$0,03 por conversa). Plano abaixo desconta essa taxa." data-en="Build the agent in 5 minutes, plug it into WhatsApp, attend 24/7. You only pay for the APIs it consumes (~R$0.03 per conversation on average). The plan below discounts that fee.">Cria agente em 5 minutos, conecta no WhatsApp, atende 24h. Você paga só pelas APIs que ele consome (média ~R$0,03 por conversa). Plano abaixo desconta essa taxa.</p>
+          <a href="/build" style="color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;" data-pt="Criar agente →" data-en="Build agent →">Criar agente →</a>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(25,213,198,0.06),transparent);border:1px solid rgba(25,213,198,0.30);border-radius:12px;padding:20px;">
+          <div style="font-size:11px;color:var(--accent-2);text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:8px;" data-pt="Caminho 2 · sem agente" data-en="Path 2 · no agent">Caminho 2 · sem agente</div>
+          <h3 style="margin:0 0 10px;font-size:18px;letter-spacing:-0.01em;" data-pt="É dev? Chama as APIs direto." data-en="Dev? Call the APIs directly.">É dev? Chama as APIs direto.</h3>
+          <p style="margin:0 0 14px;color:var(--text-dim);font-size:13px;line-height:1.55;" data-pt="40+ APIs num único endpoint. Paga em USDC via x402 (HTTP 402 nativo) — sem cadastro de cartão, sem fatura mensal, sem chave por API. Centavos por chamada." data-en="40+ APIs through a single endpoint. Pay in USDC via x402 (native HTTP 402) — no credit card, no monthly invoice, no per-API key. Pennies per call.">40+ APIs num único endpoint. Paga em USDC via x402 (HTTP 402 nativo) — sem cadastro de cartão, sem fatura mensal, sem chave por API. Centavos por chamada.</p>
+          <a href="/#apis" style="color:var(--accent-2);font-size:13px;font-weight:600;text-decoration:none;" data-pt="Ver APIs disponíveis →" data-en="See available APIs →">Ver APIs disponíveis →</a>
+        </div>
+      </div>
+      <style>
+        @media (max-width:640px){.usage-paths{grid-template-columns:1fr !important;}}
+      </style>
+
+      <p class="pitch" data-pt="Os planos abaixo se aplicam aos dois caminhos: descontam a taxa por chamada e destravam capacidade (mais clientes simultâneos, mais agentes, suporte). Cancele a hora que quiser." data-en="The plans below apply to both paths: they discount the per-call fee and unlock capacity (more concurrent customers, more agents, support). Cancel anytime.">Os planos abaixo se aplicam aos dois caminhos: <strong>descontam a taxa por chamada</strong> e destravam capacidade. Cancele a hora que quiser.</p>
 
       <div id="state-row" class="current-state" style="display:none">
         <span><span class="label">Plano atual:</span> <strong id="cur-tier">—</strong></span>
