@@ -112,6 +112,13 @@ publicRoutes.get('/explore', async (c) => {
   `);
   const data = ((rows as any).rows ?? (rows as any) ?? []) as any[];
 
+  // Resolve each agent's template id to its hero image, so the /explore
+  // page can render real photos instead of emojis without an extra lookup.
+  // Falls back to undefined if the agent's `template` field doesn't match
+  // a known template (legacy agents or hand-crafted ones).
+  const templateImageBySlug: Record<string, string | undefined> = {};
+  for (const t of AGENT_TEMPLATES) templateImageBySlug[t.id] = t.imageUrl;
+
   return c.json({
     data: data.map((r) => ({
       slug: r.slug,
@@ -119,6 +126,7 @@ publicRoutes.get('/explore', async (c) => {
       description: r.description,
       primary_color: r.primary_color,
       template: r.template,
+      template_image: r.template ? templateImageBySlug[r.template] || null : null,
       ui_language: r.ui_language,
       tool_count: Array.isArray(r.allowed_tools) ? r.allowed_tools.length : 0,
       pay_mode: r.pay_mode,

@@ -42,18 +42,25 @@
       }
       .ag-card {
         background: var(--bg-elev); border: 1px solid var(--border);
-        border-radius: 12px; padding: 22px;
+        border-radius: 12px; padding: 0;
         cursor: pointer; text-decoration: none;
         color: inherit;
         position: relative; overflow: hidden;
         transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
         display: flex; flex-direction: column;
       }
-      .ag-card::before {
-        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-        background: var(--ac, var(--accent));
-      }
       .ag-card:hover { transform: translateY(-2px); border-color: var(--ac, var(--accent)); box-shadow: 0 12px 32px rgba(0,0,0,0.18); }
+      .ag-card .ag-photo {
+        width: 100%; height: 130px;
+        background: linear-gradient(135deg, var(--ac, var(--accent)) 0%, rgba(0,0,0,0.4) 100%);
+        background-size: cover; background-position: center;
+        position: relative;
+      }
+      .ag-card .ag-photo::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 100%);
+      }
+      .ag-card .ag-body { padding: 16px 20px 20px; flex: 1; display: flex; flex-direction: column; }
       .ag-card .ag-emoji { font-size: 22px; line-height: 1; margin-bottom: 8px; display: block; }
       .ag-card h3 { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
       .ag-card .ag-cat {
@@ -150,13 +157,13 @@
       <div class="filter-row">
         <label>Category</label>
         <button class="chip-btn active" data-cat="">All</button>
-        <button class="chip-btn" data-cat="ecommerce">🛒 E-commerce</button>
-        <button class="chip-btn" data-cat="market-research">📊 Research</button>
-        <button class="chip-btn" data-cat="legal-fiscal">⚖️ Legal/Fiscal</button>
-        <button class="chip-btn" data-cat="research-analyst">🔬 Academic</button>
-        <button class="chip-btn" data-cat="content">🎨 Content</button>
-        <button class="chip-btn" data-cat="real-estate">🏠 Real estate</button>
-        <button class="chip-btn" data-cat="crypto">💰 Crypto</button>
+        <button class="chip-btn" data-cat="ecommerce">E-commerce</button>
+        <button class="chip-btn" data-cat="market-research">Research</button>
+        <button class="chip-btn" data-cat="legal-fiscal">Legal/Fiscal</button>
+        <button class="chip-btn" data-cat="research-analyst">Academic</button>
+        <button class="chip-btn" data-cat="content">Content</button>
+        <button class="chip-btn" data-cat="real-estate">Real estate</button>
+        <button class="chip-btn" data-cat="crypto">Crypto</button>
       </div>
 
       <div class="ag-grid" id="grid">Loading…</div>
@@ -174,15 +181,27 @@
       const BASE_KEY = 'axon.baseUrl';
       const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
 
-      // Map template id → emoji + category label (mirror of templates.ts metadata)
+      // Map template id → category label (mirror of templates.ts).
+      // The hero photo for each template now comes from the API response
+      // (template_image field) — no longer hardcoded here, so adding a
+      // new template upstream automatically lights up here too.
       const TPL_META = {
-        'ecommerce-br':       { emoji: '🛒', cat: 'E-commerce' },
-        'market-research-br': { emoji: '📊', cat: 'Research' },
-        'legal-fiscal-br':    { emoji: '⚖️', cat: 'Legal/Fiscal' },
-        'research-analyst':   { emoji: '🔬', cat: 'Academic' },
-        'content-creator':    { emoji: '🎨', cat: 'Content' },
-        'real-estate-br':     { emoji: '🏠', cat: 'Real estate' },
-        'crypto-finance':     { emoji: '💰', cat: 'Crypto' },
+        'recepcionista-roteador':  { cat: 'Roteador' },
+        'pesquisador-academico-br':{ cat: 'Academic' },
+        'petshop-br':              { cat: 'Pet shop' },
+        'auto-dealer-br':          { cat: 'Concessionária' },
+        'imobiliaria-br':          { cat: 'Imóveis' },
+        'delivery-pro-br':         { cat: 'Delivery' },
+        'ecommerce-br':            { cat: 'E-commerce' },
+        'market-research-br':      { cat: 'Research' },
+        'legal-fiscal-br':         { cat: 'Legal/Fiscal' },
+        'research-analyst':        { cat: 'Academic' },
+        'content-creator':         { cat: 'Content' },
+        'real-estate-br':          { cat: 'Real estate' },
+        'crypto-finance':          { cat: 'Crypto' },
+        'recepcionista-clinica-br':{ cat: 'Clínica' },
+        'restaurante-br':          { cat: 'Restaurante' },
+        'faq-bot-simples':         { cat: 'FAQ' },
       };
 
       let currentCat = '';
@@ -214,7 +233,7 @@
           let html = '';
           if (demos.length > 0) {
             html += `<div style="grid-column:1/-1;padding:16px 0 8px;">
-              <h2 style="margin:0;font-size:18px;letter-spacing:1px;color:#22c55e;">🎮 TESTE GRÁTIS AGORA — sem cadastro</h2>
+              <h2 style="margin:0;font-size:18px;letter-spacing:1px;color:#22c55e;">TESTE GRÁTIS AGORA — sem cadastro</h2>
               <p style="margin:6px 0 0;color:var(--text-muted);font-size:13px;">Clica em qualquer agente abaixo, conversa de verdade. A Axon paga essas conversas como demonstração.</p>
             </div>`;
             html += demos.map(a => renderCard(a, true)).join('');
@@ -238,7 +257,7 @@
       }
 
       function renderCard(a, isDemo) {
-        const meta = TPL_META[a.template] || { emoji: '🤖', cat: 'Custom' };
+        const meta = TPL_META[a.template] || { cat: 'Custom' };
         const calls = a.calls_30d > 0
           ? `<span class="calls-pill">${a.calls_30d.toLocaleString()} calls / 30d</span>`
           : '<span class="calls-pill" style="color:var(--text-muted);">novo</span>';
@@ -251,15 +270,23 @@
           badge = '<span class="calls-pill">bring your wallet</span>';
         }
         const demoStyle = isDemo ? 'border-color:rgba(34,197,94,0.4);box-shadow:0 0 0 1px rgba(34,197,94,0.2);' : '';
+        // Hero photo comes from template_image (joined server-side from
+        // the templates registry). When missing — custom agent without a
+        // template — we fall back to a colored gradient placeholder.
+        const photo = a.template_image
+          ? `<div class="ag-photo" style="background-image:url('${escape(a.template_image)}')"></div>`
+          : `<div class="ag-photo"></div>`;
         return `
           <a class="ag-card" style="--ac:${a.primary_color};${demoStyle}" data-slug="${escape(a.slug)}" href="/agent/${escape(a.slug)}">
-            <span class="ag-emoji">${meta.emoji}</span>
-            <span class="ag-cat">${meta.cat}</span>
-            <h3>${escape(a.name)}</h3>
-            <p class="ag-desc">${escape(a.description || 'No description provided.')}</p>
-            <div class="ag-meta">
-              ${calls}
-              ${badge}
+            ${photo}
+            <div class="ag-body">
+              <span class="ag-cat">${meta.cat}</span>
+              <h3>${escape(a.name)}</h3>
+              <p class="ag-desc">${escape(a.description || 'No description provided.')}</p>
+              <div class="ag-meta">
+                ${calls}
+                ${badge}
+              </div>
             </div>
           </a>
         `;
