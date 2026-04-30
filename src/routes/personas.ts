@@ -14,6 +14,27 @@ import { db } from '~/db';
 import { personas } from '~/db/schema';
 import { renderPersonaAvatar } from '~/personas/avatar';
 
+/**
+ * Real-photo overrides keyed by persona slug. Replaces the SVG-with-emoji
+ * avatar in customer-facing surfaces (gallery, agent build) with a human
+ * portrait that matches the persona's vibe — Tia Zélia gets a warm
+ * grandmother, Don Salvatore an older Italian-looking gentleman, etc.
+ *
+ * The SVG avatar route still works as a fallback for places that haven't
+ * adopted image_url yet (embeds, share previews) and for any new persona
+ * added to the seed list before its photo is curated.
+ */
+const PERSONA_PHOTOS: Record<string, string> = {
+  'tia-zelia':         'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&h=400&q=80',
+  'don-salvatore':     'https://images.unsplash.com/photo-1559963110-71b394e7494d?auto=format&fit=crop&w=400&h=400&q=80',
+  'cabra-da-peste':    'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=400&h=400&q=80',
+  'hacker-cyberpunk':  'https://images.unsplash.com/photo-1535378917042-10a22c95931a?auto=format&fit=crop&w=400&h=400&q=80',
+  'carioca-maluco':    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&h=400&q=80',
+  'paulista-tubarao':  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&h=400&q=80',
+  'mineirinho-curioso':'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&h=400&q=80',
+  'mestra-yoba':       'https://images.unsplash.com/photo-1530268729831-4b0b9e170218?auto=format&fit=crop&w=400&h=400&q=80',
+};
+
 export const personaRoutes = new Hono();
 
 personaRoutes.get('/', async (c) => {
@@ -35,6 +56,7 @@ personaRoutes.get('/', async (c) => {
       avatar_color_primary: p.avatarColorPrimary,
       avatar_color_secondary: p.avatarColorSecondary,
       avatar_url: `/v1/personas/${p.slug}/avatar.svg`,
+      image_url: PERSONA_PHOTOS[p.slug] || null,
       premium: p.premium,
       monthly_price_brl: p.monthlyPriceBrl,
     })),
@@ -59,6 +81,7 @@ personaRoutes.get('/:slug', async (c) => {
     avatar_color_primary: p.avatarColorPrimary,
     avatar_color_secondary: p.avatarColorSecondary,
     avatar_url: `/v1/personas/${p.slug}/avatar.svg`,
+    image_url: PERSONA_PHOTOS[p.slug] || null,
     has_voice: !!p.voiceIdElevenlabs,
     premium: p.premium,
     monthly_price_brl: p.monthlyPriceBrl,

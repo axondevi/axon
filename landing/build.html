@@ -789,12 +789,17 @@
             grid.innerHTML = '<p style="color:var(--text-muted)">Nenhuma persona disponível ainda.</p>';
             return;
           }
-          grid.innerHTML = personasCache.map((p) => `
+          grid.innerHTML = personasCache.map((p) => {
+            // Prefer real photo (image_url) — falls back to the procedural
+            // SVG-with-emoji avatar if backend hasn't curated a photo yet
+            // (keeps new personas working without breaking the gallery).
+            const photoSrc = p.image_url || (BASE + p.avatar_url + '?size=400&name=0');
+            return `
             <div class="tpl-card" style="--tc: ${p.avatar_color_primary};padding:0;overflow:hidden;cursor:pointer;" data-persona="${p.slug}" onclick="selectPersona('${p.slug}')">
-              <img src="${BASE}${p.avatar_url}?size=400&name=0" alt="${escape(p.name)}" style="width:100%;aspect-ratio:1;display:block;">
+              <img src="${escape(photoSrc)}" alt="${escape(p.name)}" loading="lazy" style="width:100%;aspect-ratio:1;display:block;object-fit:cover;background:linear-gradient(135deg,${p.avatar_color_primary},${p.avatar_color_secondary || p.avatar_color_primary});">
               <div style="padding:14px 16px;">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-                  <h3 style="margin:0;font-size:16px;font-weight:700;">${escape(p.emoji)} ${escape(p.name)}</h3>
+                  <h3 style="margin:0;font-size:16px;font-weight:700;">${escape(p.name)}</h3>
                   ${p.premium ? '<span style="background:rgba(255,184,0,0.15);color:#ffb800;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;">PREMIUM</span>' : '<span style="background:rgba(74,222,128,0.1);color:#4ade80;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;">GRÁTIS</span>'}
                 </div>
                 <p style="margin:0 0 8px;color:var(--text-dim);font-size:12px;">${escape(p.tagline || '')}</p>
@@ -802,7 +807,7 @@
                 <button class="btn primary" style="width:100%;font-size:13px;" type="button">Usar essa persona →</button>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         } catch (e) {
           document.getElementById('persona-grid').innerHTML =
             `<p style="color:#f87171">Could not load personas: ${e.message}</p>`;
@@ -1388,6 +1393,46 @@
           </div>
         `;
 
+        // Shown when backend rejects the auto-provision because the agent
+        // is in pay_mode=visitor. Explains WHY in plain Portuguese and
+        // offers a 1-click fix that PATCHes pay_mode=owner and re-runs
+        // the auto flow — saving the user from a manual round trip.
+        const renderPayModeFix = () => `
+          <h3 style="margin:0 0 6px;font-size:20px;display:flex;align-items:center;gap:8px;"><span style="color:#fbbf24;">⚠</span> Esse agente está em modo cliente paga</h3>
+          <p style="color:var(--text-muted);font-size:13px;margin:6px 0 18px;">Pra ativar WhatsApp, ele precisa estar em <strong>modo dono paga</strong>.</p>
+
+          <div style="background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.3);border-radius:8px;padding:16px;margin-bottom:18px;font-size:13px;line-height:1.6;color:var(--text-dim);">
+            <strong style="color:var(--text);">Por que isso?</strong><br/>
+            No WhatsApp, quem manda zap é um número anônimo — seu agente não sabe quem é nem tem como cobrar dele. Por isso o dono (você) cobre as conversas WhatsApp da sua wallet USDC.<br/><br/>
+            <strong style="color:var(--text);">Quanto custa?</strong> Cada turno (mensagem do cliente + resposta do agente) custa entre <strong style="color:#4ade80;">$0,001 e $0,005</strong> dependendo das ferramentas usadas. Você controla o teto diário (default: $5/dia) na edição do agente.
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+            <button id="wa-cancel-paymode" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:9px 14px;border-radius:5px;font-size:13px;cursor:pointer;">Cancelar</button>
+            <button id="wa-fix-paymode" style="background:#25d366;color:#0a0a0b;border:none;padding:9px 18px;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;">Mudar para modo dono e tentar de novo →</button>
+          </div>
+        `;
+
+        function showPayModeFix() {
+          card.innerHTML = renderPayModeFix();
+          document.getElementById('wa-cancel-paymode').addEventListener('click', closeWaModal);
+          document.getElementById('wa-fix-paymode').addEventListener('click', async () => {
+            const btn = document.getElementById('wa-fix-paymode');
+            btn.disabled = true; btn.textContent = 'Mudando…';
+            try {
+              await api('/v1/agents/' + agentId, {
+                method: 'PATCH',
+                body: JSON.stringify({ pay_mode: 'owner' }),
+              });
+              // Now re-run the auto-provision; it should succeed now.
+              await launchAutoFlow();
+            } catch (e) {
+              btn.disabled = false; btn.textContent = 'Mudar para modo dono e tentar de novo →';
+              showToast('Falhou ao mudar pay_mode: ' + e.message, 'error');
+            }
+          });
+        }
+
         // Truly paired → show connected view + disconnect.
         if (current.connected) {
           card.innerHTML = renderConnected(current);
@@ -1423,7 +1468,17 @@
               body: JSON.stringify({}),
             });
           } catch (e) {
+            const errCode = e.data && e.data.error;
             const msg = String(e.message || '');
+
+            // pay_mode=visitor agents can't take WhatsApp traffic — visitors
+            // are anonymous on WhatsApp so the owner has to pay. Backend
+            // returns 400 wrong_pay_mode here. We catch it and offer a 1-
+            // click fix instead of dumping the error in the user's face.
+            if (errCode === 'wrong_pay_mode' || /pay_mode=owner|wrong_pay_mode/.test(msg)) {
+              showPayModeFix();
+              return;
+            }
             if (/evolution server not configured|auto_provision_unavailable/i.test(msg)) {
               showAdvanced();
               return;
