@@ -101,13 +101,22 @@ ownerWhatsapp.get('/:id/whatsapp', async (c) => {
     // stored status so the dashboard isn't blank on a brief Evolution flap.
   }
 
-  // Persist status drift so subsequent GETs don't re-pay the probe cost
-  // unnecessarily for already-stable states (open ↔ connected).
+  // Default to NOT paired. Only flip to paired with POSITIVE evidence:
+  //   1. The live probe says 'open' or 'connected', OR
+  //   2. The probe failed BUT this row has received WhatsApp messages
+  //      before (lastEventAt set) — so it must have been paired at
+  //      some point.
+  //
+  // Falling back to conn.status would be wrong: the column defaults to
+  // 'connected' on insert, so a fresh-but-unpaired row would look paired
+  // any time the probe fails (e.g. cold-start of Evolution, transient
+  // flap right after createInstance), causing the dashboard to flash
+  // "connected" 3 seconds after the QR appears.
   const isPaired = liveState
     ? ['open', 'connected'].includes(liveState)
-    : ['connected', 'open'].includes((conn.status || '').toLowerCase());
-  const newStatus = isPaired ? 'connected' : (liveState || conn.status || 'connecting');
-  if (liveState && newStatus !== conn.status) {
+    : !!conn.lastEventAt;
+  const newStatus = isPaired ? 'connected' : (liveState || 'pairing');
+  if (newStatus !== conn.status) {
     db.update(whatsappConnections)
       .set({ status: newStatus, updatedAt: new Date() })
       .where(eq(whatsappConnections.id, conn.id))
@@ -171,7 +180,12 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
   const encrypted = encrypt(apiKey);
   const webhookUrl = webhookUrlFor(c, secret);
 
-  // Replace any existing connection for this agent (one-per-agent invariant)
+  // Replace any existing connection for this agent (one-per-agent invariant).
+  // Initial status reflects the probe — if Evolution already says 'open' the
+  // BYO instance is paired and we can mark connected; otherwise 'pairing' so
+  // GET /whatsapp returns pending_pairing instead of a false-positive.
+  const probeState = (probe.status || '').toLowerCase();
+  const initialStatus = ['open', 'connected'].includes(probeState) ? 'connected' : 'pairing';
   await db.delete(whatsappConnections).where(eq(whatsappConnections.agentId, agentId));
   await db.insert(whatsappConnections).values({
     agentId,
@@ -180,7 +194,7 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
     instanceName,
     apiKey: encrypted,
     webhookSecret: secret,
-    status: 'connected',
+    status: initialStatus,
   });
 
   // Persist owner_phone on the agent (only if the caller provided one — we
@@ -297,6 +311,9 @@ ownerWhatsapp.post('/:id/whatsapp/auto', async (c) => {
 
   // 2. Persist the connection. Use per-instance api key (created.apiKey),
   // NOT the global key — instance-isolated even on shared server.
+  // Status starts at 'pairing' since the customer still has to scan the QR;
+  // the webhook receiver flips it to 'connected' on first inbound message,
+  // and GET /whatsapp re-probes Evolution if the row hasn't seen traffic.
   const encrypted = encrypt(created.apiKey);
   await db.delete(whatsappConnections).where(eq(whatsappConnections.agentId, agentId));
   await db.insert(whatsappConnections).values({
@@ -306,7 +323,7 @@ ownerWhatsapp.post('/:id/whatsapp/auto', async (c) => {
     instanceName: created.instanceName!,
     apiKey: encrypted,
     webhookSecret: secret,
-    status: 'connected',
+    status: 'pairing',
   });
 
   if (ownerPhone) {
@@ -453,13 +470,18 @@ publicWebhook.post('/:secret', async (c) => {
     // Don't 404 — return 200 so a misconfigured webhook doesn't keep retrying
     return c.json({ ignored: true });
   }
-  if (conn.status !== 'connected') {
+  // Owner can mark a connection 'disabled' to mute the agent without deleting
+  // the row. Anything else (pairing, connecting, connected) means traffic is
+  // welcome — and a real inbound proves the WhatsApp is actually paired, so
+  // we can flip 'pairing' → 'connected' here too.
+  if (conn.status === 'disabled') {
     return c.json({ ignored: 'disabled' });
   }
 
-  // Update freshness ping (sync, fire-and-forget would be fine too)
+  // Update freshness ping + promote to 'connected' on first real event so
+  // GET /whatsapp can short-circuit the probe path for traffic-bearing rows.
   db.update(whatsappConnections)
-    .set({ lastEventAt: new Date() })
+    .set({ lastEventAt: new Date(), status: 'connected' })
     .where(eq(whatsappConnections.id, conn.id))
     .catch(() => {});
 
