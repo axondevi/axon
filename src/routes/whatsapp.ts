@@ -685,6 +685,25 @@ async function processBufferedTurn(opts: {
   const userSentAudio = anyAudio(msgs);
   const mergedText = mergeBufferedText(msgs);
 
+  // ─── Re-check pause/handoff right before running the LLM ───────────
+  // The pause/handoff check at the webhook entry point happened up to
+  // 3-10s ago (buffer debounce + LLM warm-up). The owner could have
+  // toggled "Pausar" on the dashboard in the meantime, or the handoff
+  // window could have shifted. Re-fetching the agent + contact memory
+  // here is cheap (two indexed lookups) and prevents the worst surprise:
+  // an agent answering AFTER the owner muted it.
+  const [freshAgent] = await db.select().from(agents).where(eq(agents.id, a.id)).limit(1);
+  if (!freshAgent) return;
+  if (freshAgent.pausedAt) {
+    return;  // owner paused while message was buffering — drop silently
+  }
+  const [freshMem] = await db.select().from(contactMemory)
+    .where(and(eq(contactMemory.agentId, a.id), eq(contactMemory.phone, inbound.phone)))
+    .limit(1);
+  if (freshMem?.humanPausedUntil && freshMem.humanPausedUntil.getTime() > Date.now()) {
+    return;  // human took over while message was buffering — drop silently
+  }
+
   const [owner] = await db.select().from(users).where(eq(users.id, a.ownerId)).limit(1);
   if (!owner) return;
 
@@ -784,6 +803,13 @@ async function processBufferedTurn(opts: {
     if (routedId) {
       const routed = await loadRoutedAgent({ agentId: routedId, ownerId: a.ownerId }).catch(() => null);
       if (routed) {
+        // The routed agent has its OWN paused_at. If the owner muted the
+        // specialist (e.g. clinic receptionist agent paused for the night)
+        // we must drop the message even though the front-door agent is
+        // active — otherwise pause is leaky in any routes_to setup.
+        if ((routed as any).pausedAt) {
+          return;
+        }
         runtimeAgent = routed;
         // Re-augment system prompt using the routed agent's prompt — but
         // KEEP the contact memory context block since memory is keyed on
