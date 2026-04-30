@@ -1306,11 +1306,19 @@
             body: JSON.stringify({}),
           });
         } catch (e) {
-          // Backend returns 503 with message "Axon Evolution server not
-          // configured..." when AXON_EVOLUTION_URL/KEY env vars are unset.
-          // In that case the customer must use BYO Evolution → show the
-          // advanced form. Any other error = real problem; show retry.
           const msg = String(e.message || '');
+
+          // Agent is in pay_mode=visitor → can't take WhatsApp traffic
+          // (visitors are anonymous, owner has to pay). Backend returns
+          // 400 wrong_pay_mode. Offer 1-click fix instead of dumping the
+          // raw error in the user's face.
+          if (/wrong_pay_mode|pay_mode=owner/i.test(msg)) {
+            showPayModeFix(card, agentId, agentName, closeOverlay);
+            return;
+          }
+          // Backend returns 503 with "Axon Evolution server not configured"
+          // when AXON_EVOLUTION_URL/KEY env vars are unset → fall back to
+          // the manual "Modo avançado" flow.
           if (/evolution server not configured|auto_provision_unavailable/i.test(msg)) {
             renderAdvancedForm(card, agentId, agentName, closeOverlay);
             return;
@@ -1577,6 +1585,55 @@
             <button data-act="retry" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Tentar de novo</button>
           </div>
         `;
+      }
+
+      // Shown when the WhatsApp auto-provision fails with wrong_pay_mode
+      // (the agent is in pay_mode=visitor). Explains in plain Portuguese
+      // why visitor-paid agents can't use WhatsApp and offers a 1-click
+      // toggle that PATCHes pay_mode=owner and re-runs the auto flow.
+      function renderWaPayModeFix(agentName) {
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+            <div>
+              <h2 style="margin:0;font-size:18px;display:flex;align-items:center;gap:8px;"><span style="color:#fbbf24;">⚠</span> Esse agente está em modo cliente paga</h2>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(agentName)}</div>
+            </div>
+            <button data-act="close" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>
+          </div>
+          <p style="color:var(--text-dim);font-size:13px;margin:0 0 16px;">Pra ativar WhatsApp, ele precisa estar em <strong>modo dono paga</strong>.</p>
+
+          <div style="background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.3);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.6;color:var(--text-dim);">
+            <strong style="color:var(--text);">Por que isso?</strong><br/>
+            No WhatsApp, quem manda zap é um número anônimo — seu agente não sabe quem é nem tem como cobrar dele. Por isso o dono (você) cobre as conversas WhatsApp da sua wallet USDC.<br/><br/>
+            <strong style="color:var(--text);">Quanto custa?</strong> Cada turno (mensagem do cliente + resposta do agente) custa entre <strong style="color:#4ade80;">$0,001 e $0,005</strong> dependendo das ferramentas usadas. Você controla o teto diário (default: $5/dia) na edição do agente.
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+            <button data-act="close" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 14px;border-radius:6px;font-size:13px;cursor:pointer;">Cancelar</button>
+            <button data-act="fix-paymode" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Mudar para modo dono e tentar de novo →</button>
+          </div>
+        `;
+      }
+
+      function showPayModeFix(card, agentId, agentName, closeOverlay) {
+        card.innerHTML = renderWaPayModeFix(agentName);
+        card.querySelector('[data-act="close"]').onclick = closeOverlay;
+        card.querySelector('[data-act="fix-paymode"]').onclick = async (e) => {
+          const btn = e.currentTarget;
+          btn.disabled = true; btn.textContent = 'Mudando…';
+          try {
+            await api(`/v1/agents/${agentId}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ pay_mode: 'owner' }),
+            });
+            // Re-run auto-provision now that pay_mode is correct
+            await launchQrFlow(card, agentId, agentName, closeOverlay);
+          } catch (err) {
+            btn.disabled = false;
+            btn.textContent = 'Mudar para modo dono e tentar de novo →';
+            window.AxonUI && AxonUI.toast('Falhou ao mudar pay_mode: ' + err.message, { type: 'error' });
+          }
+        };
       }
 
       // ─── Advanced manual form (BYO Evolution) ───────────────────

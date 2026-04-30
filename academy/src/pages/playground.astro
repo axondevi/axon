@@ -155,24 +155,32 @@ import TryCall from '../components/TryCall.astro';
 
       <div class="pg-next-grid">
         <a href="/learn/tutorials/primeiro-agente-apis-brasileiras" class="pg-next-card">
-          <div class="pg-next-icon">📘</div>
-          <h3>Tutorial completo em Python</h3>
-          <p>Transforma isso num agente Python com LLM (GPT-4o-mini) que interpreta as respostas.</p>
+          <div class="pg-next-photo" style="background-image:url('https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&w=400&h=160&q=80')"></div>
+          <div class="pg-next-body">
+            <h3>Tutorial completo em Python</h3>
+            <p>Transforma isso num agente Python com LLM (GPT-4o-mini) que interpreta as respostas.</p>
+          </div>
         </a>
         <a href="/learn/tutorials/self-paying-research-agent" class="pg-next-card">
-          <div class="pg-next-icon">🌐</div>
-          <h3>Self-Paying Research Agent (EN)</h3>
-          <p>Vercel AI SDK + tool use. Agente que busca na web, scraped, sintetiza.</p>
+          <div class="pg-next-photo" style="background-image:url('https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=400&h=160&q=80')"></div>
+          <div class="pg-next-body">
+            <h3>Self-Paying Research Agent (EN)</h3>
+            <p>Vercel AI SDK + tool use. Agente que busca na web, scraped, sintetiza.</p>
+          </div>
         </a>
         <a href="https://axon-5zf.pages.dev/dashboard" class="pg-next-card" target="_blank">
-          <div class="pg-next-icon">📊</div>
-          <h3>Dashboard completo ↗</h3>
-          <p>Veja todos os requests, custos, cache hits do seu agente em tempo real.</p>
+          <div class="pg-next-photo" style="background-image:url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&h=160&q=80')"></div>
+          <div class="pg-next-body">
+            <h3>Dashboard completo ↗</h3>
+            <p>Veja todos os requests, custos, cache hits do seu agente em tempo real.</p>
+          </div>
         </a>
         <a href="/learn/guides" class="pg-next-card">
-          <div class="pg-next-icon">📖</div>
-          <h3>Guias Conceituais</h3>
-          <p>Entenda x402, MCP, cache semântico e arquitetura de agentes.</p>
+          <div class="pg-next-photo" style="background-image:url('https://images.unsplash.com/photo-1532153975070-2e9ab71f1b14?auto=format&fit=crop&w=400&h=160&q=80')"></div>
+          <div class="pg-next-body">
+            <h3>Guias Conceituais</h3>
+            <p>Entenda x402, MCP, cache semântico e arquitetura de agentes.</p>
+          </div>
         </a>
       </div>
     </section>
@@ -348,13 +356,16 @@ import TryCall from '../components/TryCall.astro';
   }
 
   .pg-next-card {
-    padding: 1.5rem;
+    padding: 0;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     text-decoration: none;
     color: inherit;
     transition: all 0.2s;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .pg-next-card:hover {
@@ -363,9 +374,17 @@ import TryCall from '../components/TryCall.astro';
     text-decoration: none;
   }
 
-  .pg-next-icon {
-    font-size: 1.75rem;
-    margin-bottom: 0.5rem;
+  .pg-next-photo {
+    width: 100%;
+    height: 110px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--bg-primary);
+  }
+
+  .pg-next-body {
+    padding: 1.1rem 1.25rem 1.3rem;
+    flex: 1;
   }
 
   .pg-next-card h3 {

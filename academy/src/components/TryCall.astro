@@ -323,11 +323,11 @@ const widgetId = 'trycall-' + Math.random().toString(36).slice(2, 10);
           paramStyle: paramStyle === 'query' ? 'query' : 'path',
         });
 
-        respStatus.textContent = '✓ 200 OK';
+        respStatus.textContent = '200 OK';
         respStatus.className = 'tc-resp-status success';
-        respCost.textContent = `💰 $${result.cost.toFixed(6)}`;
-        respCache.textContent = result.cacheHit ? '⚡ Cache HIT (50% off)' : '🌐 Upstream';
-        respLatency.textContent = `⏱ ${result.latencyMs}ms`;
+        respCost.textContent = `$${result.cost.toFixed(6)}`;
+        respCache.textContent = result.cacheHit ? 'Cache HIT (50% off)' : 'Upstream';
+        respLatency.textContent = `${result.latencyMs}ms`;
         respJson.textContent = JSON.stringify(result.data, null, 2);
         responseBox.hidden = false;
 
