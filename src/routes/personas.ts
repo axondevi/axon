@@ -17,22 +17,30 @@ import { renderPersonaAvatar } from '~/personas/avatar';
 /**
  * Real-photo overrides keyed by persona slug. Replaces the SVG-with-emoji
  * avatar in customer-facing surfaces (gallery, agent build) with a human
- * portrait that matches the persona's vibe — Tia Zélia gets a warm
- * grandmother, Don Salvatore an older Italian-looking gentleman, etc.
+ * portrait that matches the persona's vibe.
+ *
+ * These PNGs are AI-generated portraits (Stability XL, custom prompts
+ * tuned to each persona's role + setting) checked into the landing/
+ * folder and served by Cloudflare Pages at /personas/<slug>.png. We
+ * tried curated Unsplash IDs first but couldn't visually verify each
+ * photo without browsing — many landed on photos that didn't match
+ * (Tia Zélia returned a young woman, Don Salvatore returned a grain
+ * of sand, etc). Generated portraits give us deterministic, on-brand
+ * imagery that matches the persona description exactly.
  *
  * The SVG avatar route still works as a fallback for places that haven't
  * adopted image_url yet (embeds, share previews) and for any new persona
  * added to the seed list before its photo is curated.
  */
 const PERSONA_PHOTOS: Record<string, string> = {
-  'tia-zelia':         'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&h=400&q=80',
-  'don-salvatore':     'https://images.unsplash.com/photo-1559963110-71b394e7494d?auto=format&fit=crop&w=400&h=400&q=80',
-  'cabra-da-peste':    'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=400&h=400&q=80',
-  'hacker-cyberpunk':  'https://images.unsplash.com/photo-1535378917042-10a22c95931a?auto=format&fit=crop&w=400&h=400&q=80',
-  'carioca-maluco':    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&h=400&q=80',
-  'paulista-tubarao':  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&h=400&q=80',
-  'mineirinho-curioso':'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&h=400&q=80',
-  'mestra-yoba':       'https://images.unsplash.com/photo-1530268729831-4b0b9e170218?auto=format&fit=crop&w=400&h=400&q=80',
+  'tia-zelia':         'https://axon-5zf.pages.dev/personas/tia-zelia.png',
+  'don-salvatore':     'https://axon-5zf.pages.dev/personas/don-salvatore.png',
+  'cabra-da-peste':    'https://axon-5zf.pages.dev/personas/cabra-da-peste.png',
+  'hacker-cyberpunk':  'https://axon-5zf.pages.dev/personas/hacker-cyberpunk.png',
+  'carioca-maluco':    'https://axon-5zf.pages.dev/personas/carioca-maluco.png',
+  'paulista-tubarao':  'https://axon-5zf.pages.dev/personas/paulista-tubarao.png',
+  'mineirinho-curioso':'https://axon-5zf.pages.dev/personas/mineirinho-curioso.png',
+  'mestra-yoba':       'https://axon-5zf.pages.dev/personas/mestra-yoba.png',
 };
 
 export const personaRoutes = new Hono();
