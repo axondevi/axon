@@ -16,7 +16,16 @@
   .niche-hero h1 { font-size: clamp(32px, 6vw, 56px); margin: 16px 0; line-height: 1.1; }
   .niche-hero h1 .accent { color: var(--niche); }
   .niche-hero .subhead { font-size: clamp(16px, 2.4vw, 20px); color: var(--text-dim); max-width: 680px; margin: 0 auto 32px; }
-  .niche-emoji { font-size: 64px; }
+  .niche-hero-photo {
+    display: block;
+    margin: 0 auto 24px;
+    width: 100%;
+    max-width: 380px;
+    aspect-ratio: 16/10;
+    object-fit: cover;
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+  }
   .niche-cta { display: inline-flex; align-items: center; gap: 10px; background: var(--niche); color: #fff; padding: 16px 32px; border-radius: 10px; font-weight: 700; font-size: 16px; text-decoration: none; min-height: 44px; box-shadow: 0 8px 24px var(--niche-shadow); transition: transform 0.15s; }
   .niche-cta:hover { transform: translateY(-2px); }
   .niche-cta-sub { color: var(--text-dim); font-size: 13px; margin-top: 12px; }
@@ -27,7 +36,15 @@
   .niche-features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
   .niche-feature { padding: 28px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); transition: transform 0.15s, border-color 0.15s; }
   .niche-feature:hover { transform: translateY(-2px); border-color: var(--niche); }
-  .niche-feature .ico { font-size: 32px; margin-bottom: 12px; }
+  .niche-feature .ico {
+    width: 100%;
+    height: 140px;
+    background-size: cover;
+    background-position: center;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    background-color: var(--bg-elev);
+  }
   .niche-feature h3 { font-size: 18px; margin-bottom: 8px; color: var(--niche); }
   .niche-feature p { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
   .niche-how { background: var(--bg-elev); padding: 60px 0; }
@@ -76,8 +93,8 @@
       <a href="/build" data-pt="Criar agente" data-en="Build agent">Criar agente</a>
       <a href="/upgrade" data-pt="Planos" data-en="Plans">Planos</a>
       <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
-        <span data-active="pt">🇧🇷 PT</span>
-        <span data-active="en">🇺🇸 EN</span>
+        <span data-active="pt">PT</span>
+        <span data-active="en">EN</span>
       </button>
     </nav>
   </div>
@@ -101,11 +118,17 @@
  *   /restaurante   → /niche?tipo=restaurante
  *   /loja          → /niche?tipo=loja
  */
+// Helper to build Unsplash CDN URLs cropped to the size we render at.
+// Photos are checked-in by ID — see src/agents/templates.ts for hero
+// imageUrls; per-feature IDs were curated and verified to return 200.
+const IMG = (id, w = 400, h = 240) =>
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&h=${h}&q=80`;
+
 const NICHES = {
   clinica: {
     color: '#06b6d4',
     shadow: 'rgba(6, 182, 212, 0.35)',
-    emoji: '🏥',
+    image: IMG('1576091160550-2173dba999ef', 800, 480),
     title: 'Recepcionista virtual 24h pra sua clínica',
     metaDesc: 'Agende consultas, responda dúvidas e atenda pacientes no WhatsApp 24h por dia. R$249/mês.',
     h1Pre: 'Sua clínica atendendo',
@@ -116,12 +139,12 @@ const NICHES = {
     trust: ['✓ Português brasileiro nativo', '✓ Reconhece urgências', '✓ Funciona no WhatsApp'],
     featuresTitle: 'O que sua recepcionista virtual sabe fazer',
     features: [
-      ['📅', 'Agenda consultas', 'Anota nome, telefone, especialidade desejada, melhor horário. Confirma feriados antes de agendar — não te dá dor de cabeça com furo de agenda.'],
-      ['💰', 'Responde valores', 'Você cadastra os preços de cada especialidade uma vez, ela responde 24h. Pessoa não precisa esperar até segunda pra saber se cabe no bolso.'],
-      ['🚨', 'Identifica urgências', 'Reconhece sintomas graves (febre alta, sangramento, dor forte) e orienta buscar pronto-socorro imediatamente. Treinada pra nunca dar diagnóstico.'],
-      ['📍', 'Endereço e horários', 'Manda o endereço da clínica, horário de funcionamento, formas de pagamento, convênios aceitos. Tudo configurável pelo dono.'],
-      ['🌙', 'Funciona 24h', 'Madrugada, fim de semana, feriado. Pessoa que precisa marcar consulta às 23h não desiste — é atendida na hora e fica como lead pra você confirmar de manhã.'],
-      ['🇧🇷', 'Português brasileiro real', 'Tom acolhedor, calmo, profissional. Não soa robótica. Pessoa não percebe que é IA até você contar — e mesmo assim, prefere o atendimento ágil.'],
+      [IMG('1506784983877-45594efa4cbe'), 'Agenda consultas', 'Anota nome, telefone, especialidade desejada, melhor horário. Confirma feriados antes de agendar — não te dá dor de cabeça com furo de agenda.'],
+      [IMG('1554224155-6726b3ff858f'),    'Responde valores', 'Você cadastra os preços de cada especialidade uma vez, ela responde 24h. Pessoa não precisa esperar até segunda pra saber se cabe no bolso.'],
+      [IMG('1532938911079-1b06ac7ceec7'), 'Identifica urgências', 'Reconhece sintomas graves (febre alta, sangramento, dor forte) e orienta buscar pronto-socorro imediatamente. Treinada pra nunca dar diagnóstico.'],
+      [IMG('1524661135-423995f22d0b'),    'Endereço e horários', 'Manda o endereço da clínica, horário de funcionamento, formas de pagamento, convênios aceitos. Tudo configurável pelo dono.'],
+      [IMG('1501139083538-0139583c060f'), 'Funciona 24h', 'Madrugada, fim de semana, feriado. Pessoa que precisa marcar consulta às 23h não desiste — é atendida na hora e fica como lead pra você confirmar de manhã.'],
+      [IMG('1556761175-5973dc0f32e7'),    'Português brasileiro real', 'Tom acolhedor, calmo, profissional. Não soa robótica. Pessoa não percebe que é IA até você contar — e mesmo assim, prefere o atendimento ágil.'],
     ],
     steps: [
       ['Crie conta grátis', 'Cadastra com email. R$5 de crédito grátis pra testar — não precisa cartão.'],
@@ -154,7 +177,7 @@ const NICHES = {
   restaurante: {
     color: '#f97316',
     shadow: 'rgba(249, 115, 22, 0.35)',
-    emoji: '🍽️',
+    image: IMG('1517248135467-4c7edcad34c4', 800, 480),
     title: 'Atendente virtual pra seu restaurante 24h',
     metaDesc: 'Mostre cardápio, receba pedidos, calcule taxa de entrega no WhatsApp. R$199/mês.',
     h1Pre: 'Seu restaurante atendendo',
@@ -165,12 +188,12 @@ const NICHES = {
     trust: ['✓ Cardápio editável a qualquer momento', '✓ Calcula entrega por CEP', '✓ Funciona no WhatsApp'],
     featuresTitle: 'O que seu atendente sabe fazer',
     features: [
-      ['📋', 'Mostra cardápio organizado', 'Por categoria: pratos, bebidas, sobremesas. Cliente vê preços e descrições. Você cadastra uma vez, ele responde sempre que perguntarem.'],
-      ['🛵', 'Calcula entrega por CEP', 'Cliente manda CEP, ele responde a taxa de entrega. Você define a base + por km. Não tem mais "qual o valor pro meu bairro?".'],
-      ['🕐', 'Confere horários e feriados', '"Vocês tão abertos hoje?" — ele sabe se é feriado, se já fechou, qual o horário de hoje. Sem cliente perdido.'],
-      ['📝', 'Anota pedidos completos', 'Item + quantidade + observação + endereço + forma de pagamento. Confirma o pedido antes de fechar. Manda direto pra você no formato que quiser.'],
-      ['🍕', 'Tom de gente real', 'Emoji de comida, expressões coloquiais BR, leve humor. Cliente não sente que está falando com robô.'],
-      ['📊', 'Histórico completo', 'Veja todas conversas no dashboard. Identifica padrões: prato mais pedido, horário de pico, perguntas mais frequentes.'],
+      [IMG('1543353071-873f17a7a088'),    'Mostra cardápio organizado', 'Por categoria: pratos, bebidas, sobremesas. Cliente vê preços e descrições. Você cadastra uma vez, ele responde sempre que perguntarem.'],
+      [IMG('1526367790999-0150786686a2'), 'Calcula entrega por CEP', 'Cliente manda CEP, ele responde a taxa de entrega. Você define a base + por km. Não tem mais "qual o valor pro meu bairro?".'],
+      [IMG('1495364141860-b0d03eccd065'), 'Confere horários e feriados', '"Vocês tão abertos hoje?" — ele sabe se é feriado, se já fechou, qual o horário de hoje. Sem cliente perdido.'],
+      [IMG('1488521787991-ed7bbaae773c'), 'Anota pedidos completos', 'Item + quantidade + observação + endereço + forma de pagamento. Confirma o pedido antes de fechar. Manda direto pra você no formato que quiser.'],
+      [IMG('1516223725307-6f76b9ec8742'), 'Tom de gente real', 'Expressões coloquiais BR, leve humor. Cliente não sente que está falando com robô.'],
+      [IMG('1551288049-bebda4e38f71'),    'Histórico completo', 'Veja todas conversas no dashboard. Identifica padrões: prato mais pedido, horário de pico, perguntas mais frequentes.'],
     ],
     steps: [
       ['Crie conta grátis', 'Cadastra com email. R$5 de crédito grátis pra testar.'],
@@ -202,7 +225,7 @@ const NICHES = {
   loja: {
     color: '#22c55e',
     shadow: 'rgba(34, 197, 94, 0.35)',
-    emoji: '🛒',
+    image: IMG('1607082348824-0a96f2a4b9da', 800, 480),
     title: 'Atendente virtual pra sua loja online',
     metaDesc: 'Calcula frete por CEP, valida CNPJ, compara preço. Reduz abandono de carrinho. R$199/mês.',
     h1Pre: 'Sua loja online atendendo',
@@ -213,12 +236,12 @@ const NICHES = {
     trust: ['✓ Funciona em Shopify, Nuvemshop, Loja Integrada', '✓ Cálculo de frete por CEP', '✓ Valida CNPJ na hora'],
     featuresTitle: 'O que seu atendente sabe fazer',
     features: [
-      ['📦', 'Calcula frete por CEP', 'Cliente manda CEP, ele responde valor + prazo de entrega na hora. Reduz abandono de carrinho — pessoa não precisa esperar até preencher checkout pra saber o frete.'],
-      ['🏢', 'Valida CNPJ na hora', '"Vocês são empresa séria?" — ele consulta CNPJ, mostra dados públicos da empresa, situação cadastral. Trust automático sem você pedir.'],
-      ['🔍', 'Compara com concorrente', 'Cliente acha barato em outro site? Ele consulta o link do concorrente e mostra o que vocês têm de diferente (frete grátis, garantia, troca, prazo).'],
-      ['↩️', 'Política de troca/devolução', 'Você cadastra a política uma vez, ele responde sempre que perguntarem. Sem você ter que repetir o mesmo texto 50 vezes.'],
-      ['💱', 'Converte moeda', 'Cliente vê produto em dólar/euro? Ele converte pra real automaticamente. Útil pra dropshipping ou cross-border.'],
-      ['📈', 'Captura leads', 'Quando alguém pergunta produto que vocês não têm, ele anota e te avisa. Você sabe exatamente o que falta no catálogo.'],
+      [IMG('1607082348824-0a96f2a4b9da'), 'Calcula frete por CEP', 'Cliente manda CEP, ele responde valor + prazo de entrega na hora. Reduz abandono de carrinho — pessoa não precisa esperar até preencher checkout pra saber o frete.'],
+      [IMG('1486406146926-c627a92ad1ab'), 'Valida CNPJ na hora', '"Vocês são empresa séria?" — ele consulta CNPJ, mostra dados públicos da empresa, situação cadastral. Trust automático sem você pedir.'],
+      [IMG('1488229297570-58520851e868'), 'Compara com concorrente', 'Cliente acha barato em outro site? Ele consulta o link do concorrente e mostra o que vocês têm de diferente (frete grátis, garantia, troca, prazo).'],
+      [IMG('1555529669-e69e7aa0ba9a'),    'Política de troca/devolução', 'Você cadastra a política uma vez, ele responde sempre que perguntarem. Sem você ter que repetir o mesmo texto 50 vezes.'],
+      [IMG('1554224155-6726b3ff858f'),    'Converte moeda', 'Cliente vê produto em dólar/euro? Ele converte pra real automaticamente. Útil pra dropshipping ou cross-border.'],
+      [IMG('1551288049-bebda4e38f71'),    'Captura leads', 'Quando alguém pergunta produto que vocês não têm, ele anota e te avisa. Você sabe exatamente o que falta no catálogo.'],
     ],
     steps: [
       ['Crie conta grátis', 'Cadastra com email. R$5 de crédito grátis pra testar.'],
@@ -272,15 +295,15 @@ const otherNiches = Object.entries(NICHES)
 document.getElementById('root').innerHTML = `
   <section class="niche-hero">
     <div class="container">
-      <div class="niche-emoji">${cfg.emoji}</div>
+      <img class="niche-hero-photo" src="${cfg.image}" alt="" loading="eager" />
       <h1>${esc(cfg.h1Pre)}<br /><span class="accent">${esc(cfg.h1Accent)}</span></h1>
       <p class="subhead">${esc(cfg.subhead)}</p>
       <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
         <a class="niche-cta" href="/agent/${esc(cfg.demoSlug)}" style="background:#22c55e;box-shadow:0 8px 24px rgba(34,197,94,0.35);">
-          💬 Testar grátis (sem cadastro)
+          Testar grátis (sem cadastro)
         </a>
         <a class="niche-cta" href="/build?template=${esc(cfg.template)}">
-          🚀 Criar a minha agora
+          Criar a minha agora
         </a>
       </div>
       <div class="niche-cta-sub">5 minutos · sem cartão de crédito · cancela quando quiser</div>
@@ -294,9 +317,9 @@ document.getElementById('root').innerHTML = `
     <div class="container">
       <h2>${esc(cfg.featuresTitle)}</h2>
       <div class="niche-features-grid">
-        ${cfg.features.map(([ico, h, p]) => `
+        ${cfg.features.map(([img, h, p]) => `
           <div class="niche-feature">
-            <div class="ico">${ico}</div>
+            <div class="ico" style="background-image:url('${img}')"></div>
             <h3>${esc(h)}</h3>
             <p>${esc(p)}</p>
           </div>
@@ -327,7 +350,7 @@ document.getElementById('root').innerHTML = `
       <h2>Quanto custa</h2>
       <div class="price">${esc(cfg.price)}<small>/mês</small></div>
       <ul>${cfg.priceItems.map((it) => `<li>${esc(it)}</li>`).join('')}</ul>
-      <a class="niche-cta" href="/build?template=${esc(cfg.template)}">🚀 Criar a minha agora</a>
+      <a class="niche-cta" href="/build?template=${esc(cfg.template)}">Criar a minha agora</a>
     </div>
   </section>
 
