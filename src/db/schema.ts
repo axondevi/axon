@@ -232,6 +232,11 @@ export const agents = pgTable(
     // affiliate, both in one transaction. No smart contract yet.
     affiliateEnabled: boolean('affiliate_enabled').notNull().default(false),
     affiliatePayoutMicro: bigint('affiliate_payout_micro', { mode: 'bigint' }).notNull().default(0n),
+    // Owner-controlled global pause. When set, the WhatsApp webhook ignores
+    // every inbound for this agent until the owner unpauses. Useful for
+    // overnight quiet hours, manual debugging, or while testing changes
+    // without losing the connection.
+    pausedAt: timestamp('paused_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -413,6 +418,13 @@ export const contactMemory = pgTable(
     // flips from NULL to a timestamp (idempotent — never double-pay).
     referredByUserId: uuid('referred_by_user_id'),
     affiliatePaidAt: timestamp('affiliate_paid_at'),
+
+    // Human handoff. Set when the WhatsApp owner replies manually from
+    // their phone (we detect this via fromMe events that didn't originate
+    // from our sendText). The webhook then mutes the agent for this
+    // contact until the timestamp passes — gives the human time to handle
+    // the conversation without the AI talking over them.
+    humanPausedUntil: timestamp('human_paused_until'),
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

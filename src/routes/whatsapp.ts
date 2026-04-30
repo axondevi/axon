@@ -19,6 +19,7 @@ import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { encrypt, decrypt } from '~/lib/crypto';
 import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound } from '~/whatsapp/evolution';
+import { recordSentId, isSentByUs } from '~/whatsapp/sent-ids';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
   getOrCreateMemory,
@@ -489,6 +490,51 @@ publicWebhook.post('/:secret', async (c) => {
   const inbound = extractInbound(payload);
   if (!inbound) return c.json({ ignored: 'unsupported_event' });
 
+  // ─── Human handoff detection ─────────────────────────────────────
+  // fromMe=true on a webhook means the WhatsApp account itself sent the
+  // message — but that account is doing TWO things: (a) us replying via
+  // sendText, (b) the human owner picking up their phone and typing.
+  // We tell them apart by message ID:
+  //   - ID matches one we just sent → ignore (echo of our own send)
+  //   - ID is unknown → human typed it → flip the contact into "human
+  //     paused" mode for 30min so the agent stops talking over them.
+  if (inbound.fromMe) {
+    if (inbound.messageId && isSentByUs(inbound.messageId)) {
+      return c.json({ ignored: 'echo' });
+    }
+    // Unknown fromMe → human just answered. Mute the agent for this
+    // contact for 30min. Agent resumes automatically when the timer
+    // expires (next inbound from this customer reactivates it).
+    const targetAgentId = conn.agentId;
+    const pauseUntil = new Date(Date.now() + 30 * 60 * 1000);
+    db.update(contactMemory)
+      .set({ humanPausedUntil: pauseUntil, updatedAt: new Date() })
+      .where(and(eq(contactMemory.agentId, targetAgentId), eq(contactMemory.phone, inbound.phone)))
+      .catch(() => {});
+    return c.json({ ignored: 'human_handoff', paused_until: pauseUntil.toISOString() });
+  }
+
+  // Look up the agent + contact memory once so we can early-out on
+  // pause/handoff without doing the expensive media-fetch + LLM work.
+  const [agentRow] = await db.select().from(agents).where(eq(agents.id, conn.agentId)).limit(1);
+  if (!agentRow) return c.json({ ignored: 'agent_missing' });
+
+  // Owner-set global pause from the dashboard. While paused_at is set,
+  // every inbound is dropped — connection stays alive, agent stays mute.
+  if (agentRow.pausedAt) {
+    return c.json({ ignored: 'agent_paused' });
+  }
+
+  // Per-contact human handoff. If the owner replied manually within the
+  // last 30min, stay quiet for that customer. Cleared automatically when
+  // the timestamp passes.
+  const [memRow] = await db.select().from(contactMemory)
+    .where(and(eq(contactMemory.agentId, agentRow.id), eq(contactMemory.phone, inbound.phone)))
+    .limit(1);
+  if (memRow?.humanPausedUntil && memRow.humanPausedUntil.getTime() > Date.now()) {
+    return c.json({ ignored: 'human_handoff_active', until: memRow.humanPausedUntil.toISOString() });
+  }
+
   // ─── Decode the API key once, reused for media fetch + reply ───────
   let connApiKey: string;
   try {
@@ -561,9 +607,10 @@ publicWebhook.post('/:secret', async (c) => {
 
   // Resolve agent + owner — needed to compute the session bucket BEFORE
   // we decide whether to buffer (owner conversations live in their own
-  // bucket so they never get merged with a customer's burst).
-  const [a] = await db.select().from(agents).where(eq(agents.id, conn.agentId)).limit(1);
-  if (!a || !a.public) return c.json({ ignored: 'agent_inactive' });
+  // bucket so they never get merged with a customer's burst). agentRow
+  // was already loaded above for the pause/handoff checks.
+  const a = agentRow;
+  if (!a.public) return c.json({ ignored: 'agent_inactive' });
 
   const inboundDigits = inbound.phone.replace(/\D/g, '');
   const ownerDigits = (a.ownerPhone || '').replace(/\D/g, '');
@@ -814,9 +861,23 @@ async function processBufferedTurn(opts: {
 
   const apiKey = connApiKey;
 
+  // Each agent send is recorded by message ID so the inbound webhook can
+  // tell our own echoes apart from the human owner replying by hand.
+  // Wrapper helpers keep the call sites tidy.
+  const sendOurText = async (args: Parameters<typeof sendText>[0]) => {
+    const r = await sendText(args).catch(() => ({ ok: false } as const));
+    if (r && (r as any).messageId) recordSentId((r as any).messageId);
+    return r;
+  };
+  const sendOurMedia = async (args: Parameters<typeof sendMedia>[0]) => {
+    const r = await sendMedia(args).catch(() => ({ ok: false } as const));
+    if (r && (r as any).messageId) recordSentId((r as any).messageId);
+    return r;
+  };
+
   // ─── Send any generated images first (out-of-band from text reply) ─
   for (const img of images) {
-    await sendMedia({
+    await sendOurMedia({
       instanceUrl: conn.instanceUrl,
       instanceName: conn.instanceName,
       apiKey,
@@ -827,7 +888,7 @@ async function processBufferedTurn(opts: {
       fileName: 'gerada.png',
       caption: img.prompt ? img.prompt.slice(0, 700) : '',
       delayMs: 800,
-    }).catch(() => {});
+    });
     await new Promise((r) => setTimeout(r, 400));
   }
 
@@ -838,7 +899,7 @@ async function processBufferedTurn(opts: {
       pix.description,
       pix.expiresAt ? `Expira em 30 minutos.` : '',
     ].filter(Boolean).join('\n');
-    await sendMedia({
+    await sendOurMedia({
       instanceUrl: conn.instanceUrl,
       instanceName: conn.instanceName,
       apiKey,
@@ -849,16 +910,16 @@ async function processBufferedTurn(opts: {
       fileName: 'pix.png',
       caption: captionLines.slice(0, 700),
       delayMs: 800,
-    }).catch(() => {});
+    });
     await new Promise((r) => setTimeout(r, 600));
-    await sendText({
+    await sendOurText({
       instanceUrl: conn.instanceUrl,
       instanceName: conn.instanceName,
       apiKey,
       number: inbound.phone,
       text: `Pix copia-e-cola:\n\`\`\`${pix.qrCode}\`\`\``,
       delayMs: 600,
-    }).catch(() => {});
+    });
     await new Promise((r) => setTimeout(r, 400));
   }
 
@@ -884,7 +945,7 @@ async function processBufferedTurn(opts: {
         let bin = '';
         for (let i = 0; i < tts.audioBytes.length; i++) bin += String.fromCharCode(tts.audioBytes[i]);
         const base64 = btoa(bin);
-        await sendMedia({
+        await sendOurMedia({
           instanceUrl: conn.instanceUrl,
           instanceName: conn.instanceName,
           apiKey,
@@ -894,7 +955,7 @@ async function processBufferedTurn(opts: {
           mimetype: 'audio/mpeg',
           fileName: 'voz.mp3',
           delayMs: 800,
-        }).catch(() => {});
+        });
         textWasReplaced = true;
       }
     } catch {
@@ -908,7 +969,7 @@ async function processBufferedTurn(opts: {
     for (let i = 0; i < bubbles.length; i++) {
       const part = bubbles[i];
       const typingMs = Math.min(800 + part.length * 35, 3000) + i * 300;
-      await sendText({
+      await sendOurText({
         instanceUrl: conn.instanceUrl,
         instanceName: conn.instanceName,
         apiKey,

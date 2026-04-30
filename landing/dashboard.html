@@ -1090,6 +1090,7 @@
               <a class="agent-btn" href="/agent-preview/${escapeAttr(a.slug)}" target="_blank" title="Pré-visualizar e testar agente antes de conectar WhatsApp" style="border-color:rgba(124,92,255,0.4);color:var(--accent);">🧪 Testar</a>
               <a class="agent-btn" href="/whatsapp" title="Ver memória, contatos e conversas">🧠 Cérebro</a>
               <button class="agent-btn" onclick="openWhatsappModal('${escapeAttr(a.id)}', '${escapeAttr(a.name)}')">💬 WhatsApp</button>
+              <button class="agent-btn" id="pause-btn-${escapeAttr(a.id)}" onclick="togglePauseAgent('${escapeAttr(a.id)}', '${escapeAttr(a.name)}', ${a.paused ? 'true' : 'false'})" title="${a.paused ? 'Agente pausado — clique pra retomar' : 'Pausar agente (para de responder no WhatsApp)'}" style="${a.paused ? 'background:rgba(255,214,10,0.15);border-color:rgba(255,214,10,0.5);color:#ffd60a;' : ''}">${a.paused ? '▶️ Retomar' : '⏸️ Pausar'}</button>
               <a class="agent-btn" href="/build?edit=${escapeAttr(a.id)}" title="Editar prompt, ferramentas, cor">⚙ Editar</a>
               <a class="agent-btn" href="/agent/${escapeAttr(a.slug)}" target="_blank" title="Abrir chat público">🔗 Abrir</a>
               <button class="agent-btn agent-btn-danger" onclick="deleteAgent('${escapeAttr(a.id)}', '${escapeAttr(a.name)}')" title="Excluir agente permanentemente">×</button>
@@ -1621,6 +1622,30 @@
       }
 
       // ─── Delete agent (with confirmation) ────────────────────────────────
+      // Toggle global pause for an agent. Paused agents stop replying on every
+      // channel (WhatsApp inbound, web chat) but stay connected — flip back
+      // any time. The button label is toggled optimistically; we reload the
+      // dashboard on success to pick up the new color/state everywhere.
+      window.togglePauseAgent = async function(agentId, agentName, currentlyPaused) {
+        const target = !currentlyPaused;
+        const action = target ? 'pausar' : 'retomar';
+        const verb = target ? 'pausado' : 'retomado';
+        if (!confirm(`Tem certeza que quer ${action} o agente "${agentName}"?\n\n${target ? 'Ele para de responder em todos os canais (WhatsApp, web). A conexão fica viva — só o agente fica mudo.' : 'Ele volta a atender mensagens automaticamente.'}`)) return;
+        const btn = document.getElementById(`pause-btn-${agentId}`);
+        if (btn) { btn.disabled = true; btn.textContent = target ? 'Pausando…' : 'Retomando…'; }
+        try {
+          await api(`/v1/agents/${agentId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ paused: target }),
+          });
+          window.AxonUI && AxonUI.toast(`Agente ${verb}`, { type: 'success' });
+          location.reload();
+        } catch (e) {
+          window.AxonUI && AxonUI.toast('Falha: ' + e.message, { type: 'error' });
+          if (btn) { btn.disabled = false; btn.textContent = target ? '⏸️ Pausar' : '▶️ Retomar'; }
+        }
+      };
+
       window.deleteAgent = async function(agentId, agentName) {
         if (!confirm(`Excluir o agente "${agentName}"?\n\nIsso vai deletar PERMANENTEMENTE: o agente, todas as conversas, toda a memória de contatos, e desconectar do WhatsApp se conectado.\n\nAção irreversível.`)) return;
         try {

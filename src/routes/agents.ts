@@ -192,6 +192,8 @@ app.get('/', async (c) => {
       nft_url: nftViewUrlFor(a.id),
       persona_id: a.personaId,
       routes_to: a.routesTo,
+      paused: !!a.pausedAt,
+      paused_at: a.pausedAt,
       created_at: a.createdAt,
       updated_at: a.updatedAt,
     })),
@@ -234,6 +236,8 @@ app.get('/:id', async (c) => {
     routes_to: a.routesTo,
     affiliate_enabled: a.affiliateEnabled,
     affiliate_payout_usdc: (Number(a.affiliatePayoutMicro) / 1_000_000).toFixed(6),
+    paused_at: a.pausedAt,
+    paused: !!a.pausedAt,
     created_at: a.createdAt,
     updated_at: a.updatedAt,
   });
@@ -418,6 +422,11 @@ app.patch('/:id', async (c) => {
   }
   if (body.affiliate_enabled !== undefined) {
     update.affiliateEnabled = !!body.affiliate_enabled;
+  }
+  // Pause/resume — accepts boolean. true sets paused_at=now (mutes the
+  // agent on every channel until unpaused). false clears it.
+  if (body.paused !== undefined) {
+    update.pausedAt = body.paused ? new Date() : null;
   }
   if (body.affiliate_payout_usdc !== undefined) {
     // USDC value comes as a string (e.g. "0.20"). Convert to micro-USDC,

@@ -114,7 +114,7 @@ export async function sendText(opts: {
   number: string;       // raw phone like "5511999999999"
   text: string;
   delayMs?: number;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   try {
     const res = await evoFetch(opts.instanceUrl, `/message/sendText/${encodeURIComponent(opts.instanceName)}`, {
       method: 'POST',
@@ -129,7 +129,13 @@ export async function sendText(opts: {
       const body = await res.text().catch(() => '');
       return { ok: false, error: `sendText ${res.status}: ${body.slice(0, 200)}` };
     }
-    return { ok: true };
+    // Capture the message ID so the webhook receiver can distinguish our
+    // own sends from messages the human typed by hand on their phone (both
+    // arrive as fromMe=true on the inbound webhook).
+    const data: any = await res.json().catch(() => ({}));
+    const messageId: string | undefined =
+      data?.key?.id || data?.message?.key?.id || data?.id || undefined;
+    return { ok: true, messageId };
   } catch (err: any) {
     return { ok: false, error: err.message || String(err) };
   }
@@ -354,7 +360,7 @@ export async function sendMedia(opts: {
   fileName?: string;
   caption?: string;
   delayMs?: number;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   if (!opts.media && !opts.base64Data) {
     return { ok: false, error: 'sendMedia: must provide media (URL) or base64Data' };
   }
@@ -387,7 +393,10 @@ export async function sendMedia(opts: {
       const text = await res.text().catch(() => '');
       return { ok: false, error: `sendMedia ${res.status}: ${text.slice(0, 200)}` };
     }
-    return { ok: true };
+    const data: any = await res.json().catch(() => ({}));
+    const messageId: string | undefined =
+      data?.key?.id || data?.message?.key?.id || data?.id || undefined;
+    return { ok: true, messageId };
   } catch (err: any) {
     return { ok: false, error: err.message || String(err) };
   }
@@ -473,18 +482,22 @@ export interface InboundMessage {
   text: string;                  // caption for media, transcript-target empty for audio
   messageKey?: any;              // for media re-fetch
   messageRaw?: any;              // for media re-fetch
+  fromMe: boolean;               // true if WhatsApp account itself sent it (us OR a human typing)
+  messageId?: string;            // Evolution's message ID — used to dedupe our own sends
 }
 export function extractInbound(payload: any): InboundMessage | null {
   if (!payload) return null;
   const event = payload.event || payload.type;
   if (event !== 'messages.upsert' && event !== 'MESSAGES_UPSERT') return null;
   const data = payload.data || payload;
-  if (!data || data.key?.fromMe) return null;            // ignore our own sends
+  if (!data) return null;
   const remote = data.key?.remoteJid as string | undefined;
   if (!remote || remote.endsWith('@g.us')) return null;  // skip group chats for now
   const phone = remote.split('@')[0];
   const m = data.message || {};
   const messageKey = data.key;
+  const fromMe = !!data.key?.fromMe;
+  const messageId: string | undefined = data.key?.id || undefined;
 
   // Text message — fastest path, no media re-fetch needed.
   const plainText =
@@ -492,7 +505,7 @@ export function extractInbound(payload: any): InboundMessage | null {
     (typeof m.extendedTextMessage?.text === 'string' && m.extendedTextMessage.text) ||
     null;
   if (plainText) {
-    return { phone, pushName: data.pushName || '', kind: 'text', text: plainText };
+    return { phone, pushName: data.pushName || '', kind: 'text', text: plainText, fromMe, messageId };
   }
 
   // Image message — caption is optional. Even without caption, we still
@@ -505,6 +518,8 @@ export function extractInbound(payload: any): InboundMessage | null {
       text: typeof m.imageMessage.caption === 'string' ? m.imageMessage.caption : '',
       messageKey,
       messageRaw: m,
+      fromMe,
+      messageId,
     };
   }
 
@@ -518,6 +533,8 @@ export function extractInbound(payload: any): InboundMessage | null {
       text: typeof m.audioMessage.caption === 'string' ? m.audioMessage.caption : '',
       messageKey,
       messageRaw: m,
+      fromMe,
+      messageId,
     };
   }
 
