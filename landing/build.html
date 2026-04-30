@@ -912,11 +912,27 @@
             `;
             return;
           }
-          list.innerHTML = d.data.map((a) => `
-            <div class="agent-row">
+          list.innerHTML = d.data.map((a) => {
+            // Paused agents get a yellow border + paused chip in the slug row
+            // so the state is obvious at a glance, not just buried in a button.
+            const pausedChip = a.paused
+              ? '<span style="background:rgba(255,214,10,0.18);color:#ffd60a;padding:1px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-left:6px;">⏸ pausado</span>'
+              : '';
+            const rowStyle = a.paused
+              ? 'border-color:rgba(255,214,10,0.35);background:rgba(255,214,10,0.03);'
+              : '';
+            const pauseBtnStyle = a.paused
+              ? 'background:rgba(255,214,10,0.15);border-color:rgba(255,214,10,0.5);color:#ffd60a;'
+              : '';
+            const pauseBtnLabel = a.paused ? '▶ Retomar' : '⏸ Pausar';
+            const pauseBtnTitle = a.paused
+              ? 'Agente pausado — clique pra voltar a atender'
+              : 'Pausar agente (para de responder no WhatsApp/web)';
+            return `
+            <div class="agent-row" style="${rowStyle}">
               <span class="agent-color-dot" style="background:${a.primary_color}"></span>
               <div>
-                <h4 class="ar-name">${escape(a.name)}</h4>
+                <h4 class="ar-name">${escape(a.name)}${pausedChip}</h4>
                 <div class="ar-slug">/agent/${escape(a.slug)} · ${a.tool_count} tools · ${a.public ? 'public' : 'private'} · ${a.pay_mode === 'owner' ? 'owner-paid' : 'visitor-paid'}</div>
               </div>
               <span class="ar-meta">updated ${relTime(a.updated_at)}</span>
@@ -925,12 +941,13 @@
                 <button class="ar-btn" onclick="showAnalytics('${a.id}','${escape(a.name)}','${escape(a.primary_color)}')">Stats</button>
                 <button class="ar-btn" onclick="showLogs('${a.id}','${escape(a.name)}')">Logs</button>
                 <button class="ar-btn" onclick="showWhatsapp('${a.id}','${escape(a.name)}','${escape(a.primary_color)}')" style="background:rgba(37,211,102,0.12); border-color:rgba(37,211,102,0.4); color:#25d366;">WhatsApp</button>
+                <button class="ar-btn" onclick="togglePauseAgent('${a.id}','${escape(a.name)}',${a.paused ? 'true' : 'false'})" title="${pauseBtnTitle}" style="${pauseBtnStyle}">${pauseBtnLabel}</button>
                 <button class="ar-btn" onclick="showEmbed('${escape(a.slug)}','${escape(a.primary_color)}')">Embed</button>
                 <button class="ar-btn" onclick="editAgent('${a.id}')">Edit</button>
                 <button class="ar-btn danger" onclick="deleteAgent('${a.id}','${escape(a.name)}')">Delete</button>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         } catch (e) {
           document.getElementById('agent-list').innerHTML = `<p style="color:#f87171">${e.message}</p>`;
         }
@@ -976,6 +993,25 @@
           showToast('Agent deleted', 'success');
           loadMyAgents();
         } catch (e) { showToast(e.message, 'error'); }
+      };
+
+      // Toggle the global pause flag on an agent. Paused agents stop replying
+      // on every channel (WhatsApp inbound, web chat) but stay connected.
+      // Reload the list on success to pick up the new color/chip/button label.
+      window.togglePauseAgent = async function(id, name, currentlyPaused) {
+        const target = !currentlyPaused;
+        const action = target ? 'pausar' : 'retomar';
+        const msg = target
+          ? `Pausar o agente "${name}"?\n\nEle para de responder em todos os canais (WhatsApp, web). A conexão fica viva — só o agente fica mudo.`
+          : `Retomar o agente "${name}"?\n\nVolta a responder mensagens automaticamente.`;
+        if (!confirm(msg)) return;
+        try {
+          await api('/v1/agents/' + id, { method: 'PATCH', body: JSON.stringify({ paused: target }) });
+          showToast(`Agente ${target ? 'pausado' : 'retomado'}`, 'success');
+          loadMyAgents();
+        } catch (e) {
+          showToast('Falha ao ' + action + ': ' + e.message, 'error');
+        }
       };
 
       window.showEmbed = function(slug, color) {
