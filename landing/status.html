@@ -72,9 +72,13 @@
         <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
         <nav class="nav-links">
           <a href="/#apis">APIs</a>
-          <a href="/#pricing">Pricing</a>
-          <a href="/stats">Stats</a>
-          <a href="/status" style="color: var(--text)">Status</a>
+          <a href="/#pricing" data-pt="Preço" data-en="Pricing">Preço</a>
+          <a href="/stats" data-pt="Estatísticas" data-en="Stats">Estatísticas</a>
+          <a href="/status" style="color: var(--text)" data-pt="Status" data-en="Status">Status</a>
+          <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
+            <span data-active="pt">🇧🇷 PT</span>
+            <span data-active="en">🇺🇸 EN</span>
+          </button>
         </nav>
       </div>
     </header>
@@ -82,8 +86,8 @@
     <main>
       <section class="status-wrap">
         <div class="container">
-          <h1>System status</h1>
-          <p class="intro">Real-time health of every piece of the gateway. Refreshes every 30 seconds.</p>
+          <h1 data-pt="Status do sistema" data-en="System status">Status do sistema</h1>
+          <p class="intro" data-pt="Saúde em tempo real de cada parte do gateway. Atualiza a cada 30 segundos." data-en="Real-time health of every piece of the gateway. Refreshes every 30 seconds.">Saúde em tempo real de cada parte do gateway. Atualiza a cada 30 segundos.</p>
 
           <div class="overall" id="overall">
             <span class="pulse unk" id="pulse"></span>
@@ -181,5 +185,7 @@
       render();
       setInterval(render, 30_000);
     </script>
+    <link rel="stylesheet" href="/_i18n.css" />
+    <script src="/_i18n.js" defer></script>
   </body>
 </html>

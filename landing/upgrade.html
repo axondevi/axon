@@ -131,20 +131,24 @@
       <div class="container">
         <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
         <nav>
-          <a href="/explore">Explorar</a>
-          <a href="/build">Criar agente</a>
-          <a href="/dashboard">Painel</a>
-          <a href="/upgrade" aria-current="page">Planos</a>
-          <a href="/learn/">Tutoriais</a>
-          <a href="/stats">Estatísticas</a>
+          <a href="/explore" data-pt="Explorar" data-en="Explore">Explorar</a>
+          <a href="/build" data-pt="Criar agente" data-en="Build agent">Criar agente</a>
+          <a href="/dashboard" data-pt="Painel" data-en="Dashboard">Painel</a>
+          <a href="/upgrade" aria-current="page" data-pt="Planos" data-en="Plans">Planos</a>
+          <a href="/learn/" data-pt="Tutoriais" data-en="Tutorials">Tutoriais</a>
+          <a href="/stats" data-pt="Estatísticas" data-en="Stats">Estatísticas</a>
+          <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
+            <span data-active="pt">🇧🇷 PT</span>
+            <span data-active="en">🇺🇸 EN</span>
+          </button>
         </nav>
       </div>
     </header>
 
     <main class="container up-wrap">
-      <h1>Escolha seu plano</h1>
-      <p class="lede">Pague em USDC da sua carteira Axon. Sem cartão, sem fatura mensal — um débito direto por período de 30 dias.</p>
-      <p class="pitch">Cada plano destrava <strong>capacidade real</strong> pro seu agente: quantos clientes simultâneos consegue atender, e quanto economiza em taxas por chamada. Cancele a hora que quiser.</p>
+      <h1 data-pt="Escolha seu plano" data-en="Choose your plan">Escolha seu plano</h1>
+      <p class="lede" data-pt="Pague em USDC da sua carteira Axon. Sem cartão, sem fatura mensal — um débito direto por período de 30 dias." data-en="Pay in USDC from your Axon wallet. No credit card, no monthly invoice — a direct debit for a 30-day period.">Pague em USDC da sua carteira Axon. Sem cartão, sem fatura mensal — um débito direto por período de 30 dias.</p>
+      <p class="pitch" data-pt="Cada plano destrava capacidade real pro seu agente: quantos clientes simultâneos consegue atender, e quanto economiza em taxas por chamada. Cancele a hora que quiser." data-en="Each plan unlocks real capacity for your agent: how many simultaneous customers it can handle, and how much you save in per-call fees. Cancel anytime.">Cada plano destrava <strong>capacidade real</strong> pro seu agente: quantos clientes simultâneos consegue atender, e quanto economiza em taxas por chamada. Cancele a hora que quiser.</p>
 
       <div id="state-row" class="current-state" style="display:none">
         <span><span class="label">Plano atual:</span> <strong id="cur-tier">—</strong></span>
@@ -442,5 +446,8 @@
 
       init();
     </script>
+
+    <link rel="stylesheet" href="/_i18n.css" />
+    <script src="/_i18n.js" defer></script>
   </body>
 </html>

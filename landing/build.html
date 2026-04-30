@@ -278,12 +278,16 @@
       <div class="container">
         <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
         <nav>
-          <a href="/explore">Explore</a>
-          <a href="/build" aria-current="page">Build</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/upgrade">Plans</a>
-          <a href="/learn/">Learn</a>
-          <a href="/stats">Stats</a>
+          <a href="/explore" data-pt="Explorar" data-en="Explore">Explorar</a>
+          <a href="/build" aria-current="page" data-pt="Criar" data-en="Build">Criar</a>
+          <a href="/dashboard" data-pt="Painel" data-en="Dashboard">Painel</a>
+          <a href="/upgrade" data-pt="Planos" data-en="Plans">Planos</a>
+          <a href="/learn/" data-pt="Aprender" data-en="Learn">Aprender</a>
+          <a href="/stats" data-pt="Estatísticas" data-en="Stats">Estatísticas</a>
+          <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
+            <span data-active="pt">🇧🇷 PT</span>
+            <span data-active="en">🇺🇸 EN</span>
+          </button>
         </nav>
       </div>
     </header>
@@ -291,12 +295,12 @@
     <main class="container build-wrap">
       <div class="build-hero">
         <div>
-          <h1>Construa seu agente de IA</h1>
-          <p>Pick a template, customize the prompt and tools, share the URL. Each call is paid from your Axon wallet — no extra hosting, no infra.</p>
+          <h1 data-pt="Construa seu agente de IA" data-en="Build your AI agent">Construa seu agente de IA</h1>
+          <p data-pt="Escolha um template, personalize prompt e ferramentas, compartilhe a URL. Cada chamada é paga da sua carteira Axon — sem hospedagem extra, sem infra." data-en="Pick a template, customize the prompt and tools, share the URL. Each call is paid from your Axon wallet — no extra hosting, no infra.">Escolha um template, personalize prompt e ferramentas, compartilhe a URL. Cada chamada é paga da sua carteira Axon — sem hospedagem extra, sem infra.</p>
         </div>
         <div class="actions">
-          <button class="ar-btn" id="how-it-works" style="background:rgba(124,92,255,0.12);border-color:rgba(124,92,255,0.5);">How it works</button>
-          <button class="ar-btn primary" id="new-blank">+ Blank agent</button>
+          <button class="ar-btn" id="how-it-works" style="background:rgba(124,92,255,0.12);border-color:rgba(124,92,255,0.5);" data-pt="Como funciona" data-en="How it works">Como funciona</button>
+          <button class="ar-btn primary" id="new-blank" data-pt="+ Agente em branco" data-en="+ Blank agent">+ Agente em branco</button>
         </div>
       </div>
 
@@ -1831,6 +1835,17 @@
       maybeAutoLoadEdit();
       maybeAutoLoadTemplate();
       maybeAutoLoadPersona();
+
+      // Re-translate dynamic content (templates, personas, my agents)
+      // whenever the language flips. The lists are rebuilt by their own
+      // load* functions, so we hook into the i18n event to re-apply
+      // attribute translations after re-render.
+      document.addEventListener('axon:langchanged', function () {
+        if (window.AxonI18n) window.AxonI18n.apply();
+      });
     </script>
+
+    <link rel="stylesheet" href="/_i18n.css" />
+    <script src="/_i18n.js" defer></script>
   </body>
 </html>

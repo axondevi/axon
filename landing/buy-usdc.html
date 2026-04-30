@@ -74,15 +74,19 @@
         <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
         <nav class="nav-links">
           <a href="/#apis">APIs</a>
-          <a href="/#pricing">Pricing</a>
-          <a href="/stats">Stats</a>
+          <a href="/#pricing" data-pt="Preço" data-en="Pricing">Preço</a>
+          <a href="/stats" data-pt="Estatísticas" data-en="Stats">Estatísticas</a>
           <a href="https://github.com/axondevi/axon">GitHub</a>
+          <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
+            <span data-active="pt">🇧🇷 PT</span>
+            <span data-active="en">🇺🇸 EN</span>
+          </button>
         </nav>
       </div>
     </header>
 
     <main class="container buy-wrap">
-      <h1>Buy USDC for your Axon wallet</h1>
+      <h1 data-pt="Comprar USDC pra sua carteira Axon" data-en="Buy USDC for your Axon wallet">Comprar USDC pra sua carteira Axon</h1>
       <p class="lede">
         Axon wallets accept deposits in <strong>USDC on the Base L2 network</strong>.
         This guide walks through the three common paths to get USDC on Base,
@@ -357,5 +361,7 @@
         </div>
       </div>
     </footer>
+    <link rel="stylesheet" href="/_i18n.css" />
+    <script src="/_i18n.js" defer></script>
   </body>
 </html>

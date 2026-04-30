@@ -962,109 +962,20 @@
       })();
     </script>
 
-    <!-- ─── i18n engine (PT default, EN opt-in) ─────────────────────
-         Walks every [data-pt][data-en] node and swaps its textContent
-         based on the saved language. Avoids the browser's auto-translate
-         (which mangled words like "clínicas" → "r e os" — see commit
-         f19f7a1 for the root cause). Persisted via localStorage so the
-         choice sticks across page loads.
-
-         Note: only innerText is swapped (innerHTML stays put), so any
-         child elements inside the translated nodes survive — important
-         for the gradient <span> inside the H1, etc. -->
-    <style>
-      .lang-toggle {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 6px 10px;
-        font: inherit;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--text-dim);
-        cursor: pointer;
-        display: inline-flex;
-        gap: 6px;
-        align-items: center;
-        transition: border-color 0.15s, color 0.15s;
-      }
-      .lang-toggle:hover { border-color: var(--accent); color: var(--text); }
-      .lang-toggle [data-active] { opacity: 0.45; transition: opacity 0.15s; }
-      .lang-toggle [data-active="pt"].active,
-      .lang-toggle [data-active="en"].active { opacity: 1; color: var(--accent-2); }
-      @media (max-width: 720px) {
-        .lang-toggle { padding: 5px 8px; font-size: 11px; }
-      }
-    </style>
+    <!-- i18n: shared engine + toggle styles. See landing/_i18n.js for
+         how data-pt/data-en attribute pairs translate the page. -->
+    <link rel="stylesheet" href="/_i18n.css" />
+    <script src="/_i18n.js" defer></script>
     <script>
-      (function () {
-        var STORAGE = 'axon-lang';
-        var DEFAULT = 'pt';
-
-        function getLang() {
-          var saved = localStorage.getItem(STORAGE);
-          if (saved === 'pt' || saved === 'en') return saved;
-          // Fall back to browser hint when nothing was saved yet
-          var nav = (navigator.language || '').toLowerCase();
-          return nav.indexOf('pt') === 0 ? 'pt' : 'en';
+      // Re-render the dynamic API eyebrow when language flips after load.
+      document.addEventListener('axon:langchanged', function (e) {
+        var eb = document.getElementById('apis-eyebrow');
+        if (eb && /\d/.test(eb.textContent)) {
+          var n = (eb.textContent.match(/\d+/) || ['27+'])[0];
+          eb.innerHTML = '<span class="dot"></span><span translate="no">' + n + '</span> ' +
+            (e.detail.lang === 'en' ? 'APIs available · new ones every week' : 'APIs disponíveis · novas toda semana');
         }
-
-        function applyLang(lang) {
-          // Update <html lang> so screen readers + future browser hints work
-          document.documentElement.lang = lang === 'en' ? 'en' : 'pt-BR';
-
-          // Walk every translatable node (innerText only — preserves <br>,
-          // <span class="gradient">, etc. that live inside the parent)
-          var nodes = document.querySelectorAll('[data-pt][data-en]');
-          for (var i = 0; i < nodes.length; i++) {
-            var n = nodes[i];
-            var v = n.dataset[lang];
-            if (typeof v === 'string') {
-              // If the node has child elements (like the H1's gradient
-              // span), bail and only update the matching text nodes.
-              if (n.children.length === 0) {
-                n.textContent = v;
-              } else {
-                // Replace only the FIRST text node so embedded children
-                // survive (works for the hero H1 layout).
-                var c = n.firstChild;
-                while (c && c.nodeType !== 3) c = c.nextSibling;
-                if (c) c.nodeValue = v;
-                else n.insertBefore(document.createTextNode(v), n.firstChild);
-              }
-            }
-          }
-
-          // Toggle button highlight
-          var spans = document.querySelectorAll('#lang-toggle [data-active]');
-          for (var j = 0; j < spans.length; j++) {
-            spans[j].classList.toggle('active', spans[j].dataset.active === lang);
-          }
-
-          // Re-render the dynamic API eyebrow if it was already populated
-          var eb = document.getElementById('apis-eyebrow');
-          if (eb && /\d/.test(eb.textContent)) {
-            var match = eb.textContent.match(/\d+/);
-            if (match) {
-              var n = match[0];
-              eb.innerHTML = '<span class="dot"></span><span translate="no">' + n + '</span> ' +
-                (lang === 'en' ? 'APIs available · new ones every week' : 'APIs disponíveis · novas toda semana');
-            }
-          }
-        }
-
-        var lang = getLang();
-        applyLang(lang);
-
-        var btn = document.getElementById('lang-toggle');
-        if (btn) {
-          btn.addEventListener('click', function () {
-            var next = (localStorage.getItem(STORAGE) === 'en') ? 'pt' : 'en';
-            localStorage.setItem(STORAGE, next);
-            applyLang(next);
-          });
-        }
-      })();
+      });
     </script>
   </body>
 </html>

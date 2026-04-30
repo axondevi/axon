@@ -125,12 +125,16 @@
       <div class="container">
         <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
         <nav>
-          <a href="/explore" aria-current="page">Explore</a>
-          <a href="/build">Build</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/upgrade">Plans</a>
-          <a href="/learn/">Learn</a>
-          <a href="/stats">Stats</a>
+          <a href="/explore" aria-current="page" data-pt="Explorar" data-en="Explore">Explorar</a>
+          <a href="/build" data-pt="Criar" data-en="Build">Criar</a>
+          <a href="/dashboard" data-pt="Painel" data-en="Dashboard">Painel</a>
+          <a href="/upgrade" data-pt="Planos" data-en="Plans">Planos</a>
+          <a href="/learn/" data-pt="Aprender" data-en="Learn">Aprender</a>
+          <a href="/stats" data-pt="Estatísticas" data-en="Stats">Estatísticas</a>
+          <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
+            <span data-active="pt">🇧🇷 PT</span>
+            <span data-active="en">🇺🇸 EN</span>
+          </button>
         </nav>
       </div>
     </header>
@@ -138,8 +142,8 @@
     <main class="container explore-wrap">
       <div class="explore-hero">
         <div>
-          <h1>Explore agents</h1>
-          <p>Public AI agents built on Axon. Each one runs on USDC — chat for free if the owner is paying, or connect your own wallet for tighter control.</p>
+          <h1 data-pt="Explorar agentes" data-en="Explore agents">Explorar agentes</h1>
+          <p data-pt="Agentes públicos de IA construídos no Axon. Cada um roda em USDC — converse grátis se o dono está pagando, ou conecte sua carteira pra mais controle." data-en="Public AI agents built on Axon. Each one runs on USDC — chat for free if the owner is paying, or connect your own wallet for tighter control.">Agentes públicos de IA construídos no Axon. Cada um roda em USDC — converse grátis se o dono está pagando, ou conecte sua carteira pra mais controle.</p>
         </div>
       </div>
 
@@ -276,5 +280,8 @@
 
       load();
     </script>
+
+    <link rel="stylesheet" href="/_i18n.css" />
+    <script src="/_i18n.js" defer></script>
   </body>
 </html>

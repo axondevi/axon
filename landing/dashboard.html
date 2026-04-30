@@ -1372,22 +1372,26 @@
           <header>
             <div class="brand"><span class="logo-dot"></span> axon</div>
             <nav style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-              <a href="/build" style="color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;border-radius:5px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);">+ Criar agente</a>
+              <a href="/build" style="color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;border-radius:5px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);" data-pt="+ Criar agente" data-en="+ New agent">+ Criar agente</a>
               <a href="/whatsapp" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">💬 WhatsApp</a>
-              <a href="/explore" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Explorar</a>
-              <a href="/upgrade" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Planos</a>
-              <a href="/learn/" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Tutoriais</a>
-              <a href="/stats" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">Estatísticas</a>
+              <a href="/explore" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="Explorar" data-en="Explore">Explorar</a>
+              <a href="/upgrade" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="Planos" data-en="Plans">Planos</a>
+              <a href="/learn/" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="Tutoriais" data-en="Tutorials">Tutoriais</a>
+              <a href="/stats" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="Estatísticas" data-en="Stats">Estatísticas</a>
               <a href="/status" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" title="Status do sistema">●</a>
+              <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:6px;">
+                <span data-active="pt">🇧🇷 PT</span>
+                <span data-active="en">🇺🇸 EN</span>
+              </button>
             </nav>
             <div style="display:flex; gap:8px; align-items:center;">
               <span class="tier-badge" id="tier-badge" title="Click to manage subscription" style="display:none">free</span>
               <span class="key-chip" id="keyview">ax_live_…</span>
-              <button class="key-chip" id="logout">sair</button>
+              <button class="key-chip" id="logout" data-pt="sair" data-en="sign out">sair</button>
             </div>
           </header>
           <div class="container">
-            <h1>Painel</h1>
+            <h1 data-pt="Painel" data-en="Dashboard">Painel</h1>
             <div id="next-action-hero"></div>
             <div id="deposit-hero-wrap"></div>
             <div class="grid" id="metrics">Carregando…</div>
@@ -3567,6 +3571,17 @@
       const key = localStorage.getItem(STORAGE_KEY);
       if (key) renderApp();
       else renderLogin();
+
+      // Re-translate the dashboard's heavy dynamic content (next-action
+      // hero, agent cards, transactions table) when language flips.
+      // The render functions don't need to know about i18n — they just
+      // emit data-pt/data-en attributes, and apply() walks them.
+      document.addEventListener('axon:langchanged', function () {
+        if (window.AxonI18n) window.AxonI18n.apply();
+      });
     </script>
+
+    <link rel="stylesheet" href="/_i18n.css" />
+    <script src="/_i18n.js" defer></script>
   </body>
 </html>

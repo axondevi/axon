@@ -1,0 +1,31 @@
+/* Axon i18n — toggle button styles, drop on any page that uses _i18n.js */
+.lang-toggle {
+  background: var(--bg-card, #16161a);
+  border: 1px solid var(--border, #25252b);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim, #9a9aa4);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.lang-toggle:hover {
+  border-color: var(--accent, #7c5cff);
+  color: var(--text, #eeeef0);
+}
+.lang-toggle [data-active] {
+  opacity: 0.45;
+  transition: opacity 0.15s, color 0.15s;
+}
+.lang-toggle [data-active].active {
+  opacity: 1;
+  color: var(--accent-2, #19d5c6);
+}
+@media (max-width: 720px) {
+  .lang-toggle { padding: 5px 8px; font-size: 11px; gap: 4px; }
+}

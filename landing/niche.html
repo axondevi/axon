@@ -70,11 +70,15 @@
   <div class="container nav-inner">
     <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
     <nav class="nav-links">
-      <a href="/clinica">Clínica</a>
-      <a href="/restaurante">Restaurante</a>
-      <a href="/loja">Loja</a>
-      <a href="/build">Criar agente</a>
-      <a href="/upgrade">Planos</a>
+      <a href="/clinica" data-pt="Clínica" data-en="Clinic">Clínica</a>
+      <a href="/restaurante" data-pt="Restaurante" data-en="Restaurant">Restaurante</a>
+      <a href="/loja" data-pt="Loja" data-en="Shop">Loja</a>
+      <a href="/build" data-pt="Criar agente" data-en="Build agent">Criar agente</a>
+      <a href="/upgrade" data-pt="Planos" data-en="Plans">Planos</a>
+      <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
+        <span data-active="pt">🇧🇷 PT</span>
+        <span data-active="en">🇺🇸 EN</span>
+      </button>
     </nav>
   </div>
 </header>
@@ -85,7 +89,7 @@
 
 <footer class="footer-mini">
   <div class="container" style="padding: 24px 0; text-align: center; color: var(--text-muted); font-size: 13px;">
-    <span id="footer-tag">Axon</span> · <a href="/" style="color: var(--text-dim);">Início</a> · <a href="/build" style="color: var(--text-dim);">Criar agente</a>
+    <span id="footer-tag">Axon</span> · <a href="/" style="color: var(--text-dim);" data-pt="Início" data-en="Home">Início</a> · <a href="/build" style="color: var(--text-dim);" data-pt="Criar agente" data-en="Build agent">Criar agente</a>
   </div>
 </footer>
 
@@ -347,6 +351,12 @@ document.getElementById('root').innerHTML = `
 
 document.getElementById('footer-tag').textContent = cfg.footer + ' · Axon';
 </script>
+
+<link rel="stylesheet" href="/_i18n.css" />
+<script src="/_i18n.js" defer></script>
+<!-- TODO: niche body content (features, steps, FAQ) is BR-targeted and stays in
+     PT-BR for now. Nav + footer translate via _i18n.js. Full EN copy can be
+     added by extending NICHES[id] with { pt: {...}, en: {...} } subkeys. -->
 
 </body>
 </html>
