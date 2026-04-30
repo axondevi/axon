@@ -1142,47 +1142,189 @@
       }
 
       // ─── WhatsApp connect/disconnect modal ────────────────────────────────
+      // State holder: pollHandle is the setInterval id used to detect when
+      // the customer finishes scanning the QR — needs to be cleared on close.
+      window.__waModalState = window.__waModalState || { pollHandle: null };
+
       window.openWhatsappModal = async function(agentId, agentName) {
         // Show loading immediately
         const overlay = document.createElement('div');
         overlay.id = 'wa-modal';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
         overlay.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:540px;width:100%;text-align:center;color:var(--text-dim);">Carregando…</div>`;
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        const closeOverlay = () => {
+          if (window.__waModalState.pollHandle) {
+            clearInterval(window.__waModalState.pollHandle);
+            window.__waModalState.pollHandle = null;
+          }
+          overlay.remove();
+        };
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
         document.body.appendChild(overlay);
 
         const conn = await api(`/v1/agents/${agentId}/whatsapp`).catch(() => ({ connected: false }));
 
-        const inner = conn.connected
-          ? renderWaConnectedView(agentId, agentName, conn)
-          : renderWaConnectForm(agentId, agentName);
-
-        overlay.innerHTML = '';
         const card = document.createElement('div');
         card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;';
-        card.innerHTML = inner;
+        overlay.innerHTML = '';
         overlay.appendChild(card);
 
-        // Wire actions
-        const closeBtn = card.querySelector('[data-act="close"]');
-        if (closeBtn) closeBtn.onclick = () => overlay.remove();
+        if (conn.connected) {
+          // Already connected → show status + disconnect button
+          card.innerHTML = renderWaConnectedView(agentId, agentName, conn);
+          card.querySelector('[data-act="close"]').onclick = closeOverlay;
+          const disconnectBtn = card.querySelector('[data-act="disconnect"]');
+          if (disconnectBtn) disconnectBtn.onclick = async () => {
+            if (!confirm(`Desconectar WhatsApp do agente "${agentName}"?\n\nAs mensagens param de chegar e o número fica livre pra reusar em outro agente.`)) return;
+            disconnectBtn.disabled = true;
+            disconnectBtn.textContent = 'Desconectando…';
+            try {
+              await api(`/v1/agents/${agentId}/whatsapp`, { method: 'DELETE' });
+              window.AxonUI && AxonUI.toast('WhatsApp desconectado', { type: 'success' });
+              closeOverlay();
+              location.reload();
+            } catch (e) {
+              window.AxonUI && AxonUI.toast('Falha ao desconectar: ' + e.message, { type: 'error' });
+              disconnectBtn.disabled = false;
+              disconnectBtn.textContent = 'Desconectar';
+            }
+          };
+          return;
+        }
 
-        const disconnectBtn = card.querySelector('[data-act="disconnect"]');
-        if (disconnectBtn) disconnectBtn.onclick = async () => {
-          if (!confirm(`Desconectar WhatsApp do agente "${agentName}"? O Axon vai parar de receber mensagens, mas a instância Evolution continua rodando.`)) return;
-          disconnectBtn.disabled = true;
-          disconnectBtn.textContent = 'Desconectando…';
+        // Not connected → show the simple QR Code flow
+        await launchQrFlow(card, agentId, agentName, closeOverlay);
+      };
+
+      /**
+       * QR Code flow — the simple path most customers see.
+       *
+       * 1. Calls POST /v1/agents/:id/whatsapp/auto → server provisions a fresh
+       *    Evolution instance and returns a QR PNG (base64).
+       * 2. Renders the QR with step-by-step instructions in plain Portuguese.
+       * 3. Polls GET /v1/agents/:id/whatsapp every 3s — when status === "open",
+       *    swaps the UI to "Conectado!" and reloads the dashboard.
+       * 4. If the server replies 503 (auto-provision off), falls back to the
+       *    advanced manual form.
+       */
+      async function launchQrFlow(card, agentId, agentName, closeOverlay) {
+        card.innerHTML = renderWaQrLoading(agentName);
+
+        let resp;
+        try {
+          resp = await api(`/v1/agents/${agentId}/whatsapp/auto`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+          });
+        } catch (e) {
+          // Backend returns 503 with message "Axon Evolution server not
+          // configured..." when AXON_EVOLUTION_URL/KEY env vars are unset.
+          // In that case the customer must use BYO Evolution → show the
+          // advanced form. Any other error = real problem; show retry.
+          const msg = String(e.message || '');
+          if (/evolution server not configured|auto_provision_unavailable/i.test(msg)) {
+            renderAdvancedForm(card, agentId, agentName, closeOverlay);
+            return;
+          }
+          card.innerHTML = renderWaError(agentName, msg);
+          card.querySelector('[data-act="close"]').onclick = closeOverlay;
+          card.querySelector('[data-act="retry"]').onclick = () => launchQrFlow(card, agentId, agentName, closeOverlay);
+          card.querySelector('[data-act="advanced"]').onclick = () => renderAdvancedForm(card, agentId, agentName, closeOverlay);
+          return;
+        }
+
+        const qr = resp?.connection?.qr_base64 || '';
+        const pairing = resp?.connection?.pairing_code || '';
+        if (!qr && !pairing) {
+          card.innerHTML = renderWaError(agentName, 'O servidor não retornou um QR Code. Tente de novo.');
+          card.querySelector('[data-act="close"]').onclick = closeOverlay;
+          card.querySelector('[data-act="retry"]').onclick = () => launchQrFlow(card, agentId, agentName, closeOverlay);
+          card.querySelector('[data-act="advanced"]').onclick = () => renderAdvancedForm(card, agentId, agentName, closeOverlay);
+          return;
+        }
+
+        card.innerHTML = renderWaQrView(agentName, qr, pairing);
+        card.querySelector('[data-act="close"]').onclick = closeOverlay;
+        const advBtn = card.querySelector('[data-act="show-advanced"]');
+        if (advBtn) advBtn.onclick = () => {
+          if (window.__waModalState.pollHandle) {
+            clearInterval(window.__waModalState.pollHandle);
+            window.__waModalState.pollHandle = null;
+          }
+          renderAdvancedForm(card, agentId, agentName, closeOverlay);
+        };
+        const refreshBtn = card.querySelector('[data-act="refresh-qr"]');
+        if (refreshBtn) refreshBtn.onclick = async () => {
+          refreshBtn.disabled = true;
+          refreshBtn.textContent = 'Atualizando…';
           try {
-            await api(`/v1/agents/${agentId}/whatsapp`, { method: 'DELETE' });
-            window.AxonUI && AxonUI.toast('WhatsApp desconectado', { type: 'success' });
-            overlay.remove();
-            location.reload();
+            const r = await api(`/v1/agents/${agentId}/whatsapp/qr`);
+            if (r.paired) {
+              onWaConnected(card, closeOverlay);
+              return;
+            }
+            const newQr = r.qr_base64;
+            const newPairing = r.pairing_code;
+            const img = card.querySelector('#wa-qr-img');
+            if (img && newQr) img.src = `data:image/png;base64,${newQr}`;
+            const code = card.querySelector('#wa-pairing-code');
+            if (code && newPairing) code.textContent = newPairing;
           } catch (e) {
-            window.AxonUI && AxonUI.toast('Falha ao desconectar: ' + e.message, { type: 'error' });
-            disconnectBtn.disabled = false;
-            disconnectBtn.textContent = 'Desconectar';
+            window.AxonUI && AxonUI.toast('Falha ao atualizar QR: ' + e.message, { type: 'error' });
+          } finally {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = '🔄 Atualizar QR';
           }
         };
+
+        // Begin polling for connection. status === "open" means the customer
+        // scanned the QR with their phone and WhatsApp finished pairing.
+        startConnectionPolling(agentId, () => onWaConnected(card, closeOverlay));
+      }
+
+      function startConnectionPolling(agentId, onConnected) {
+        if (window.__waModalState.pollHandle) clearInterval(window.__waModalState.pollHandle);
+        let attempts = 0;
+        const maxAttempts = 100; // ~5 min at 3s — QR codes expire around there anyway
+        window.__waModalState.pollHandle = setInterval(async () => {
+          attempts++;
+          if (attempts > maxAttempts) {
+            clearInterval(window.__waModalState.pollHandle);
+            window.__waModalState.pollHandle = null;
+            return;
+          }
+          try {
+            const r = await api(`/v1/agents/${agentId}/whatsapp`);
+            const status = (r.status || '').toLowerCase();
+            if (r.connected && (status === 'open' || status === 'connected')) {
+              clearInterval(window.__waModalState.pollHandle);
+              window.__waModalState.pollHandle = null;
+              onConnected();
+            }
+          } catch { /* keep polling on transient errors */ }
+        }, 3000);
+      }
+
+      function onWaConnected(card, closeOverlay) {
+        card.innerHTML = `
+          <div style="text-align:center;padding:24px 8px;">
+            <div style="font-size:48px;margin-bottom:12px;">✅</div>
+            <h2 style="margin:0 0 8px;font-size:20px;color:#22c55e;">WhatsApp conectado!</h2>
+            <p style="font-size:13px;color:var(--text-dim);margin:0 0 20px;">Seu agente já está atendendo. Pode fechar essa janela.</p>
+            <button data-act="close" style="background:var(--accent);color:white;border:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Fechar</button>
+          </div>`;
+        card.querySelector('[data-act="close"]').onclick = () => {
+          closeOverlay();
+          location.reload();
+        };
+        window.AxonUI && AxonUI.toast('WhatsApp conectado!', { type: 'success' });
+      }
+
+      function renderAdvancedForm(card, agentId, agentName, closeOverlay) {
+        card.innerHTML = renderWaConnectForm(agentId, agentName);
+        card.querySelector('[data-act="close"]').onclick = closeOverlay;
+        const backBtn = card.querySelector('[data-act="back-to-qr"]');
+        if (backBtn) backBtn.onclick = () => launchQrFlow(card, agentId, agentName, closeOverlay);
 
         const connectBtn = card.querySelector('[data-act="connect"]');
         if (connectBtn) connectBtn.onclick = async () => {
@@ -1201,7 +1343,7 @@
               body: JSON.stringify({ instance_url: url, instance_name: name, api_key: key }),
             });
             window.AxonUI && AxonUI.toast(`WhatsApp conectado! Status: ${r.connection?.status || 'ok'}`, { type: 'success' });
-            overlay.remove();
+            closeOverlay();
             location.reload();
           } catch (e) {
             window.AxonUI && AxonUI.toast('Falha: ' + e.message, { type: 'error', durationMs: 8000 });
@@ -1209,7 +1351,7 @@
             connectBtn.textContent = 'Conectar';
           }
         };
-      };
+      }
 
       function renderWaConnectedView(agentId, agentName, conn) {
         return `
@@ -1248,19 +1390,103 @@
         `;
       }
 
+      // ─── QR Code flow templates ─────────────────────────────────
+      function renderWaQrLoading(agentName) {
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0;font-size:18px;">📱 Conectando WhatsApp</h2>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(agentName)}</div>
+            </div>
+            <button data-act="close" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>
+          </div>
+          <div style="text-align:center;padding:48px 16px;">
+            <div style="display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+            <p style="font-size:13px;color:var(--text-dim);margin-top:16px;">Gerando seu QR Code…</p>
+          </div>
+          <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+        `;
+      }
+
+      function renderWaQrView(agentName, qrBase64, pairingCode) {
+        const pairingBlock = pairingCode ? `
+          <div style="margin-top:18px;padding:14px;background:rgba(124,92,255,0.06);border:1px dashed rgba(124,92,255,0.25);border-radius:8px;text-align:center;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Sem câmera? Pareie com código</div>
+            <div id="wa-pairing-code" style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--accent-2);letter-spacing:2px;">${escapeHtml(pairingCode)}</div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">No celular: <em>WhatsApp → Configurações → Aparelhos conectados → Conectar com número</em></div>
+          </div>` : '';
+
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0;font-size:18px;">📱 Conectar ao WhatsApp</h2>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(agentName)}</div>
+            </div>
+            <button data-act="close" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>
+          </div>
+
+          <div style="background:#fff;border-radius:12px;padding:16px;text-align:center;margin-bottom:16px;">
+            <img id="wa-qr-img" src="data:image/png;base64,${qrBase64}" alt="QR Code WhatsApp" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto;" />
+          </div>
+
+          <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.18);border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.7;color:var(--text);">
+            <strong style="color:#22c55e;display:block;margin-bottom:8px;">Como conectar (3 passos):</strong>
+            <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:6px;"><span style="background:#22c55e;color:#000;font-weight:700;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px;">1</span><span>Abra o <strong>WhatsApp</strong> no celular do número que vai atender</span></div>
+            <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:6px;"><span style="background:#22c55e;color:#000;font-weight:700;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px;">2</span><span>Toque em <strong>Configurações → Aparelhos conectados → Conectar um aparelho</strong></span></div>
+            <div style="display:flex;gap:10px;align-items:flex-start;"><span style="background:#22c55e;color:#000;font-weight:700;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px;">3</span><span>Aponte a câmera do celular pro QR Code aí em cima</span></div>
+          </div>
+
+          ${pairingBlock}
+
+          <div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding:10px 12px;background:rgba(255,214,10,0.06);border:1px solid rgba(255,214,10,0.15);border-radius:6px;font-size:12px;color:var(--text-dim);">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fbbf24;animation:pulse 1.5s ease-in-out infinite;"></span>
+            <span>Aguardando você escanear… vou avisar assim que conectar.</span>
+          </div>
+          <style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}</style>
+
+          <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap;">
+            <button data-act="refresh-qr" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 14px;border-radius:6px;font-size:12px;cursor:pointer;">🔄 Atualizar QR</button>
+            <div style="font-size:11px;color:var(--text-muted);">
+              Já tem servidor Evolution?
+              <button data-act="show-advanced" style="background:none;border:none;color:var(--accent-2);font-size:11px;cursor:pointer;text-decoration:underline;padding:0;">Modo avançado</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderWaError(agentName, errorMessage) {
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0;font-size:18px;">⚠️ Não consegui gerar o QR</h2>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(agentName)}</div>
+            </div>
+            <button data-act="close" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>
+          </div>
+          <div style="background:rgba(255,95,87,0.06);border:1px solid rgba(255,95,87,0.2);border-radius:8px;padding:14px;font-size:12px;color:var(--text-dim);margin-bottom:16px;word-break:break-word;">
+            ${escapeHtml(errorMessage || 'Erro desconhecido')}
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+            <button data-act="advanced" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:9px 14px;border-radius:6px;font-size:13px;cursor:pointer;">Modo avançado</button>
+            <button data-act="retry" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Tentar de novo</button>
+          </div>
+        `;
+      }
+
+      // ─── Advanced manual form (BYO Evolution) ───────────────────
       function renderWaConnectForm(agentId, agentName) {
         return `
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <div>
-              <h2 style="margin:0;font-size:18px;">💬 Conectar WhatsApp</h2>
+              <h2 style="margin:0;font-size:18px;">🔧 Modo avançado — Evolution própria</h2>
               <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(agentName)}</div>
             </div>
             <button data-act="close" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;line-height:1;">×</button>
           </div>
 
           <p style="font-size:13px;color:var(--text-dim);margin:0 0 16px;">
-            Cole as 3 credenciais da sua instância <a href="https://github.com/EvolutionAPI/evolution-api" target="_blank" style="color:var(--accent-2);">Evolution API</a>.
-            <a href="/whatsapp" style="color:var(--accent-2);">Não tem Evolution rodando? Veja como obter →</a>
+            Use essa opção apenas se você roda sua própria <a href="https://github.com/EvolutionAPI/evolution-api" target="_blank" style="color:var(--accent-2);">Evolution API</a>.
+            Pra maioria dos casos o <button data-act="back-to-qr" style="background:none;border:none;color:var(--accent-2);text-decoration:underline;cursor:pointer;padding:0;font-size:13px;">QR Code automático</button> resolve.
           </p>
 
           <div style="display:flex;flex-direction:column;gap:12px;">
@@ -1279,7 +1505,7 @@
           </div>
 
           <div style="margin-top:16px;padding:10px 12px;background:rgba(255,214,10,0.06);border:1px solid rgba(255,214,10,0.15);border-radius:6px;font-size:12px;color:var(--text-dim);">
-            ⚠️ A instância Evolution já precisa estar conectada a um número WhatsApp (escaneando QR ou pareando) <strong>antes</strong> de você conectar aqui.
+            ⚠️ A instância Evolution já precisa estar conectada a um número WhatsApp <strong>antes</strong> de você conectar aqui.
           </div>
 
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
