@@ -423,7 +423,23 @@
             <textarea id="b-prompt" placeholder="Você é uma assistente prestativa. Use ferramentas quando relevante…"></textarea>
             <div class="hint">
               Suporta Markdown. O bloco "## Language" e a lista de ferramentas são anexados automaticamente.
-              · <a href="#personas" onclick="document.querySelector('.tab-bar button[data-tab=&quot;personas&quot;]')?.click(); return false;" style="color: var(--accent-2);">🎭 Aplicar uma persona pronta</a>
+              · <a href="#personas" onclick="document.querySelector('.tab-bar button[data-tab=&quot;personas&quot;]')?.click(); return false;" style="color: var(--accent-2);">Aplicar uma persona pronta</a>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="b-business">Informações importantes do seu negócio <span class="info-tip" data-tip="Endereço, horário, telefone, valores, especialidades, convênios — tudo que o agente precisa saber pra responder o cliente. Quanto mais específico, menos invenção.">?</span></label>
+            <textarea id="b-business" rows="8" placeholder="Cole aqui as informações importantes pro agente saber. Exemplo:
+
+Endereço: Rua das Flores, 123, Vila Madalena, São Paulo
+Horário: seg-sex 8h-18h, sáb 9h-13h. Domingo fechado.
+Telefone: (11) 3000-1234
+Especialidades: clínico geral, cardiologia, pediatria, dermatologia
+Valor consulta particular: R$ 250
+Convênios: Bradesco Saúde, Amil, Sulamérica, Notre Dame
+Estacionamento: gratuito por 1h"></textarea>
+            <div class="hint">
+              O agente trata estas informações como verdade ao responder. Sem isso, ele responde "deixa eu confirmar com a equipe" pra perguntas específicas.
             </div>
           </div>
 
@@ -738,6 +754,7 @@
       let formState = {
         name: '', slug: '', description: '',
         system_prompt: '', system_prompt_b: '', ab_split: 0,
+        business_info: '',
         allowed_tools: [],
         primary_color: '#7c5cff', welcome_message: '',
         quick_prompts: [], public: true,
@@ -987,6 +1004,7 @@
             slug: a.slug,
             description: a.description || '',
             system_prompt: a.system_prompt,
+            business_info: a.business_info || '',
             system_prompt_b: a.system_prompt_b || '',
             ab_split: a.ab_split || 0,
             allowed_tools: a.allowed_tools || [],
@@ -1630,6 +1648,7 @@
         document.getElementById('b-slug').disabled = !!id;
         document.getElementById('b-desc').value = formState.description || '';
         document.getElementById('b-prompt').value = formState.system_prompt;
+        document.getElementById('b-business').value = formState.business_info || '';
         document.getElementById('b-color').value = formState.primary_color;
         document.getElementById('b-public').value = String(formState.public);
         document.getElementById('b-welcome').value = formState.welcome_message || '';
@@ -1782,13 +1801,14 @@
       }
 
       // Sync form inputs into formState
-      ['b-name','b-slug','b-desc','b-prompt','b-color','b-public','b-welcome','b-soft','b-hard','b-paymode','b-daily','b-tier','b-lang','b-vanity','b-prompt-b','b-ab'].forEach((id) => {
+      ['b-name','b-slug','b-desc','b-prompt','b-business','b-color','b-public','b-welcome','b-soft','b-hard','b-paymode','b-daily','b-tier','b-lang','b-vanity','b-prompt-b','b-ab'].forEach((id) => {
         document.getElementById(id).addEventListener('input', () => {
           formState.name = document.getElementById('b-name').value;
           formState.slug = document.getElementById('b-slug').value.toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40);
           document.getElementById('b-slug').value = formState.slug;
           formState.description = document.getElementById('b-desc').value;
           formState.system_prompt = document.getElementById('b-prompt').value;
+          formState.business_info = document.getElementById('b-business').value;
           formState.primary_color = document.getElementById('b-color').value;
           formState.public = document.getElementById('b-public').value === 'true';
           formState.welcome_message = document.getElementById('b-welcome').value;
@@ -1839,6 +1859,7 @@
             name: formState.name,
             description: formState.description,
             system_prompt: formState.system_prompt,
+            business_info: formState.business_info || '',
             allowed_tools: formState.allowed_tools,
             primary_color: formState.primary_color,
             welcome_message: formState.welcome_message,

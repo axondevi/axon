@@ -247,6 +247,7 @@ app.get('/:id', async (c) => {
     affiliate_payout_usdc: (Number(a.affiliatePayoutMicro) / 1_000_000).toFixed(6),
     paused_at: a.pausedAt,
     paused: !!a.pausedAt,
+    business_info: a.businessInfo || '',
     created_at: a.createdAt,
     updated_at: a.updatedAt,
   });
@@ -436,6 +437,12 @@ app.patch('/:id', async (c) => {
   // agent on every channel until unpaused). false clears it.
   if (body.paused !== undefined) {
     update.pausedAt = body.paused ? new Date() : null;
+  }
+  // Business info — free-text reference data the owner wants the agent
+  // to know (address, hours, prices, etc). Empty string clears it.
+  if (body.business_info !== undefined) {
+    const v = String(body.business_info || '').slice(0, 4000);
+    update.businessInfo = v.trim() ? v : null;
   }
   if (body.affiliate_payout_usdc !== undefined) {
     // USDC value comes as a string (e.g. "0.20"). Convert to micro-USDC,

@@ -753,9 +753,17 @@ async function processBufferedTurn(opts: {
     // null here — getOrCreateMemory keeps any earlier attribution intact.
     memory = await getOrCreateMemory(a.id, inbound.phone, inbound.pushName, null).catch(() => null);
     const memoryContext = memory ? buildMemoryContext(memory) : '';
-    augmentedSystemPrompt = memoryContext
-      ? `${a.systemPrompt}\n\n## O que você sabe sobre este contato\n${memoryContext}`
-      : a.systemPrompt;
+
+    // Owner-curated business info (address, hours, prices, etc) is
+    // injected RIGHT AFTER the role prompt so the LLM treats it as
+    // ground truth when answering "qual o endereço?", "quanto custa?",
+    // etc — instead of saying "não tenho essa informação".
+    const businessBlock = (a.businessInfo && a.businessInfo.trim())
+      ? `\n\n## Informações do negócio (use estas como verdade ao responder o cliente)\n${a.businessInfo.trim()}`
+      : '';
+
+    augmentedSystemPrompt = `${a.systemPrompt}${businessBlock}` +
+      (memoryContext ? `\n\n## O que você sabe sobre este contato\n${memoryContext}` : '');
 
     // Affiliate payout (fire-and-forget). Idempotent — if already paid
     // or no referrer, this is a single SELECT and returns immediately.
@@ -812,12 +820,14 @@ async function processBufferedTurn(opts: {
         }
         runtimeAgent = routed;
         // Re-augment system prompt using the routed agent's prompt — but
-        // KEEP the contact memory context block since memory is keyed on
-        // the original (router) agent's id, not the routed one.
+        // KEEP the contact memory context block + the routed agent's own
+        // businessInfo (address, hours, prices, etc).
         const memoryContext = buildMemoryContext(memory);
-        augmentedSystemPrompt = memoryContext
-          ? `${routed.systemPrompt}\n\n## O que você sabe sobre este contato\n${memoryContext}`
-          : routed.systemPrompt;
+        const routedBusiness = ((routed as any).businessInfo && (routed as any).businessInfo.trim())
+          ? `\n\n## Informações do negócio (use estas como verdade ao responder o cliente)\n${(routed as any).businessInfo.trim()}`
+          : '';
+        augmentedSystemPrompt = `${routed.systemPrompt}${routedBusiness}` +
+          (memoryContext ? `\n\n## O que você sabe sobre este contato\n${memoryContext}` : '');
       }
     }
   }

@@ -237,6 +237,12 @@ export const agents = pgTable(
     // overnight quiet hours, manual debugging, or while testing changes
     // without losing the connection.
     pausedAt: timestamp('paused_at'),
+    // Free-text "important business info" the owner fills in: address,
+    // hours, phone, prices, accepted insurances, specialties, anything
+    // the agent should reference when answering customers. Injected into
+    // the system_prompt at runtime so changes take effect immediately
+    // without re-deploying the prompt.
+    businessInfo: text('business_info'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
