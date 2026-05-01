@@ -14,7 +14,7 @@
       "method": "GET",
       "path": "/nft/v3/:apiKey/getNFTsForOwner",
       "price_usd": 0.0002,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 60,
       "notes": "Path template resolves apiKey from upstream key."
     },
@@ -22,7 +22,7 @@
       "method": "POST",
       "path": "/prices/v1/:apiKey/tokens/by-symbol",
       "price_usd": 0.0005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 300,
       "cache_on_body": true
     }

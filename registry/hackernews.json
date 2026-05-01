@@ -5,13 +5,15 @@
   "description": "Hacker News full-text search, item lookup, and user profiles via Algolia. No API key. Covers the entire HN history with millisecond response times.",
   "homepage": "https://hn.algolia.com/api",
   "base_url": "https://hn.algolia.com",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "search": {
       "method": "GET",
       "path": "/api/v1/search",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 300,
       "notes": "Relevance-ranked search. Required: ?query=YOUR_QUERY. Optional: tags=story,comment,poll,ask_hn,show_hn,front_page; numericFilters=points>100,created_at_i>1700000000; hitsPerPage=20."
     },
@@ -19,7 +21,7 @@
       "method": "GET",
       "path": "/api/v1/search_by_date",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 60,
       "notes": "Newest-first search — feed-style for monitoring. Same params as /search."
     },
@@ -27,7 +29,7 @@
       "method": "GET",
       "path": "/api/v1/items/:id",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 600,
       "notes": "Single item with the full nested comment tree. :id is HN story/comment id."
     },
@@ -35,7 +37,7 @@
       "method": "GET",
       "path": "/api/v1/users/:username",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "User profile — karma, about, created_at, average story score."
     }

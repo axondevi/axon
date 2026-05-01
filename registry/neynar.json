@@ -14,14 +14,14 @@
       "method": "GET",
       "path": "/v2/farcaster/user/bulk",
       "price_usd": 0.0005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600
     },
     "casts-by-fid": {
       "method": "GET",
       "path": "/v2/farcaster/feed/user/casts",
       "price_usd": 0.001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 300
     }
   }

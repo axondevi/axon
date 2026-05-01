@@ -15,7 +15,7 @@
       "method": "POST",
       "path": "/v2/translate",
       "price_usd": 0.004,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 604800,
       "cache_on_body": true,
       "notes": "7-day cache on (text, source_lang, target_lang) — deterministic output."

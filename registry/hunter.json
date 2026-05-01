@@ -14,7 +14,7 @@
       "method": "GET",
       "path": "/v2/domain-search",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 604800,
       "notes": "7-day cache on (domain). Changes infrequently."
     },
@@ -22,14 +22,14 @@
       "method": "GET",
       "path": "/v2/email-finder",
       "price_usd": 0.01,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 604800
     },
     "verify": {
       "method": "GET",
       "path": "/v2/email-verifier",
       "price_usd": 0.002,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 86400
     }
   }

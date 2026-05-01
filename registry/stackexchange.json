@@ -5,13 +5,15 @@
   "description": "Stack Exchange API v2.3 — search Stack Overflow + sister sites. 300 req/day per IP without key, 10000/day with free app key.",
   "homepage": "https://api.stackexchange.com/docs",
   "base_url": "https://api.stackexchange.com/2.3",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "search-stackoverflow": {
       "method": "GET",
       "path": "/search/advanced",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 1800,
       "notes": "Advanced search Stack Overflow. Pass site=stackoverflow&q=<query>&order=desc&sort=votes&pagesize=10. Returns questions with score, view count, accepted answer flag."
     }

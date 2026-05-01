@@ -14,7 +14,7 @@
       "method": "POST",
       "path": "/v2/transcript",
       "price_usd": 0.1,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Submit audio URL for async transcription. Returns transcript ID — poll /v2/transcript/{id}. Supports `audio_url` or pre-uploaded file. Add `speaker_labels:true` for diarization, `summarization:true` for summary, `sentiment_analysis:true` for sentiment."
     },
@@ -22,7 +22,7 @@
       "method": "GET",
       "path": "/v2/transcript/:id",
       "price_usd": 0,
-      "markup_pct": 15,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Poll transcript status (queued/processing/completed/error). Free — only the submission charges."
     },
@@ -30,7 +30,7 @@
       "method": "POST",
       "path": "/lemur/v3/generate/summary",
       "price_usd": 0.05,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 86400,
       "notes": "Run LeMUR LLM to generate a summary across one or more transcripts."
     },
@@ -38,7 +38,7 @@
       "method": "POST",
       "path": "/lemur/v3/generate/question-answer",
       "price_usd": 0.05,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 86400,
       "notes": "Ask structured questions over transcripts; returns JSON answers."
     },
@@ -46,7 +46,7 @@
       "method": "POST",
       "path": "/v2/upload",
       "price_usd": 0,
-      "markup_pct": 15,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Upload audio file directly (returns upload_url to feed into /v2/transcript). Free — only transcription charges."
     }

@@ -13,7 +13,7 @@
       "method": "POST",
       "path": "/v1/image_to_video",
       "price_usd": 0.5,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Expensive. Async — client polls the task ID."
     },
@@ -21,7 +21,7 @@
       "method": "GET",
       "path": "/v1/tasks/:id",
       "price_usd": 0,
-      "markup_pct": 15,
+      "markup_pct": 50,
       "cache_ttl": 0
     }
   }

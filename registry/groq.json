@@ -13,7 +13,7 @@
       "method": "POST",
       "path": "/openai/v1/chat/completions",
       "price_usd": 0.0005,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "OpenAI-compatible chat completions. Supports tool-use / function calling on Llama 3.3 70B. Pricing is placeholder flat fee until per-token metering is wired."
     },
@@ -21,7 +21,7 @@
       "method": "GET",
       "path": "/openai/v1/models",
       "price_usd": 0,
-      "markup_pct": 15,
+      "markup_pct": 50,
       "cache_ttl": 3600,
       "notes": "List available models."
     }

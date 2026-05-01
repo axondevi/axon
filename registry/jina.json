@@ -13,7 +13,7 @@
       "method": "POST",
       "path": "/v1/embeddings",
       "price_usd": 0.0012,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 2592000,
       "cache_on_body": true,
       "fallbacks": [
@@ -27,7 +27,7 @@
       "method": "POST",
       "path": "/v1/rerank",
       "price_usd": 0.0025,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 86400,
       "cache_on_body": true,
       "fallbacks": [
@@ -41,7 +41,7 @@
       "method": "POST",
       "path": "/",
       "price_usd": 0.003,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "cache_on_body": true
     }

@@ -5,13 +5,15 @@
   "description": "Brazilian Institute of Geography and Statistics public APIs — population, municipalities, states, districts. Free and no key required.",
   "homepage": "https://servicodados.ibge.gov.br/api/docs",
   "base_url": "https://servicodados.ibge.gov.br/api",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "city": {
       "method": "GET",
       "path": "/v1/localidades/municipios/:id",
       "price_usd": 0.0003,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 2592000,
       "notes": "Municipality info by IBGE id (e.g. 3550308 = São Paulo capital). Returns name, microregion, mesoregion, state."
     },
@@ -19,7 +21,7 @@
       "method": "GET",
       "path": "/v1/localidades/municipios",
       "price_usd": 0.0003,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 2592000,
       "notes": "Full list of all 5,570 BR municipalities. Heavy (~600KB) — caller should grep client-side or use the by-id endpoint when possible."
     },
@@ -27,7 +29,7 @@
       "method": "GET",
       "path": "/v1/localidades/estados",
       "price_usd": 0.0001,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 2592000,
       "notes": "All 27 BR states/DF. Includes id, sigla, nome, region."
     }

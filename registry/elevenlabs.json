@@ -14,7 +14,7 @@
       "method": "POST",
       "path": "/v1/text-to-speech/:voice_id",
       "price_usd": 0.03,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 86400,
       "cache_on_body": true,
       "notes": "Identical (voice_id, text, settings) → same audio. 24h cache on body."
@@ -23,7 +23,7 @@
       "method": "GET",
       "path": "/v1/voices",
       "price_usd": 0.001,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 3600
     }
   }

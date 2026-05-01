@@ -5,13 +5,16 @@
   "description": "Crypto market data — prices, market caps, OHLC, historical, exchanges, NFT floors, derivatives. Free Demo tier: 30 req/min, 10k credits/month, 50+ endpoints.",
   "homepage": "https://www.coingecko.com/en/api",
   "base_url": "https://api.coingecko.com",
-  "auth": { "type": "header", "name": "x-cg-demo-api-key" },
+  "auth": {
+    "type": "header",
+    "name": "x-cg-demo-api-key"
+  },
   "endpoints": {
     "simple-price": {
       "method": "GET",
       "path": "/api/v3/simple/price",
       "price_usd": 0.0002,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 60,
       "notes": "Cheap fast price lookup. Required: ?ids=bitcoin,ethereum&vs_currencies=usd,brl. Optional: include_market_cap, include_24hr_vol, include_24hr_change."
     },
@@ -19,7 +22,7 @@
       "method": "GET",
       "path": "/api/v3/coins/list",
       "price_usd": 0.0002,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 86400,
       "notes": "All ~17k coins with id/symbol/name. Use to map symbols → ids before /simple/price."
     },
@@ -27,7 +30,7 @@
       "method": "GET",
       "path": "/api/v3/coins/markets",
       "price_usd": 0.0003,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 60,
       "notes": "Market data ranked by mcap. Required: ?vs_currency=usd. Optional: ids, category, order, per_page (max 250), price_change_percentage."
     },
@@ -35,7 +38,7 @@
       "method": "GET",
       "path": "/api/v3/coins/:id",
       "price_usd": 0.0003,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 300,
       "notes": "Full coin profile: description, links, community/dev stats, market data. :id is the CoinGecko id (bitcoin, ethereum, solana)."
     },
@@ -43,7 +46,7 @@
       "method": "GET",
       "path": "/api/v3/coins/:id/history",
       "price_usd": 0.0003,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 86400,
       "notes": "Historical snapshot at a specific date. Required: ?date=DD-MM-YYYY (note European format)."
     },
@@ -51,7 +54,7 @@
       "method": "GET",
       "path": "/api/v3/coins/:id/ohlc",
       "price_usd": 0.0003,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 600,
       "notes": "OHLC candles for charts. Required: ?vs_currency=usd&days=1|7|14|30|90|180|365|max."
     },
@@ -59,7 +62,7 @@
       "method": "GET",
       "path": "/api/v3/search/trending",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 300,
       "notes": "Top 7 trending coins, NFTs, categories on CoinGecko in last 24h."
     },
@@ -67,7 +70,7 @@
       "method": "GET",
       "path": "/api/v3/global",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 300,
       "notes": "Total market cap, BTC dominance, active cryptos, exchanges count."
     }

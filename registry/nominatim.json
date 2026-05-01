@@ -5,13 +5,15 @@
   "description": "Free worldwide geocoding from the OpenStreetMap project. Address → coordinates, reverse geocoding, place lookup. No API key required (subject to OSM usage policy: 1 req/s per IP, identify with User-Agent).",
   "homepage": "https://nominatim.openstreetmap.org/",
   "base_url": "https://nominatim.openstreetmap.org",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "search": {
       "method": "GET",
       "path": "/search",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 86400,
       "notes": "Free-form geocoding. Pass q=<address>. Returns lat/lon + display_name. format=json default. 1-day cache (addresses don't move)."
     },
@@ -19,7 +21,7 @@
       "method": "GET",
       "path": "/reverse",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 86400,
       "notes": "Reverse geocoding. Pass lat=...&lon=... — returns formatted address."
     }

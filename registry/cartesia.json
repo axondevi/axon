@@ -14,7 +14,7 @@
       "method": "POST",
       "path": "/tts/bytes",
       "price_usd": 0.02,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 86400,
       "cache_on_body": true,
       "fallbacks": [

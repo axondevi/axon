@@ -5,13 +5,17 @@
   "description": "GitHub REST API — public user / repo / search data. No auth: 60 req/h per IP. With a token (operator-set UPSTREAM_KEY_GITHUB), 5,000 req/h.",
   "homepage": "https://docs.github.com/en/rest",
   "base_url": "https://api.github.com",
-  "auth": { "type": "header", "name": "Authorization", "prefix": "Bearer " },
+  "auth": {
+    "type": "header",
+    "name": "Authorization",
+    "prefix": "Bearer "
+  },
   "endpoints": {
     "user": {
       "method": "GET",
       "path": "/users/:login",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "Public profile by login (e.g. 'torvalds'). Includes avatar, bio, follower count, public-repo count."
     },
@@ -19,7 +23,7 @@
       "method": "GET",
       "path": "/repos/:owner/:repo",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "Public repo metadata — stars, forks, language, license, default branch, description."
     },
@@ -27,7 +31,7 @@
       "method": "GET",
       "path": "/search/repositories",
       "price_usd": 0.0003,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 1800,
       "notes": "Search public repositories. Pass q=<query>. e.g. 'q=react+language:typescript+stars:>10000'."
     }

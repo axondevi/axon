@@ -14,7 +14,7 @@
       "method": "POST",
       "path": "/v1/messages",
       "price_usd": 0.012,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Flat MVP price. Switch to per-token metering once middleware lands."
     }

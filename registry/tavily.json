@@ -13,7 +13,7 @@
       "method": "POST",
       "path": "/search",
       "price_usd": 0.008,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 1800,
       "cache_on_body": true
     },
@@ -21,7 +21,7 @@
       "method": "POST",
       "path": "/extract",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "cache_on_body": true
     }

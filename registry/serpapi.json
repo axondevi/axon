@@ -14,7 +14,7 @@
       "method": "GET",
       "path": "/search",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "Same (q, engine, location) returns same SERP for ~1h — heavy cache win."
     }

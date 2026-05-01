@@ -15,7 +15,7 @@
       "method": "POST",
       "path": "/v1/listen",
       "price_usd": 0.015,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 2592000,
       "cache_on_body": true,
       "notes": "Same audio URL always transcribes identically — 30-day cache is safe."

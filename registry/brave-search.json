@@ -14,7 +14,7 @@
       "method": "GET",
       "path": "/res/v1/web/search",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "fallbacks": [
         {
@@ -27,7 +27,7 @@
       "method": "GET",
       "path": "/res/v1/news/search",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 1800
     }
   }

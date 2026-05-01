@@ -5,13 +5,15 @@
   "description": "Wikipedia's official REST API + Action API. No key required. Page summaries, search, full article content, related pages, in 300+ languages.",
   "homepage": "https://en.wikipedia.org/api/rest_v1/",
   "base_url": "https://en.wikipedia.org",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "summary": {
       "method": "GET",
       "path": "/api/rest_v1/page/summary/:title",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "Concise summary of a page — extract, thumbnail, description, lang. :title URL-encoded (e.g. Albert_Einstein). Use for fast factual lookups."
     },
@@ -19,7 +21,7 @@
       "method": "GET",
       "path": "/api/rest_v1/page/html/:title",
       "price_usd": 0.0002,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "Full rendered HTML of a page. Heavy — prefer /summary or /search if you only need facts."
     },
@@ -27,7 +29,7 @@
       "method": "GET",
       "path": "/api/rest_v1/page/related/:title",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "Up to 20 related pages with summaries — good for 'see also' workflows."
     },
@@ -35,7 +37,7 @@
       "method": "GET",
       "path": "/api/rest_v1/page/random/summary",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 0,
       "notes": "A random Wikipedia article summary. No cache (output is random by design)."
     },
@@ -43,7 +45,7 @@
       "method": "GET",
       "path": "/w/api.php",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 600,
       "notes": "Full-text search via Action API. Required: ?action=query&list=search&srsearch=YOUR_QUERY&format=json&origin=*. Returns hits with snippet."
     },
@@ -51,7 +53,7 @@
       "method": "GET",
       "path": "/w/api.php",
       "price_usd": 0.0001,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 600,
       "notes": "Autocomplete-style suggestions. Required: ?action=opensearch&search=YOUR_QUERY&limit=10&format=json. Returns [query, [titles], [descriptions], [urls]]."
     }

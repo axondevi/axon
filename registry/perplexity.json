@@ -13,7 +13,7 @@
       "method": "POST",
       "path": "/chat/completions",
       "price_usd": 0.01,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 0,
       "notes": "Real-time search, output varies — no cache."
     }

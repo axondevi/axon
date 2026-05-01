@@ -5,13 +5,16 @@
   "description": "IP → geolocation, ASN, company, carrier, abuse info.",
   "homepage": "https://ipinfo.io/developers",
   "base_url": "https://ipinfo.io",
-  "auth": { "type": "query", "name": "token" },
+  "auth": {
+    "type": "query",
+    "name": "token"
+  },
   "endpoints": {
     "lookup": {
       "method": "GET",
       "path": "/:ip/json",
       "price_usd": 0.0005,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 2592000,
       "notes": "30-day cache — IP-to-location rarely changes. Path-template substitution on :ip."
     }

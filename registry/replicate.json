@@ -15,7 +15,7 @@
       "method": "POST",
       "path": "/v1/predictions",
       "price_usd": 0.02,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Async prediction creation. Pricing is model-dependent — MVP flat price, migrate to model-aware metering later."
     },
@@ -23,7 +23,7 @@
       "method": "GET",
       "path": "/v1/predictions/:id",
       "price_usd": 0,
-      "markup_pct": 15,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Polling is free. MVP routing assumes client passes :id in query as `id` — wrapper substitutes."
     },
@@ -31,7 +31,7 @@
       "method": "POST",
       "path": "/v1/models/black-forest-labs/flux-schnell/predictions",
       "price_usd": 0.003,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "FLUX schnell — fast high-quality image gen ($0.003/img). Async: returns prediction id, client polls /v1/predictions/:id until status=succeeded."
     }

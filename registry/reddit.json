@@ -5,13 +5,15 @@
   "description": "Public Reddit JSON endpoints — search posts, subreddit feeds, top posts. No auth required for read-only access (rate-limited per IP). For higher quotas use OAuth.",
   "homepage": "https://www.reddit.com/dev/api",
   "base_url": "https://www.reddit.com",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "search": {
       "method": "GET",
       "path": "/search.json",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 600,
       "notes": "Search posts across all subreddits. Pass q=<query>&limit=N&sort=hot|new|top|relevance. Returns titles, subreddit, score, author."
     },
@@ -19,7 +21,7 @@
       "method": "GET",
       "path": "/r/:sub/top.json",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 1800,
       "notes": "Top posts from a specific subreddit. Pass :sub (no /r/ prefix) and t=hour|day|week|month|year|all."
     }

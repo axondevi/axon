@@ -13,7 +13,7 @@
       "method": "POST",
       "path": "/v1/embeddings",
       "price_usd": 0.0015,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 2592000,
       "cache_on_body": true,
       "notes": "30-day cache — embeddings of identical (model, input) are deterministic. Massive cache margin."
@@ -22,7 +22,7 @@
       "method": "POST",
       "path": "/v1/rerank",
       "price_usd": 0.003,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 86400,
       "cache_on_body": true
     }

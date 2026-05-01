@@ -5,13 +5,15 @@
   "description": "Câmara dos Deputados open data — propositions, deputies, votations, expenses. 100% free, no API key required.",
   "homepage": "https://dadosabertos.camara.leg.br/swagger/api.html",
   "base_url": "https://dadosabertos.camara.leg.br/api/v2",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "proposicoes": {
       "method": "GET",
       "path": "/proposicoes",
       "price_usd": 0.0003,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 1800,
       "notes": "List propositions (PL, PEC, MP, etc). Pass siglaTipo=PL&numero=N&ano=YYYY to find a specific bill, or keywordsList=<term> to search by topic."
     },
@@ -19,7 +21,7 @@
       "method": "GET",
       "path": "/deputados/:id",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 86400,
       "notes": "Deputy profile by id. Returns full name, party, state, current legislature, contact info."
     },
@@ -27,7 +29,7 @@
       "method": "GET",
       "path": "/deputados",
       "price_usd": 0.0002,
-      "markup_pct": 30,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "notes": "Search deputies by name, party (siglaPartido=PT), state (siglaUf=SP), or current legislature. Default returns active deputies."
     }

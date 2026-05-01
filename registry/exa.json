@@ -14,7 +14,7 @@
       "method": "POST",
       "path": "/search",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 1800,
       "cache_on_body": true
     },
@@ -22,7 +22,7 @@
       "method": "POST",
       "path": "/contents",
       "price_usd": 0.003,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "cache_on_body": true
     },
@@ -30,7 +30,7 @@
       "method": "POST",
       "path": "/findSimilar",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 40,
       "cache_ttl": 3600,
       "cache_on_body": true
     }

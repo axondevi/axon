@@ -13,7 +13,7 @@
       "method": "POST",
       "path": "/v1/scrape",
       "price_usd": 0.005,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 3600,
       "cache_on_body": true,
       "notes": "1h cache on (url, params) — popular pages get hit many times."
@@ -22,7 +22,7 @@
       "method": "POST",
       "path": "/v1/crawl",
       "price_usd": 0.05,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 0,
       "notes": "Crawl jobs are async — no cache."
     },
@@ -30,7 +30,7 @@
       "method": "POST",
       "path": "/v1/search",
       "price_usd": 0.01,
-      "markup_pct": 25,
+      "markup_pct": 50,
       "cache_ttl": 1800,
       "cache_on_body": true
     }
