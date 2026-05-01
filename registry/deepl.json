@@ -5,13 +5,17 @@
   "description": "High-quality machine translation across 30+ languages.",
   "homepage": "https://www.deepl.com/docs-api",
   "base_url": "https://api.deepl.com",
-  "auth": { "type": "header", "name": "authorization", "prefix": "DeepL-Auth-Key " },
+  "auth": {
+    "type": "header",
+    "name": "authorization",
+    "prefix": "DeepL-Auth-Key "
+  },
   "endpoints": {
     "translate": {
       "method": "POST",
       "path": "/v2/translate",
       "price_usd": 0.004,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 604800,
       "cache_on_body": true,
       "notes": "7-day cache on (text, source_lang, target_lang) — deterministic output."

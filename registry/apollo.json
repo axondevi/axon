@@ -5,13 +5,16 @@
   "description": "B2B contact and company enrichment — people, emails, firmographics.",
   "homepage": "https://apollo.io",
   "base_url": "https://api.apollo.io",
-  "auth": { "type": "header", "name": "x-api-key" },
+  "auth": {
+    "type": "header",
+    "name": "x-api-key"
+  },
   "endpoints": {
     "people-match": {
       "method": "POST",
       "path": "/v1/people/match",
       "price_usd": 0.02,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 604800,
       "cache_on_body": true,
       "notes": "7-day cache. Same (email|linkedin_url) → same profile. Massive cache margin."
@@ -20,7 +23,7 @@
       "method": "GET",
       "path": "/v1/organizations/enrich",
       "price_usd": 0.015,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 604800,
       "notes": "7-day cache on (domain)."
     }

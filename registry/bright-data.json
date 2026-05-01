@@ -5,18 +5,26 @@
   "description": "Enterprise-grade scraping infra with proxies + SERP.",
   "homepage": "https://docs.brightdata.com",
   "base_url": "https://api.brightdata.com",
-  "auth": { "type": "bearer" },
+  "auth": {
+    "type": "bearer"
+  },
   "endpoints": {
     "serp": {
       "method": "POST",
       "path": "/request",
       "price_usd": 0.01,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 1800,
       "cache_on_body": true,
       "fallbacks": [
-        { "slug": "serpapi", "endpoint": "search" },
-        { "slug": "brave-search", "endpoint": "search" }
+        {
+          "slug": "serpapi",
+          "endpoint": "search"
+        },
+        {
+          "slug": "brave-search",
+          "endpoint": "search"
+        }
       ]
     }
   }

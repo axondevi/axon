@@ -5,13 +5,15 @@
   "description": "Gen-3 video generation.",
   "homepage": "https://docs.dev.runwayml.com",
   "base_url": "https://api.dev.runwayml.com",
-  "auth": { "type": "bearer" },
+  "auth": {
+    "type": "bearer"
+  },
   "endpoints": {
     "image-to-video": {
       "method": "POST",
       "path": "/v1/image_to_video",
       "price_usd": 0.5,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 0,
       "notes": "Expensive. Async — client polls the task ID."
     },
@@ -19,7 +21,7 @@
       "method": "GET",
       "path": "/v1/tasks/:id",
       "price_usd": 0,
-      "markup_pct": 0,
+      "markup_pct": 15,
       "cache_ttl": 0
     }
   }

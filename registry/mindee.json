@@ -5,13 +5,17 @@
   "description": "OCR and structured data extraction — invoices, receipts, IDs, custom docs.",
   "homepage": "https://developers.mindee.com",
   "base_url": "https://api.mindee.net",
-  "auth": { "type": "header", "name": "authorization", "prefix": "Token " },
+  "auth": {
+    "type": "header",
+    "name": "authorization",
+    "prefix": "Token "
+  },
   "endpoints": {
     "invoice": {
       "method": "POST",
       "path": "/v1/products/mindee/invoices/v4/predict",
       "price_usd": 0.02,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 604800,
       "cache_on_body": true,
       "notes": "7-day cache: same document URL → same extraction."
@@ -20,7 +24,7 @@
       "method": "POST",
       "path": "/v1/products/mindee/expense_receipts/v5/predict",
       "price_usd": 0.015,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 604800,
       "cache_on_body": true
     }

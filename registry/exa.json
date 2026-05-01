@@ -5,13 +5,16 @@
   "description": "Neural search built for AI agents — semantic web search.",
   "homepage": "https://exa.ai",
   "base_url": "https://api.exa.ai",
-  "auth": { "type": "header", "name": "x-api-key" },
+  "auth": {
+    "type": "header",
+    "name": "x-api-key"
+  },
   "endpoints": {
     "search": {
       "method": "POST",
       "path": "/search",
       "price_usd": 0.005,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 1800,
       "cache_on_body": true
     },
@@ -19,7 +22,7 @@
       "method": "POST",
       "path": "/contents",
       "price_usd": 0.003,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 3600,
       "cache_on_body": true
     },
@@ -27,7 +30,7 @@
       "method": "POST",
       "path": "/findSimilar",
       "price_usd": 0.005,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 3600,
       "cache_on_body": true
     }

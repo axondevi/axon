@@ -5,7 +5,10 @@
   "description": "Farcaster protocol API — read/write casts, user graph, channels.",
   "homepage": "https://docs.neynar.com",
   "base_url": "https://api.neynar.com",
-  "auth": { "type": "header", "name": "x-api-key" },
+  "auth": {
+    "type": "header",
+    "name": "x-api-key"
+  },
   "endpoints": {
     "user-by-fid": {
       "method": "GET",
@@ -18,7 +21,7 @@
       "method": "GET",
       "path": "/v2/farcaster/feed/user/casts",
       "price_usd": 0.001,
-      "markup_pct": 20,
+      "markup_pct": 25,
       "cache_ttl": 300
     }
   }

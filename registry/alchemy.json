@@ -5,7 +5,10 @@
   "description": "Multichain JSON-RPC + enhanced APIs (NFTs, transfers, prices).",
   "homepage": "https://docs.alchemy.com",
   "base_url": "https://eth-mainnet.g.alchemy.com",
-  "auth": { "type": "query", "name": "apiKey" },
+  "auth": {
+    "type": "query",
+    "name": "apiKey"
+  },
   "endpoints": {
     "nft-by-owner": {
       "method": "GET",
@@ -19,7 +22,7 @@
       "method": "POST",
       "path": "/prices/v1/:apiKey/tokens/by-symbol",
       "price_usd": 0.0005,
-      "markup_pct": 20,
+      "markup_pct": 25,
       "cache_ttl": 300,
       "cache_on_body": true
     }

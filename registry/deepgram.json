@@ -5,13 +5,17 @@
   "description": "Fast, accurate speech-to-text and real-time transcription.",
   "homepage": "https://deepgram.com",
   "base_url": "https://api.deepgram.com",
-  "auth": { "type": "header", "name": "authorization", "prefix": "Token " },
+  "auth": {
+    "type": "header",
+    "name": "authorization",
+    "prefix": "Token "
+  },
   "endpoints": {
     "transcribe-url": {
       "method": "POST",
       "path": "/v1/listen",
       "price_usd": 0.015,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 2592000,
       "cache_on_body": true,
       "notes": "Same audio URL always transcribes identically — 30-day cache is safe."

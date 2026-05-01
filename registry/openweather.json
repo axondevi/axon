@@ -5,13 +5,16 @@
   "description": "Current weather, forecasts, and historical data worldwide.",
   "homepage": "https://openweathermap.org/api",
   "base_url": "https://api.openweathermap.org",
-  "auth": { "type": "query", "name": "appid" },
+  "auth": {
+    "type": "query",
+    "name": "appid"
+  },
   "endpoints": {
     "current": {
       "method": "GET",
       "path": "/data/2.5/weather",
       "price_usd": 0.0005,
-      "markup_pct": 20,
+      "markup_pct": 25,
       "cache_ttl": 900,
       "notes": "15m cache on (lat,lon) — same location/time returns same data."
     },
@@ -19,7 +22,7 @@
       "method": "GET",
       "path": "/data/2.5/forecast",
       "price_usd": 0.001,
-      "markup_pct": 20,
+      "markup_pct": 25,
       "cache_ttl": 3600
     },
     "geocode": {

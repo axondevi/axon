@@ -5,7 +5,9 @@
   "description": "Free FX rate API backed by the European Central Bank reference rates. No API key required. ~30 currencies, daily updates, full history back to 1999.",
   "homepage": "https://frankfurter.dev",
   "base_url": "https://api.frankfurter.dev",
-  "auth": { "type": "none" },
+  "auth": {
+    "type": "none"
+  },
   "endpoints": {
     "latest": {
       "method": "GET",
@@ -35,7 +37,7 @@
       "method": "GET",
       "path": "/v1/currencies",
       "price_usd": 0,
-      "markup_pct": 0,
+      "markup_pct": 15,
       "cache_ttl": 86400,
       "notes": "List supported currency codes and their full names."
     }

@@ -5,13 +5,15 @@
   "description": "GPT-4, GPT-4o, embeddings, and more from OpenAI.",
   "homepage": "https://platform.openai.com",
   "base_url": "https://api.openai.com",
-  "auth": { "type": "bearer" },
+  "auth": {
+    "type": "bearer"
+  },
   "endpoints": {
     "chat": {
       "method": "POST",
       "path": "/v1/chat/completions",
       "price_usd": 0.01,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 0,
       "notes": "Pricing is upstream-metered; this is a placeholder flat fee. Switch to per-token metering when metering middleware lands."
     },
@@ -19,7 +21,7 @@
       "method": "POST",
       "path": "/v1/embeddings",
       "price_usd": 0.002,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 86400,
       "cache_on_body": true,
       "notes": "Embeddings of identical inputs are deterministic — cache 24h."
@@ -28,7 +30,7 @@
       "method": "POST",
       "path": "/v1/moderations",
       "price_usd": 0.001,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 3600,
       "cache_on_body": true
     }

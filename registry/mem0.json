@@ -5,13 +5,17 @@
   "description": "Persistent long-term memory layer for AI agents — store, search, and forget user-specific facts that survive across sessions. Closes the 'goldfish memory' gap.",
   "homepage": "https://mem0.ai",
   "base_url": "https://api.mem0.ai",
-  "auth": { "type": "header", "name": "authorization", "prefix": "Token " },
+  "auth": {
+    "type": "header",
+    "name": "authorization",
+    "prefix": "Token "
+  },
   "endpoints": {
     "add-memory": {
       "method": "POST",
       "path": "/v1/memories/",
       "price_usd": 0.001,
-      "markup_pct": 20,
+      "markup_pct": 25,
       "cache_ttl": 0,
       "notes": "Add a new memory tied to a user_id (and optional agent_id, run_id). Body: { messages: [{role, content}], user_id }. Mem0 auto-extracts atomic facts from the messages."
     },
@@ -19,7 +23,7 @@
       "method": "POST",
       "path": "/v1/memories/search/",
       "price_usd": 0.0008,
-      "markup_pct": 20,
+      "markup_pct": 25,
       "cache_ttl": 0,
       "notes": "Semantic search over a user's memories. Body: { query, user_id, limit }. Returns ranked memories with relevance scores — feed into LLM context."
     },
@@ -27,7 +31,7 @@
       "method": "GET",
       "path": "/v1/memories/",
       "price_usd": 0.0005,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 30,
       "notes": "List all memories for a user_id (paginated). Use ?user_id=&page=&page_size=."
     },
@@ -35,7 +39,7 @@
       "method": "GET",
       "path": "/v1/memories/:memory_id/",
       "price_usd": 0,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 60,
       "notes": "Fetch a single memory by ID."
     },
@@ -43,7 +47,7 @@
       "method": "PUT",
       "path": "/v1/memories/:memory_id/",
       "price_usd": 0.001,
-      "markup_pct": 20,
+      "markup_pct": 25,
       "cache_ttl": 0,
       "notes": "Replace a memory's content. Body: { data: '...' }."
     },
@@ -51,7 +55,7 @@
       "method": "DELETE",
       "path": "/v1/memories/:memory_id/",
       "price_usd": 0,
-      "markup_pct": 0,
+      "markup_pct": 15,
       "cache_ttl": 0,
       "notes": "Forget a memory permanently."
     },
@@ -59,7 +63,7 @@
       "method": "GET",
       "path": "/v1/memories/:memory_id/history/",
       "price_usd": 0.0002,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 30,
       "notes": "Audit trail of changes to a memory (created/updated/deleted events)."
     }

@@ -5,13 +5,15 @@
   "description": "Run open-source models (Llama 4, Qwen, DeepSeek, Mixtral, etc.) at scale.",
   "homepage": "https://docs.together.ai",
   "base_url": "https://api.together.xyz",
-  "auth": { "type": "bearer" },
+  "auth": {
+    "type": "bearer"
+  },
   "endpoints": {
     "chat": {
       "method": "POST",
       "path": "/v1/chat/completions",
       "price_usd": 0.002,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 0,
       "notes": "Flat MVP price. Model-dependent — migrate to per-token metering."
     },
@@ -19,14 +21,14 @@
       "method": "POST",
       "path": "/v1/completions",
       "price_usd": 0.002,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 0
     },
     "embeddings": {
       "method": "POST",
       "path": "/v1/embeddings",
       "price_usd": 0.0005,
-      "markup_pct": 15,
+      "markup_pct": 25,
       "cache_ttl": 2592000,
       "cache_on_body": true
     }

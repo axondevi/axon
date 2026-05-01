@@ -5,16 +5,24 @@
   "description": "Ultra-low-latency voice synthesis (Sonic).",
   "homepage": "https://docs.cartesia.ai",
   "base_url": "https://api.cartesia.ai",
-  "auth": { "type": "header", "name": "x-api-key" },
+  "auth": {
+    "type": "header",
+    "name": "x-api-key"
+  },
   "endpoints": {
     "tts": {
       "method": "POST",
       "path": "/tts/bytes",
       "price_usd": 0.02,
-      "markup_pct": 10,
+      "markup_pct": 25,
       "cache_ttl": 86400,
       "cache_on_body": true,
-      "fallbacks": [{ "slug": "elevenlabs", "endpoint": "tts" }]
+      "fallbacks": [
+        {
+          "slug": "elevenlabs",
+          "endpoint": "tts"
+        }
+      ]
     }
   }
 }
