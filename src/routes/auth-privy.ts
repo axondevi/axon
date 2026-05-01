@@ -28,9 +28,9 @@ import { Hono } from 'hono';
 import { db } from '~/db';
 import { users, wallets } from '~/db/schema';
 import { eq } from 'drizzle-orm';
-import { env } from '~/config';
-import { hash } from 'crypto';
 import { randomBytes, createHash } from 'crypto';
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
+import { log } from '~/lib/logger';
 
 const app = new Hono();
 
@@ -45,6 +45,25 @@ interface PrivyClaim {
   linked_accounts?: Array<{ type: string; address?: string; email?: string }>;
 }
 
+// JWKS resolver — cached by `jose`. We build it lazily per APP_ID so a
+// boot without PRIVY_APP_ID doesn't waste a fetch.
+let jwksResolver: ReturnType<typeof createRemoteJWKSet> | null = null;
+let jwksAppId: string | null = null;
+
+function getJwks(appId: string) {
+  if (jwksResolver && jwksAppId === appId) return jwksResolver;
+  jwksAppId = appId;
+  jwksResolver = createRemoteJWKSet(
+    new URL(`https://auth.privy.io/api/v1/apps/${appId}/jwks.json`),
+    {
+      // 12h cache; jose refreshes automatically on key rotation kid-miss.
+      cacheMaxAge: 12 * 60 * 60 * 1000,
+      cooldownDuration: 30_000,
+    },
+  );
+  return jwksResolver;
+}
+
 // ─── Public config (frontend needs APP_ID to init Privy SDK) ──────────
 app.get('/config', (c) => {
   const enabled = !!process.env.PRIVY_APP_ID;
@@ -54,22 +73,48 @@ app.get('/config', (c) => {
   });
 });
 
-// ─── Verify Privy access token via JWKS ────────────────────────────────
+// ─── Verify Privy access token cryptographically via JWKS ─────────────
 //
-// Privy publishes their public key at:
+// Privy signs tokens with ES256 (P-256). The public keys are at
 //   https://auth.privy.io/api/v1/apps/{APP_ID}/jwks.json
+// We verify the signature locally via jose's createRemoteJWKSet, which
+// caches the keyset and rotates on kid-miss. Server-side `/users/me` is
+// authoritative on the live state of the user, but doing crypto verify
+// in-process means a token forged with a leaked Privy access token from
+// another app, or a replay past the exp claim, fails fast without a
+// network round-trip — and the audit signal is clean.
 //
-// We verify with the standard JOSE library if available, or via fetch
-// against Privy's verify endpoint as a fallback.
+// After signature passes we still hit `/users/me` ONCE to fetch the
+// linked wallet/email (which aren't always in the token claims). The
+// JWT proves "this token holder is whoever it says"; the API call
+// fetches their current account state.
 async function verifyPrivyToken(token: string): Promise<PrivyClaim | null> {
   const appId = process.env.PRIVY_APP_ID;
-  const appSecret = process.env.PRIVY_APP_SECRET;
-  if (!appId || !appSecret) return null;
+  if (!appId) return null;
 
-  // Server-side verification via Privy REST API (auth Basic = appId:appSecret)
-  // This is the most reliable path and doesn't require pulling in jose lib.
+  let payload: JWTPayload;
   try {
-    const auth = Buffer.from(`${appId}:${appSecret}`).toString('base64');
+    const jwks = getJwks(appId);
+    const result = await jwtVerify(token, jwks, {
+      issuer: 'privy.io',
+      audience: appId,
+      // Default algorithms include ES256; lock to the one Privy actually
+      // uses so a downgrade attack can't slip through on RS256/HS256.
+      algorithms: ['ES256'],
+    });
+    payload = result.payload;
+  } catch (err) {
+    log.warn('privy_jwt_verify_failed', {
+      reason: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+
+  // Pull live user state (wallet/email may have been updated since the
+  // token was issued, and they're not always in the JWT). This is now a
+  // pure data fetch — auth was already proven by the signature check.
+  let userInfo: { wallet?: { address?: string }; email?: { address?: string }; linked_accounts?: Array<{ type: string; address?: string }> } = {};
+  try {
     const r = await fetch('https://auth.privy.io/api/v1/users/me', {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -78,21 +123,22 @@ async function verifyPrivyToken(token: string): Promise<PrivyClaim | null> {
       },
       signal: AbortSignal.timeout(5000),
     });
-    if (!r.ok) return null;
-    const j = (await r.json()) as any;
-    return {
-      sub: j.id,
-      iss: 'privy.io',
-      aud: appId,
-      iat: 0,
-      exp: 0,
-      cr: j.wallet?.address || j.linked_accounts?.find((a: any) => a.type === 'wallet')?.address,
-      email: j.email?.address || j.linked_accounts?.find((a: any) => a.type === 'email')?.address,
-      linked_accounts: j.linked_accounts,
-    };
+    if (r.ok) userInfo = (await r.json()) as typeof userInfo;
   } catch {
-    return null;
+    // Non-fatal — JWT alone is enough to identify the user via `sub`.
   }
+
+  const linked = userInfo.linked_accounts ?? [];
+  return {
+    sub: String(payload.sub ?? ''),
+    iss: String(payload.iss ?? 'privy.io'),
+    aud: String(Array.isArray(payload.aud) ? payload.aud[0] : payload.aud ?? appId),
+    iat: Number(payload.iat ?? 0),
+    exp: Number(payload.exp ?? 0),
+    cr: userInfo.wallet?.address || linked.find((a) => a.type === 'wallet')?.address,
+    email: userInfo.email?.address || linked.find((a) => a.type === 'email')?.address,
+    linked_accounts: linked as PrivyClaim['linked_accounts'],
+  };
 }
 
 function newApiKey(): { plaintext: string; hash: string } {

@@ -9,10 +9,19 @@
  */
 import { Hono } from 'hono';
 import { and, desc, gte, sql } from 'drizzle-orm';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, createHash } from 'node:crypto';
 import { db } from '~/db';
 import { requests, wallets, settlements } from '~/db/schema';
 import { env } from '~/config';
+
+// Stable, non-reversible label for a userId. Without this, Prometheus
+// labels would carry raw user UUIDs straight to whoever scrapes the
+// metrics endpoint — even with the bearer token gate, that's needless
+// PII propagation. Hash + first 12 chars is enough for cardinality
+// (collision probability negligible at the wallet count scale).
+function hashUserId(id: string): string {
+  return createHash('sha256').update(id).digest('hex').slice(0, 12);
+}
 
 const app = new Hono();
 
@@ -99,7 +108,7 @@ app.get('/', async (c) => {
   lines.push('# TYPE axon_wallet_balance_micro gauge');
   for (const w of topWallets) {
     lines.push(
-      `axon_wallet_balance_micro{user_id="${escape(w.userId)}"} ${w.balance.toString()}`,
+      `axon_wallet_balance_micro{user_hash="${hashUserId(w.userId)}"} ${w.balance.toString()}`,
     );
   }
 
@@ -113,6 +122,10 @@ app.get('/', async (c) => {
   });
 });
 
+// Prometheus label-value escaping per the exposition format:
+// only \, ", and newline are special — but a value containing `}` or `=`
+// is fine inside double-quotes. Escape backslash first so we don't
+// double-escape the slashes we just inserted.
 function escape(s: string | null | undefined): string {
   return (s ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }

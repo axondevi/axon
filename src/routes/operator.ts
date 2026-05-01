@@ -199,18 +199,26 @@ app.post('/reset-signup-limit', adminAuth, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { ip?: string };
   const { redis } = await import('~/cache/redis');
 
-  if (body.ip) {
-    // Delete all buckets for this specific IP (past + current)
-    const pattern = `signup:ratelimit:${body.ip}:*`;
-    const keys = await redis.keys(pattern);
-    if (keys.length) await redis.del(...keys);
-    return c.json({ cleared: keys.length, ip: body.ip });
-  }
+  // SCAN-based deletion. The previous code used KEYS which is O(N) over
+  // the entire keyspace and blocks Redis for the duration — at any
+  // production scale that's a stop-the-world event. SCAN walks the
+  // keyspace incrementally with bounded server work per batch.
+  const pattern = body.ip
+    ? `signup:ratelimit:${body.ip}:*`
+    : 'signup:ratelimit:*';
 
-  // Clear ALL signup rate limits
-  const keys = await redis.keys('signup:ratelimit:*');
-  if (keys.length) await redis.del(...keys);
-  return c.json({ cleared: keys.length, scope: 'all' });
+  let cleared = 0;
+  let cursor = '0';
+  do {
+    const [next, batch] = (await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 500)) as [string, string[]];
+    cursor = next;
+    if (batch.length) {
+      await redis.del(...batch);
+      cleared += batch.length;
+    }
+  } while (cursor !== '0');
+
+  return c.json({ cleared, scope: body.ip ? 'ip' : 'all', ip: body.ip ?? null });
 });
 
 export default app;

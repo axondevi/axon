@@ -13,7 +13,7 @@
  */
 import { Hono } from 'hono';
 import { eq, and, desc } from 'drizzle-orm';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
@@ -479,6 +479,32 @@ publicWebhook.post('/:secret', async (c) => {
     // Don't 404 — return 200 so a misconfigured webhook doesn't keep retrying
     return c.json({ ignored: true });
   }
+
+  // Replay-guard: Evolution doesn't sign webhook bodies, so the path
+  // secret is the only auth. If the secret leaks (Evolution logs, MITM
+  // in a non-TLS dev setup, ex-employee), an attacker can replay old
+  // payloads or fabricate new ones forever. We tighten the window:
+  //  - Each delivery's message id is dedup'd in Redis for 10 min, so
+  //    the same payload replayed beats `ignored: replay`.
+  //  - We don't cryptographically verify (Evolution can't sign), but
+  //    the replay window + status-flag check makes burst replay useless.
+  const { redis } = await import('~/cache/redis');
+  // Drain payload once so we can both inspect and forward it. Evolution
+  // posts JSON; .json() throws on empty, hence the catch fallthrough.
+  const rawBody = await c.req.text();
+  let payload: unknown = null;
+  try { payload = JSON.parse(rawBody); } catch { /* not-JSON tolerated below */ }
+  // Compose a stable id: prefer Evolution's own message id, fall back to
+  // a hash of the body (so non-message events still get dedup'd).
+  const evMsgId =
+    (payload as { data?: { key?: { id?: string } } } | null)?.data?.key?.id || '';
+  const dedupKey = evMsgId
+    ? `wa:replay:${conn.id}:${evMsgId}`
+    : `wa:replay:${conn.id}:body:${createHash('sha256').update(rawBody).digest('hex').slice(0, 16)}`;
+  const fresh = await redis.set(dedupKey, '1', 'EX', 600, 'NX');
+  if (!fresh) {
+    return c.json({ ignored: 'replay' });
+  }
   // Owner can mark a connection 'disabled' to mute the agent without deleting
   // the row. Anything else (pairing, connecting, connected) means traffic is
   // welcome — and a real inbound proves the WhatsApp is actually paired, so
@@ -494,7 +520,7 @@ publicWebhook.post('/:secret', async (c) => {
     .where(eq(whatsappConnections.id, conn.id))
     .catch(() => {});
 
-  const payload = await c.req.json().catch(() => null);
+  // Body already drained as `payload` above for the replay guard; reuse.
   const inbound = extractInbound(payload);
   if (!inbound) return c.json({ ignored: 'unsupported_event' });
 

@@ -404,6 +404,11 @@ async function refund(
     type: 'refund',
     meta: { api: ctx.slug, endpoint: ctx.endpointKey, reason },
   });
+  // Release the Redis budget reservation so the user gets that headroom
+  // back on the daily cap. enforcePolicy reserved it on the way in;
+  // a refund means the call effectively didn't count.
+  const { releaseBudget } = await import('~/policy/engine');
+  await releaseBudget(ctx.userId, ctx.slug, amountMicro);
 }
 
 async function callUpstream(
