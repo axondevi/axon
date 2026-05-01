@@ -259,6 +259,8 @@ app.get('/:id', async (c) => {
     paused_at: a.pausedAt,
     paused: !!a.pausedAt,
     business_info: a.businessInfo || '',
+    voice_enabled: a.voiceEnabled !== false,
+    voice_id_override: a.voiceIdOverride || '',
     created_at: a.createdAt,
     updated_at: a.updatedAt,
   });
@@ -347,6 +349,11 @@ app.post('/', async (c) => {
     public: body.public !== false,
     template: seed.template ?? (body.template ? String(body.template).slice(0, 80) : null),
     personaId,
+    voiceEnabled: typeof body.voice_enabled === 'boolean' ? body.voice_enabled : true,
+    voiceIdOverride:
+      body.voice_id_override && /^[A-Za-z0-9]{8,40}$/.test(String(body.voice_id_override).trim())
+        ? String(body.voice_id_override).trim()
+        : null,
   };
 
   // Enforce tier gate on the OWNER (current user). If they pick a
@@ -492,6 +499,22 @@ app.patch('/:id', async (c) => {
   if (body.business_info !== undefined) {
     const v = String(body.business_info || '').slice(0, 4000);
     update.businessInfo = v.trim() ? v : null;
+  }
+  // Voice on/off + per-agent voice override. ElevenLabs voice IDs are
+  // 20-32 alphanumeric chars. Empty string clears the override (revert
+  // to persona default or DEFAULT_VOICE_ID).
+  if (typeof body.voice_enabled === 'boolean') {
+    update.voiceEnabled = body.voice_enabled;
+  }
+  if (body.voice_id_override !== undefined) {
+    const raw = String(body.voice_id_override || '').trim();
+    if (!raw) {
+      update.voiceIdOverride = null;
+    } else if (!/^[A-Za-z0-9]{8,40}$/.test(raw)) {
+      return c.json({ error: 'bad_request', message: 'voice_id_override must be 8-40 alphanumeric chars (ElevenLabs voice id)' }, 400);
+    } else {
+      update.voiceIdOverride = raw;
+    }
   }
   if (body.affiliate_payout_usdc !== undefined) {
     // USDC value comes as a string (e.g. "0.20"). Convert to micro-USDC,

@@ -164,6 +164,14 @@ export async function ensureCriticalSchema() {
     CREATE UNIQUE INDEX IF NOT EXISTS "settlement_period_idx"
       ON "settlements" ("api_slug", "period_start", "period_end")
   `);
+
+  // 0018: per-agent voice toggle + override. SELECT * paths reference
+  // these so they MUST be in ensureCriticalSchema. voice_enabled defaults
+  // to true (existing rows keep current behaviour where TTS fires when
+  // the customer sent audio); voice_id_override is nullable and only
+  // wins when explicitly set.
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "voice_enabled" boolean NOT NULL DEFAULT true`);
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "voice_id_override" text`);
 }
 
 export async function ensureSystemRows() {

@@ -243,6 +243,15 @@ export const agents = pgTable(
     // the system_prompt at runtime so changes take effect immediately
     // without re-deploying the prompt.
     businessInfo: text('business_info'),
+    // Per-agent voice override + global voice toggle. When voiceEnabled
+    // is false, the runtime never calls TTS regardless of persona/audio
+    // mirroring. When voiceIdOverride is set, it wins over the persona's
+    // default voice — useful when an owner picks a persona for the prompt
+    // tone but wants a different voice (e.g. Tia Zélia prompt + a younger
+    // ElevenLabs voice). null = use persona's default; null + no persona
+    // = ElevenLabs DEFAULT_VOICE_ID.
+    voiceEnabled: boolean('voice_enabled').notNull().default(true),
+    voiceIdOverride: text('voice_id_override'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

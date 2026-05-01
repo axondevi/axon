@@ -995,14 +995,24 @@ async function processBufferedTurn(opts: {
 
   // ─── Reply mode: voice in → voice out (mirror customer's preference) ─
   let textWasReplaced = false;
-  if (userSentAudio && reply.trim().length > 0) {
+  // Owner can hard-disable voice for this agent regardless of any other
+  // signal (persona / mirror) — useful for clinics that want to keep
+  // the bot text-only for compliance, or owners A/B-testing.
+  const voiceAllowed = (runtimeAgent as { voiceEnabled?: boolean }).voiceEnabled !== false;
+  if (userSentAudio && reply.trim().length > 0 && voiceAllowed) {
     try {
       const { synthesizeSpeech } = await import('~/voice/elevenlabs');
       let voiceId: string | undefined;
-      // Use the routed agent's persona when smart routing kicked in — so Tia
-      // Zélia answers with the warm-elderly voice and Don Salvatore with the
-      // deep Italian one, even though the customer reached out to Camila.
-      if (runtimeAgent.personaId) {
+      // Resolution order:
+      //   1. agent.voice_id_override — owner picked a specific voice
+      //      (overrides persona default; lets them mix prompt tone +
+      //      different voice).
+      //   2. persona.voice_id_elevenlabs — when a persona is attached.
+      //   3. undefined → synthesizeSpeech falls back to DEFAULT_VOICE_ID.
+      const override = (runtimeAgent as { voiceIdOverride?: string | null }).voiceIdOverride;
+      if (override && override.trim()) {
+        voiceId = override.trim();
+      } else if (runtimeAgent.personaId) {
         try {
           const { personas } = await import('~/db/schema');
           const [persona] = await db.select().from(personas).where(eq(personas.id, runtimeAgent.personaId)).limit(1);
