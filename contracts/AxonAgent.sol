@@ -15,11 +15,26 @@ pragma solidity ^0.8.24;
  *
  * @dev Minimal ERC-721 + EIP-2981 royalty implementation. Built for Base.
  *
- *      Why not OpenZeppelin? Two reasons:
- *        1. Smaller contract = lower gas to deploy
- *        2. Audit surface = exactly what we need, no bloat
- *      For production, swap to OpenZeppelin's ERC721 + ERC2981 if you want
- *      the audited base.
+ *      Hardening over the v0 minimal version:
+ *        1. safeTransferFrom now actually checks IERC721Receiver — required
+ *           by ERC-721 spec; vault/multisig wrappers depend on it. The
+ *           "Privy/EOA always accepts" comment was wrong: Safe contract
+ *           wallets, Argent, and Coinbase Smart Wallet are all contracts.
+ *        2. Pausable: an authorized pauser can stop mint+transfer if a
+ *           critical bug is found before mainnet rollback.
+ *        3. ReentrancyGuard on the only state-mutating call that calls back
+ *           into a third party (safeTransferFrom → onERC721Received).
+ *        4. Two-step ownership transfer: setOwner picks a pending owner,
+ *           acceptOwnership claims it. Prevents accidental transfer to a
+ *           wrong address (single-step setOwner could brick the contract).
+ *        5. tokenURI is settable post-mint by `minter` only. The original
+ *           used `tokenURI[tokenId] = uri` at mint with no update path —
+ *           if the metadata host moved, every NFT broke.
+ *
+ *      Why not import OpenZeppelin: this codebase compiles with raw solc,
+ *      no Foundry/Hardhat. Inlined the small bits we need rather than
+ *      pulling node_modules into a Solidity build. Audited as a single
+ *      file.
  */
 contract AxonAgent {
     // ─── ERC-721 storage ─────────────────────────────────────
@@ -42,8 +57,14 @@ contract AxonAgent {
     ///         behalf. This is the "paymaster" / "operator" pattern.
     address public minter;
 
-    /// @notice Contract owner (governance, can rotate minter).
+    /// @notice Contract owner (governance, can rotate minter, set royalty).
     address public owner;
+    /// @notice Two-step ownership transfer staging slot.
+    address public pendingOwner;
+
+    /// @notice Pauser address — separate role from `owner` so a multisig
+    /// can keep upgrade rights while granting kill-switch to incident response.
+    address public pauser;
 
     /// @notice Royalty receiver (Axon platform). 5% by default.
     address public royaltyReceiver;
@@ -51,22 +72,39 @@ contract AxonAgent {
 
     uint256 public totalSupply;
 
+    /// @notice When true, mint and transfer revert. Read/view paths still work.
+    bool public paused;
+
+    /// @notice Reentrancy guard.
+    uint256 private _reentrant;
+
     // ─── Events ──────────────────────────────────────────────
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
     event AgentMinted(uint256 indexed tokenId, address indexed creator, string slug);
     event MinterChanged(address indexed previous, address indexed next);
+    event PauserChanged(address indexed previous, address indexed next);
+    event Paused(address indexed by);
+    event Unpaused(address indexed by);
+    event OwnershipTransferStarted(address indexed previous, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previous, address indexed next);
     event RoyaltyChanged(address indexed receiver, uint96 bps);
+    event TokenURIUpdated(uint256 indexed tokenId, string uri);
 
     // ─── Errors ──────────────────────────────────────────────
     error NotOwner();
+    error NotPendingOwner();
     error NotMinter();
+    error NotPauser();
     error NotAuthorized();
     error InvalidRecipient();
     error AlreadyMinted();
     error TokenDoesNotExist();
     error InvalidRoyalty();
+    error PausedError();
+    error Reentrant();
+    error UnsafeRecipient();
 
     // ─── Modifiers ───────────────────────────────────────────
     modifier onlyOwner() {
@@ -79,12 +117,31 @@ contract AxonAgent {
         _;
     }
 
+    modifier onlyPauser() {
+        if (msg.sender != pauser && msg.sender != owner) revert NotPauser();
+        _;
+    }
+
+    modifier whenNotPaused() {
+        if (paused) revert PausedError();
+        _;
+    }
+
+    modifier nonReentrant() {
+        if (_reentrant == 1) revert Reentrant();
+        _reentrant = 1;
+        _;
+        _reentrant = 0;
+    }
+
     // ─── Constructor ─────────────────────────────────────────
     constructor(address _minter, address _royaltyReceiver) {
         owner = msg.sender;
+        pauser = msg.sender;
         minter = _minter;
         royaltyReceiver = _royaltyReceiver;
         emit MinterChanged(address(0), _minter);
+        emit PauserChanged(address(0), msg.sender);
         emit RoyaltyChanged(_royaltyReceiver, royaltyBps);
     }
 
@@ -100,6 +157,7 @@ contract AxonAgent {
     function mint(address to, uint256 tokenId, string calldata uri, string calldata slug)
         external
         onlyMinter
+        whenNotPaused
     {
         if (to == address(0)) revert InvalidRecipient();
         if (ownerOf[tokenId] != address(0)) revert AlreadyMinted();
@@ -114,13 +172,49 @@ contract AxonAgent {
         emit AgentMinted(tokenId, to, slug);
     }
 
-    // ─── Transfer (standard ERC-721) ─────────────────────────
-    function safeTransferFrom(address from, address to, uint256 tokenId) external {
-        transferFrom(from, to, tokenId);
-        // Skipping IERC721Receiver check for gas — Privy/EOA wallets always accept
+    /// @notice Update the metadata URI of an existing token. Useful when the
+    /// metadata host moves (e.g. IPFS pin churn). Only the minter (the
+    /// platform) can call — owners can't tamper with provenance.
+    function setTokenURI(uint256 tokenId, string calldata uri) external onlyMinter {
+        if (ownerOf[tokenId] == address(0)) revert TokenDoesNotExist();
+        tokenURI[tokenId] = uri;
+        emit TokenURIUpdated(tokenId, uri);
     }
 
-    function transferFrom(address from, address to, uint256 tokenId) public {
+    // ─── Transfer (standard ERC-721) ─────────────────────────
+    function safeTransferFrom(address from, address to, uint256 tokenId) external nonReentrant whenNotPaused {
+        _safeTransferFrom(from, to, tokenId, "");
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data)
+        external
+        nonReentrant
+        whenNotPaused
+    {
+        _safeTransferFrom(from, to, tokenId, data);
+    }
+
+    function _safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) internal {
+        _transferFrom(from, to, tokenId);
+        // ERC-721 spec: if `to` is a contract, it MUST implement
+        // IERC721Receiver.onERC721Received and return the magic value.
+        // The previous version skipped this for gas — incorrect, since
+        // Safe / Argent / Coinbase Smart Wallet are all contracts and a
+        // marketplace using safeTransferFrom would silently lock NFTs.
+        if (to.code.length > 0) {
+            try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data) returns (bytes4 ret) {
+                if (ret != IERC721Receiver.onERC721Received.selector) revert UnsafeRecipient();
+            } catch {
+                revert UnsafeRecipient();
+            }
+        }
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) external whenNotPaused {
+        _transferFrom(from, to, tokenId);
+    }
+
+    function _transferFrom(address from, address to, uint256 tokenId) internal {
         if (to == address(0)) revert InvalidRecipient();
         address prev = ownerOf[tokenId];
         if (prev == address(0)) revert TokenDoesNotExist();
@@ -167,6 +261,22 @@ contract AxonAgent {
         return (royaltyReceiver, (salePrice * royaltyBps) / 10000);
     }
 
+    // ─── Pause ───────────────────────────────────────────────
+    function pause() external onlyPauser {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyPauser {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function setPauser(address newPauser) external onlyOwner {
+        emit PauserChanged(pauser, newPauser);
+        pauser = newPauser;
+    }
+
     // ─── Admin ────────────────────────────────────────────────
     function setMinter(address newMinter) external onlyOwner {
         emit MinterChanged(minter, newMinter);
@@ -180,8 +290,30 @@ contract AxonAgent {
         emit RoyaltyChanged(receiver, bps);
     }
 
-    function setOwner(address newOwner) external onlyOwner {
-        owner = newOwner;
+    /// @notice Stage a new owner. Two-step: must call acceptOwnership() from
+    /// the new address to actually transfer. Single-step transfers historically
+    /// brick contracts when the operator types the wrong address.
+    function transferOwnership(address newOwner) external onlyOwner {
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /// @notice Accept the staged ownership transfer. Caller must equal pendingOwner.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert NotPendingOwner();
+        address prev = owner;
+        owner = pendingOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(prev, owner);
+    }
+
+    /// @notice Renounce ownership — irreversibly disable governance. Use with
+    /// extreme care; once renounced, royalty changes / minter rotation /
+    /// pause are forever frozen.
+    function renounceOwnership() external onlyOwner {
+        emit OwnershipTransferred(owner, address(0));
+        owner = address(0);
+        pendingOwner = address(0);
     }
 
     // ─── EIP-165 Interface Detection ─────────────────────────
@@ -192,4 +324,14 @@ contract AxonAgent {
             interfaceId == 0x5b5e139f ||  // ERC-721 Metadata
             interfaceId == 0x2a55205a;    // EIP-2981 Royalty
     }
+}
+
+/// @notice Minimal IERC721Receiver inlined to avoid an import.
+interface IERC721Receiver {
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4);
 }
