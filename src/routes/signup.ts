@@ -206,7 +206,11 @@ app.post('/', ipRateLimit, async (c) => {
       });
       await sendEmail({ to: email, subject: t.subject, html: t.html, text: t.text, tag: 'welcome' });
     } catch (err) {
-      log.warn('signup.email_failed', { email, error: err instanceof Error ? err.message : String(err) });
+      const { redactEmail } = await import('~/lib/logger');
+      log.warn('signup.email_failed', {
+        email: redactEmail(email),
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   })();
 

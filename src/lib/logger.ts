@@ -63,3 +63,32 @@ export const log = {
   warn: (msg: string, fields?: Record<string, unknown>) => emit('warn', msg, fields),
   error: (msg: string, fields?: Record<string, unknown>) => emit('error', msg, fields),
 };
+
+/**
+ * PII redaction helpers. Use when emitting log fields that may contain
+ * customer-controlled phone numbers / emails / addresses (LGPD says you
+ * can keep them, but only with the bare minimum needed to operate).
+ *
+ *   redactPhone('5511995432538') → '5511***2538'
+ *   redactEmail('kaolin@gmail.com') → 'k***@gmail.com'
+ *
+ * The mid is fully obscured so the logged value is enough to correlate
+ * a single user across requests but not to identify them outside the
+ * platform.
+ */
+export function redactPhone(phone: string | null | undefined): string {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length < 6) return '***';
+  return `${digits.slice(0, 4)}***${digits.slice(-4)}`;
+}
+
+export function redactEmail(email: string | null | undefined): string {
+  if (!email) return '';
+  const at = String(email).indexOf('@');
+  if (at < 1) return '***';
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const head = local.slice(0, 1);
+  return `${head}${'*'.repeat(Math.max(2, local.length - 1))}@${domain}`;
+}

@@ -47,7 +47,9 @@ export async function sendEmail(opts: {
   const from = opts.from || process.env.EMAIL_FROM;
 
   if (!apiKey) {
-    log.info('email.skipped', { reason: 'no_api_key', subject: opts.subject, to: opts.to });
+    const { redactEmail } = await import('~/lib/logger');
+    const toLog = Array.isArray(opts.to) ? opts.to.map(redactEmail) : redactEmail(opts.to);
+    log.info('email.skipped', { reason: 'no_api_key', subject: opts.subject, to: toLog });
     return { ok: false, skipped: 'no_api_key' };
   }
   if (!from) {
@@ -92,9 +94,10 @@ export async function sendEmail(opts: {
       return { ok: false, error: `resend ${res.status}: ${text.slice(0, 120)}` };
     }
     const data: any = await res.json().catch(() => ({}));
+    const { redactEmail } = await import('~/lib/logger');
     log.info('email.sent', {
       id: data.id,
-      to: to[0],
+      to: redactEmail(to[0]),
       subject: opts.subject,
       tag: opts.tag,
     });

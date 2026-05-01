@@ -7,6 +7,7 @@ import { AppError } from '~/lib/errors';
 import { log } from '~/lib/logger';
 import { apiKeyAuth } from '~/auth/middleware';
 import { rateLimit } from '~/middleware/rate-limit';
+import { publicRateLimit } from '~/middleware/public-rate-limit';
 import { requestId } from '~/middleware/request-id';
 import { watchRegistry } from '~/registry/apis';
 import { x402Middleware } from '~/payment/x402';
@@ -110,6 +111,13 @@ app.get('/health/ready', async (c) => {
 });
 
 // ─── Public: catalog + stats + metrics ────────────────
+// Public routes share one IP-keyed rate limiter so a scraper can't
+// hammer the catalog DB. 120/min covers legitimate dashboard use
+// (which polls /v1/stats/public + /v1/apis) and shared-NAT mobile
+// carriers without false-positives.
+const publicCatalogRl = publicRateLimit({ perMin: 120, bucket: 'catalog' });
+app.use('/v1/apis/*', publicCatalogRl);
+app.use('/v1/stats/*', publicCatalogRl);
 app.route('/v1/apis', apiRoutes);
 app.route('/v1/stats', statsRoutes);
 app.route('/metrics', metricsRoutes);
@@ -146,6 +154,11 @@ app.route('/v1/run', agentRunRoutes);
 app.route('/v1/webhooks/whatsapp', whatsappPublicWebhook);
 // Public NFT metadata — fetched by marketplaces (OpenSea, Basescan) at the
 // tokenURI of every minted agent NFT. Must be unauthenticated.
+// Same scraper-resistance for NFT metadata (marketplaces hit this) and
+// the public personas gallery. 240/min — marketplaces refresh in bursts.
+const publicAssetRl = publicRateLimit({ perMin: 240, bucket: 'asset' });
+app.use('/agent-meta/*', publicAssetRl);
+app.use('/v1/personas/*', publicAssetRl);
 app.route('/agent-meta', nftMetaRoutes);
 // Public personas API — gallery + avatar SVGs.
 app.route('/v1/personas', personaRoutes);
