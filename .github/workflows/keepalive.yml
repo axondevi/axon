@@ -1,0 +1,41 @@
+name: keepalive
+
+# Render's free tier sleeps a service after ~15 minutes of inactivity.
+# When that happens to the Evolution WhatsApp gateway, inbound webhooks
+# from WhatsApp time out (cold start ~30-50s) and the message is lost
+# from the customer's point of view — agent silently misses replies.
+#
+# This workflow pings both URLs every 10 minutes so neither service
+# ever idles long enough to be put to sleep. Cost: ~150 GitHub Actions
+# minutes/month, well under the 2000-minute free quota for private repos
+# (and unlimited for public).
+
+on:
+  schedule:
+    # Every 10 minutes. Cron uses UTC. The */10 pattern hits :00, :10,
+    # :20, :30, :40, :50 of each hour.
+    - cron: '*/10 * * * *'
+  # Allow manual trigger from the Actions tab for ad-hoc warmup.
+  workflow_dispatch:
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Evolution gateway
+        # 60s timeout absorbs the cold-start latency on the first hit
+        # after a long idle. -f makes curl exit non-zero on 4xx/5xx so
+        # the job goes red if the service is genuinely down.
+        run: |
+          curl -sSf --max-time 60 https://evolution-api-feirinha.onrender.com/ \
+            -o /dev/null -w "evolution: HTTP %{http_code} time=%{time_total}s\n"
+
+      - name: Ping Axon backend
+        run: |
+          curl -sSf --max-time 60 https://axon-kedb.onrender.com/health/ready \
+            -o /dev/null -w "axon: HTTP %{http_code} time=%{time_total}s\n"
