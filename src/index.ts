@@ -163,6 +163,13 @@ app.route('/agent-meta', nftMetaRoutes);
 // Public personas API — gallery + avatar SVGs.
 app.route('/v1/personas', personaRoutes);
 
+// ─── Webhooks (signature-verified, no auth middleware) ──
+// MUST be mounted BEFORE the authed /v1 sub-router so the apiKeyAuth
+// middleware doesn't shadow the public webhook endpoints (alchemy,
+// mercadopago, manual). Same reason /v1/signup, /v1/auth/privy, and
+// /v1/webhooks/whatsapp are mounted earlier.
+app.route('/v1/webhooks', webhookRoutes);
+
 // ─── Authed: wallet, calls, usage ─────────────────────
 const v1 = new Hono();
 v1.use('*', apiKeyAuth);
@@ -178,9 +185,6 @@ v1.route('/checkout', checkoutRoutes);  // POST /v1/checkout/pix + status pollin
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 v1.route('/affiliate', affiliateRoutes);  // earnings + agent list for referrers
 app.route('/v1', v1);
-
-// ─── Webhooks (signature-verified, no auth middleware) ──
-app.route('/v1/webhooks', webhookRoutes);
 
 // ─── Error handler ────────────────────────────────────
 app.onError((err, c) => {
