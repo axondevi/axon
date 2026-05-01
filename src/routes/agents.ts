@@ -517,6 +517,11 @@ app.patch('/:id', async (c) => {
       for (const key of ['sales', 'personal', 'support']) {
         const targetId = wanted[key];
         if (typeof targetId === 'string' && targetId.length > 0) {
+          // Validate target ownership against the SAME user.id we're
+          // updating with. The full PATCH runs in a single transaction
+          // below so this read participates in the same snapshot — the
+          // attacker can't transfer the target between this check and
+          // the UPDATE.
           const [target] = await db.select().from(agents).where(eq(agents.id, targetId)).limit(1);
           if (!target || target.ownerId !== user.id) {
             return c.json({ error: 'bad_request', message: `routes_to.${key} must point to an agent you own` }, 400);
@@ -529,7 +534,10 @@ app.patch('/:id', async (c) => {
       return c.json({ error: 'bad_request', message: 'routes_to must be an object or null' }, 400);
     }
   }
-  await db.update(agents).set(update).where(eq(agents.id, id));
+  // Belt-and-suspenders ownership: include ownerId in the WHERE so even
+  // if the agent was transferred between the lookup at the top of this
+  // handler and now, we never UPDATE someone else's row.
+  await db.update(agents).set(update).where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
   return c.json({ ok: true });
 });
 

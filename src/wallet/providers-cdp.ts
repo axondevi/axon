@@ -84,10 +84,20 @@ export class CDPWalletProviderReal implements WalletProvider {
     const addr = await wallet.getDefaultAddress();
     const exported = wallet.export();
 
+    // Encrypt the seed/exported backup INSIDE the provider so the cleartext
+    // never crosses a module boundary. Previously the JSON-stringified seed
+    // was returned in plaintext and only later cipher-wrapped at the route
+    // layer — any logger middleware or accidental SQL log between provider
+    // and route would have leaked it. By encrypting here we shrink the
+    // exposure window to a single function. The route still treats the
+    // payload as opaque.
+    const { encrypt } = await import('~/lib/crypto');
+    const ciphertext = encrypt(JSON.stringify(exported));
+
     return {
       address: addr.getId(),
       walletId: wallet.getId(),
-      serializedBackup: JSON.stringify(exported),
+      serializedBackup: ciphertext,
     };
   }
 }

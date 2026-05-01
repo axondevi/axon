@@ -4,7 +4,7 @@ import { adminAuth } from '~/auth/middleware';
 import { db } from '~/db';
 import { transactions, users, wallets } from '~/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { generateApiKey, hashApiKey, encrypt } from '~/lib/crypto';
+import { generateApiKey, hashApiKey } from '~/lib/crypto';
 import { Errors } from '~/lib/errors';
 import { getWalletProvider } from '~/wallet/providers';
 
@@ -78,10 +78,12 @@ admin.post('/users', adminAuth, async (c) => {
   const provider = getWalletProvider();
   const deposit = await provider.createUserWallet(user.id);
 
-  // If the provider returned a backup blob, encrypt and persist in meta.
-  // (For placeholder there's nothing to back up.)
+  // The provider's contract is "serializedBackup is already opaque/encrypted
+  // by the provider when it contains key material" (see CDPWalletProviderReal).
+  // We store as-is in meta — wrapping in encrypt() again is just noise and
+  // there's no key rotation contract that benefits from it.
   const walletMeta = deposit.serializedBackup
-    ? { cdp_wallet_id: deposit.walletId, backup_enc: encrypt(deposit.serializedBackup) }
+    ? { cdp_wallet_id: deposit.walletId, backup_enc: deposit.serializedBackup }
     : null;
 
   await db.insert(wallets).values({

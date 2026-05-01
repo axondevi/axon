@@ -14,7 +14,7 @@ import type { Context, Next } from 'hono';
 import { eq } from 'drizzle-orm';
 import { db } from '~/db';
 import { transactions, users, wallets } from '~/db/schema';
-import { generateApiKey, hashApiKey, encrypt } from '~/lib/crypto';
+import { generateApiKey, hashApiKey } from '~/lib/crypto';
 import { toMicro } from '~/wallet/service';
 import { getWalletProvider } from '~/wallet/providers';
 import { Errors } from '~/lib/errors';
@@ -138,11 +138,14 @@ app.post('/', ipRateLimit, async (c) => {
       balanceMicro: toMicro(SIGNUP_BONUS_USDC),
     });
 
+    // serializedBackup is already opaque/encrypted by the provider when it
+    // contains key material (CDP). Persist as-is — re-encrypting at the
+    // route was harmless duplication.
     const walletMeta = deposit.serializedBackup
       ? {
           event: 'wallet_provisioned',
           wallet_id: deposit.walletId,
-          backup_enc: encrypt(deposit.serializedBackup),
+          backup_enc: deposit.serializedBackup,
         }
       : null;
 
