@@ -129,7 +129,41 @@ if (env.NODE_ENV === 'production') {
   }
 }
 
+/**
+ * Several upstream services are touched in TWO places: the gateway proxy
+ * (`/v1/call/<slug>/...`) and the agent runtime (`src/voice/*`,
+ * `src/llm/vision.ts`). Historically those used different env names —
+ * the gateway expects `UPSTREAM_KEY_<SLUG>`, the runtime expects the
+ * vendor's natural name (`ELEVENLABS_API_KEY`, `DEEPGRAM_API_KEY`,
+ * `GEMINI_API_KEY`). Operators only configured one and the other path
+ * silently 502'd.
+ *
+ * This list maps each `UPSTREAM_KEY_<SLUG>` lookup to a fallback
+ * vendor-natural name. Set EITHER and both call paths work.
+ */
+const UPSTREAM_KEY_ALIASES: Record<string, string[]> = {
+  ELEVENLABS: ['ELEVENLABS_API_KEY'],
+  DEEPGRAM: ['DEEPGRAM_API_KEY'],
+  GEMINI: ['GEMINI_API_KEY'],
+  GROQ: ['GROQ_API_KEY'],
+  OPENAI: ['OPENAI_API_KEY'],
+  ANTHROPIC: ['ANTHROPIC_API_KEY'],
+  COHERE: ['COHERE_API_KEY'],
+  MISTRAL: ['MISTRAL_API_KEY'],
+  PERPLEXITY: ['PERPLEXITY_API_KEY'],
+  REPLICATE: ['REPLICATE_API_TOKEN', 'REPLICATE_API_KEY'],
+  STABILITY: ['STABILITY_API_KEY'],
+  CARTESIA: ['CARTESIA_API_KEY'],
+  ASSEMBLYAI: ['ASSEMBLYAI_API_KEY'],
+};
+
 export function upstreamKeyFor(slug: string): string | undefined {
-  const envKey = `UPSTREAM_KEY_${slug.toUpperCase().replace(/-/g, '_')}`;
-  return process.env[envKey];
+  const upper = slug.toUpperCase().replace(/-/g, '_');
+  const primary = process.env[`UPSTREAM_KEY_${upper}`];
+  if (primary) return primary;
+  for (const fallback of UPSTREAM_KEY_ALIASES[upper] ?? []) {
+    const v = process.env[fallback];
+    if (v) return v;
+  }
+  return undefined;
 }
