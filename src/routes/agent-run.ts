@@ -234,6 +234,13 @@ app.post('/:slug/chat', async (c) => {
       systemPrompt = agent.systemPromptB;
     }
   }
+  // Inject owner-curated business info (address, hours, prices, etc) so
+  // the agent treats it as ground truth when answering — same logic the
+  // WhatsApp webhook uses, but applied here too so /chat behaves
+  // identically to inbound zaps.
+  if ((agent as any).businessInfo && (agent as any).businessInfo.trim()) {
+    systemPrompt = `${systemPrompt}\n\n## Informações do negócio (use estas como verdade ao responder o cliente)\n${(agent as any).businessInfo.trim()}`;
+  }
   c.header('x-axon-agent-variant', variant);
   c.header('x-axon-agent-slug', slug);
 
