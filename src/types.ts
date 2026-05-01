@@ -10,6 +10,8 @@ declare module 'hono' {
   interface ContextVariableMap {
     user: User;
     'axon:x402_paid': boolean;
+    'axon:agent_id': string;
+    request_id: string;
   }
 }
 

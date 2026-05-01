@@ -927,7 +927,8 @@ export async function runAgent(opts: {
         continue;
       }
 
-      const built = def.buildRequest ? def.buildRequest(args) : { params: args };
+      const built: { params?: Record<string, unknown>; body?: unknown } =
+        def.buildRequest ? def.buildRequest(args) : { params: args };
 
       try {
         const upstreamRes = await handleCall(c, {

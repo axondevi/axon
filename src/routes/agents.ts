@@ -27,9 +27,20 @@ function userMeetsTier(user: { tier: string; tierExpiresAt: Date | null }, requi
 }
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function reservedSlug(s: string) {
   return ['new', 'templates', 'by-slug', 'admin', 'api'].includes(s);
+}
+
+// Accept either UUID or slug as the path identifier. Postgres throws
+// "invalid input syntax for type uuid" if you eq() a non-UUID against a uuid
+// column, so we route to slug when the param doesn't look like a UUID.
+function whereAgentByIdOrSlug(idOrSlug: string, ownerId: string) {
+  const match = UUID_RE.test(idOrSlug)
+    ? eq(agents.id, idOrSlug)
+    : eq(agents.slug, idOrSlug);
+  return and(match, eq(agents.ownerId, ownerId));
 }
 
 // ============ Public routes (no auth) ============
@@ -210,14 +221,14 @@ app.get('/', async (c) => {
   });
 });
 
-// Get one (by id, owned)
+// Get one (by uuid OR slug, owned)
 app.get('/:id', async (c) => {
   const user = c.get('user') as { id: string };
-  const id = c.req.param('id');
+  const idOrSlug = c.req.param('id');
   const [a] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id));
   if (!a) throw Errors.notFound('Agent');
   return c.json({
     id: a.id,
@@ -391,14 +402,15 @@ app.post('/', async (c) => {
 // Update
 app.patch('/:id', async (c) => {
   const user = c.get('user') as { id: string };
-  const id = c.req.param('id');
+  const idOrSlug = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
 
   const [existing] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id));
   if (!existing) throw Errors.notFound('Agent');
+  const id = existing.id;
 
   const update: any = { updatedAt: new Date() };
   if (body.name != null) update.name = String(body.name).slice(0, 80);
@@ -502,26 +514,6 @@ app.patch('/:id', async (c) => {
       return c.json({ error: 'bad_request', message: 'routes_to must be an object or null' }, 400);
     }
   }
-  if (body.persona_id !== undefined || body.persona_slug !== undefined) {
-    if (body.persona_id === null || body.persona_id === '' || body.persona_slug === null || body.persona_slug === '') {
-      update.personaId = null;  // Detach persona — agent reverts to default behavior.
-    } else {
-      const { personas } = await import('~/db/schema');
-      let resolved: string | null = null;
-      if (body.persona_id) {
-        const [p] = await db.select().from(personas).where(eq(personas.id, String(body.persona_id))).limit(1);
-        resolved = p?.id ?? null;
-      } else if (body.persona_slug) {
-        const [p] = await db.select().from(personas).where(eq(personas.slug, String(body.persona_slug))).limit(1);
-        resolved = p?.id ?? null;
-      }
-      if (!resolved) {
-        return c.json({ error: 'bad_request', message: `Unknown persona` }, 400);
-      }
-      update.personaId = resolved;
-    }
-  }
-
   await db.update(agents).set(update).where(eq(agents.id, id));
   return c.json({ ok: true });
 });
@@ -529,15 +521,16 @@ app.patch('/:id', async (c) => {
 // Analytics — owner-only
 app.get('/:id/analytics', async (c) => {
   const user = c.get('user') as { id: string };
-  const id = c.req.param('id');
+  const idOrSlug = c.req.param('id');
   const days = Math.min(Math.max(parseInt(c.req.query('days') || '30', 10), 1), 90);
 
-  // Verify ownership
+  // Verify ownership (slug or uuid)
   const [a] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id));
   if (!a) throw Errors.notFound('Agent');
+  const id = a.id;
 
   // Totals across the window
   const totalsRow = await db.execute(sql`
@@ -621,29 +614,30 @@ app.get('/:id/analytics', async (c) => {
 // Used by dashboard to show "your agent saved you $X via semantic cache".
 app.get('/:id/cache-stats', async (c) => {
   const user = c.get('user') as { id: string };
-  const id = c.req.param('id');
+  const idOrSlug = c.req.param('id');
   const [a] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id));
   if (!a) throw Errors.notFound('Agent');
-  const stats = await getCacheStats(id);
+  const stats = await getCacheStats(a.id);
   return c.json(stats);
 });
 
 // Conversation messages — owner-only
 app.get('/:id/messages', async (c) => {
   const user = c.get('user') as { id: string };
-  const id = c.req.param('id');
+  const idOrSlug = c.req.param('id');
   const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '50', 10), 1), 200);
   const sessionId = c.req.query('session_id');
 
-  // Ownership check
+  // Ownership check (slug or uuid)
   const [a] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id));
   if (!a) throw Errors.notFound('Agent');
+  const id = a.id;
 
   // Optional filter by session (e.g. session_id=wa:5511995432538 for one WhatsApp contact)
   const where = sessionId
@@ -673,7 +667,7 @@ app.get('/:id/messages', async (c) => {
 // Delete
 app.delete('/:id', async (c) => {
   const user = c.get('user') as { id: string };
-  const id = c.req.param('id');
+  const idOrSlug = c.req.param('id');
 
   // Ownership check + connection lookup BEFORE deleting the agent. Once the
   // agent row is gone, the FK CASCADE drops whatsapp_connections — so we
@@ -684,9 +678,10 @@ app.delete('/:id', async (c) => {
   const [a] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, id), eq(agents.ownerId, user.id)))
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id))
     .limit(1);
   if (!a) throw Errors.notFound('Agent');
+  const id = a.id;
 
   const [conn] = await db
     .select()

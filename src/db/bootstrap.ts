@@ -116,6 +116,39 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "referred_by_user_id" uuid`);
   await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "affiliate_paid_at" timestamp`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_memory_referred_by_idx" ON "contact_memory" ("referred_by_user_id") WHERE "referred_by_user_id" IS NOT NULL`);
+
+  // 0014: pause + handoff. agents.paused_at mutes the bot on every channel
+  // until cleared. contact_memory.human_paused_until lets the owner take
+  // over a single conversation for N minutes without disabling the agent
+  // globally. Both nullable so existing rows are unaffected. SELECT * paths
+  // touch these columns so they MUST be in ensureCriticalSchema.
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "paused_at" timestamp`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "human_paused_until" timestamp`);
+
+  // 0015: business_info — free-text reference (address, hours, prices) the
+  // owner wants the agent to know. Plumbed into the system prompt at runtime.
+  // SELECT * paths reference it, so DDL goes here.
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "business_info" text`);
+
+  // 0016: requests.agent_id was added in migration 0004 without a foreign
+  // key. Add ON DELETE SET NULL so deleting an agent leaves request history
+  // intact for accounting/analytics rather than orphaning rows that violate
+  // referential integrity. We DO NOT use CASCADE — operator may need the
+  // request audit trail even after deletion. The constraint name lets us
+  // skip if it already exists (Postgres lacks "IF NOT EXISTS" on FK).
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'requests_agent_id_fkey'
+      ) THEN
+        ALTER TABLE "requests"
+          ADD CONSTRAINT "requests_agent_id_fkey"
+          FOREIGN KEY ("agent_id") REFERENCES "agents"("id") ON DELETE SET NULL;
+      END IF;
+    END $$
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "whatsapp_connections_owner_idx" ON "whatsapp_connections" ("owner_id")`);
 }
 
 export async function ensureSystemRows() {
