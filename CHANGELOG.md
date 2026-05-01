@@ -6,7 +6,64 @@ Unreleased changes appear at the top. When we cut a release, they move under a d
 
 ## [Unreleased]
 
-### Added
+### Added — security & robustness sweep (Wave 1–7 + Pro 1–6, 2026-05-01)
+
+- `src/lib/ssrf.ts` — `checkUrlSafe()` blocks RFC1918 / loopback / link-local / 169.254 (cloud IMDS) / CGNAT / IPv6 ULA / `*.local` / `*.internal` / `metadata.{aws,google}.internal`. Wired into webhook subscriber URLs, the `summarize_url` agent tool, and the WhatsApp `instance_url` registration. **16 new test cases** in `src/tests/ssrf.test.ts`.
+- `src/middleware/public-rate-limit.ts` — IP-keyed rate limiter for public catalog (`/v1/apis/*`, `/v1/stats/*`) at 120/min and asset routes (`/agent-meta/*`, `/v1/personas/*`) at 240/min. Fail-closed in prod on Redis outage.
+- `src/lib/logger.ts` — `redactPhone()` and `redactEmail()` helpers; applied to email send paths and signup failure logs. **9 new test cases** in `src/tests/redact.test.ts`.
+- `src/policy/engine.ts` — `releaseBudget()` releases Redis budget reservations on refund.
+- Privy JWT verification via `jose.createRemoteJWKSet` against the Privy JWKS endpoint (ES256-only). Added `jose` dependency.
+- `src/payment/mercadopago.ts` — `isMpConfigured()` helper for silent-skip in tools.
+- Pix dedupe: `POST /v1/checkout/pix` returns the existing pending QR when one is still fresh, instead of stacking duplicates.
+- Settlement now uses `INSERT ... ON CONFLICT DO UPDATE` against a new unique index on `(api_slug, period_start, period_end)`. Added in bootstrap as migration 0017.
+- Bootstrap migrations 0014, 0015, 0016 self-applied via `ensureCriticalSchema` (paused_at, business_info, requests.agent_id FK with orphan cleanup, whatsapp_connections.owner_id index).
+- Database migrations FK on `requests.agent_id` (`ON DELETE SET NULL`) — orphan rows null'ed first.
+- `src/middleware/rate-limit.ts` — fail-closed on Redis outage in production (returns 503 + retry-after).
+- `src/wallet/service.ts` — `credit()` now writes the ledger row first when `onchain_tx` is supplied; replays return idempotent.
+- WhatsApp inbound webhook dedupes by Evolution message id for 10 min in Redis (`ignored:replay`).
+- Subscription `subscribe()` serializes per (user, tier) via Redis `SET NX` to prevent double-charge from concurrent click.
+- Tool selector caps at 3 tools per turn, ranked by uniqueness × match length.
+- NFT mint serialized through a per-process promise queue (no nonce contention) + `ownerOf` preflight returns idempotent for already-minted tokens.
+- CDP wallet provider encrypts the exported seed inside the provider (`MASTER_ENCRYPTION_KEY` AES-256-GCM); routes persist as opaque blob.
+- Cache key now defaults to per-user scope (`userId` in the hash); endpoints opt into a global cache via registry `cache_scope: 'shared'`. **3 new test cases** in `src/tests/cache-key.test.ts`.
+- ESLint + Prettier + `.gitattributes` (LF normalization). New scripts: `lint`, `lint:fix`, `format`, `format:check`, `verify` (typecheck + lint + test). CI runs `verify` + `build`.
+- `openapi.yaml` expanded from 18 paths to 46 paths covering Agents CRUD, Personas, Subscription, Checkout/Pix, Affiliate, Auth/Privy, Webhooks, Preview chat, NFT metadata. 17 schemas total.
+
+### Changed
+
+- **Breaking (self-host):** Dockerfile bumped to `oven/bun:1.3-alpine` (was `1.1-alpine`). `package.json` `engines.bun` is now `>=1.2.0`. The shipped `bun.lock` is the text-format introduced in Bun 1.2; old image versions can't parse it.
+- **Breaking (security):** MercadoPago HMAC verification now uses constant-time XOR comparison (was `===` short-circuit, leaking position via timing). MP webhook fail-closed when `MP_WEBHOOK_SECRET` is unset in production (returns 503 instead of silently accepting).
+- **Breaking (security):** `/v1/webhooks/manual` is fully disabled in production — set token bypassed previous gate.
+- **Breaking (security):** TURN-K-EY type narrowing — `wallet` is correctly optional; explicit narrowing at the callsite. Removed `as any` casts on Hono context vars; added typed `'axon:agent_id'` and `request_id` to `ContextVariableMap`.
+- API URL across SDKs/openapi/MCP/curl/n8n/landing/admin updated from non-resolving `https://api.axon.dev` to `https://axon-kedb.onrender.com` (34 occurrences in 23 files). The `evolution-api-feirinha.onrender.com` placeholder leaked into `landing/whatsapp.html` was replaced with a generic example.
+- `src/index.ts` — `/v1/webhooks` mount moved BEFORE the authed `/v1` sub-router so the apiKeyAuth middleware doesn't shadow the public webhook handlers (Alchemy / MercadoPago / manual).
+- `GET /v1/agents/:id` accepts both UUID and slug (was 500 on slug because Postgres rejected non-UUID input on `eq(agents.id, ...)`); same fix in PATCH/DELETE/analytics/cache-stats/messages.
+- Operator `/reset-signup-limit` uses Redis `SCAN` instead of `KEYS` (O(N) blocking).
+- Prometheus metrics `axon_wallet_balance_micro` label is now `user_hash` (sha256 truncated to 12) instead of raw UUID.
+- `app.all('/v1/call/:slug/:endpoint{.+}')` accepts multi-segment endpoint keys for OpenAI-compat path style.
+- `POST /v1/agents` caps every free-text field server-side (system_prompt 8k, description 1k, welcome 500, quick_prompt 200, allowed_tools 64×80).
+- Privy JWT verifier locked to ES256; verifies issuer/audience claims; `/users/me` is a data fetch only after signature passes.
+- Vision (`contextHint`) and contact-memory extractor sanitize attacker-controlled input — strips quotes/newlines from `contextHint`, replaces `"""` in user messages, drops extracted facts whose key matches a forbidden pattern (`admin`, `tier`, `role`, `api_key`, etc).
+- Production config booting: `TREASURY_ADDRESS=0x000…` and `WALLET_PROVIDER=placeholder` log loud warnings (not hard-fail) so existing deploys don't crash-loop on the new asserts; only fail-closed when the affected feature is live (`ENABLE_X402_NATIVE` for treasury, `cdp/turnkey` for credentials).
+
+### Fixed
+
+- `routes/agents.ts` — duplicated `persona_id` block in PATCH was silently overwriting the first apply when both keys came in; removed.
+- Dockerfile glob `bun.lockb*` didn't match the text-format `bun.lock`; updated to `bun.lock*`. Frozen-lockfile installs now actually work.
+- `bun.lock` was untracked; committed.
+- `contracts/AxonAgent.compiled.json` and the compile-and-deploy script were untracked; committed.
+- `src/agents/runtime.ts:937` — the inferred union from `def.buildRequest` didn't expose `body` on the fallback branch; explicit type annotation.
+- `src/wallet/providers-cdp.ts` — error thrown on dynamic-import failure now preserves `cause` for triage.
+
+### Security
+
+- AxonAgent.sol production-grade (mainnet-ready): real `IERC721Receiver` check on `safeTransferFrom`, `Pausable` (separate `pauser` role), `ReentrancyGuard`, two-step ownership transfer, post-mint `setTokenURI` (minter-only) for IPFS pin migration, inlined `IERC721Receiver` interface (no OZ node_modules dep on solc-only build).
+- WhatsApp inbound webhook gets a 10-minute replay window via Redis `SET NX` on the Evolution message id (or body hash if missing).
+- `POST /v1/webhook-subscriptions` blocks SSRF at create time AND at delivery (`webhooks/emitter.ts`).
+- Operator `/v1/admin/operator/reset-signup-limit` uses `SCAN` not `KEYS`.
+
+### Pre-existing (kept for context)
+
 - Landing favicon (brand gradient SVG) + 1200×630 OG share image.
 - `og:type`, `og:image`, `og:url`, Twitter card meta on index/stats/status.
 - Accessible label on the waitlist email input (WCAG 2.1 A compliance).

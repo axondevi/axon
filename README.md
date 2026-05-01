@@ -1,9 +1,17 @@
 # Axon
 
-> **Universal API gateway for autonomous agents.**
-> One endpoint. One USDC wallet. Every paid API your agent needs.
+[![ci](https://github.com/axondevi/axon/actions/workflows/ci.yml/badge.svg)](https://github.com/axondevi/axon/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![bun](https://img.shields.io/badge/bun-%E2%89%A51.2-black?logo=bun)](https://bun.sh)
+
+> **Universal API gateway + agent factory for autonomous agents.**
+> One endpoint. One USDC wallet. Every paid API your agent needs. Plus a hosted agent factory: build a WhatsApp / web agent in minutes — voice, vision, Pix payment, NFT ownership baked in.
 
 Axon is the aggregation layer on top of x402 (HTTP 402 Payment Required). Your agent deposits USDC on Base once, then calls any listed API through a single endpoint. Per-request pricing, automatic cache, refunds on failure, no per-vendor signups.
+
+The agent factory layer lets you point a WhatsApp number at one of our templates (clínica, restaurante, loja, recepcionista) or 8 BR-flavoured personas (Tia Zélia, Don Salvatore, Cabra da Peste, ...) and serve customers in PT-BR with voice, image understanding, and Pix charge generation in-chat.
+
+**Live:** [`axon-5zf.pages.dev`](https://axon-5zf.pages.dev) · **Docs:** [`/learn`](https://axon-5zf.pages.dev/learn) · **API:** `https://axon-kedb.onrender.com`
 
 ---
 
@@ -30,7 +38,7 @@ axon/
 │   ├── routes/                   # wallet, apis, call, usage, webhooks, policy, settlement, stats, metrics
 │   ├── lib/                      # crypto, errors, logger
 │   └── tests/                    # unit + integration
-├── registry/                     # JSON configs — 27 APIs
+├── registry/                     # JSON configs — 40+ APIs
 │   ├── LLMs: openai · anthropic · together · perplexity
 │   ├── Search: serpapi · exa · tavily · brave-search · bright-data
 │   ├── Scraping: firecrawl

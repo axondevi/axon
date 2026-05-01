@@ -13,7 +13,10 @@ Axon custodies USDC and proxies API keys. Security reports are handled seriously
 
 **Do not open a public GitHub issue.**
 
-Email: `security@axon.dev`
+Use GitHub's private vulnerability disclosure for this repo:
+[https://github.com/axondevi/axon/security/advisories/new](https://github.com/axondevi/axon/security/advisories/new)
+
+(Or, if email is preferred, contact the maintainer through their GitHub profile.)
 
 Please include:
 1. A description of the vulnerability
@@ -43,12 +46,46 @@ Good-faith research is welcome. We will not pursue legal action if you:
 
 In rough order of concern:
 
-1. **Wallet / ledger integrity.** Any path that produces a wrong balance, double-debits, or skips a refund is critical. See `docs/security.md` for the invariants.
-2. **x402 native isolation.** The on-chain payment middleware must not allow an attacker to trigger internal debits, and vice versa.
-3. **Admin surface.** Unauthorized access to `/v1/admin/*` compromises every user.
-4. **Webhook signature verification.** Forged deposit webhooks would credit attacker wallets.
-5. **Upstream key exposure.** Decryption paths for `transactions.meta.backup_enc` and upstream secrets.
-6. **CSRF / CORS** — less critical because API key auth is stateless, but still in scope.
+1. **Wallet / ledger integrity.** Any path that produces a wrong balance, double-debits, or skips a refund is critical. See `docs/security.md` for the invariants. We use atomic Postgres `UPDATE WHERE balance-reserved >= amount` for debit, Redis `INCRBY` reservations for daily/monthly/per-API budgets, and a unique partial index on `transactions.onchain_tx` to prevent replay credits.
+2. **x402 native isolation.** The on-chain payment middleware must not allow an attacker to trigger internal debits, and vice versa. The `/x402/v1/*` subtree is only mounted when `ENABLE_X402_NATIVE=true`.
+3. **Admin surface.** Unauthorized access to `/v1/admin/*` compromises every user. `x-admin-key` comparison uses `crypto.timingSafeEqual`.
+4. **Webhook signature verification.** Forged deposit webhooks would credit attacker wallets. Alchemy uses HMAC-SHA256 of the raw body. MercadoPago uses constant-time XOR comparison of the `x-signature` HMAC; in production a missing `MP_WEBHOOK_SECRET` returns 503 instead of silently accepting payloads. WhatsApp inbound has a 10-min Redis replay-guard.
+5. **Privy authentication.** `/v1/auth/privy` cryptographically verifies the Privy JWT via `jose.createRemoteJWKSet` against the published JWKS, ES256-only. Issuer + audience claims enforced.
+6. **Upstream key exposure.** Decryption paths for `transactions.meta.backup_enc` and upstream secrets. CDP wallet seeds are encrypted (AES-256-GCM with `MASTER_ENCRYPTION_KEY`) inside the provider before crossing module boundaries.
+7. **SSRF.** `src/lib/ssrf.ts` blocks RFC1918 / loopback / link-local / 169.254 (cloud IMDS) / CGNAT / IPv6 ULA / `*.local` / `*.internal` / cloud-metadata hostnames at every place we fetch on a user-supplied URL: webhook subscribers (create-time + delivery), the `summarize_url` agent tool, WhatsApp `instance_url` registration.
+8. **Multi-tenant cache leakage.** Wrapper cache keys default to per-user scope (`userId` in the hash); endpoints opt into a global LRU only via registry `cache_scope: 'shared'`.
+9. **CSRF / CORS** — less critical because API key auth is stateless, but still in scope. CORS locks to `CORS_ALLOWED_ORIGINS` (csv); the default is just `https://axon-5zf.pages.dev`.
+
+## Verification commands
+
+To independently confirm the security gates:
+
+```bash
+# 1. CORS allows ONLY configured origins
+curl -i -X OPTIONS -H "Origin: https://evil.com" \
+  -H "Access-Control-Request-Method: GET" \
+  https://axon-kedb.onrender.com/v1/wallet/balance
+# Expect: no `access-control-allow-origin` header in response
+
+# 2. SSRF guard rejects metadata IMDS
+curl -X POST -H "X-API-Key: $AXON_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"http://169.254.169.254/","events":["deposit.received"]}' \
+  https://axon-kedb.onrender.com/v1/webhook-subscriptions
+# Expect: 400 with reason "private IPv4 169.254.169.254 blocked"
+
+# 3. Manual deposit webhook is disabled in prod
+curl -X POST -H "x-deposit-token: anything" \
+  -H "Content-Type: application/json" \
+  -d '{"address":"0x0","amount_usdc":"1"}' \
+  https://axon-kedb.onrender.com/v1/webhooks/manual
+# Expect: 403 forbidden
+
+# 4. MP webhook fail-closed without secret
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"data":{"id":"fake"}}' \
+  https://axon-kedb.onrender.com/v1/webhooks/mercadopago
+# Expect: 503 'misconfigured' (until MP_WEBHOOK_SECRET is set)
+```
 
 ## What's out of scope
 

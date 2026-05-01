@@ -1,12 +1,13 @@
 openapi: 3.1.0
 info:
   title: Axon
-  version: 0.1.0
-  summary: Universal API gateway for autonomous agents
+  version: 0.2.0
+  summary: Universal API gateway + agent factory for autonomous agents
   description: |
     Axon proxies calls to a catalog of paid APIs and settles payment per
-    request in USDC on Base. One endpoint, one wallet, per-request pricing,
-    automatic cache, auto-refund on upstream failures.
+    request in USDC on Base, AND runs a hosted agent factory: build a
+    WhatsApp / web agent in minutes, with built-in voice (Deepgram +
+    ElevenLabs), vision (Gemini), and Pix payment (MercadoPago) tools.
 
     Two authentication modes:
       1. **Prepaid wallet** — default. Deposit USDC, then authenticate with
@@ -14,14 +15,14 @@ info:
       2. **x402 native** — no API key. Responds 402 with payment
          requirements, client pays on-chain per call. Use `/x402/v1/call/*`.
 
-    Every response carries `x-axon-cost-usdc`, `x-axon-cache`,
+    Every gateway response carries `x-axon-cost-usdc`, `x-axon-cache`,
     `x-axon-latency-ms`, and `x-request-id`.
   license:
     name: MIT
     identifier: MIT
   contact:
     name: Axon
-    url: https://axon.dev
+    url: https://axon-5zf.pages.dev
 
 servers:
   - url: https://axon-kedb.onrender.com
@@ -38,6 +39,20 @@ tags:
     description: USDC balance and deposits
   - name: Usage
     description: Your own spend / usage metrics
+  - name: Agents
+    description: Agent factory CRUD + analytics + WhatsApp + contacts
+  - name: Personas
+    description: Built-in BR-flavoured agent personas (Tia Zélia, Don Salvatore, etc)
+  - name: Subscription
+    description: Tier upgrades (free / pro / team / enterprise)
+  - name: Checkout
+    description: Pix top-ups via MercadoPago
+  - name: Affiliate
+    description: Earnings + agent listing for referrers
+  - name: Auth
+    description: Privy embedded-wallet sign-in
+  - name: NFT
+    description: Agent ownership NFTs (silent-mint, OpenSea metadata)
   - name: Stats
     description: Public, anonymized stats across all users
   - name: Admin
@@ -395,6 +410,688 @@ paths:
         '200': { description: Processed }
         '403': { description: Signature invalid }
 
+  /v1/webhooks/mercadopago:
+    post:
+      tags: [Webhooks]
+      summary: MercadoPago Pix payment notification
+      description: |
+        Signed via `x-signature: ts=...,v1=hmac` header. We verify with
+        `MP_WEBHOOK_SECRET` and re-fetch the payment from MP before
+        crediting (never trust the webhook payload alone). In production
+        a missing secret returns 503.
+      security: []
+      responses:
+        '200': { description: Processed (or idempotent / ignored) }
+        '503': { description: Webhook secret not configured (production only) }
+
+  /v1/webhooks/whatsapp/{secret}:
+    post:
+      tags: [Webhooks]
+      summary: Inbound WhatsApp message from Evolution
+      description: |
+        Path secret IS the auth — keep it private. Body is dedup'd by
+        Evolution message id for 10 min so replays return `ignored:replay`.
+      security: []
+      parameters:
+        - name: secret
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Processed or ignored }
+
+  # ─── Personas (public catalog of BR-flavoured agent personalities) ──
+  /v1/personas:
+    get:
+      tags: [Personas]
+      summary: List active personas
+      security: []
+      responses:
+        '200':
+          description: Array of personas with avatar URLs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Persona' }
+
+  /v1/personas/{slug}:
+    get:
+      tags: [Personas]
+      summary: Get one persona by slug
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Persona
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Persona' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/personas/{slug}/avatar.svg:
+    get:
+      tags: [Personas]
+      summary: Procedural SVG avatar
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: SVG markup
+          content:
+            image/svg+xml: { schema: { type: string } }
+
+  # ─── NFT marketplace metadata (OpenSea standard) ────────────
+  /agent-meta/{slug}.json:
+    get:
+      tags: [NFT]
+      summary: OpenSea-compatible metadata for an agent NFT
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Metadata JSON
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name: { type: string }
+                  description: { type: string }
+                  image: { type: string }
+                  external_url: { type: string }
+                  attributes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        trait_type: { type: string }
+                        value: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─── Auth (Privy) ───────────────────────────────────────────
+  /v1/auth/privy/config:
+    get:
+      tags: [Auth]
+      summary: Public config — Privy app id (frontend SDK init)
+      security: []
+      responses:
+        '200':
+          description: Config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+                  app_id: { type: string, nullable: true }
+
+  /v1/auth/privy:
+    post:
+      tags: [Auth]
+      summary: Exchange a Privy access token for an Axon API key
+      description: |
+        Verifies the JWT cryptographically (ES256 against Privy's JWKS),
+        then looks up or creates the user. New users get a $0.50 welcome
+        credit. The plaintext API key is returned ONCE for new accounts.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                wallet_address: { type: string }
+                email: { type: string }
+      responses:
+        '200':
+          description: Existing user (no api_key)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResult' }
+        '201':
+          description: New user (api_key returned once)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ─── Subscription (tier management) ─────────────────────────
+  /v1/subscription/plans:
+    get:
+      tags: [Subscription]
+      summary: List paid tier prices
+      security: []
+      responses:
+        '200':
+          description: Plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plans:
+                    type: array
+                    items: { $ref: '#/components/schemas/SubscriptionPlan' }
+
+  /v1/subscription:
+    get:
+      tags: [Subscription]
+      summary: Current subscription state
+      responses:
+        '200':
+          description: Subscription
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionState' }
+    post:
+      tags: [Subscription]
+      summary: Upgrade/renew tier (debits balance)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier]
+              properties:
+                tier: { type: string, enum: [pro, team] }
+                auto_renew: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Subscription updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionState' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '402': { $ref: '#/components/responses/InsufficientFunds' }
+
+  /v1/subscription/auto-renew:
+    delete:
+      tags: [Subscription]
+      summary: Cancel auto-renew (current tier kept until expiry)
+      responses:
+        '200': { description: Cancelled }
+
+  # ─── Checkout (Pix top-up) ──────────────────────────────────
+  /v1/checkout/pix:
+    post:
+      tags: [Checkout]
+      summary: Create a Pix charge for USDC top-up (MercadoPago)
+      description: |
+        Idempotent: if a still-fresh pending Pix already exists for the
+        user, the same QR is returned with `reused: true`. Range
+        R$5–R$5000 enforced server-side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_brl]
+              properties:
+                amount_brl: { type: number, minimum: 5, maximum: 5000 }
+      responses:
+        '200':
+          description: Pix payment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PixPayment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '502':
+          description: MP create failed (token missing or upstream error)
+
+  /v1/checkout/pix/{id}:
+    get:
+      tags: [Checkout]
+      summary: Poll a Pix charge status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PixPayment' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─── Agents (factory CRUD) ──────────────────────────────────
+  /v1/agents:
+    get:
+      tags: [Agents]
+      summary: List agents owned by the caller
+      responses:
+        '200':
+          description: Agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Agent' }
+                  count: { type: integer }
+    post:
+      tags: [Agents]
+      summary: Create an agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AgentCreateInput' }
+      responses:
+        '201':
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  slug: { type: string }
+                  url: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { description: Tier required exceeds caller's tier }
+
+  /v1/agents/templates:
+    get:
+      tags: [Agents]
+      summary: List built-in agent templates (public)
+      security: []
+      responses:
+        '200':
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items: { $ref: '#/components/schemas/AgentTemplate' }
+
+  /v1/agents/by-slug/{slug}:
+    get:
+      tags: [Agents]
+      summary: Public-flagged agent (drives the /agent/{slug} chat page)
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Agent (public fields only)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/agents/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, description: 'UUID or slug' }
+    get:
+      tags: [Agents]
+      summary: Get one agent (UUID or slug)
+      responses:
+        '200':
+          description: Agent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Agents]
+      summary: Update agent fields (partial)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AgentUpdateInput' }
+      responses:
+        '200': { description: Updated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Agents]
+      summary: Delete an agent (cascades WhatsApp instance cleanup)
+      responses:
+        '200': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/agents/{id}/analytics:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: days
+        in: query
+        schema: { type: integer, default: 30, minimum: 1, maximum: 90 }
+    get:
+      tags: [Agents]
+      summary: Analytics rollup (calls, gross, net, cache hit rate, top tools)
+      responses:
+        '200':
+          description: Analytics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentAnalytics' }
+
+  /v1/agents/{id}/messages:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 50, maximum: 200 }
+      - name: session_id
+        in: query
+        schema: { type: string }
+    get:
+      tags: [Agents]
+      summary: Conversation history (owner-only)
+      responses:
+        '200':
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        session_id: { type: string }
+                        role: { type: string, enum: [user, assistant, system, tool] }
+                        content: { type: string }
+                        created_at: { type: string, format: date-time }
+
+  /v1/agents/{id}/contacts:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Agents]
+      summary: Contacts who messaged this agent
+      responses:
+        '200':
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contacts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Contact' }
+
+  /v1/agents/{id}/whatsapp:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Agents]
+      summary: WhatsApp connection status
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected: { type: boolean }
+                  status: { type: string, enum: [pairing, connecting, connected, disabled] }
+                  qr_code: { type: string, nullable: true }
+                  paired_phone: { type: string, nullable: true }
+    post:
+      tags: [Agents]
+      summary: Register or auto-provision a WhatsApp instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                instance_url: { type: string, description: 'BYO Evolution URL — SSRF-blocked private hosts' }
+                instance_name: { type: string }
+                api_key: { type: string }
+                owner_phone: { type: string, description: '10–15 digits, no +' }
+      responses:
+        '200': { description: Connected or pairing started }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ─── Preview (sandbox chat — uses owner's wallet) ───────────
+  /v1/agents/{slug}/preview:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Agents]
+      summary: Public preview metadata (welcome message, persona, etc)
+      security: []
+      responses:
+        '200':
+          description: Preview metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/agents/{slug}/preview/chat:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Agents]
+      summary: Sandbox chat turn (free, IP rate-limited)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string }
+      responses:
+        '200':
+          description: Assistant reply
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content: { type: string }
+                  tool_calls: { type: array, items: { type: object } }
+                  remaining_quota: { type: integer }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  # ─── Affiliate ─────────────────────────────────────────────
+  /v1/affiliate/stats:
+    get:
+      tags: [Affiliate]
+      summary: My referral earnings + recent contacts I brought in
+      responses:
+        '200':
+          description: Earnings rollup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_earned_usdc: { type: string }
+                  payouts_count: { type: integer }
+                  recent_contacts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        contact_id: { type: string }
+                        agent_slug: { type: string }
+                        agent_name: { type: string }
+                        reward_usdc: { type: string }
+                        paid: { type: boolean }
+                        first_contact_at: { type: string, format: date-time }
+
+  /v1/affiliate/agents:
+    get:
+      tags: [Affiliate]
+      summary: Agents that pay an affiliate reward (sorted by reward desc)
+      responses:
+        '200':
+          description: Agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        slug: { type: string }
+                        name: { type: string }
+                        reward_usdc: { type: string }
+                        affiliate_link: { type: string }
+                  count: { type: integer }
+
+  # ─── Signup (public, IP rate-limited) ──────────────────────
+  /v1/signup:
+    post:
+      tags: [Auth]
+      summary: Self-service signup (no Privy required)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: string, format: uuid }
+                  api_key: { type: string }
+                  wallet_address: { type: string }
+                  bonus_usdc: { type: string }
+        '409': { description: Email already registered }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  # ─── Webhook subscriptions (outbound webhooks owner manages) ──
+  /v1/webhook-subscriptions:
+    get:
+      tags: [Webhooks]
+      summary: List my webhook subscriptions
+      responses:
+        '200':
+          description: Subs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        url: { type: string }
+                        events: { type: array, items: { type: string } }
+                        active: { type: boolean }
+    post:
+      tags: [Webhooks]
+      summary: Create a webhook subscription
+      description: 'SSRF-blocked: private/internal hosts are rejected.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url: { type: string, format: uri }
+                events:
+                  type: array
+                  items:
+                    type: string
+                    enum: [deposit.received, call.refunded, subscription.charged, agent.created]
+      responses:
+        '200': { description: Created — secret returned ONCE }
+        '400': { description: 'URL rejected (SSRF block) or invalid event' }
+
+  /v1/webhook-subscriptions/{id}:
+    delete:
+      tags: [Webhooks]
+      summary: Delete a webhook subscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Deleted }
+
 components:
   securitySchemes:
     apiKey:
@@ -561,3 +1258,189 @@ components:
           additionalProperties: { type: string }
         exclude_cache_from_budget: { type: boolean }
         label: { type: string }
+
+    Persona:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        tagline: { type: string }
+        emoji: { type: string }
+        tone_description: { type: string }
+        sample_greeting: { type: string }
+        sample_signoff: { type: string }
+        avatar_color_primary: { type: string }
+        avatar_color_secondary: { type: string }
+        avatar_url: { type: string }
+        image_url: { type: string }
+        premium: { type: boolean }
+        monthly_price_brl: { type: integer }
+
+    AuthResult:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        wallet_address: { type: string }
+        api_key:
+          type: string
+          nullable: true
+          description: 'Plaintext returned ONCE on signup. null for returning users.'
+        is_new: { type: boolean }
+        privy_did: { type: string }
+        email: { type: string }
+
+    SubscriptionPlan:
+      type: object
+      properties:
+        tier: { type: string, enum: [free, pro, team, enterprise] }
+        price_usdc: { type: string }
+        period_days: { type: integer }
+        rate_limit_per_min: { type: integer }
+        markup_discount_pct: { type: integer }
+        self_service: { type: boolean }
+
+    SubscriptionState:
+      type: object
+      properties:
+        tier_active: { type: string }
+        tier_effective: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true }
+        auto_renew: { type: boolean }
+        days_remaining: { type: integer }
+        rate_limit_per_min: { type: integer }
+        markup_discount_pct: { type: integer }
+
+    PixPayment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mp_id: { type: string }
+        amount_brl: { type: string }
+        estimated_credit_usdc: { type: string }
+        fx_rate_brl_per_usd: { type: number }
+        qr_code: { type: string, description: 'Pix copy-paste EMV string' }
+        qr_code_base64: { type: string, description: 'PNG image base64 (no data: prefix)' }
+        ticket_url: { type: string }
+        expires_at: { type: string, format: date-time }
+        status: { type: string, enum: [pending, approved, rejected, cancelled, refunded] }
+        reused: { type: boolean, description: 'true when an existing pending Pix is returned' }
+
+    Agent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        system_prompt: { type: string }
+        allowed_tools: { type: array, items: { type: string } }
+        primary_color: { type: string }
+        welcome_message: { type: string, nullable: true }
+        quick_prompts: { type: array, items: { type: string }, nullable: true }
+        budget_per_session_usdc: { type: string }
+        hard_cap_usdc: { type: string }
+        pay_mode: { type: string, enum: [visitor, owner] }
+        daily_budget_usdc: { type: string }
+        tier_required: { type: string }
+        public: { type: boolean }
+        template: { type: string, nullable: true }
+        persona_id: { type: string, format: uuid, nullable: true }
+        owner_phone: { type: string, nullable: true }
+        routes_to: { type: object, nullable: true }
+        affiliate_enabled: { type: boolean }
+        affiliate_payout_usdc: { type: string }
+        paused: { type: boolean }
+        business_info: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AgentCreateInput:
+      type: object
+      required: [slug]
+      properties:
+        slug: { type: string, description: '2–40 chars, [a-z0-9-]' }
+        name: { type: string, maxLength: 80 }
+        description: { type: string, maxLength: 1000 }
+        system_prompt: { type: string, maxLength: 8000 }
+        template: { type: string }
+        persona_slug: { type: string }
+        primary_color: { type: string }
+        welcome_message: { type: string, maxLength: 500 }
+        quick_prompts: { type: array, items: { type: string, maxLength: 200 }, maxItems: 8 }
+        allowed_tools: { type: array, items: { type: string }, maxItems: 64 }
+        budget_per_session_usdc: { type: string }
+        hard_cap_usdc: { type: string }
+        pay_mode: { type: string, enum: [visitor, owner] }
+        daily_budget_usdc: { type: string }
+        tier_required: { type: string, enum: [free, pro, team, enterprise] }
+        public: { type: boolean }
+        ui_language: { type: string, enum: [auto, pt, en, es] }
+
+    AgentUpdateInput:
+      description: |
+        All fields optional. Same field shapes as AgentCreateInput plus:
+        `paused` (boolean), `owner_phone` (10–15 digits or empty),
+        `affiliate_enabled` (boolean), `affiliate_payout_usdc` (0–5),
+        `routes_to` ({ sales?, personal?, support? }), `business_info`.
+      type: object
+      additionalProperties: true
+
+    AgentTemplate:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        primary_color: { type: string }
+        tier_required: { type: string }
+        tools: { type: array, items: { type: string } }
+        welcome_message: { type: string }
+        quick_prompts: { type: array, items: { type: string } }
+
+    AgentAnalytics:
+      type: object
+      properties:
+        window_days: { type: integer }
+        agent_id: { type: string }
+        agent_slug: { type: string }
+        totals:
+          type: object
+          properties:
+            calls: { type: integer }
+            gross_usdc: { type: string }
+            net_usdc: { type: string }
+            cache_hit_rate: { type: number }
+            error_rate: { type: number }
+            avg_latency_ms: { type: number }
+        timeseries:
+          type: array
+          items:
+            type: object
+            properties:
+              day: { type: string, format: date }
+              calls: { type: integer }
+              gross_usdc: { type: string }
+        top_tools:
+          type: array
+          items:
+            type: object
+            properties:
+              api_slug: { type: string }
+              endpoint: { type: string }
+              calls: { type: integer }
+              gross_usdc: { type: string }
+              cache_hits: { type: integer }
+
+    Contact:
+      type: object
+      properties:
+        phone: { type: string }
+        display_name: { type: string, nullable: true }
+        language: { type: string }
+        formality: { type: string, enum: [formal, informal, auto] }
+        tags: { type: array, items: { type: string } }
+        message_count: { type: integer }
+        first_contact_at: { type: string, format: date-time }
+        last_contact_at: { type: string, format: date-time }
+        facts_count: { type: integer }
