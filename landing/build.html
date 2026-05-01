@@ -425,6 +425,10 @@
               Suporta Markdown. O bloco "## Language" e a lista de ferramentas são anexados automaticamente.
               · <a href="#personas" onclick="document.querySelector('.tab-bar button[data-tab=&quot;personas&quot;]')?.click(); return false;" style="color: var(--accent-2);">Aplicar uma persona pronta</a>
             </div>
+            <div id="b-persona-badge" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);border-radius:6px;font-size:12px;color:var(--accent);align-items:center;gap:8px;justify-content:space-between;">
+              <span>Persona aplicada: <strong id="b-persona-name">—</strong></span>
+              <button type="button" id="b-persona-clear" style="background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:11px;text-decoration:underline;padding:0;">Remover</button>
+            </div>
           </div>
 
           <div class="field">
@@ -832,20 +836,48 @@ Estacionamento: gratuito por 1h"></textarea>
       }
 
       window.selectPersona = (slug) => {
-        // Select persona — opens the builder modal pre-filled, fresh agent.
         const p = (personasCache || []).find((x) => x.slug === slug);
         if (!p) return;
-        // Need to be logged in to actually save an agent. Be loud about it
-        // so the click doesn't feel broken — the previous silent no-op was
-        // confusing.
+
         if (!KEY) {
           alert('Pra usar a persona ' + p.name + ' você precisa fazer login primeiro. Use o botão "Use my key" no banner amarelo acima OU crie uma conta.');
           var banner = document.getElementById('login-banner');
           if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
-        // The function is openBuilder (not showBuilder — that was a typo
-        // that made the click silently fail).
+
+        // Two paths depending on whether the user is mid-edit:
+        //
+        // 1) Already editing an agent (the modal is open or the user
+        //    came back to the persona tab from inside the builder) —
+        //    just APPLY the persona to the current formState. No reset
+        //    of prompt / business_info / tools / welcome / budget. The
+        //    persona overlay (prompt_fragment + voice_id) takes effect
+        //    on the next save.
+        //
+        // 2) Fresh start (no agent open) — open the builder with the
+        //    persona pre-applied and sensible defaults, like before.
+        const builderOpen = document.getElementById('builder')?.dataset.open === '1' || !!editingAgentId;
+
+        if (builderOpen) {
+          formState.persona_slug = p.slug;
+          formState.persona_id = p.id;
+          // The persona's brand color is a NICE TO HAVE — only override
+          // if the user hasn't already picked a custom color on the form.
+          if (!formState.primary_color || formState.primary_color === '#7c5cff') {
+            formState.primary_color = p.avatar_color_primary;
+            const colorEl = document.getElementById('b-color');
+            if (colorEl) colorEl.value = p.avatar_color_primary;
+          }
+          renderPersonaBadge();
+          showToast('Persona "' + p.name + '" aplicada — salve pra confirmar', 'success');
+          // Switch back to the builder modal if it's open
+          const builder = document.getElementById('builder');
+          if (builder) builder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+
+        // Otherwise: open a fresh agent pre-configured with this persona
         openBuilder({
           name: p.name,
           slug: p.slug + '-' + Math.random().toString(36).slice(2, 6),
@@ -1649,6 +1681,7 @@ Estacionamento: gratuito por 1h"></textarea>
         document.getElementById('b-desc').value = formState.description || '';
         document.getElementById('b-prompt').value = formState.system_prompt;
         document.getElementById('b-business').value = formState.business_info || '';
+        renderPersonaBadge();
         document.getElementById('b-color').value = formState.primary_color;
         document.getElementById('b-public').value = String(formState.public);
         document.getElementById('b-welcome').value = formState.welcome_message || '';
@@ -1718,6 +1751,37 @@ Estacionamento: gratuito por 1h"></textarea>
         bind(elPersonal, 'personal');
         bind(elSupport, 'support');
       }
+
+      // Show or hide the "Persona aplicada: X" badge above the prompt
+      // textarea, based on whether formState has a persona attached.
+      // The badge has a "Remover" button so the owner can detach the
+      // persona from the agent without leaving the builder.
+      function renderPersonaBadge() {
+        const badge = document.getElementById('b-persona-badge');
+        const nameEl = document.getElementById('b-persona-name');
+        if (!badge || !nameEl) return;
+        if (!formState.persona_slug && !formState.persona_id) {
+          badge.style.display = 'none';
+          return;
+        }
+        const p = (personasCache || []).find(
+          (x) => x.slug === formState.persona_slug || x.id === formState.persona_id
+        );
+        nameEl.textContent = p ? p.name : (formState.persona_slug || 'persona');
+        badge.style.display = 'flex';
+      }
+      // Wire the "Remover" button — clicking strips the persona from
+      // formState and sends persona_id:null on next save (PATCH handles
+      // null as "clear persona, revert to default voice").
+      (function wirePersonaClear() {
+        const btn = document.getElementById('b-persona-clear');
+        if (btn) btn.addEventListener('click', () => {
+          formState.persona_slug = null;
+          formState.persona_id = null;
+          renderPersonaBadge();
+          showToast('Persona removida — salve pra confirmar', 'success');
+        });
+      })();
 
       function closeBuilder() {
         document.getElementById('builder').dataset.open = '0';

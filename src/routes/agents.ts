@@ -438,6 +438,28 @@ app.patch('/:id', async (c) => {
   if (body.paused !== undefined) {
     update.pausedAt = body.paused ? new Date() : null;
   }
+  // Persona — accept either UUID (persona_id) or slug (persona_slug). The
+  // canonical id is what we store. null/empty clears the persona so the
+  // agent reverts to its default voice.
+  if (body.persona_id !== undefined || body.persona_slug !== undefined) {
+    if (!body.persona_id && !body.persona_slug) {
+      update.personaId = null;
+    } else {
+      const { personas } = await import('~/db/schema');
+      let resolved: string | null = null;
+      if (body.persona_id) {
+        const [p] = await db.select().from(personas).where(eq(personas.id, String(body.persona_id))).limit(1);
+        resolved = p?.id ?? null;
+      } else if (body.persona_slug) {
+        const [p] = await db.select().from(personas).where(eq(personas.slug, String(body.persona_slug))).limit(1);
+        resolved = p?.id ?? null;
+      }
+      if (!resolved) {
+        return c.json({ error: 'unknown_persona', message: `Unknown persona: ${body.persona_id || body.persona_slug}` }, 400);
+      }
+      update.personaId = resolved;
+    }
+  }
   // Business info — free-text reference data the owner wants the agent
   // to know (address, hours, prices, etc). Empty string clears it.
   if (body.business_info !== undefined) {
