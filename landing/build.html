@@ -835,7 +835,7 @@ Estacionamento: gratuito por 1h"></textarea>
         }
       }
 
-      window.selectPersona = (slug) => {
+      window.selectPersona = async (slug) => {
         const p = (personasCache || []).find((x) => x.slug === slug);
         if (!p) return;
 
@@ -846,38 +846,128 @@ Estacionamento: gratuito por 1h"></textarea>
           return;
         }
 
-        // Two paths depending on whether the user is mid-edit:
+        // Three paths depending on context:
         //
-        // 1) Already editing an agent (the modal is open or the user
-        //    came back to the persona tab from inside the builder) —
-        //    just APPLY the persona to the current formState. No reset
-        //    of prompt / business_info / tools / welcome / budget. The
-        //    persona overlay (prompt_fragment + voice_id) takes effect
-        //    on the next save.
+        // 1) Builder is OPEN (user is editing) — apply directly to the
+        //    current formState. No reset of prompt / business_info /
+        //    tools / welcome / budget. Persona overlay (prompt_fragment
+        //    + voice_id) takes effect on next save.
         //
-        // 2) Fresh start (no agent open) — open the builder with the
-        //    persona pre-applied and sensible defaults, like before.
+        // 2) Builder is CLOSED but the user has agents — show a small
+        //    picker so they choose which agent receives the persona.
+        //    First option in the list is always "Criar agente novo"
+        //    so the old behavior is one click away.
+        //
+        // 3) Builder is CLOSED and no agents exist yet — go straight to
+        //    a fresh agent (the picker would only have one option).
         const builderOpen = document.getElementById('builder')?.dataset.open === '1' || !!editingAgentId;
 
         if (builderOpen) {
-          formState.persona_slug = p.slug;
-          formState.persona_id = p.id;
-          // The persona's brand color is a NICE TO HAVE — only override
-          // if the user hasn't already picked a custom color on the form.
-          if (!formState.primary_color || formState.primary_color === '#7c5cff') {
-            formState.primary_color = p.avatar_color_primary;
-            const colorEl = document.getElementById('b-color');
-            if (colorEl) colorEl.value = p.avatar_color_primary;
-          }
-          renderPersonaBadge();
-          showToast('Persona "' + p.name + '" aplicada — salve pra confirmar', 'success');
-          // Switch back to the builder modal if it's open
-          const builder = document.getElementById('builder');
-          if (builder) builder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          applyPersonaToCurrent(p);
           return;
         }
 
-        // Otherwise: open a fresh agent pre-configured with this persona
+        let myAgents = [];
+        try {
+          const d = await api('/v1/agents');
+          myAgents = d.data || [];
+        } catch { /* offline or fresh user — fall through to fresh agent */ }
+
+        if (myAgents.length === 0) {
+          openFreshPersonaAgent(p);
+          return;
+        }
+
+        showPersonaPicker(p, myAgents);
+      };
+
+      // Apply persona to whatever the builder is currently editing.
+      function applyPersonaToCurrent(p) {
+        formState.persona_slug = p.slug;
+        formState.persona_id = p.id;
+        if (!formState.primary_color || formState.primary_color === '#7c5cff') {
+          formState.primary_color = p.avatar_color_primary;
+          const colorEl = document.getElementById('b-color');
+          if (colorEl) colorEl.value = p.avatar_color_primary;
+        }
+        renderPersonaBadge();
+        showToast('Persona "' + p.name + '" aplicada — salve pra confirmar', 'success');
+        const builder = document.getElementById('builder');
+        if (builder) builder.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      // Picker modal: "Aplicar 'X' em qual agente?" — list existing
+      // agents + a "Criar agente novo" option. Closes on background
+      // click. Single-shot, doesn't persist.
+      function showPersonaPicker(p, agents) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
+        wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+        const card = document.createElement('div');
+        card.style.cssText = 'background:var(--bg);padding:24px;border-radius:14px;max-width:480px;width:100%;max-height:88vh;overflow-y:auto;';
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:6px;">
+            <div>
+              <h3 style="margin:0;font-size:18px;">Aplicar persona "${escape(p.name)}"</h3>
+              <p style="color:var(--text-muted);font-size:13px;margin:6px 0 18px;">Escolha onde aplicar essa voz e personalidade:</p>
+            </div>
+            <button id="pp-close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;">×</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${agents.map((a) => `
+              <button data-action="apply" data-id="${escape(a.id)}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;cursor:pointer;text-align:left;color:var(--text);transition:border-color 0.15s;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${a.primary_color};flex-shrink:0;"></span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:600;font-size:14px;">${escape(a.name)}</div>
+                  <div style="font-size:11px;color:var(--text-muted);">/agent/${escape(a.slug)} · ${a.tool_count||0} tools${a.paused ? ' · ⏸ pausado' : ''}</div>
+                </div>
+              </button>
+            `).join('')}
+
+            <div style="height:1px;background:var(--border);margin:6px 0;"></div>
+
+            <button data-action="new" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:transparent;border:1px dashed var(--border);border-radius:8px;cursor:pointer;text-align:left;color:var(--text-dim);transition:border-color 0.15s, color 0.15s;">
+              <span style="font-size:18px;">+</span>
+              <div style="flex:1;">
+                <div style="font-weight:600;font-size:14px;">Criar agente novo</div>
+                <div style="font-size:11px;color:var(--text-muted);">Começa do zero com essa persona aplicada</div>
+              </div>
+            </button>
+          </div>
+        `;
+        wrap.appendChild(card);
+        document.body.appendChild(wrap);
+        card.querySelector('#pp-close').onclick = () => wrap.remove();
+        card.querySelectorAll('button[data-action]').forEach((btn) => {
+          btn.addEventListener('mouseover', () => { btn.style.borderColor = 'var(--accent-1)'; });
+          btn.addEventListener('mouseout', () => { btn.style.borderColor = btn.dataset.action === 'new' ? 'var(--border)' : 'var(--border)'; });
+          btn.onclick = async () => {
+            wrap.remove();
+            if (btn.dataset.action === 'new') {
+              openFreshPersonaAgent(p);
+              return;
+            }
+            // Apply to existing — PATCH directly without opening builder
+            const id = btn.dataset.id;
+            try {
+              await api('/v1/agents/' + id, {
+                method: 'PATCH',
+                body: JSON.stringify({ persona_slug: p.slug }),
+              });
+              showToast('Persona "' + p.name + '" aplicada ao agente!', 'success');
+              loadMyAgents();
+              // Switch tabs back to "My agents" so the user sees the change
+              document.querySelector('.tab-bar button[data-tab="mine"]')?.click();
+            } catch (e) {
+              showToast('Falha ao aplicar persona: ' + e.message, 'error');
+            }
+          };
+        });
+      }
+
+      // Open a fresh agent pre-configured with this persona
+      function openFreshPersonaAgent(p) {
         openBuilder({
           name: p.name,
           slug: p.slug + '-' + Math.random().toString(36).slice(2, 6),
@@ -894,7 +984,7 @@ Estacionamento: gratuito por 1h"></textarea>
           welcome_message: p.sample_greeting,
           quick_prompts: [],
           public: true,
-          pay_mode: 'owner',  // WhatsApp requires owner-paid
+          pay_mode: 'owner',
           budget_per_session_usdc: '0.50',
           hard_cap_usdc: '2.00',
           daily_budget_usdc: '5.00',
@@ -906,7 +996,7 @@ Estacionamento: gratuito por 1h"></textarea>
           persona_slug: p.slug,
           persona_id: p.id,
         });
-      };
+      }
 
       // ── Templates ─────────────────────────────────────────────────────
       async function loadTemplates() {
