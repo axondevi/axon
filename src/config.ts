@@ -53,32 +53,31 @@ const schema = z.object({
         'METRICS_TOKEN is required in production — /metrics exposes wallet balances.',
     });
   }
-  // Treasury default is the zero address — sending USDC there literally
-  // burns it. Refuse to boot in production unless an actual address is
-  // configured.
+  // The TREASURY_ADDRESS / WALLET_PROVIDER / wallet-cred combinations
+  // below are checked at boot, but only HARD-fail when the affected
+  // feature is actually live. Otherwise we log a warning so a fresh
+  // deploy still boots and the operator sees the gap. Hard-fail
+  // conditions:
+  //   - TREASURY zero AND ENABLE_X402_NATIVE=true (x402 settles to it)
+  //   - WALLET_PROVIDER=cdp without CDP creds (first user signup crashes)
+  //   - WALLET_PROVIDER=turnkey without Turnkey creds (ditto)
+  // Soft-warn:
+  //   - TREASURY zero in prod (no x402 yet — caller will see it before
+  //     turning x402 on)
+  //   - WALLET_PROVIDER=placeholder in prod (signup hands out fake wallet
+  //     addresses that can't receive deposits, but doesn't crash)
   if (
     data.NODE_ENV === 'production' &&
-    data.TREASURY_ADDRESS === '0x0000000000000000000000000000000000000000'
+    data.TREASURY_ADDRESS === '0x0000000000000000000000000000000000000000' &&
+    data.ENABLE_X402_NATIVE
   ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['TREASURY_ADDRESS'],
       message:
-        'TREASURY_ADDRESS must be set in production — the zero-address default would burn settlement transfers.',
+        'TREASURY_ADDRESS must be set when ENABLE_X402_NATIVE=true — settlement to the zero address burns funds.',
     });
   }
-  // WALLET_PROVIDER=placeholder is fine for local/dev but silently spawns
-  // fake wallets in prod. Force an explicit choice.
-  if (data.NODE_ENV === 'production' && data.WALLET_PROVIDER === 'placeholder') {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['WALLET_PROVIDER'],
-      message:
-        'WALLET_PROVIDER=placeholder is not allowed in production. Choose cdp or turnkey.',
-    });
-  }
-  // If the operator picks a wallet provider, require its credentials at
-  // boot rather than first-request. Saves a 500 in prod.
   if (data.WALLET_PROVIDER === 'cdp') {
     if (!data.CDP_API_KEY_NAME || !data.CDP_API_KEY_PRIVATE) {
       ctx.addIssue({
@@ -114,6 +113,21 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// Soft warnings — log loudly so the operator sees them in deploy logs but
+// don't refuse to boot. These are footguns, not blockers.
+if (env.NODE_ENV === 'production') {
+  if (env.TREASURY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    console.warn(
+      '[config] WARNING: TREASURY_ADDRESS is the zero address. x402 settlement transfers would burn funds. Set it before flipping ENABLE_X402_NATIVE on.',
+    );
+  }
+  if (env.WALLET_PROVIDER === 'placeholder') {
+    console.warn(
+      '[config] WARNING: WALLET_PROVIDER=placeholder in production. Signup hands out fake wallet addresses that cannot receive deposits. Set WALLET_PROVIDER=cdp or =turnkey before going live.',
+    );
+  }
+}
 
 export function upstreamKeyFor(slug: string): string | undefined {
   const envKey = `UPSTREAM_KEY_${slug.toUpperCase().replace(/-/g, '_')}`;
