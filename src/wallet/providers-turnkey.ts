@@ -54,7 +54,10 @@ interface TurnkeyServerClient {
     };
   }): Promise<{
     subOrganizationId: string;
-    wallet: { walletId: string; addresses: string[] };
+    // Real SDK marks `wallet` as optional because the create activity may
+    // be async/queued. We narrow at the callsite to fail loudly when it
+    // comes back undefined rather than silently shipping a placeholder.
+    wallet?: { walletId: string; addresses: string[] };
   }>;
 }
 
@@ -77,7 +80,11 @@ async function ensureClient(): Promise<TurnkeyServerClient> {
     try {
       // @ts-ignore — optional dep
       const mod = await import('@turnkey/sdk-server');
-      sdk = { Turnkey: mod.Turnkey };
+      // The shipped Turnkey SDK class returns a richer object than the
+      // narrow surface we declare in TurnkeyServerClient; cast through
+      // unknown to keep the structural typing strict at every callsite
+      // that uses the narrowed interface.
+      sdk = { Turnkey: mod.Turnkey as unknown as TurnkeySdkStatic };
     } catch {
       throw new Error(
         'TurnkeyWalletProvider requires @turnkey/sdk-server. Install it:\n' +
@@ -86,6 +93,10 @@ async function ensureClient(): Promise<TurnkeyServerClient> {
       );
     }
   }
+  // Refine after the assignment so the rest of the function sees a non-null
+  // sdk without each access tripping TS18047. `sdk` is module-scoped and
+  // cached, so we won't reach here without it being set.
+  const sdkRef = sdk;
 
   const pub = process.env.TURNKEY_API_PUBLIC_KEY;
   const priv = process.env.TURNKEY_API_PRIVATE_KEY;
@@ -99,7 +110,7 @@ async function ensureClient(): Promise<TurnkeyServerClient> {
     );
   }
 
-  const turnkey = new sdk.Turnkey({
+  const turnkey = new sdkRef.Turnkey({
     apiBaseUrl: base,
     apiPublicKey: pub,
     apiPrivateKey: priv,
@@ -151,17 +162,24 @@ export class TurnkeyWalletProviderReal implements WalletProvider {
       },
     });
 
-    const address = res.wallet.addresses[0];
+    // Wallet may come back undefined when the create activity is queued
+    // (rare for synchronous P256 signers, but the SDK types it as
+    // optional). Fail loudly rather than ship a placeholder address.
+    const wallet = res.wallet;
+    if (!wallet) {
+      throw new Error('Turnkey returned no wallet — activity likely pending');
+    }
+    const address = wallet.addresses[0];
     if (!address) {
       throw new Error('Turnkey returned a wallet without an address');
     }
 
     return {
       address,
-      walletId: res.wallet.walletId,
+      walletId: wallet.walletId,
       serializedBackup: JSON.stringify({
         subOrganizationId: res.subOrganizationId,
-        walletId: res.wallet.walletId,
+        walletId: wallet.walletId,
         provider: 'turnkey',
       }),
     };

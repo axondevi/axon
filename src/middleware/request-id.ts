@@ -13,7 +13,7 @@ export async function requestId(c: Context, next: Next) {
   const id = incoming && /^[A-Za-z0-9_-]{1,64}$/.test(incoming)
     ? incoming
     : randomBytes(8).toString('hex'); // 16-hex-char short ID
-  c.set('request_id' as any, id);
+  c.set('request_id', id);
   c.header('x-request-id', id);
   await next();
 }

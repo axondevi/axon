@@ -78,7 +78,7 @@ app.use('*', async (c, next) => {
   await next();
   const elapsed = Date.now() - start;
   log.info('http', {
-    request_id: c.get('request_id' as any),
+    request_id: c.get('request_id'),
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     status: c.res.status,
@@ -171,7 +171,7 @@ app.route('/v1/webhooks', webhookRoutes);
 
 // ─── Error handler ────────────────────────────────────
 app.onError((err, c) => {
-  const rid = c.get('request_id' as any);
+  const rid = c.get('request_id');
   if (err instanceof AppError) {
     log.warn('app_error', {
       request_id: rid,

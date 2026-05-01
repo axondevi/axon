@@ -9,6 +9,8 @@
 import type { Context, Next } from 'hono';
 import { redis } from '~/cache/redis';
 import { TIER_RATE_LIMITS, effectiveTier } from '~/subscription';
+import { env } from '~/config';
+import { log } from '~/lib/logger';
 
 const WINDOW_SEC = 60;
 
@@ -28,13 +30,40 @@ export async function rateLimit(c: Context, next: Next) {
   const window = Math.floor(now / WINDOW_SEC);
   const key = `ratelimit:${user.id}:${window}`;
 
-  const pipeline = redis.multi();
-  pipeline.incr(key);
-  pipeline.expire(key, WINDOW_SEC + 5);
-  const execRes = await pipeline.exec();
+  let count = 0;
+  let redisOk = true;
+  try {
+    const pipeline = redis.multi();
+    pipeline.incr(key);
+    pipeline.expire(key, WINDOW_SEC + 5);
+    const execRes = await pipeline.exec();
+    // ioredis exec() returns [[err, result], ...] — surface the per-op
+    // error rather than coercing it to 0 (which silently bypassed the
+    // limiter when Redis hiccuped).
+    const [opErr, opVal] = execRes?.[0] ?? [null, 0];
+    if (opErr) throw opErr;
+    count = Number(opVal ?? 0);
+  } catch (err) {
+    redisOk = false;
+    log.error('ratelimit_redis_unavailable', {
+      user_id: user.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
-  // ioredis exec() returns [[err, result], ...]; be defensive.
-  const count = Number(execRes?.[0]?.[1] ?? 0);
+  // Fail-closed in production: an unreachable Redis previously meant
+  // unlimited traffic. Refuse the request instead so a Redis outage
+  // can't be exploited to drain margin.
+  if (!redisOk && env.NODE_ENV === 'production') {
+    return c.json(
+      {
+        error: 'rate_limiter_unavailable',
+        message: 'Rate limiter dependency unavailable. Try again shortly.',
+      },
+      503,
+      { 'retry-after': '5' },
+    );
+  }
 
   const remaining = Math.max(0, limit - count);
   const reset = (window + 1) * WINDOW_SEC - now;
