@@ -172,6 +172,23 @@ export async function ensureCriticalSchema() {
   // wins when explicitly set.
   await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "voice_enabled" boolean NOT NULL DEFAULT true`);
   await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "voice_id_override" text`);
+
+  // 0019: user_voices — voices the user picked from the ElevenLabs library
+  // or cloned via /v1/voices/clone. Drives the in-builder voice picker.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "user_voices" (
+      "id"           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "user_id"      uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "external_id"  text NOT NULL,
+      "label"        text NOT NULL,
+      "source"       text NOT NULL DEFAULT 'cloned',
+      "preview_url"  text,
+      "meta"         jsonb,
+      "created_at"   timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "user_voices_user_idx" ON "user_voices" ("user_id")`);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "user_voices_user_ext_idx" ON "user_voices" ("user_id", "external_id")`);
 }
 
 export async function ensureSystemRows() {

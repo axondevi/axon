@@ -432,16 +432,25 @@
           </div>
 
           <div class="field">
-            <label>🔊 Voz <span class="info-tip" data-tip="Quando ON, e o cliente manda áudio, o agente responde com áudio (ElevenLabs). Persona escolhida define a voz padrão; você pode sobrescrever com um voice ID específico do ElevenLabs.">?</span></label>
-            <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap;">
+            <label>🔊 Voz <span class="info-tip" data-tip="Quando ON, e o cliente manda áudio, o agente responde com áudio (ElevenLabs). Escolha entre vozes prontas, vozes da persona, ou grave a sua própria voz.">?</span></label>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap;">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
                 <input type="checkbox" id="b-voice-enabled" checked />
                 <span>Responder com voz quando o cliente mandar áudio</span>
               </label>
             </div>
-            <input type="text" id="b-voice-id-override" maxlength="40" placeholder="Voice ID do ElevenLabs (opcional — sobrescreve a voz da persona)" pattern="[A-Za-z0-9]{8,40}" />
+            <div id="b-voice-current" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+              <span style="font-size:18px;line-height:1;">🎙️</span>
+              <div style="flex:1;min-width:0;">
+                <div id="b-voice-current-label" style="font-size:13px;font-weight:600;color:var(--text);">Voz padrão</div>
+                <div id="b-voice-current-sub" style="font-size:11px;color:var(--text-muted);">Use voz padrão do ElevenLabs ou da persona escolhida</div>
+              </div>
+              <button type="button" id="b-voice-preview-current" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;display:none;">▶</button>
+              <button type="button" id="b-voice-pick" class="btn primary" style="padding:6px 14px;font-size:12px;">Escolher voz</button>
+            </div>
+            <input type="hidden" id="b-voice-id-override" />
             <div class="hint">
-              Em branco = usa voz da persona (se houver) ou voz default. Pegue um ID em <a href="https://elevenlabs.io/app/voice-library" target="_blank" rel="noopener noreferrer" style="color:var(--accent-2);">elevenlabs.io/voice-library</a>.
+              Você pode escolher entre vozes prontas, vozes das personas, ou <strong style="color:var(--accent-2);">gravar sua própria voz</strong> (≥30s de áudio limpo).
             </div>
           </div>
 
@@ -980,6 +989,357 @@ Estacionamento: gratuito por 1h"></textarea>
             close();
           };
         });
+      };
+
+      // ── Voice picker + recorder ───────────────────────────────────────
+      // Single shared <audio> so clicking ▶ on a different card stops the
+      // previous preview cleanly.
+      let _voicePreviewAudio = null;
+      function stopVoicePreview() {
+        if (_voicePreviewAudio) {
+          try { _voicePreviewAudio.pause(); } catch {}
+          _voicePreviewAudio = null;
+        }
+      }
+      function playVoicePreview(externalId, btn) {
+        stopVoicePreview();
+        const audio = new Audio(BASE + '/v1/voices/' + encodeURIComponent(externalId) + '/preview.mp3');
+        // Auth via query string isn't supported; the preview endpoint
+        // requires X-API-Key. Workaround: prefetch as Blob via fetch +
+        // assign object URL.
+        if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+        fetch(BASE + '/v1/voices/' + encodeURIComponent(externalId) + '/preview.mp3', {
+          headers: { 'X-API-Key': KEY || '' },
+        }).then(async (r) => {
+          if (!r.ok) throw new Error('preview failed (' + r.status + ')');
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          audio.src = url;
+          audio.onended = () => { URL.revokeObjectURL(url); if (btn) btn.textContent = '▶'; };
+          audio.onerror = () => { URL.revokeObjectURL(url); if (btn) btn.textContent = '▶'; };
+          _voicePreviewAudio = audio;
+          await audio.play();
+          if (btn) btn.textContent = '⏸';
+        }).catch((e) => {
+          showToast('Falha ao gerar preview: ' + e.message, 'error');
+          if (btn) btn.textContent = '▶';
+        }).finally(() => {
+          if (btn) btn.disabled = false;
+        });
+      }
+
+      function refreshVoiceCurrentChip() {
+        const lbl = document.getElementById('b-voice-current-label');
+        const sub = document.getElementById('b-voice-current-sub');
+        const pv = document.getElementById('b-voice-preview-current');
+        const id = (formState.voice_id_override || '').trim();
+        if (!id) {
+          lbl.textContent = 'Voz padrão';
+          sub.textContent = 'Usa voz da persona aplicada (se houver) ou voz padrão do ElevenLabs';
+          pv.style.display = 'none';
+          return;
+        }
+        // Try to resolve a friendly label from the cached picker payload.
+        const cached = window._voicesPickerCache;
+        let label = id;
+        let kind = 'Voz personalizada';
+        if (cached) {
+          const all = [
+            ...(cached.curated || []),
+            ...(cached.personas || []),
+            ...(cached.mine || []),
+          ];
+          const match = all.find((v) => v.external_id === id);
+          if (match) {
+            label = match.label;
+            kind = match.source === 'cloned' ? 'Sua voz clonada' :
+                   match.source === 'persona' ? 'Voz de persona' : 'Voz curada';
+          }
+        }
+        lbl.textContent = label;
+        sub.textContent = kind + ' · ' + id.slice(0, 12) + '…';
+        pv.style.display = 'inline-block';
+        pv.textContent = '▶';
+      }
+
+      window.openVoicePicker = async function () {
+        if (!KEY) {
+          showToast('Login necessário pra escolher voz', 'error');
+          return;
+        }
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.88);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
+        wrap.onclick = (e) => { if (e.target === wrap) close(); };
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background:var(--bg);padding:24px;border-radius:14px;max-width:880px;width:100%;max-height:90vh;overflow-y:auto;border:1px solid var(--border);';
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;">
+            <div>
+              <h3 style="margin:0;font-size:20px;">🎙️ Escolher voz</h3>
+              <p style="color:var(--text-muted);font-size:13px;margin:4px 0 0;">Toque ▶ pra ouvir, depois clique em "Usar essa".</p>
+            </div>
+            <button id="vp-close" style="background:none;border:none;color:var(--text-muted);font-size:26px;cursor:pointer;line-height:1;padding:0 4px;">×</button>
+          </div>
+          <div class="vp-tabs" style="display:flex;gap:8px;border-bottom:1px solid var(--border);margin-bottom:14px;">
+            <button class="vp-tab active" data-tab="library">Biblioteca</button>
+            <button class="vp-tab" data-tab="record">🎤 Gravar a sua</button>
+          </div>
+          <div id="vp-library" class="vp-panel"><p style="color:var(--text-muted)">Carregando…</p></div>
+          <div id="vp-record" class="vp-panel" style="display:none;"></div>
+          <style>
+            .vp-tab { background:transparent;border:none;color:var(--text-muted);padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;font-family:inherit; }
+            .vp-tab.active { color:var(--text);border-bottom-color:var(--accent); }
+            .vp-section { margin-bottom:18px; }
+            .vp-section h4 { margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-dim); }
+            .vp-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px; }
+            .vp-card { background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px; }
+            .vp-card-row { display:flex;align-items:center;gap:8px; }
+            .vp-card .label { font-weight:700;font-size:13px;color:var(--text); }
+            .vp-card .tagline { font-size:11px;color:var(--text-muted); }
+            .vp-card .actions { display:flex;gap:6px;margin-top:6px; }
+            .vp-card .actions button { flex:1;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit; }
+            .vp-card .preview-btn { background:transparent;border:1px solid var(--border);color:var(--text); }
+            .vp-card .pick-btn { background:var(--accent);border:none;color:white;font-weight:600; }
+            .vp-card .delete-btn { background:transparent;border:1px solid var(--border);color:#f87171;font-size:11px;padding:4px 8px; }
+            .vp-record-stage { display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px; }
+            .vp-record-btn { width:80px;height:80px;border-radius:50%;border:3px solid var(--accent);background:var(--bg);color:var(--text);font-size:32px;cursor:pointer; }
+            .vp-record-btn.recording { background:#ef4444;border-color:#ef4444;color:white;animation:pulse 1.4s infinite; }
+            @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0.6); } 50% { box-shadow:0 0 0 14px rgba(239,68,68,0); } }
+          </style>`;
+
+        function close() {
+          stopVoicePreview();
+          if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+          if (mediaStream) mediaStream.getTracks().forEach((t) => t.stop());
+          wrap.remove();
+          document.removeEventListener('keydown', onEsc);
+        }
+        function onEsc(e) { if (e.key === 'Escape') close(); }
+        document.addEventListener('keydown', onEsc);
+
+        wrap.appendChild(card);
+        document.body.appendChild(wrap);
+
+        // Tab switching.
+        const tabs = card.querySelectorAll('.vp-tab');
+        const panels = { library: card.querySelector('#vp-library'), record: card.querySelector('#vp-record') };
+        tabs.forEach((t) => {
+          t.onclick = () => {
+            tabs.forEach((x) => x.classList.remove('active'));
+            t.classList.add('active');
+            panels.library.style.display = t.dataset.tab === 'library' ? '' : 'none';
+            panels.record.style.display = t.dataset.tab === 'record' ? '' : 'none';
+            stopVoicePreview();
+            if (t.dataset.tab === 'record') renderRecordPanel();
+          };
+        });
+
+        card.querySelector('#vp-close').onclick = close;
+
+        // ─── Library tab ──────────────────────────────────────
+        try {
+          const data = await api('/v1/voices');
+          window._voicesPickerCache = data;
+          renderLibrary(data);
+        } catch (e) {
+          panels.library.innerHTML = '<p style="color:#f87171">Falha ao listar vozes: ' + escape(e.message) + '</p>';
+        }
+
+        function renderLibrary(data) {
+          const sections = [];
+          if ((data.mine || []).length > 0) {
+            sections.push({
+              title: '🎤 Suas vozes (clonadas)',
+              items: data.mine.map((v) => ({
+                external_id: v.external_id,
+                label: v.label,
+                tagline: v.source === 'cloned' ? 'Voz que você gravou' : v.source,
+                deletable_id: v.id,
+              })),
+            });
+          }
+          if ((data.personas || []).length > 0) {
+            sections.push({
+              title: '🎭 Vozes das personas',
+              items: data.personas,
+            });
+          }
+          if ((data.curated || []).length > 0) {
+            sections.push({
+              title: '⭐ Vozes selecionadas',
+              items: data.curated,
+            });
+          }
+          panels.library.innerHTML = sections.map((s) => `
+            <div class="vp-section">
+              <h4>${escape(s.title)}</h4>
+              <div class="vp-grid">
+                ${s.items.map((v) => `
+                  <div class="vp-card">
+                    <div class="label">${escape(v.label)}</div>
+                    <div class="tagline">${escape(v.tagline || '')}</div>
+                    <div class="actions">
+                      <button class="preview-btn" data-action="preview" data-id="${escape(v.external_id)}">▶</button>
+                      <button class="pick-btn" data-action="pick" data-id="${escape(v.external_id)}" data-label="${escape(v.label)}">Usar essa</button>
+                      ${v.deletable_id ? `<button class="delete-btn" data-action="delete" data-id="${escape(v.deletable_id)}" data-label="${escape(v.label)}" title="Apagar">🗑</button>` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>`).join('');
+          panels.library.querySelectorAll('button[data-action]').forEach((b) => {
+            b.onclick = async () => {
+              const a = b.dataset.action;
+              if (a === 'preview') {
+                playVoicePreview(b.dataset.id, b);
+              } else if (a === 'pick') {
+                formState.voice_id_override = b.dataset.id;
+                refreshVoiceCurrentChip();
+                showToast('Voz "' + b.dataset.label + '" selecionada — salve pra confirmar', 'success');
+                close();
+              } else if (a === 'delete') {
+                if (!confirm('Apagar voz "' + b.dataset.label + '"? Não dá pra desfazer.')) return;
+                try {
+                  await api('/v1/voices/' + b.dataset.id, { method: 'DELETE' });
+                  if (formState.voice_id_override) {
+                    // If the deleted voice was selected, clear it.
+                    const reload = await api('/v1/voices');
+                    const stillThere = [...reload.curated, ...reload.personas, ...reload.mine].some(
+                      (v) => v.external_id === formState.voice_id_override,
+                    );
+                    if (!stillThere) {
+                      formState.voice_id_override = '';
+                      refreshVoiceCurrentChip();
+                    }
+                    window._voicesPickerCache = reload;
+                    renderLibrary(reload);
+                  } else {
+                    const reload = await api('/v1/voices');
+                    window._voicesPickerCache = reload;
+                    renderLibrary(reload);
+                  }
+                  showToast('Voz apagada', 'success');
+                } catch (e) {
+                  showToast(e.message, 'error');
+                }
+              }
+            };
+          });
+        }
+
+        // ─── Record tab ───────────────────────────────────────
+        let mediaRecorder = null;
+        let mediaStream = null;
+        let chunks = [];
+        let recordSec = 0;
+        let recordTimer = null;
+
+        function renderRecordPanel() {
+          panels.record.innerHTML = `
+            <div class="vp-record-stage">
+              <p style="margin:0 0 4px;font-weight:600;text-align:center;">Grave 30 a 60 segundos lendo um texto curto, num lugar silencioso.</p>
+              <p style="margin:0;font-size:12px;color:var(--text-muted);text-align:center;">Dica: leia um parágrafo natural — variando entonação. Quanto mais limpo o áudio, melhor a clonagem.</p>
+              <button class="vp-record-btn" id="vp-rec">🎤</button>
+              <div id="vp-rec-status" style="font-size:13px;color:var(--text-muted);">Clique pra começar a gravar</div>
+              <audio id="vp-rec-playback" controls style="display:none;width:100%;max-width:480px;"></audio>
+              <input type="text" id="vp-rec-name" placeholder="Nome dessa voz (ex: 'Minha voz oficial')" maxlength="80"
+                style="display:none;width:100%;max-width:480px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-family:inherit;font-size:13px;" />
+              <div id="vp-rec-actions" style="display:none;gap:10px;">
+                <button id="vp-rec-discard" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;cursor:pointer;font-size:13px;">Descartar</button>
+                <button id="vp-rec-upload" class="btn primary" style="padding:10px 18px;font-size:13px;">Clonar voz →</button>
+              </div>
+            </div>`;
+          const recBtn = panels.record.querySelector('#vp-rec');
+          const statusEl = panels.record.querySelector('#vp-rec-status');
+          const playback = panels.record.querySelector('#vp-rec-playback');
+          const nameInput = panels.record.querySelector('#vp-rec-name');
+          const actions = panels.record.querySelector('#vp-rec-actions');
+
+          recBtn.onclick = async () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+              mediaRecorder.stop();
+              return;
+            }
+            try {
+              mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (e) {
+              statusEl.textContent = 'Permissão de microfone negada: ' + e.message;
+              return;
+            }
+            chunks = [];
+            recordSec = 0;
+            // Prefer webm/opus — well-supported by Chromium browsers and
+            // ElevenLabs IVC accepts it. Safari falls back to default.
+            const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+            mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+            mediaRecorder.ondataavailable = (ev) => { if (ev.data.size > 0) chunks.push(ev.data); };
+            mediaRecorder.onstop = () => {
+              clearInterval(recordTimer);
+              recordTimer = null;
+              if (mediaStream) { mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null; }
+              recBtn.classList.remove('recording');
+              recBtn.textContent = '🎤';
+              const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+              if (blob.size < 1000) {
+                statusEl.textContent = 'Gravação muito curta — tente de novo (30s+).';
+                return;
+              }
+              statusEl.textContent = 'Gravado: ' + recordSec + 's. Ouça antes de enviar:';
+              const url = URL.createObjectURL(blob);
+              playback.src = url;
+              playback.style.display = '';
+              nameInput.style.display = '';
+              actions.style.display = 'flex';
+              window._recordedBlob = blob;
+              if (recordSec < 25) {
+                statusEl.textContent += ' ⚠️ Recomendado 30s+ pra qualidade boa.';
+              }
+            };
+            mediaRecorder.start();
+            recBtn.classList.add('recording');
+            recBtn.textContent = '⏹';
+            statusEl.textContent = 'Gravando… 0s';
+            recordTimer = setInterval(() => {
+              recordSec++;
+              statusEl.textContent = 'Gravando… ' + recordSec + 's' + (recordSec >= 60 ? ' (parando automaticamente)' : '');
+              if (recordSec >= 60) mediaRecorder.stop();
+            }, 1000);
+          };
+
+          panels.record.querySelector('#vp-rec-discard').onclick = () => {
+            window._recordedBlob = null;
+            renderRecordPanel();
+          };
+          panels.record.querySelector('#vp-rec-upload').onclick = async () => {
+            const blob = window._recordedBlob;
+            const name = nameInput.value.trim() || 'Minha voz';
+            if (!blob) return;
+            const fd = new FormData();
+            fd.append('name', name);
+            fd.append('description', 'Cloned via Axon builder');
+            fd.append('audio', blob, 'sample.webm');
+            actions.querySelector('#vp-rec-upload').textContent = 'Enviando…';
+            actions.querySelector('#vp-rec-upload').disabled = true;
+            try {
+              const r = await fetch(BASE + '/v1/voices/clone', {
+                method: 'POST',
+                headers: { 'X-API-Key': KEY },
+                body: fd,
+              });
+              const j = await r.json();
+              if (!r.ok) throw new Error(j.message || j.error || ('upload failed (' + r.status + ')'));
+              showToast('Voz clonada! Selecionando…', 'success');
+              formState.voice_id_override = j.external_id;
+              refreshVoiceCurrentChip();
+              close();
+            } catch (e) {
+              actions.querySelector('#vp-rec-upload').textContent = 'Clonar voz →';
+              actions.querySelector('#vp-rec-upload').disabled = false;
+              showToast('Falha: ' + e.message, 'error');
+            }
+          };
+        }
       };
 
       // Picker modal: "Aplicar 'X' em qual agente?" — list existing
@@ -1881,6 +2241,12 @@ Estacionamento: gratuito por 1h"></textarea>
         const voiceIdEl = document.getElementById('b-voice-id-override');
         if (voiceEnEl) voiceEnEl.checked = formState.voice_enabled !== false;
         if (voiceIdEl) voiceIdEl.value = formState.voice_id_override || '';
+        // Pre-warm picker cache so the chip shows the friendly label
+        // (curated/persona/cloned name) on edit instead of the raw id.
+        if (formState.voice_id_override && KEY && !window._voicesPickerCache) {
+          api('/v1/voices').then((d) => { window._voicesPickerCache = d; refreshVoiceCurrentChip(); }).catch(() => {});
+        }
+        refreshVoiceCurrentChip();
         renderTools();
         renderQuickPrompts();
         renderPreview();
@@ -1972,6 +2338,24 @@ Estacionamento: gratuito por 1h"></textarea>
         if (openLink) openLink.addEventListener('click', (e) => {
           e.preventDefault();
           window.openPersonaPickerInBuilder();
+        });
+        // Voice picker button + preview-current-voice button.
+        const pickBtn = document.getElementById('b-voice-pick');
+        if (pickBtn) pickBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.openVoicePicker();
+        });
+        const pvBtn = document.getElementById('b-voice-preview-current');
+        if (pvBtn) pvBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const id = (formState.voice_id_override || '').trim();
+          if (!id) return;
+          if (_voicePreviewAudio && !_voicePreviewAudio.paused) {
+            stopVoicePreview();
+            pvBtn.textContent = '▶';
+          } else {
+            playVoicePreview(id, pvBtn);
+          }
         });
       })();
 

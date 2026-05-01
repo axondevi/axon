@@ -92,3 +92,115 @@ export async function synthesizeSpeech(opts: {
     return { ok: false, error: err.message || String(err) };
   }
 }
+
+/**
+ * List voices in the operator's ElevenLabs account.
+ * Returns an empty array when ELEVENLABS_API_KEY is unset (silent skip).
+ */
+export interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  preview_url?: string;
+  labels?: Record<string, string>;
+}
+export async function listVoices(): Promise<ElevenLabsVoice[]> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return [];
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 10_000);
+    const res = await fetch(`${EL_BASE}/voices`, {
+      headers: { 'xi-api-key': apiKey, Accept: 'application/json' },
+      signal: ctl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      log.warn('voice.list.api_error', { status: res.status });
+      return [];
+    }
+    const data = (await res.json()) as { voices?: ElevenLabsVoice[] };
+    return data.voices ?? [];
+  } catch (err) {
+    log.warn('voice.list.error', { error: err instanceof Error ? err.message : String(err) });
+    return [];
+  }
+}
+
+/**
+ * Instant Voice Cloning. The user uploads ~30s-60s of clean audio and
+ * gets a voice_id back. ElevenLabs IVC works on Starter ($5/mo) and up;
+ * Free tier rejects with 401 (the `unusable_shared_voice` error code).
+ *
+ * `audio` is a single Blob/File or array of Blobs (MediaRecorder
+ * produces webm/opus on Chrome — ElevenLabs accepts it). `name` is what
+ * shows up in the user's ElevenLabs library; we also store it locally.
+ */
+export interface CloneResult {
+  ok: boolean;
+  voice_id?: string;
+  error?: string;
+  status?: number;
+}
+export async function cloneVoice(opts: {
+  name: string;
+  description?: string;
+  audio: Blob | Blob[];
+}): Promise<CloneResult> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return { ok: false, error: 'voice cloning unavailable (ELEVENLABS_API_KEY not configured)' };
+  const audios = Array.isArray(opts.audio) ? opts.audio : [opts.audio];
+  if (audios.length === 0 || audios.every((a) => a.size === 0)) {
+    return { ok: false, error: 'audio sample is empty' };
+  }
+
+  const fd = new FormData();
+  fd.append('name', opts.name.slice(0, 80));
+  if (opts.description) fd.append('description', opts.description.slice(0, 500));
+  audios.forEach((blob, idx) => {
+    // ElevenLabs expects field name 'files' (plural) for IVC; extension
+    // matters less than the mimetype on the blob, but giving the file a
+    // sensible name makes their dashboard readable.
+    const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp3') ? 'mp3' : blob.type.includes('wav') ? 'wav' : 'audio';
+    fd.append('files', blob, `sample-${idx + 1}.${ext}`);
+  });
+
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 60_000);
+    const res = await fetch(`${EL_BASE}/voices/add`, {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey, Accept: 'application/json' },
+      body: fd,
+      signal: ctl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      log.warn('voice.clone.api_error', { status: res.status, body: text.slice(0, 240) });
+      return { ok: false, error: `elevenlabs ${res.status}: ${text.slice(0, 200)}`, status: res.status };
+    }
+    const j = (await res.json()) as { voice_id?: string };
+    if (!j.voice_id) return { ok: false, error: 'no voice_id in response' };
+    return { ok: true, voice_id: j.voice_id };
+  } catch (err) {
+    log.warn('voice.clone.error', { error: err instanceof Error ? err.message : String(err) });
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Delete a cloned voice from ElevenLabs (best-effort cleanup on user delete). */
+export async function deleteRemoteVoice(voiceId: string): Promise<{ ok: boolean }> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return { ok: false };
+  try {
+    const res = await fetch(`${EL_BASE}/voices/${encodeURIComponent(voiceId)}`, {
+      method: 'DELETE',
+      headers: { 'xi-api-key': apiKey },
+    });
+    return { ok: res.ok };
+  } catch {
+    return { ok: false };
+  }
+}

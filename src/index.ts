@@ -37,6 +37,7 @@ import statsRoutes from '~/routes/stats';
 import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
 import { affiliateRoutes } from '~/routes/affiliate';
+import voicesRoutes from '~/routes/voices';
 
 const app = new Hono();
 
@@ -184,6 +185,7 @@ v1.route('/agents', ownerContacts);  // adds /v1/agents/:id/contacts/* under sam
 v1.route('/checkout', checkoutRoutes);  // POST /v1/checkout/pix + status polling
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 v1.route('/affiliate', affiliateRoutes);  // earnings + agent list for referrers
+v1.route('/voices', voicesRoutes);        // picker / preview / clone / delete
 app.route('/v1', v1);
 
 // ─── Error handler ────────────────────────────────────

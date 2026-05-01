@@ -525,3 +525,36 @@ export const personas = pgTable(
   }),
 );
 export type Persona = typeof personas.$inferSelect;
+
+// ─── User voices (ElevenLabs IDs the user picked or cloned) ──────────────
+// Each row = one voice the user can pick when configuring an agent.
+//   - source='curated' → built-in voice we recommend (pre-seeded subset
+//     of ElevenLabs library tagged for PT-BR / our personas)
+//   - source='cloned'  → uploaded by the user via /v1/voices/clone, lives
+//     in the user's ElevenLabs account (we just track the id+label here)
+//   - source='persona' → mirror of a persona's voice_id_elevenlabs, used
+//     so personas show in the picker without a special-case query
+// `external_id` is the ElevenLabs voice_id (always 8-32 alphanumeric).
+// `label` is what the picker displays. `preview_url` is an optional
+// pre-rendered MP3 url (S3/CDN/blob); when null the picker generates
+// the preview on demand and caches it via /v1/voices/:id/preview.mp3.
+export const userVoices = pgTable(
+  'user_voices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    externalId: text('external_id').notNull(),
+    label: text('label').notNull(),
+    source: text('source').notNull().default('cloned'),
+    previewUrl: text('preview_url'),
+    meta: jsonb('meta'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    userIdx: index('user_voices_user_idx').on(t.userId),
+    extIdx: uniqueIndex('user_voices_user_ext_idx').on(t.userId, t.externalId),
+  }),
+);
+export type UserVoice = typeof userVoices.$inferSelect;
