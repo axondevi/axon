@@ -1159,7 +1159,17 @@ async function executePixTool(opts: {
   }
 
   try {
-    const { createPixPayment } = await import('~/payment/mercadopago');
+    const { createPixPayment, isMpConfigured } = await import('~/payment/mercadopago');
+    // Silent skip when the operator hasn't configured MP. Same pattern as
+    // Vision/Voice/Email — feature degrades to a friendly error rather than
+    // throwing and breaking the whole agent turn.
+    if (!isMpConfigured()) {
+      return {
+        ok: false,
+        error:
+          'Pagamento Pix temporariamente indisponível neste agente. Tente outra forma de combinar com o atendente.',
+      };
+    }
     const { db: dbm } = await import('~/db');
     const { pixPayments, users } = await import('~/db/schema');
     const { eq: eqm } = await import('drizzle-orm');

@@ -157,8 +157,15 @@ app.post('/mercadopago', async (c) => {
   const requestId = c.req.header('x-request-id');
   const sigHeader = c.req.header('x-signature');
 
-  // 1. Verify signature (skip in test mode — env not set)
+  // 1. Verify signature. In production, MP_WEBHOOK_SECRET is REQUIRED — without
+  // it, the endpoint that credits user wallets becomes an open door for credit
+  // injection by anyone who can guess the URL. Tests/dev can run without the
+  // secret, but a missing secret in prod is a hard 503 (deploy-time error).
   const secret = process.env.MP_WEBHOOK_SECRET || '';
+  if (env.NODE_ENV === 'production' && !secret) {
+    log.error('mp_webhook_secret_missing', { msg: 'refusing to process — set MP_WEBHOOK_SECRET' });
+    return c.json({ error: 'misconfigured', message: 'MP webhook secret not set' }, 503);
+  }
   if (secret) {
     const v = await verifyWebhookSignature({
       signatureHeader: sigHeader || null,
@@ -169,6 +176,7 @@ app.post('/mercadopago', async (c) => {
     if (!v.valid) {
       // Log but return 200 — MP retries non-200 forever, even on our own bugs.
       // Better to absorb a possibly-spoofed payload than create a retry storm.
+      // Counter helps spot brute-force attempts in metrics.
       log.warn('mp_signature_invalid', { reason: v.reason });
       return c.json({ ignored: 'signature_invalid' });
     }
@@ -290,10 +298,19 @@ app.post('/mercadopago', async (c) => {
 
 /**
  * Manual deposit webhook (internal / testnet fallback).
- * Useful when you want to credit without Alchemy in the loop.
- * Protect with DEPOSIT_WEBHOOK_TOKEN.
+ *
+ * BLAST RADIUS: this credits arbitrary `amount_usdc` to whichever user owns
+ * `address`. If DEPOSIT_WEBHOOK_TOKEN ever leaks (logs, env dump, ex-employee,
+ * compromised CI), the holder mints unlimited USDC into any wallet they can
+ * name. We refuse to expose that vector in production. Use the on-chain
+ * Alchemy webhook (signed) for prod credits; this endpoint is dev/testnet
+ * only.
  */
 app.post('/manual', async (c) => {
+  if (env.NODE_ENV === 'production') {
+    log.warn('manual_webhook_blocked', { reason: 'disabled in production' });
+    throw Errors.forbidden();
+  }
   const token = c.req.header('x-deposit-token');
   if (!env.DEPOSIT_WEBHOOK_TOKEN || token !== env.DEPOSIT_WEBHOOK_TOKEN) {
     throw Errors.forbidden();
@@ -305,6 +322,14 @@ app.post('/manual', async (c) => {
     onchain_tx?: string;
   }>();
 
+  // Defense in depth: cap arbitrary credit even in dev so a leaked token in a
+  // staging/preview env doesn't drain a non-trivial amount of margin.
+  const MAX_MANUAL_DEPOSIT_MICRO = 100_000_000n; // $100
+  const amountMicro = toMicro(amount_usdc);
+  if (amountMicro > MAX_MANUAL_DEPOSIT_MICRO) {
+    return c.json({ error: 'amount_too_large', message: 'manual deposits capped at $100' }, 400);
+  }
+
   const [wallet] = await db
     .select()
     .from(wallets)
@@ -314,7 +339,7 @@ app.post('/manual', async (c) => {
 
   await credit({
     userId: wallet.userId,
-    amountMicro: toMicro(amount_usdc),
+    amountMicro,
     type: 'deposit',
     onchainTx: onchain_tx,
     meta: { source: 'manual_webhook' },

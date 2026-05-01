@@ -29,6 +29,15 @@ function token(): string {
   return t;
 }
 
+/**
+ * True when MP integration is configured. Lets callers (e.g. the in-chat
+ * `generate_pix` agent tool) silent-skip rather than throwing when the
+ * operator hasn't wired MP creds yet.
+ */
+export function isMpConfigured(): boolean {
+  return !!(process.env.MP_ACCESS_TOKEN && process.env.MP_ACCESS_TOKEN.trim());
+}
+
 async function mpFetch(path: string, init: RequestInit & { idempotencyKey?: string } = {}): Promise<Response> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
@@ -227,7 +236,20 @@ export async function verifyWebhookSignature(opts: {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 
-  return expected === parts.v1
+  // Constant-time comparison — `expected === parts.v1` short-circuits on
+  // first byte mismatch, leaking position via response time. An attacker
+  // forging signatures bytes-at-a-time uses that side channel; we don't
+  // give them the wedge.
+  return constantTimeStringEqual(expected, parts.v1)
     ? { valid: true }
     : { valid: false, reason: 'hmac mismatch' };
+}
+
+function constantTimeStringEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
 }
