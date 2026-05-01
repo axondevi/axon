@@ -16,6 +16,7 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '~/db';
 import { webhookSubscriptions, webhookDeliveries } from '~/db/schema';
 import { log } from '~/lib/logger';
+import { checkUrlSafe } from '~/lib/ssrf';
 import type { WebhookEvent, WebhookPayload } from './events';
 
 const TIMEOUT_MS = 10_000;
@@ -67,6 +68,24 @@ async function deliver(
   secret: string,
   payload: WebhookPayload<unknown>,
 ) {
+  // Defense in depth: even though create-time validation rejects bad
+  // URLs, an admin DB edit or future code path could slip an internal
+  // host past. Block at delivery time too.
+  const safe = checkUrlSafe(url);
+  if (!safe.ok) {
+    log.warn('webhook_ssrf_blocked', { subscription_id: subscriptionId, url, reason: safe.reason });
+    await db.insert(webhookDeliveries).values({
+      subscriptionId,
+      event: payload.event,
+      payload,
+      attempts: 1,
+      lastStatus: null,
+      lastError: `ssrf_blocked: ${safe.reason}`,
+      deliveredAt: null,
+    });
+    return;
+  }
+
   const body = JSON.stringify(payload);
   const sig = createHmac('sha256', secret).update(body, 'utf8').digest('hex');
 

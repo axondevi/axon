@@ -40,4 +40,22 @@ describe('cacheKey', () => {
     const k = cacheKey('x', 'y', {});
     expect(k.startsWith('axon:cache:x:y:')).toBe(true);
   });
+
+  it('isolates per-user caches by default (userId-scoped)', () => {
+    const a = cacheKey('x', 'y', { q: '1' }, undefined, { userId: 'alice' });
+    const b = cacheKey('x', 'y', { q: '1' }, undefined, { userId: 'bob' });
+    expect(a).not.toBe(b);
+  });
+
+  it('shares the cache across users when scope=shared', () => {
+    const a = cacheKey('x', 'y', { q: '1' }, undefined, { userId: 'alice', scope: 'shared' });
+    const b = cacheKey('x', 'y', { q: '1' }, undefined, { userId: 'bob', scope: 'shared' });
+    expect(a).toBe(b);
+  });
+
+  it('does not collide across scopes for the same user', () => {
+    const a = cacheKey('x', 'y', { q: '1' }, undefined, { userId: 'alice', scope: 'per_user' });
+    const b = cacheKey('x', 'y', { q: '1' }, undefined, { userId: 'alice', scope: 'shared' });
+    expect(a).not.toBe(b);
+  });
 });

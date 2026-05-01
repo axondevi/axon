@@ -99,12 +99,19 @@ export async function handleCall(
 async function execute(c: Context, ctx: CallContext) {
   const startedAt = Date.now();
 
-  // 1. Cache check
+  // 1. Cache check.
+  // Default to per-user scope so a cached response from one tenant never
+  // leaks to another. Endpoints in the registry can opt into a shared
+  // cache via `cache_scope: 'shared'` when the response is genuinely
+  // public/deterministic (CEP lookup, holiday list, etc).
+  const cacheScope = (ctx.endpoint as { cache_scope?: 'shared' | 'per_user' })
+    .cache_scope ?? 'per_user';
   const key = cacheKey(
     ctx.slug,
     ctx.endpointKey,
     ctx.params,
     ctx.endpoint.cache_on_body ? ctx.body : undefined,
+    { userId: ctx.userId, scope: cacheScope },
   );
 
   if (ctx.endpoint.cache_ttl > 0) {

@@ -70,49 +70,65 @@ export async function subscribe(userId: string, tier: Tier, opts: { autoRenew?: 
   const price = TIER_PRICES[tier];
   if (price <= 0n) throw Errors.badRequest('Invalid tier price');
 
-  const [existing] = await db.select().from(users).where(eq(users.id, userId));
-  if (!existing) throw Errors.notFound('User');
-
-  // Compute new expiry. If still active in same tier, extend; otherwise start fresh.
-  const now = new Date();
-  let baseTime = now.getTime();
-  if (existing.tier === tier && existing.tierExpiresAt && existing.tierExpiresAt.getTime() > now.getTime()) {
-    baseTime = existing.tierExpiresAt.getTime();
+  // Concurrency guard. Without this, two parallel subscribe() calls (e.g.
+  // a frantic double-click on "Upgrade") both pass the balance check, both
+  // debit the price, but the expiry update is last-write-wins — the user
+  // pays 2× and only gets 1 period of tier. Redis SET NX with a 30-second
+  // TTL serializes the operation per (user, tier).
+  const { redis } = await import('~/cache/redis');
+  const lockKey = `subscribe:lock:${userId}:${tier}`;
+  const acquired = await redis.set(lockKey, '1', 'EX', 30, 'NX');
+  if (!acquired) {
+    throw Errors.badRequest('A subscription request is already in progress. Wait a moment and try again.');
   }
-  const newExpiry = new Date(baseTime + PERIOD_MS);
+  try {
+    const [existing] = await db.select().from(users).where(eq(users.id, userId));
+    if (!existing) throw Errors.notFound('User');
 
-  // Atomic debit happens first — if it throws (insufficient funds), we never
-  // touch the tier. We tag the transaction so the dashboard renders nicely.
-  await debit({
-    userId,
-    amountMicro: price,
-    type: 'subscription_charge',
-    apiSlug: '__subscription__',
-    meta: {
-      kind: 'subscription_charge',
+    // Compute new expiry. If still active in same tier, extend; otherwise start fresh.
+    const now = new Date();
+    let baseTime = now.getTime();
+    if (existing.tier === tier && existing.tierExpiresAt && existing.tierExpiresAt.getTime() > now.getTime()) {
+      baseTime = existing.tierExpiresAt.getTime();
+    }
+    const newExpiry = new Date(baseTime + PERIOD_MS);
+
+    // Atomic debit happens first — if it throws (insufficient funds), we never
+    // touch the tier. We tag the transaction so the dashboard renders nicely.
+    await debit({
+      userId,
+      amountMicro: price,
+      type: 'subscription_charge',
+      apiSlug: '__subscription__',
+      meta: {
+        kind: 'subscription_charge',
+        tier,
+        period_days: PERIOD_DAYS,
+        previous_tier: existing.tier,
+        previous_expires_at: existing.tierExpiresAt?.toISOString() ?? null,
+        new_expires_at: newExpiry.toISOString(),
+      },
+    });
+
+    await db
+      .update(users)
+      .set({
+        tier,
+        tierExpiresAt: newExpiry,
+        tierAutoRenew: opts.autoRenew ?? true,
+      })
+      .where(eq(users.id, userId));
+
+    return {
       tier,
-      period_days: PERIOD_DAYS,
-      previous_tier: existing.tier,
-      previous_expires_at: existing.tierExpiresAt?.toISOString() ?? null,
-      new_expires_at: newExpiry.toISOString(),
-    },
-  });
-
-  await db
-    .update(users)
-    .set({
-      tier,
-      tierExpiresAt: newExpiry,
-      tierAutoRenew: opts.autoRenew ?? true,
-    })
-    .where(eq(users.id, userId));
-
-  return {
-    tier,
-    expires_at: newExpiry.toISOString(),
-    auto_renew: opts.autoRenew ?? true,
-    charged_micro: price,
-  };
+      expires_at: newExpiry.toISOString(),
+      auto_renew: opts.autoRenew ?? true,
+      charged_micro: price,
+    };
+  } finally {
+    // Best-effort lock release; TTL covers crashes.
+    redis.del(lockKey).catch(() => {});
+  }
 }
 
 /**

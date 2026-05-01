@@ -1074,6 +1074,16 @@ async function executeInternalLLMTool(
     if (!/^https?:\/\//.test(url)) {
       return { ok: false, error: 'url must start with http:// or https://' };
     }
+    // SSRF guard. The customer's WhatsApp message ultimately drives this
+    // URL via the LLM tool call, so the attacker controls input. Without
+    // this, asking the agent to "summarize http://169.254.169.254/..."
+    // would proxy the IMDS metadata service and hand it back as a chat
+    // reply.
+    const { checkUrlSafe } = await import('~/lib/ssrf');
+    const safe = checkUrlSafe(url);
+    if (!safe.ok) {
+      return { ok: false, error: `url blocked: ${safe.reason}` };
+    }
     let pageText = '';
     try {
       // Cheap fetch with a 12s timeout — better to give up than block the

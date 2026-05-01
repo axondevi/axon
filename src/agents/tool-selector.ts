@@ -166,13 +166,31 @@ const TOOL_KEYWORDS: Record<string, RegExp> = {
  * Granular by design — picking 1-2 tools beats picking 9 because of token
  * overhead. Brazilian Portuguese keywords are intentional (target market).
  */
+/** Hard cap on how many tools the keyword pass injects into a turn. Each
+ * tool costs ~200-300 prompt tokens, so 8 matches blow ~2k tokens which
+ * would erase the savings the knowledge cache provides. 3 covers the
+ * realistic single-turn intent ("CEP do banco do Brasil em São Paulo"
+ * needs at most lookup_cep + lookup_cnpj + current_weather). */
+const QUICK_PICK_CAP = 3;
+
 function quickPickTools(text: string): string[] {
   const t = text.toLowerCase();
-  const picked = new Set<string>();
+  // Score each tool by how many distinct keyword tokens it matched —
+  // longer/more-specific matches win over a single generic word.
+  const scored: Array<{ tool: string; score: number }> = [];
   for (const [tool, pattern] of Object.entries(TOOL_KEYWORDS)) {
-    if (pattern.test(t)) picked.add(tool);
+    const matches = t.match(new RegExp(pattern.source, pattern.flags + (pattern.flags.includes('g') ? '' : 'g')));
+    if (matches && matches.length > 0) {
+      // Score = unique-match count, weighted by total length so longer
+      // domain terms (e.g. "comprovante de pagamento") outrank a stray
+      // filler word.
+      const uniq = new Set(matches.map((m) => m.toLowerCase())).size;
+      const lenWeight = matches.reduce((acc, m) => acc + m.length, 0);
+      scored.push({ tool, score: uniq * 100 + lenWeight });
+    }
   }
-  return Array.from(picked);
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, QUICK_PICK_CAP).map((x) => x.tool);
 }
 
 /**

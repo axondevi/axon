@@ -310,27 +310,42 @@ app.post('/', async (c) => {
     }
   }
 
+  // Cap free-text fields at sane sizes. Without these caps a single
+  // POST with a 1MB system_prompt amplifies into every LLM call, draining
+  // the daily_budget in seconds. Caps mirror what the dashboard form
+  // already enforces client-side; this is the server-side defence.
+  const SYSTEM_PROMPT_MAX = 8000;
+  const DESC_MAX = 1000;
+  const WELCOME_MAX = 500;
+  const QUICK_PROMPT_MAX = 200;
+  const cap = (v: unknown, n: number) => String(v ?? '').slice(0, n);
+  const rawPrompt = body.system_prompt ?? seed.systemPrompt ?? 'You are a helpful AI assistant.';
+
   const insert = {
     ownerId: user.id,
     slug,
     name: String(body.name || seed.name || 'Untitled agent').slice(0, 80),
-    description: body.description ?? seed.description ?? null,
-    systemPrompt: String(body.system_prompt ?? seed.systemPrompt ?? 'You are a helpful AI assistant.'),
-    allowedTools: Array.isArray(body.allowed_tools) ? body.allowed_tools : (seed.allowedTools ?? []),
-    primaryColor: body.primary_color ?? seed.primaryColor ?? '#7c5cff',
-    welcomeMessage: body.welcome_message ?? seed.welcomeMessage ?? null,
-    quickPrompts: body.quick_prompts ?? seed.quickPrompts ?? null,
+    description: body.description != null ? cap(body.description, DESC_MAX) : seed.description ?? null,
+    systemPrompt: cap(rawPrompt, SYSTEM_PROMPT_MAX),
+    allowedTools: Array.isArray(body.allowed_tools)
+      ? body.allowed_tools.slice(0, 64).map((t: unknown) => String(t).slice(0, 80))
+      : (seed.allowedTools ?? []),
+    primaryColor: body.primary_color ? String(body.primary_color).slice(0, 16) : seed.primaryColor ?? '#7c5cff',
+    welcomeMessage: body.welcome_message != null ? cap(body.welcome_message, WELCOME_MAX) : seed.welcomeMessage ?? null,
+    quickPrompts: Array.isArray(body.quick_prompts)
+      ? body.quick_prompts.slice(0, 8).map((p: unknown) => String(p).slice(0, QUICK_PROMPT_MAX))
+      : seed.quickPrompts ?? null,
     budgetPerSession: body.budget_per_session_usdc != null ? toMicro(String(body.budget_per_session_usdc)) : 500_000n,
     hardCap: body.hard_cap_usdc != null ? toMicro(String(body.hard_cap_usdc)) : 2_000_000n,
     payMode: body.pay_mode === 'owner' ? 'owner' : 'visitor',
     dailyBudgetMicro: body.daily_budget_usdc != null ? toMicro(String(body.daily_budget_usdc)) : 5_000_000n,
     tierRequired: ['free','pro','team','enterprise'].includes(body.tier_required) ? body.tier_required : 'free',
-    systemPromptB: body.system_prompt_b ?? null,
+    systemPromptB: body.system_prompt_b != null ? cap(body.system_prompt_b, SYSTEM_PROMPT_MAX) : null,
     abSplit: Math.max(0, Math.min(100, parseInt(body.ab_split, 10) || 0)),
-    vanityDomain: body.vanity_domain ? String(body.vanity_domain).toLowerCase().trim() : null,
+    vanityDomain: body.vanity_domain ? String(body.vanity_domain).toLowerCase().trim().slice(0, 200) : null,
     uiLanguage: ['auto','pt','en','es'].includes(body.ui_language) ? body.ui_language : 'auto',
     public: body.public !== false,
-    template: seed.template ?? body.template ?? null,
+    template: seed.template ?? (body.template ? String(body.template).slice(0, 80) : null),
     personaId,
   };
 

@@ -169,6 +169,14 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
   if (!/^https?:\/\//.test(instanceUrl)) {
     return c.json({ error: 'bad_request', message: 'instance_url must be http(s)://' }, 400);
   }
+  // SSRF guard: BYO-Evolution registration accepts a user-controlled URL.
+  // Without this, registering instance_url=http://169.254.169.254 would
+  // make the platform probe (and on inbound, deliver) to cloud metadata.
+  const { checkUrlSafe } = await import('~/lib/ssrf');
+  const safe = checkUrlSafe(instanceUrl);
+  if (!safe.ok) {
+    return c.json({ error: 'bad_request', message: `instance_url rejected: ${safe.reason}` }, 400);
+  }
 
   // 1. Probe the instance to make sure URL+key+name actually work
   const probe = await checkInstance({ instanceUrl, instanceName, apiKey });

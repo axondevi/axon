@@ -50,6 +50,14 @@ app.post('/', async (c) => {
   if (!body?.url || !/^https?:\/\//.test(body.url)) {
     throw Errors.badRequest('url must start with http:// or https://');
   }
+  // SSRF guard: block private/internal hosts at create time so the
+  // attacker can't register a metadata IMDS URL and have us POST
+  // payloads to it whenever an event fires.
+  const { checkUrlSafe } = await import('~/lib/ssrf');
+  const safe = checkUrlSafe(body.url);
+  if (!safe.ok) {
+    throw Errors.badRequest(`url rejected: ${safe.reason}`);
+  }
   const events = Array.isArray(body.events) ? body.events : [];
   if (events.length === 0) throw Errors.badRequest('events is required');
   for (const e of events) {
