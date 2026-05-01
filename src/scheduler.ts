@@ -13,7 +13,7 @@
  *
  * Alternative: don't run this at all; instead trigger the admin endpoint
  * from an external cron (GitHub Actions, cron-job.org, etc.):
- *   curl -X POST https://api.axon.dev/v1/admin/settlements/run \
+ *   curl -X POST https://axon-kedb.onrender.com/v1/admin/settlements/run \
  *     -H "x-admin-key: $ADMIN_API_KEY"
  *
  * The two approaches are equivalent. The scheduler just keeps the cron

@@ -9,7 +9,7 @@
  *
  * Env:
  *   AXON_KEY        required — your ax_live_ key
- *   AXON_BASE_URL   optional — defaults to https://api.axon.dev
+ *   AXON_BASE_URL   optional — defaults to https://axon-kedb.onrender.com
  *   AXON_APIS       optional — comma-separated slugs to expose; if empty,
  *                   all catalog entries are exposed.
  */
@@ -32,7 +32,7 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const baseUrl = process.env.AXON_BASE_URL ?? 'https://api.axon.dev';
+const baseUrl = process.env.AXON_BASE_URL ?? 'https://axon-kedb.onrender.com';
 const filterSlugs = process.env.AXON_APIS?.split(',')
   .map((s) => s.trim())
   .filter(Boolean);

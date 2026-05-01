@@ -23,7 +23,7 @@ export class AxonApi implements ICredentialType {
       displayName: 'Base URL',
       name: 'baseUrl',
       type: 'string',
-      default: 'https://api.axon.dev',
+      default: 'https://axon-kedb.onrender.com',
       description: 'Override for self-hosted deployments',
     },
   ];

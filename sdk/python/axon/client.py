@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Mapping, Optional
 
 import httpx
 
-DEFAULT_BASE_URL = "https://api.axon.dev"
+DEFAULT_BASE_URL = "https://axon-kedb.onrender.com"
 
 
 class AxonError(Exception):

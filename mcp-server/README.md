@@ -48,7 +48,7 @@ Any MCP-compatible client that speaks stdio transport works. Point it at `npx @a
 | Var | Required | Default | Purpose |
 |-----|----------|---------|---------|
 | `AXON_KEY` | yes | — | Your Axon API key |
-| `AXON_BASE_URL` | no | `https://api.axon.dev` | Override for self-hosted |
+| `AXON_BASE_URL` | no | `https://axon-kedb.onrender.com` | Override for self-hosted |
 | `AXON_APIS` | no | all | Comma-separated slugs to expose (e.g. `serpapi,firecrawl,exa`) |
 
 ## What's exposed

@@ -21,12 +21,12 @@ import (
 	"time"
 )
 
-const defaultBaseURL = "https://api.axon.dev"
+const defaultBaseURL = "https://axon-kedb.onrender.com"
 
 // Options configure the client.
 type Options struct {
 	APIKey     string
-	BaseURL    string        // default: https://api.axon.dev
+	BaseURL    string        // default: https://axon-kedb.onrender.com
 	HTTPClient *http.Client  // default: &http.Client{Timeout: 30s}
 	UserAgent  string        // default: axon-go/0.1
 }

@@ -20,7 +20,7 @@ Axon POSTs JSON events to URLs you register. Useful for:
 ## Registering a subscription
 
 ```bash
-curl -X POST https://api.axon.dev/v1/webhook-subscriptions \
+curl -X POST https://axon-kedb.onrender.com/v1/webhook-subscriptions \
   -H "x-api-key: ax_live_..." \
   -H "content-type: application/json" \
   -d '{
@@ -44,8 +44,8 @@ Response includes a `secret` used to verify signatures. **Save it** — it's not
 ## Listing / deleting subscriptions
 
 ```bash
-curl https://api.axon.dev/v1/webhook-subscriptions -H "x-api-key: ..."
-curl -X DELETE https://api.axon.dev/v1/webhook-subscriptions/<id> -H "x-api-key: ..."
+curl https://axon-kedb.onrender.com/v1/webhook-subscriptions -H "x-api-key: ..."
+curl -X DELETE https://axon-kedb.onrender.com/v1/webhook-subscriptions/<id> -H "x-api-key: ..."
 ```
 
 ## Delivery format
@@ -110,7 +110,7 @@ Every delivery has a unique `X-Axon-Delivery-Id`. If you see the same ID twice (
 ## Inspecting delivery logs
 
 ```bash
-curl https://api.axon.dev/v1/webhook-subscriptions/<id>/deliveries -H "x-api-key: ..."
+curl https://axon-kedb.onrender.com/v1/webhook-subscriptions/<id>/deliveries -H "x-api-key: ..."
 ```
 
 Returns the last 50 attempts with status/error so you can debug why something didn't fire.

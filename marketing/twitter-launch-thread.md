@@ -34,7 +34,7 @@
 >
 > ```
 > await fetch(
->   'https://api.axon.dev/v1/call/serpapi/search?q=best+espresso+lisbon',
+>   'https://axon-kedb.onrender.com/v1/call/serpapi/search?q=best+espresso+lisbon',
 >   { headers: { 'x-api-key': KEY } }
 > )
 > ```

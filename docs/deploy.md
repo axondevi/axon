@@ -49,7 +49,7 @@ railway up
 
 In the Railway dashboard:
 - Add env vars from `.env.example` (generate fresh secrets: `openssl rand -hex 32`)
-- Attach your custom domain (`api.axon.dev`) or use the Railway-provided URL
+- Attach your custom domain (`axon-kedb.onrender.com`) or use the Railway-provided URL
 - Enable autoscaling: min 1, max 3 instances
 
 ### 5. Run migrations
@@ -78,7 +78,7 @@ For v0.1, the placeholder deposit address generator works but the watcher must b
 ### 8. Set up Alchemy webhook
 
 - Create Alchemy app on Base Mainnet
-- Create "Address Activity" webhook → your endpoint: `https://api.axon.dev/v1/webhooks/alchemy`
+- Create "Address Activity" webhook → your endpoint: `https://axon-kedb.onrender.com/v1/webhooks/alchemy`
 - Add watched addresses: all user deposit addresses (API for this via Alchemy Notify)
 - Copy the signing key → `ALCHEMY_WEBHOOK_SIGNING_KEY` in Railway env
 
@@ -90,7 +90,7 @@ cd landing
 # Or: drag-and-drop upload at pages.cloudflare.com
 ```
 
-DNS: `axon.dev` → Cloudflare Pages · `api.axon.dev` → Railway
+DNS: `axon.dev` → Cloudflare Pages · `axon-kedb.onrender.com` → Railway
 
 ### 10. Observability
 

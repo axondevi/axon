@@ -79,7 +79,7 @@ export class Axon {
   constructor(opts: AxonOptions) {
     if (!opts.apiKey) throw new Error('Axon: apiKey is required');
     this.apiKey = opts.apiKey;
-    this.baseUrl = (opts.baseUrl ?? 'https://api.axon.dev').replace(/\/$/, '');
+    this.baseUrl = (opts.baseUrl ?? 'https://axon-kedb.onrender.com').replace(/\/$/, '');
     this.fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis);
     this.userAgent = opts.userAgent ?? '@axon/client/0.1';
 

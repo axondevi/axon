@@ -63,7 +63,7 @@ print(f"paid {result.cost_usdc} USDC, cache {'hit' if result.cache_hit else 'mis
 ### curl
 
 ```bash
-curl "https://api.axon.dev/v1/call/serpapi/search?q=best+espresso+in+lisbon" \
+curl "https://axon-kedb.onrender.com/v1/call/serpapi/search?q=best+espresso+in+lisbon" \
   -H "x-api-key: ax_live_..." -i
 ```
 

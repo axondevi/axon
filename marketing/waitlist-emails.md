@@ -41,7 +41,7 @@ Subject lines matter more than body. Test two per email.
 >
 > Your first request — literally paste into a terminal:
 >
->     curl https://api.axon.dev/v1/call/serpapi/search?q=hello \
+>     curl https://axon-kedb.onrender.com/v1/call/serpapi/search?q=hello \
 >       -H "x-api-key: ax_live_XXXXXXXXXXXX"
 >
 > You'll see the response, the cost it took from your wallet, and whether it was cached. That's all there is.

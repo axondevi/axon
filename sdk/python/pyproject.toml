@@ -23,8 +23,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://axon.dev"
-Documentation = "https://docs.axon.dev"
+Homepage = "https://axon-5zf.pages.dev"
+Documentation = "https://axon-5zf.pages.dev/learn"
 Source = "https://github.com/axondev/axon"
 
 [tool.setuptools.packages.find]

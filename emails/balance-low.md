@@ -25,7 +25,7 @@ Send USDC on Base to:
 If you'd rather cap spending instead, set a policy:
 
 ```
-curl -X PUT https://api.axon.dev/v1/admin/policy/<user_id> \
+curl -X PUT https://axon-kedb.onrender.com/v1/admin/policy/<user_id> \
   -H "x-admin-key: <your admin key>" \
   -d '{"daily_budget_micro": "5000000"}'
 ```

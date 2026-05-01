@@ -24,7 +24,7 @@ info:
     url: https://axon.dev
 
 servers:
-  - url: https://api.axon.dev
+  - url: https://axon-kedb.onrender.com
     description: Production (hosted)
   - url: http://localhost:3000
     description: Local development

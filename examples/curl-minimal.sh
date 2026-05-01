@@ -4,7 +4,7 @@
 set -euo pipefail
 
 : "${AXON_KEY:?set AXON_KEY}"
-BASE="${AXON_BASE:-https://api.axon.dev}"
+BASE="${AXON_BASE:-https://axon-kedb.onrender.com}"
 
 echo "── catalog ──"
 curl -s "$BASE/v1/apis" | head -c 200; echo

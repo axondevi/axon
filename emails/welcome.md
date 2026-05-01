@@ -17,7 +17,7 @@ You're in. Here's everything you need:
 ### Your first call, in under 60 seconds
 
 ```
-curl "https://api.axon.dev/v1/call/openweather/current?lat=38.72&lon=-9.14" \
+curl "https://axon-kedb.onrender.com/v1/call/openweather/current?lat=38.72&lon=-9.14" \
   -H "x-api-key: {{api_key}}"
 ```
 

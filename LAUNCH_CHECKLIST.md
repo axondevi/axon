@@ -56,7 +56,7 @@ Later additions (week 2):
 - [ ] Deploy Axon as web service
 - [ ] Managed Postgres (Neon is cheapest to start; Supabase if you want GUI)
 - [ ] Managed Redis (Upstash pay-per-request; free tier is fine until ~10k req/day)
-- [ ] Point `api.axon.dev` → your deploy
+- [ ] Point `axon-kedb.onrender.com` → your deploy
 - [ ] Point `axon.dev` → landing (Cloudflare Pages / Vercel, static)
 
 ---

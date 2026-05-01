@@ -166,7 +166,7 @@
 
       async function api(path, opts = {}) {
         const key = localStorage.getItem(STORAGE_KEY);
-        const base = localStorage.getItem(BASE_KEY) || 'https://api.axon.dev';
+        const base = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
         const res = await fetch(base + path, {
           ...opts,
           headers: { 'x-api-key': key, 'content-type': 'application/json', ...(opts.headers || {}) },
@@ -183,12 +183,12 @@
             <h1>Axon Dashboard</h1>
             <p>Paste your API key to get started.</p>
             ${err ? `<div class="error">${err}</div>` : ''}
-            <input type="text" id="base" placeholder="https://api.axon.dev" />
+            <input type="text" id="base" placeholder="https://axon-kedb.onrender.com" />
             <input type="password" id="key" placeholder="ax_live_..." />
             <button class="primary" id="go">Open dashboard</button>
           </div>
         `;
-        document.getElementById('base').value = localStorage.getItem(BASE_KEY) || 'https://api.axon.dev';
+        document.getElementById('base').value = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
         document.getElementById('go').onclick = async () => {
           const base = document.getElementById('base').value.trim();
           const key = document.getElementById('key').value.trim();

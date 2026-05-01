@@ -100,7 +100,7 @@ Save the demo API key — it's your first working credential.
    - Build output directory: `landing`
 4. Deploy. Your landing is now at `https://axon.pages.dev` (or pick a custom name)
 5. Edit the landing HTML to point at the Render backend:
-   - In `landing/stats.html` change the hardcoded `https://api.axon.dev` to `https://axon-xxxxx.onrender.com`
+   - In `landing/stats.html` change the hardcoded `https://axon-kedb.onrender.com` to `https://axon-xxxxx.onrender.com`
    - Commit and push — Cloudflare auto-redeploys
 
 ### 7. Get 3-5 upstream API keys (30 min)
@@ -170,7 +170,7 @@ You'll know you should buy a domain when:
 A `.dev` or `.ai` domain is ~$12-30/year. Use **Cloudflare Registrar** — they sell at cost, no markup. Move DNS to Cloudflare (already free).
 
 Then:
-- Add `api.axon.dev` → Render CNAME
+- Add `axon-kedb.onrender.com` → Render CNAME
 - Add `axon.dev` → Cloudflare Pages custom domain
 - Add `docs.axon.dev` → Cloudflare Pages custom domain
 - Update landing/docs to reference the new domain

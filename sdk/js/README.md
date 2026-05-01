@@ -61,7 +61,7 @@ try {
 | Option | Default | Purpose |
 |--------|---------|---------|
 | `apiKey` | — | Your Axon API key (starts with `ax_live_`) |
-| `baseUrl` | `https://api.axon.dev` | Override for self-hosted / staging |
+| `baseUrl` | `https://axon-kedb.onrender.com` | Override for self-hosted / staging |
 | `fetch` | `globalThis.fetch` | Injectable for tests / edge runtimes |
 | `userAgent` | `@axon/client/0.1` | Custom UA header |
 
