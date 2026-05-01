@@ -113,6 +113,21 @@ app.get('/:id/preview.mp3', async (c) => {
     if (r.skipped) {
       return c.json({ error: 'voice_unavailable', message: 'TTS not configured on this server' }, 503);
     }
+    // ElevenLabs Free Tier disables API access from datacenters /
+    // VPNs ("detected_unusual_activity" — see docs). Surface a
+    // friendly message so the user knows it's a billing/account issue,
+    // not a bug in their voice id. 401 → 402 (Payment Required) so
+    // the UI can hint "upgrade plan" without ambiguity.
+    if (typeof r.error === 'string' && r.error.includes('401')) {
+      return c.json(
+        {
+          error: 'voice_provider_unavailable',
+          message:
+            'ElevenLabs bloqueou a chamada (provavelmente Free Tier limitado por uso em datacenter). Faça upgrade na conta ElevenLabs ou troque a chave em ELEVENLABS_API_KEY.',
+        },
+        402,
+      );
+    }
     return c.json({ error: 'synth_failed', message: r.error ?? 'unknown' }, 502);
   }
 
