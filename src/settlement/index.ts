@@ -46,40 +46,29 @@ export async function settleForApi(
 
   if (reqCount === 0) return { inserted: false, owedMicro: 0n, requests: 0 };
 
-  // Upsert: same (slug, period) overwrites (in case we re-run for corrections)
-  const existing = await db
-    .select()
-    .from(settlements)
-    .where(
-      and(
-        eq(settlements.apiSlug, slug),
-        eq(settlements.periodStart, period.start),
-        eq(settlements.periodEnd, period.end),
-      ),
-    )
-    .limit(1);
+  // Atomic upsert via the unique index on (api_slug, period_start, period_end)
+  // so concurrent settle runs (cron + manual retry overlapping) never
+  // duplicate a row. ON CONFLICT path keeps the latest aggregate so
+  // re-running for corrections still wins. If status is already 'paid'
+  // we leave it alone to avoid resurrecting closed settlements.
+  const inserted = await db
+    .insert(settlements)
+    .values({
+      apiSlug: slug,
+      periodStart: period.start,
+      periodEnd: period.end,
+      requestCount: reqCount,
+      owedMicro,
+      status: 'pending',
+    })
+    .onConflictDoUpdate({
+      target: [settlements.apiSlug, settlements.periodStart, settlements.periodEnd],
+      set: { requestCount: reqCount, owedMicro },
+      setWhere: sql`${settlements.status} <> 'paid'`,
+    })
+    .returning({ id: settlements.id });
 
-  if (existing.length > 0) {
-    await db
-      .update(settlements)
-      .set({
-        requestCount: reqCount,
-        owedMicro,
-      })
-      .where(eq(settlements.id, existing[0].id));
-    return { inserted: false, owedMicro, requests: reqCount };
-  }
-
-  await db.insert(settlements).values({
-    apiSlug: slug,
-    periodStart: period.start,
-    periodEnd: period.end,
-    requestCount: reqCount,
-    owedMicro,
-    status: 'pending',
-  });
-
-  return { inserted: true, owedMicro, requests: reqCount };
+  return { inserted: inserted.length > 0, owedMicro, requests: reqCount };
 }
 
 /** Settle every active slug that had traffic in the window. */
@@ -103,12 +92,13 @@ export async function settleAll(period: SettlementPeriod) {
   return results;
 }
 
-/** Mark a settlement row paid (human confirmation / finance workflow). */
+/** Mark a settlement row paid (human confirmation / finance workflow).
+ * Idempotent: re-running with the same id is a no-op once status='paid'. */
 export async function markPaid(id: string, paidRef: string): Promise<void> {
   await db
     .update(settlements)
     .set({ status: 'paid', paidAt: new Date(), paidRef })
-    .where(eq(settlements.id, id));
+    .where(and(eq(settlements.id, id), sql`${settlements.status} <> 'paid'`));
 }
 
 /** Convenience for "last full UTC day". */

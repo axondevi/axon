@@ -89,6 +89,37 @@ export async function credit(params: {
 }) {
   const { userId, amountMicro, type, onchainTx, meta } = params;
 
+  if (amountMicro <= 0n) {
+    throw Errors.badRequest('credit amount must be > 0');
+  }
+
+  // Replay guard: when an onchain_tx is supplied, INSERT the ledger row
+  // FIRST. The unique partial index `tx_onchain_idx` on transactions
+  // raises on duplicate, which means we can detect a re-delivered
+  // webhook before we touch the wallet. Without this ordering, the
+  // wallet UPDATE committed first and the ledger INSERT later — a
+  // double-delivered Alchemy notification credited twice and only the
+  // second attempt threw.
+  if (onchainTx) {
+    try {
+      await db.insert(transactions).values({
+        userId,
+        type,
+        amountMicro,
+        onchainTx,
+        meta,
+      });
+    } catch (err) {
+      // Unique-violation on tx_onchain_idx → already credited. Idempotent return.
+      const code = (err as { code?: string }).code;
+      if (code === '23505') {
+        const [w] = await db.select().from(wallets).where(eq(wallets.userId, userId));
+        return { newBalanceMicro: w?.balanceMicro ?? 0n, idempotent: true as const };
+      }
+      throw err;
+    }
+  }
+
   const result = await db
     .update(wallets)
     .set({
@@ -98,17 +129,29 @@ export async function credit(params: {
     .where(eq(wallets.userId, userId))
     .returning({ newBalanceMicro: wallets.balanceMicro });
 
-  await db.insert(transactions).values({
-    userId,
-    type,
-    amountMicro,
-    onchainTx,
-    meta,
-  });
+  // Don't write a phantom transaction if the wallet doesn't exist. The
+  // previous code would record a `transactions` row even when UPDATE
+  // matched zero wallets, leaving an orphan ledger entry that confused
+  // accounting. Surface the bug instead.
+  if (result.length === 0) {
+    throw Errors.notFound('Wallet');
+  }
+
+  // Ledger row for non-onchain credits (refunds, bonuses) goes here, since
+  // the onchain branch above already inserted before crediting.
+  if (!onchainTx) {
+    await db.insert(transactions).values({
+      userId,
+      type,
+      amountMicro,
+      onchainTx,
+      meta,
+    });
+  }
 
   // Outbound webhooks for notable credits. Dynamic import so the webhook
   // module isn't pulled into test harnesses that don't need it.
-  if (result.length > 0) {
+  {
     const newBalance = fromMicro(result[0].newBalanceMicro);
     if (type === 'deposit') {
       const { emitWebhook } = await import('~/webhooks/emitter');

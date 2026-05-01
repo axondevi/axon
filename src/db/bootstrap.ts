@@ -149,6 +149,15 @@ export async function ensureCriticalSchema() {
     END $$
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "whatsapp_connections_owner_idx" ON "whatsapp_connections" ("owner_id")`);
+
+  // 0017: settlement uniqueness. Concurrent settle jobs (manual retry +
+  // scheduled) used to SELECT-then-INSERT and produce duplicate rows
+  // for the same (api, period). The unique index lets the upsert path
+  // use ON CONFLICT DO UPDATE atomically.
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "settlement_period_idx"
+      ON "settlements" ("api_slug", "period_start", "period_end")
+  `);
 }
 
 export async function ensureSystemRows() {

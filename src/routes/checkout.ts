@@ -7,7 +7,7 @@
  * Companion webhook lives in `src/routes/webhooks.ts` at /v1/webhooks/mercadopago.
  */
 import { Hono } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '~/db';
 import { pixPayments, users } from '~/db/schema';
 import { Errors } from '~/lib/errors';
@@ -37,6 +37,40 @@ checkoutRoutes.post('/pix', async (c) => {
       { error: 'bad_request', message: `amount_brl must be between R$${MIN_BRL} and R$${MAX_BRL}` },
       400,
     );
+  }
+
+  // Reuse a still-fresh pending Pix instead of stacking duplicates.
+  // The dashboard double-clicking the "Recharge" button used to mint
+  // two MP charges for the same user; one would never be paid and lived
+  // forever as an orphan. If we already have a pending row whose QR is
+  // not yet expired, return it so the user keeps the same QR code.
+  const [reusable] = await db
+    .select()
+    .from(pixPayments)
+    .where(
+      and(
+        eq(pixPayments.userId, user.id),
+        eq(pixPayments.status, 'pending'),
+        sql`(${pixPayments.expiresAt} IS NULL OR ${pixPayments.expiresAt} > NOW())`,
+      ),
+    )
+    .orderBy(desc(pixPayments.createdAt))
+    .limit(1);
+
+  if (reusable && reusable.qrCode) {
+    return c.json({
+      id: reusable.id,
+      mp_id: reusable.mpPaymentId,
+      amount_brl: reusable.amountBrl,
+      estimated_credit_usdc: (Number(reusable.amountBrl) / fxBrlPerUsd()).toFixed(6),
+      fx_rate_brl_per_usd: fxBrlPerUsd(),
+      qr_code: reusable.qrCode,
+      qr_code_base64: reusable.qrCodeBase64,
+      ticket_url: reusable.ticketUrl,
+      expires_at: reusable.expiresAt,
+      status: 'pending',
+      reused: true,
+    });
   }
 
   // Pre-create our row so we have an id to use as MP external_reference.

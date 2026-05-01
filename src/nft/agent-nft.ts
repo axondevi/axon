@@ -26,6 +26,14 @@
 
 import { log } from '~/lib/logger';
 
+// Module-scoped serializer. The minter wallet has ONE on-chain nonce; if
+// two mints fire concurrently we either reuse a nonce (revert) or skip
+// one (stuck pending). A simple in-memory promise chain serializes
+// every writeContract call from this signer. The chain is per-process,
+// which matches Render's single-instance default — multi-instance
+// deployments would need a Redis-backed lock instead.
+let mintQueue: Promise<unknown> = Promise.resolve();
+
 interface MintParams {
   to: string;          // recipient wallet (user's embedded wallet)
   agentId: string;     // UUID — used to derive tokenId deterministically
@@ -113,14 +121,58 @@ export async function mintAgentNft(params: MintParams): Promise<MintResult> {
         outputs: [],
         stateMutability: 'nonpayable',
       },
+      // ownerOf reverts when tokenId isn't minted; we use that to detect
+      // an already-minted token before sending a duplicate write.
+      {
+        type: 'function',
+        name: 'ownerOf',
+        inputs: [{ name: 'tokenId', type: 'uint256' }],
+        outputs: [{ name: '', type: 'address' }],
+        stateMutability: 'view',
+      },
     ] as const;
 
-    const txHash = await walletClient.writeContract({
-      address: contractAddress as `0x${string}`,
-      abi: mintAbi,
-      functionName: 'mint',
-      args: [params.to as `0x${string}`, tokenId, params.metadataUrl, params.slug],
+    // Pre-flight: if this tokenId is already minted, return idempotent
+    // success rather than burning gas on a sure-revert. Cheap eth_call.
+    const publicClient = viem.createPublicClient({
+      chain,
+      transport: viem.http(rpcUrl),
     });
+    try {
+      const owner = await publicClient.readContract({
+        address: contractAddress as `0x${string}`,
+        abi: mintAbi,
+        functionName: 'ownerOf',
+        args: [tokenId],
+      });
+      // ownerOf returned without revert → token already minted, idempotent return.
+      log.info('nft_already_minted', {
+        agentId: params.agentId,
+        tokenId: tokenId.toString(),
+        owner,
+      });
+      return { ok: true, tokenId: tokenId.toString(), reason: 'already_minted' };
+    } catch {
+      // ownerOf reverted → token not yet minted, proceed.
+    }
+
+    // Serialize through the per-process queue so concurrent mints from
+    // the same signer don't fight for the same nonce. The chain captures
+    // any error so a single failed mint doesn't poison the queue forever.
+    const txHash = await (mintQueue = mintQueue.then(
+      () => walletClient.writeContract({
+        address: contractAddress as `0x${string}`,
+        abi: mintAbi,
+        functionName: 'mint',
+        args: [params.to as `0x${string}`, tokenId, params.metadataUrl, params.slug],
+      }),
+      () => walletClient.writeContract({
+        address: contractAddress as `0x${string}`,
+        abi: mintAbi,
+        functionName: 'mint',
+        args: [params.to as `0x${string}`, tokenId, params.metadataUrl, params.slug],
+      }),
+    )) as `0x${string}`;
 
     log.info('nft_minted', {
       agentId: params.agentId,
