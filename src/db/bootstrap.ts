@@ -132,16 +132,22 @@ export async function ensureCriticalSchema() {
 
   // 0016: requests.agent_id was added in migration 0004 without a foreign
   // key. Add ON DELETE SET NULL so deleting an agent leaves request history
-  // intact for accounting/analytics rather than orphaning rows that violate
-  // referential integrity. We DO NOT use CASCADE — operator may need the
-  // request audit trail even after deletion. The constraint name lets us
-  // skip if it already exists (Postgres lacks "IF NOT EXISTS" on FK).
+  // intact for accounting/analytics. We DO NOT use CASCADE — operator may
+  // need the request audit trail even after deletion. The constraint name
+  // lets us skip if it already exists (Postgres lacks "IF NOT EXISTS" on
+  // FK). Before adding the constraint we NULL-out any orphan agent_ids
+  // from the FK-less past — adding a FK against existing violations would
+  // abort the whole bootstrap and crash-loop the service.
   await db.execute(sql`
     DO $$
     BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'requests_agent_id_fkey'
       ) THEN
+        UPDATE "requests"
+          SET "agent_id" = NULL
+          WHERE "agent_id" IS NOT NULL
+            AND "agent_id" NOT IN (SELECT "id" FROM "agents");
         ALTER TABLE "requests"
           ADD CONSTRAINT "requests_agent_id_fkey"
           FOREIGN KEY ("agent_id") REFERENCES "agents"("id") ON DELETE SET NULL;
