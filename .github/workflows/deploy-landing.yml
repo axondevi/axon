@@ -29,6 +29,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # wrangler-action@v3 auto-detects the package manager from lockfiles
+      # in the repo. We ship bun.lock at the root, so the action tried to
+      # `bun install -g wrangler` and crashed with "Unable to locate
+      # executable file: bun". The GitHub runner image doesn't ship Bun by
+      # default. Setup Node + pin the action to npm.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Generate static catalog from registry
         run: python scripts/build-catalog.py
 
@@ -38,3 +48,4 @@ jobs:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: pages deploy landing --project-name=axon
+          packageManager: npm
