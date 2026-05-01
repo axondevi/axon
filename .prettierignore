@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+academy/dist/
+landing/learn/
+academy-docs/
+academy/test-artifacts/
+contracts/AxonAgent.compiled.json
+bun.lock
+package-lock.json
+*.min.js
+*.min.css

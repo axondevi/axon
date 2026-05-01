@@ -48,10 +48,14 @@ async function ensureSdk() {
       const mod = await import('@coinbase/coinbase-sdk');
       sdk = { Coinbase: mod.Coinbase, Wallet: mod.Wallet };
     } catch (err) {
+      // Preserve the underlying loader error as `cause` so debug logs can
+      // tell apart "package missing" vs "package present but failed to
+      // initialize" when triaging.
       throw new Error(
         'CDPWalletProvider requires @coinbase/coinbase-sdk. Install it:\n' +
           '    bun add @coinbase/coinbase-sdk\n' +
           'Then set WALLET_PROVIDER=cdp and CDP_API_KEY_NAME / CDP_API_KEY_PRIVATE.',
+        { cause: err },
       );
     }
   }

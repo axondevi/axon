@@ -1,0 +1,46 @@
+# Normalize line endings on commit. Keeps Windows checkouts editable
+# (CRLF in working tree) while every blob in the repo is LF — silences
+# the "LF will be replaced by CRLF" warnings on every git add.
+* text=auto eol=lf
+
+# Binary blobs — never touch.
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.ico      binary
+*.pdf      binary
+*.woff     binary
+*.woff2    binary
+*.ttf      binary
+*.eot      binary
+*.zip      binary
+*.tar      binary
+*.gz       binary
+*.bun      binary
+*.lockb    binary
+
+# Shell scripts must be LF regardless of platform.
+*.sh      text eol=lf
+*.bash    text eol=lf
+
+# Windows .bat and .cmd want CRLF — leave them.
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+
+# Keep generated/static lockfiles and registry JSON merge-friendly.
+bun.lock                  text eol=lf
+package.json              text eol=lf
+*.json                    text eol=lf
+*.yml                     text eol=lf
+*.yaml                    text eol=lf
+
+# Linguist hints for the GitHub repo overview.
+academy/**       linguist-documentation
+docs/**          linguist-documentation
+emails/**        linguist-documentation
+marketing/**     linguist-documentation
+blog/**          linguist-documentation
+academy-docs/**  linguist-documentation
+landing/learn/** linguist-documentation
+contracts/AxonAgent.compiled.json linguist-generated
