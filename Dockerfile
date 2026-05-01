@@ -1,4 +1,4 @@
-FROM oven/bun:1.1-alpine AS base
+FROM oven/bun:1.3-alpine AS base
 
 # System deps for native modules (pg, ioredis keep-alive, etc.)
 RUN apk add --no-cache \
