@@ -1031,7 +1031,8 @@ async function processBufferedTurn(opts: {
   const incapacityLines: string[] = [];
   if (!effectiveTools.includes('generate_image')) {
     incapacityLines.push(
-      '- **Imagens**: você NÃO gera, edita nem desenha imagens. Se o cliente pedir uma foto/imagem/desenho, peça uma descrição em palavras ou redirecione para a forma de comunicação adequada (ex: "te mando o catálogo em PDF se preferir"). NUNCA escreva "vou gerar", "aguarde a imagem", "estou criando".',
+      '- **Imagens (geração)**: você NÃO gera, edita nem desenha imagens NOVAS. Se o cliente PEDIR pra você criar/gerar/desenhar/produzir uma imagem ("gera uma foto de X", "faz um desenho de Y"), RECUSE educadamente e ofereça alternativa em texto. NUNCA escreva "vou gerar", "aguarde a imagem", "estou criando".',
+      '- **EXCEÇÃO IMPORTANTE — foto que o cliente ENVIOU**: quando a mensagem do cliente começa com `[CLIENTE ENVIOU FOTO]` ou `[CLIENTE ENVIOU UMA FOTO...]`, isso significa que ELE acabou de mandar uma imagem e a descrição automática vem logo depois. Nesse caso REAJA à foto: comente o que está nela, faça perguntas de contexto, ajude o cliente. ISSO NÃO É GERAR — é apenas responder sobre o que ele mandou. NÃO peça pra ele descrever em palavras (a descrição já está aí). NÃO recuse. Trate como se você tivesse visto a foto.',
     );
   }
   if (!effectiveTools.includes('generate_pix')) {
@@ -1084,8 +1085,18 @@ async function processBufferedTurn(opts: {
     // https://example.com/abc123"). Post-process the reply: if it
     // promises a capability the agent doesn't have AND no actual
     // artifact was produced, replace the text with a polite refusal.
+    // When the customer just sent a photo, the agent's reply naturally
+    // contains image vocabulary ("a imagem mostra um kit", "essa foto é
+    // bonita") even though it's REACTING, not promising to generate.
+    // The verb+noun proximity check would aggressively rewrite the reply
+    // into a refusal, breaking the photo-reaction flow. Skip the rewrite
+    // entirely on photo-inbound turns — the LLM has already seen the
+    // capability guard and the photo-reaction carve-out, so any image
+    // language here is genuine commentary on the customer's photo.
+    const userJustSentPhoto = /^\s*\[CLIENTE ENVIOU (UMA )?FOTO/i.test(mergedText);
+
     const guardRewrites: string[] = [];
-    if (!effectiveTools.includes('generate_image') && images.length === 0) {
+    if (!effectiveTools.includes('generate_image') && images.length === 0 && !userJustSentPhoto) {
       // Aggressive detection: any verb conjugation of gerar/criar/fazer/
       // desenhar/enviar/mandar/produzir/montar in proximity to an image
       // noun (imagem/foto/desenho/paisagem/etc) within ~80 chars of each
