@@ -513,6 +513,11 @@ export const contactDocuments = pgTable(
     // R2 object key — full path inside the bucket
     storageKey: text('storage_key').notNull(),
 
+    // 'inbound'  — customer sent this doc to the agent
+    // 'outbound' — agent generated and sent this doc to the customer
+    // Default 'inbound' so old rows (before 0025 migration) stay correct.
+    direction: text('direction').notNull().default('inbound'),
+
     // LLM-classified taxonomy. Default 'outro' so unclassifiable docs still
     // get persisted and remain visible to the owner.
     docType: text('doc_type').notNull().default('outro'),

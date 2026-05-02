@@ -45,10 +45,12 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
+    "@types/pdfkit": "^0.17.6",
     "drizzle-orm": "^0.36.0",
     "hono": "^4.6.0",
     "ioredis": "^5.4.1",
     "jose": "^6.2.3",
+    "pdfkit": "^0.18.0",
     "pg": "^8.13.0",
     "viem": "^2.21.0",
     "zod": "^3.23.8"

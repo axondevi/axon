@@ -13,7 +13,7 @@
  * reply. Saving runs fire-and-forget after the reply is dispatched, so
  * upload latency or classifier failure can't degrade the chat experience.
  *
- * No-op when R2_* envs aren't configured — we still skip-log so ops can
+ * No-op when SUPABASE_STORAGE_* envs aren't configured — we still skip-log so ops can
  * see why uploads are missing in the dashboard.
  */
 import { db } from '~/db';
@@ -157,5 +157,88 @@ export async function saveContactDocument(opts: {
     documentId,
     storageKey: upload.ok ? storageKey : undefined,
     docType: classification.docType,
+  };
+}
+
+/**
+ * Persist a PDF the AGENT generated and sent to a customer.
+ *
+ * Distinct from saveContactDocument (which classifies inbound media via
+ * an LLM): outbound docs come with type + title + excerpt already known,
+ * so we skip the classifier and write directly. Same R2 / metadata-only
+ * fallback rules apply: row is always inserted (with empty storage_key
+ * if upload fails), so the dashboard timeline is complete even when
+ * Storage hiccups.
+ *
+ * Storage key namespace: documents/<agent>/<contact>/generated/<id>.pdf
+ * — separate "generated" prefix so ops can spot/clean outbound vs inbound
+ * with a quick prefix list.
+ */
+export async function saveOutboundDocument(opts: {
+  agentId: string;
+  contactMemoryId: string;
+  bytes: Uint8Array | Buffer;
+  mimeType: string;
+  filename: string;
+  title: string;
+  /** Caller-provided category (matches the doc_type_hint enum). */
+  docType: string;
+  /** Caller-provided one-line summary derived from the body. */
+  excerpt: string;
+}): Promise<SaveDocumentResult> {
+  const documentId = randomUUID();
+  const ext = extensionForMime(opts.mimeType, opts.filename);
+  const storageKey = `documents/${opts.agentId}/${opts.contactMemoryId}/generated/${documentId}.${ext}`;
+  const bytesUint =
+    opts.bytes instanceof Uint8Array ? opts.bytes : new Uint8Array(opts.bytes);
+
+  const upload = await putObject({
+    key: storageKey,
+    bytes: bytesUint,
+    mimeType: opts.mimeType,
+  });
+
+  const summary =
+    opts.title.trim().slice(0, 80) +
+    (opts.excerpt ? ` — ${opts.excerpt.replace(/\s+/g, ' ').slice(0, 120)}` : '');
+
+  try {
+    await db.insert(contactDocuments).values({
+      id: documentId,
+      contactMemoryId: opts.contactMemoryId,
+      agentId: opts.agentId,
+      filename: opts.filename.slice(0, 200),
+      mimeType: opts.mimeType,
+      byteSize: bytesUint.length,
+      storageKey: upload.ok ? storageKey : '',
+      docType: opts.docType,
+      direction: 'outbound',
+      extractedText: opts.excerpt.slice(0, 10000),
+      summary: summary.slice(0, 200),
+      callerCaption: null,
+    });
+  } catch (err: any) {
+    log.warn('document_vault.outbound_insert_failed', {
+      error: err?.message || String(err),
+      agent_id: opts.agentId,
+    });
+    return { ok: false, error: err?.message || String(err) };
+  }
+
+  log.info('document_vault.outbound_saved', {
+    document_id: documentId,
+    doc_type: opts.docType,
+    bytes: bytesUint.length,
+    upload_ok: upload.ok,
+  });
+
+  void import('~/lib/metrics').then(({ bumpCounter }) => {
+    bumpCounter('axon_document_vault_outbound_total', { doc_type: opts.docType });
+  });
+
+  return {
+    ok: true,
+    documentId,
+    storageKey: upload.ok ? storageKey : undefined,
   };
 }

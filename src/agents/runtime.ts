@@ -217,6 +217,50 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     // No buildRequest — generate_pix is intercepted server-side and routed to
     // our internal MercadoPago wrapper, NOT to handleCall.
   },
+  generate_pdf: {
+    description:
+      'Generate a PDF document and deliver it to the customer over WhatsApp. ' +
+      'Use for: comprovante de agendamento, ficha de cadastro, recibo, ' +
+      'orientação pré-consulta, contrato, declaração, receita virtual. ' +
+      'Always write content in PT-BR. Title should be specific (ex: "Comprovante de Agendamento"). ' +
+      'Body is the high-signal first paragraph. Sections are optional structured blocks for repeated key/value pairs (paciente, data, endereço, valor). ' +
+      'The PDF is delivered automatically — you only need to confirm to the customer in PT-BR.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Bold title at top (e.g. "Comprovante de Agendamento").' },
+        body: { type: 'string', description: 'First paragraph — concise summary of what the document confirms.' },
+        sections: {
+          type: 'array',
+          description: 'Optional structured sections (label + value blocks).',
+          items: {
+            type: 'object',
+            properties: {
+              heading: { type: 'string', description: 'Short label, e.g. "Paciente", "Data", "Valor".' },
+              content: { type: 'string', description: 'The corresponding value or info.' },
+            },
+            required: ['heading', 'content'],
+          },
+        },
+        doc_type_hint: {
+          type: 'string',
+          enum: [
+            'comprovante_gerado',
+            'agendamento_gerado',
+            'ficha_gerada',
+            'contrato_gerado',
+            'receita_gerada',
+            'recibo_gerado',
+            'orientacao_gerada',
+            'outro_gerado',
+          ],
+          description: 'Best-fit category for the document being generated.',
+        },
+      },
+      required: ['title', 'body'],
+    },
+    // No buildRequest — handled in the runtime special-case (renderPdf).
+  },
 
   // ─── Brazilian financial data ─────────────────────────────────
   lookup_bank: {
@@ -674,6 +718,21 @@ interface RunAgentResult {
     expiresAt?: string;
     mpId?: string;
   }>;
+  /**
+   * PDFs produced by `generate_pdf` tool calls. Caller (the WhatsApp
+   * webhook) is responsible for sending them via Evolution sendMedia
+   * (mediatype:'document') and persisting to contact_documents with
+   * direction='outbound'. The LLM only sees a confirmation result; it
+   * doesn't get the bytes back to read.
+   */
+  pdfs?: Array<{
+    base64: string;
+    filename: string;
+    title: string;
+    docType: string;
+    /** Cap'd version of the body for downstream summary persistence. */
+    excerpt: string;
+  }>;
 }
 
 const MAX_ITERATIONS = 8;
@@ -808,6 +867,7 @@ export async function runAgent(opts: {
   const toolCallsExecuted: RunAgentResult['tool_calls_executed'] = [];
   const generatedImages: NonNullable<RunAgentResult['images']> = [];
   const generatedPixPayments: NonNullable<RunAgentResult['pixPayments']> = [];
+  const generatedPdfs: NonNullable<RunAgentResult['pdfs']> = [];
   let totalCostMicro = 0n;
   let lastProvider: string | undefined;
 
@@ -859,6 +919,7 @@ export async function runAgent(opts: {
         latency_ms: Date.now() - t0,
         ...(generatedImages.length ? { images: generatedImages } : {}),
         ...(generatedPixPayments.length ? { pixPayments: generatedPixPayments } : {}),
+        ...(generatedPdfs.length ? { pdfs: generatedPdfs } : {}),
       };
     }
 
@@ -891,6 +952,67 @@ export async function runAgent(opts: {
           cost_usdc: '0',
           ...(result.ok ? {} : { error: result.error || 'unknown' }),
         });
+        continue;
+      }
+
+      // ─── Special-case: generate_pdf ─────────────────────────────────
+      // Doesn't go through handleCall (no upstream API). Renders a PDF
+      // locally via pdfkit and stages it on RunAgentResult.pdfs for the
+      // channel handler (WhatsApp webhook) to deliver via sendMedia
+      // (mediatype:'document') and persist to contact_documents.
+      if (tc.function.name === 'generate_pdf') {
+        try {
+          const { renderPdf, suggestPdfFilename } = await import('~/agents/pdf-renderer');
+          const title = String(args.title || '').trim().slice(0, 200) || 'Documento';
+          const body = String(args.body || '').trim().slice(0, 4000) || '';
+          const sectionsRaw = Array.isArray(args.sections) ? args.sections : [];
+          const sections = sectionsRaw.slice(0, 20).map((s: any) => ({
+            heading: String(s?.heading || '').slice(0, 120),
+            content: String(s?.content || '').slice(0, 4000),
+          })).filter((s: { heading: string; content: string }) => s.heading && s.content);
+          const ALLOWED_DOC_TYPES = new Set([
+            'comprovante_gerado',
+            'agendamento_gerado',
+            'ficha_gerada',
+            'contrato_gerado',
+            'receita_gerada',
+            'recibo_gerado',
+            'orientacao_gerada',
+            'outro_gerado',
+          ]);
+          const docTypeRaw = String(args.doc_type_hint || '').trim();
+          const docType = ALLOWED_DOC_TYPES.has(docTypeRaw) ? docTypeRaw : 'outro_gerado';
+          const pdfBytes = await renderPdf({ title, body, sections });
+          const filename = suggestPdfFilename(title);
+          generatedPdfs.push({
+            base64: pdfBytes.toString('base64'),
+            filename,
+            title,
+            docType,
+            excerpt: body.slice(0, 500),
+          });
+          history.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify({
+              ok: true,
+              filename,
+              title,
+              note: 'PDF will be delivered to the customer automatically. Confirm in PT-BR (e.g. "Pronto, te mandei o documento aqui 📄").',
+            }),
+          });
+          toolCallsExecuted.push({ name: 'generate_pdf', args, ok: true, cost_usdc: '0' });
+        } catch (err: any) {
+          const errMsg = err?.message || String(err);
+          history.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify({ error: errMsg }),
+          });
+          toolCallsExecuted.push({
+            name: 'generate_pdf', args, ok: false, cost_usdc: '0', error: errMsg,
+          });
+        }
         continue;
       }
 
@@ -1029,6 +1151,7 @@ export async function runAgent(opts: {
     latency_ms: Date.now() - t0,
     ...(generatedImages.length ? { images: generatedImages } : {}),
     ...(generatedPixPayments.length ? { pixPayments: generatedPixPayments } : {}),
+    ...(generatedPdfs.length ? { pdfs: generatedPdfs } : {}),
   };
 }
 

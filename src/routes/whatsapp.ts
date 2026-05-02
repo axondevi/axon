@@ -1236,6 +1236,7 @@ async function processBufferedTurn(opts: {
   let reply: string;
   let images: NonNullable<Awaited<ReturnType<typeof runAgent>>['images']> = [];
   let pixPayments: NonNullable<Awaited<ReturnType<typeof runAgent>>['pixPayments']> = [];
+  let pdfs: NonNullable<Awaited<ReturnType<typeof runAgent>>['pdfs']> = [];
   try {
     const result = await runAgent({
       c,
@@ -1246,9 +1247,10 @@ async function processBufferedTurn(opts: {
       personaId: runtimeAgent.personaId,
       enableCache: false,
     });
-    reply = result.content || (result.images?.length || result.pixPayments?.length ? '✅' : '🤖 (sem resposta no momento)');
+    reply = result.content || (result.images?.length || result.pixPayments?.length || result.pdfs?.length ? '✅' : '🤖 (sem resposta no momento)');
     images = result.images || [];
     pixPayments = result.pixPayments || [];
+    pdfs = result.pdfs || [];
 
     // ─── Output guardrail: catch capability hallucinations ─────────
     // Even with explicit "NÃO prometa X" rules in the system prompt,
@@ -1518,6 +1520,52 @@ async function processBufferedTurn(opts: {
       delayMs: 600,
     });
     await new Promise((r) => setTimeout(r, 400));
+  }
+
+  // ─── Send any PDFs produced by generate_pdf tool ─────────────────
+  // Two-step delivery: first ship the file via Evolution sendMedia
+  // (mediatype:'document' renders as a download bubble in WhatsApp),
+  // then upload+index in the document vault with direction='outbound'
+  // so the owner sees it in the same dashboard panel as inbound docs.
+  // The agent's text reply confirms ("Pronto, te mandei aí 📄").
+  for (const pdf of pdfs) {
+    await sendOurMedia({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey,
+      number: inbound.phone,
+      base64Data: pdf.base64,
+      mediatype: 'document',
+      mimetype: 'application/pdf',
+      fileName: pdf.filename,
+      caption: pdf.title.slice(0, 200),
+      delayMs: 800,
+    });
+    // Persist to vault asynchronously — don't block subsequent sends.
+    if (memory) {
+      void (async () => {
+        try {
+          const { saveOutboundDocument } = await import('~/whatsapp/document-vault');
+          const bytes = Buffer.from(pdf.base64, 'base64');
+          await saveOutboundDocument({
+            agentId: a.id,
+            contactMemoryId: memory!.id,
+            bytes,
+            mimeType: 'application/pdf',
+            filename: pdf.filename,
+            title: pdf.title,
+            docType: pdf.docType,
+            excerpt: pdf.excerpt,
+          });
+        } catch (err) {
+          log.warn('whatsapp.pdf.vault_failed', {
+            error: err instanceof Error ? err.message : String(err),
+            agent_id: a.id,
+          });
+        }
+      })();
+    }
+    await new Promise((r) => setTimeout(r, 600));
   }
 
   // ─── Reply mode: voice in → voice out (mirror customer's preference) ─

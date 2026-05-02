@@ -143,6 +143,7 @@ ownerContacts.get('/:id/contacts/:phone/documents', async (c) => {
       mime_type: r.mimeType,
       byte_size: r.byteSize,
       doc_type: r.docType,
+      direction: r.direction,
       summary: r.summary,
       caller_caption: r.callerCaption,
       uploaded_at: r.uploadedAt,

@@ -272,6 +272,11 @@ export async function ensureCriticalSchema() {
   // can render a typed "ficha do cliente". Default '{}' so existing
   // rows keep working.
   await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "profile" jsonb NOT NULL DEFAULT '{}'::jsonb`);
+
+  // 0025: contact_documents.direction — distinguishes 'inbound' (customer
+  // sent) from 'outbound' (agent generated and sent). Default 'inbound'
+  // so existing rows retain their semantics.
+  await db.execute(sql`ALTER TABLE "contact_documents" ADD COLUMN IF NOT EXISTS "direction" text NOT NULL DEFAULT 'inbound'`);
 }
 
 export async function ensureSystemRows() {
