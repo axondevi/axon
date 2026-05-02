@@ -1,0 +1,91 @@
+name: deploy-render
+
+# Trigger a Render deploy of the axon backend on every push to main.
+#
+# Why: the GitHub→Render webhook integration disappeared (no hook on either
+# fork, both repos show 0 webhooks via `gh api repos/.../hooks`). Even
+# though autoDeploy=yes is set on the Render service, no push events ever
+# reach Render — every recent deploy was triggered manually via the API.
+# This workflow re-establishes the link entirely on the GitHub side, with
+# no OAuth or app installation required.
+#
+# Prereqs (repo secret):
+#   RENDER_API_KEY — Render API key with deploy permissions on the axon
+#                    service. Get one at https://dashboard.render.com/u/settings#api-keys
+#
+# Path filter: only deploys when something the backend actually serves
+# changed. landing/ has its own deploy-landing.yml that ships to
+# Cloudflare Pages — touching that should NOT redeploy Render.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'drizzle/**'
+      - 'registry/**'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/deploy-render.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    name: Trigger Render deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Trigger deploy + wait until live
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          # Service id is not a secret — it's visible in the dashboard URL
+          # and Render's API surface. Keeping it inline saves managing
+          # another secret and makes the workflow self-documenting.
+          SERVICE_ID: srv-d7k49tdf420s7385ud10
+        run: |
+          set -euo pipefail
+          if [ -z "${RENDER_API_KEY:-}" ]; then
+            echo "::error::RENDER_API_KEY secret is missing. Add it under Settings → Secrets → Actions."
+            exit 1
+          fi
+
+          # Kick off the deploy. clearCache=do_not_clear keeps build cache
+          # warm — first build will be slow without it; we don't need a
+          # cold rebuild for a code-only push.
+          create=$(curl -fsS -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            "https://api.render.com/v1/services/$SERVICE_ID/deploys" \
+            -d '{"clearCache":"do_not_clear"}')
+          deploy_id=$(echo "$create" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          commit=$(echo "$create" | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"]["id"][:7])')
+          echo "::notice::Triggered deploy $deploy_id for commit $commit"
+
+          # Poll until terminal state. Render typically deploys in 2-4 min;
+          # 15 min timeout on the job covers cold starts and slow builds.
+          prev=""
+          attempt=0
+          while [ $attempt -lt 60 ]; do
+            attempt=$((attempt + 1))
+            status=$(curl -fsS \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$SERVICE_ID/deploys/$deploy_id" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+            if [ "$status" != "$prev" ]; then
+              echo "[$attempt] status=$status"
+              prev="$status"
+            fi
+            case "$status" in
+              live)
+                echo "::notice::Deploy $deploy_id is LIVE."
+                exit 0
+                ;;
+              build_failed|update_failed|canceled|deactivated)
+                echo "::error::Deploy $deploy_id ended with status=$status"
+                exit 1
+                ;;
+            esac
+            sleep 15
+          done
+          echo "::error::Deploy did not reach terminal state within timeout."
+          exit 1
