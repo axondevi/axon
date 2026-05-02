@@ -390,6 +390,9 @@
       const BASE_KEY = 'axon.baseUrl';
       const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
       const KEY = localStorage.getItem(STORAGE_KEY);
+      if (!KEY) {
+        location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
+      }
 
       function showToast(msg, kind) {
         const t = document.getElementById('toast');

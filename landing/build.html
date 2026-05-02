@@ -665,6 +665,10 @@ Estacionamento: gratuito por 1h"></textarea>
       const BASE_KEY = 'axon.baseUrl';
       const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
       const KEY = localStorage.getItem(STORAGE_KEY);
+      // Auth gate — page is owner-only. No key → kick to login, return here after.
+      if (!KEY) {
+        location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
+      }
 
       // ── Tool catalog (mirrors landing/dashboard.html AGENT_TOOLS) ────────
       // cost = approximate USD per call; "free" = no upstream cost (just markup);

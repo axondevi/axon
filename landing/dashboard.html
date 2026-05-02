@@ -1883,7 +1883,7 @@
         document.getElementById('keyview').textContent = keyShort;
         document.getElementById('logout').onclick = () => {
           localStorage.removeItem(STORAGE_KEY);
-          renderLogin();
+          location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
         };
 
         try {
@@ -3987,7 +3987,7 @@
 
       const key = localStorage.getItem(STORAGE_KEY);
       if (key) renderApp();
-      else renderLogin();
+      else location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
 
       // Re-translate the dashboard's heavy dynamic content (next-action
       // hero, agent cards, transactions table) when language flips.

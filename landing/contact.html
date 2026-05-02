@@ -490,7 +490,10 @@
       // ─── Render ────────────────────────────────
       function render() {
         const app = document.getElementById('app');
-        if (!state.apiKey) { app.innerHTML = renderLogin(); return; }
+        if (!state.apiKey) {
+          location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
+          return;
+        }
         app.innerHTML = renderApp();
       }
 

@@ -194,7 +194,11 @@
           localStorage.setItem(STORAGE_KEY, data.api_key);
           localStorage.setItem(STORAGE_KEY_LEGACY, data.api_key);
           showAlert('success', data.created ? 'Conta criada — abrindo painel…' : 'Login OK — abrindo painel…');
-          setTimeout(() => { location.href = '/dashboard'; }, 600);
+          // Honor ?return=<path> so the user lands back where they tried to go.
+          const params = new URLSearchParams(location.search);
+          const back = params.get('return');
+          const safeBack = back && back.startsWith('/') && !back.startsWith('//') ? back : '/dashboard';
+          setTimeout(() => { location.href = safeBack; }, 600);
         } catch (e) {
           showAlert('error', 'Falha no exchange: ' + e.message);
         }

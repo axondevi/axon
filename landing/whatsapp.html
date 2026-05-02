@@ -578,7 +578,10 @@
       // visible) — same UX as WhatsApp itself.
       function render() {
         const before = capturePaneScroll();
-        if (!state.apiKey) { renderLogin(); return; }
+        if (!state.apiKey) {
+          location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
+          return;
+        }
         renderApp();
         // Use rAF so the DOM is painted before we adjust scrollTop —
         // otherwise the new panes haven't been laid out yet.
