@@ -1167,8 +1167,14 @@ Estacionamento: gratuito por 1h"></textarea>
           }
           if ((data.curated || []).length > 0) {
             sections.push({
-              title: '⭐ Vozes selecionadas',
+              title: '⭐ Vozes ElevenLabs',
               items: data.curated,
+            });
+          }
+          if ((data.cartesia || []).length > 0) {
+            sections.push({
+              title: '⚡ Vozes Cartesia (PT-BR nativas)',
+              items: data.cartesia,
             });
           }
           panels.library.innerHTML = sections.map((s) => `

@@ -16,12 +16,16 @@ import { db } from '~/db';
 import { userVoices, personas } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { log } from '~/lib/logger';
-import { synthesizeSpeech, cloneVoice, listVoices, deleteRemoteVoice } from '~/voice/elevenlabs';
+import { synthesizeSpeech as synthesizeSpeechEleven, cloneVoice, listVoices, deleteRemoteVoice } from '~/voice/elevenlabs';
+import { synthesizeSpeechCartesia } from '~/voice/cartesia';
 import { redis } from '~/cache/redis';
 
 const app = new Hono();
 
-const VOICE_ID_RE = /^[A-Za-z0-9]{8,40}$/;
+// ElevenLabs ids são alfanuméricos 8-40 chars; Cartesia usa UUID v4.
+const ELEVEN_ID_RE = /^[A-Za-z0-9]{8,40}$/;
+const CARTESIA_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VOICE_ID_RE = /^([A-Za-z0-9]{8,40}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const PREVIEW_TTL_SEC = 86_400; // 24h
 const PREVIEW_TEXT = 'Olá! Eu sou sua nova assistente. Como posso ajudar você hoje?';
 
@@ -38,6 +42,16 @@ const CURATED_VOICES: Array<{ id: string; label: string; tagline: string; gender
   { id: 'TX3LPaxmHKxFdv7VOQHJ', label: 'Liam',     tagline: 'Voz masculina jovem, energética',   gender: 'M' },
   { id: 'bIHbv24MWmeRgasZH58o', label: 'Will',     tagline: 'Voz masculina relaxada, casual',    gender: 'M' },
   { id: 'VR6AewLTigWG4xSOukaG', label: 'Arnold',   tagline: 'Voz masculina forte, dramática',    gender: 'M' },
+];
+
+// Vozes Cartesia PT-BR oficiais (consultadas via GET /voices em
+// api.cartesia.ai). Cartesia tem 4 vozes brasileiras nativas hoje;
+// quando aparecerem mais é só adicionar aqui.
+const CURATED_CARTESIA_VOICES: Array<{ id: string; label: string; tagline: string; gender: 'F' | 'M' }> = [
+  { id: '8d826d43-20ad-4c56-8d37-1048eccca1bf', label: 'Larissa',  tagline: 'Voz feminina amigável, conversacional',     gender: 'F' },
+  { id: 'c9611be8-aae9-4a93-bb1c-98dd6b7d52a4', label: 'Isabella', tagline: 'Voz feminina expressiva, narração',          gender: 'F' },
+  { id: 'b603811e-54c2-4a0a-8854-09eab9ffa63f', label: 'Bruno',    tagline: 'Voz masculina clara, corporativa',           gender: 'M' },
+  { id: '07b6f895-78b9-4921-8e10-8a21c99c2e8a', label: 'Rafael',   tagline: 'Voz masculina carismática, dinâmica',        gender: 'M' },
 ];
 
 /**
@@ -72,6 +86,16 @@ app.get('/', async (c) => {
       tagline: v.tagline,
       gender: v.gender,
       source: 'curated' as const,
+      provider: 'elevenlabs' as const,
+      preview_url: null,
+    })),
+    cartesia: CURATED_CARTESIA_VOICES.map((v) => ({
+      external_id: v.id,
+      label: v.label,
+      tagline: v.tagline,
+      gender: v.gender,
+      source: 'curated' as const,
+      provider: 'cartesia' as const,
       preview_url: null,
     })),
     personas: personaVoices,
@@ -108,17 +132,23 @@ app.get('/:id/preview.mp3', async (c) => {
     });
   }
 
-  const r = await synthesizeSpeech({ text: PREVIEW_TEXT, voiceId: id });
+  // Roteamento por formato do id: UUID → Cartesia; alfanumérico → ElevenLabs.
+  // Cada provider mantém seu próprio catálogo, voiceIds não são intercambiáveis.
+  const isCartesiaId = CARTESIA_ID_RE.test(id);
+  const r = isCartesiaId
+    ? await synthesizeSpeechCartesia({ text: PREVIEW_TEXT, voiceId: id })
+    : await synthesizeSpeechEleven({ text: PREVIEW_TEXT, voiceId: id });
   if (!r.ok || !r.audioBytes) {
     if (r.skipped) {
-      return c.json({ error: 'voice_unavailable', message: 'TTS not configured on this server' }, 503);
+      const provider = isCartesiaId ? 'Cartesia' : 'ElevenLabs';
+      return c.json({ error: 'voice_unavailable', message: `${provider} TTS not configured on this server` }, 503);
     }
     // ElevenLabs Free Tier disables API access from datacenters /
     // VPNs ("detected_unusual_activity" — see docs). Surface a
     // friendly message so the user knows it's a billing/account issue,
     // not a bug in their voice id. 401 → 402 (Payment Required) so
     // the UI can hint "upgrade plan" without ambiguity.
-    if (typeof r.error === 'string' && r.error.includes('401')) {
+    if (!isCartesiaId && typeof r.error === 'string' && r.error.includes('401')) {
       return c.json(
         {
           error: 'voice_provider_unavailable',

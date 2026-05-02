@@ -500,18 +500,20 @@ app.patch('/:id', async (c) => {
     const v = String(body.business_info || '').slice(0, 4000);
     update.businessInfo = v.trim() ? v : null;
   }
-  // Voice on/off + per-agent voice override. ElevenLabs voice IDs are
-  // 20-32 alphanumeric chars. Empty string clears the override (revert
-  // to persona default or DEFAULT_VOICE_ID).
+  // Voice on/off + per-agent voice override. Aceita ElevenLabs (20-32
+  // alfanuméricos) ou Cartesia (UUID v4). Empty string clears the
+  // override (revert pra persona default ou DEFAULT_VOICE_ID do provider).
   if (typeof body.voice_enabled === 'boolean') {
     update.voiceEnabled = body.voice_enabled;
   }
   if (body.voice_id_override !== undefined) {
     const raw = String(body.voice_id_override || '').trim();
+    const ELEVEN_RE = /^[A-Za-z0-9]{8,40}$/;
+    const CARTESIA_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!raw) {
       update.voiceIdOverride = null;
-    } else if (!/^[A-Za-z0-9]{8,40}$/.test(raw)) {
-      return c.json({ error: 'bad_request', message: 'voice_id_override must be 8-40 alphanumeric chars (ElevenLabs voice id)' }, 400);
+    } else if (!ELEVEN_RE.test(raw) && !CARTESIA_RE.test(raw)) {
+      return c.json({ error: 'bad_request', message: 'voice_id_override deve ser ElevenLabs id (8-40 alfanum) ou Cartesia UUID' }, 400);
     } else {
       update.voiceIdOverride = raw;
     }

@@ -18,9 +18,10 @@ const CARTESIA_BASE = 'https://api.cartesia.ai';
 const CARTESIA_VERSION = '2024-11-13';
 const FETCH_TIMEOUT_MS = 25_000;
 
-/** Voz default Cartesia PT-BR (feminina). Operador pode sobrescrever via
- *  `CARTESIA_VOICE_ID`. Catálogo: https://play.cartesia.ai/voices */
-const DEFAULT_VOICE_ID = process.env.CARTESIA_VOICE_ID || '700d1ee3-a641-4018-ba6e-899dcadc9e2b';
+/** Voz default Cartesia PT-BR — Larissa (feminina, friendly).
+ *  Operador pode sobrescrever via `CARTESIA_VOICE_ID`. Catálogo:
+ *  https://play.cartesia.ai/voices ou GET /voices na API. */
+const DEFAULT_VOICE_ID = process.env.CARTESIA_VOICE_ID || '8d826d43-20ad-4c56-8d37-1048eccca1bf';
 const DEFAULT_MODEL_ID = process.env.CARTESIA_MODEL_ID || 'sonic-2';
 
 export interface CartesiaSynthesizeResult {
