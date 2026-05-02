@@ -1,0 +1,78 @@
+name: container-scan
+
+# Scan the production Docker image for known CVEs. Trivy hits the
+# OS layer (alpine packages) AND the application dependencies
+# (bun.lock + transitive). Goes red on HIGH or CRITICAL findings.
+#
+# Runs on every PR + weekly so we catch newly-disclosed CVEs even
+# when the image hasn't changed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/container-scan.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'package.json'
+      - 'bun.lock'
+  schedule:
+    - cron: '21 7 * * 1'  # Mondays 07:21 UTC
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    name: Build + Trivy scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: axon:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy filesystem (deps)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          # bun.lock isn't natively understood — fall back to package.json
+          skip-dirs: node_modules
+
+      - name: Trivy image (OS layer + final binary)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: axon:scan
+          format: sarif
+          output: trivy-image.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image

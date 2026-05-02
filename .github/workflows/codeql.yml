@@ -1,0 +1,49 @@
+name: codeql
+
+# GitHub-hosted static analysis. Catches the kind of issues a single-
+# pass review can miss: tainted-flow into eval/innerHTML/SQL, missing
+# auth on a route, regex DoS, hardcoded creds, weak crypto. Free for
+# public repos; this repo is private but CodeQL is included in
+# GitHub Advanced Security.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * 1'  # Mondays 06:17 UTC — pick odd minute to spread load
+  workflow_dispatch: {}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript-typescript']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # The extended queries pick up framework-specific issues.
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'

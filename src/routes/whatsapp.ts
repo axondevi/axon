@@ -184,6 +184,34 @@ ownerWhatsapp.post('/:id/whatsapp', async (c) => {
     return c.json({ error: 'evolution_unreachable', message: probe.error || 'unknown' }, 502);
   }
 
+  // 2a. Fail-loud check: owner_phone must NOT equal the WhatsApp number
+  // the instance is paired to. If they're the same, EVERY inbound from
+  // that number triggers owner-mode — the agent serves its private
+  // assistant prompt to whichever real customer happens to text the
+  // bot. Catastrophic in clinics / sales contexts. We refuse the
+  // register and audit the attempt.
+  if (ownerPhone && probe.pairedPhone) {
+    const pairedDigits = probe.pairedPhone.replace(/\D/g, '');
+    if (pairedDigits && pairedDigits === ownerPhone) {
+      const { audit } = await import('~/lib/audit');
+      audit(c, 'whatsapp.owner_phone.collision_blocked', {
+        meta: {
+          owner_phone_redacted: ownerPhone.slice(0, 4) + '***' + ownerPhone.slice(-4),
+          paired_phone_redacted: pairedDigits.slice(0, 4) + '***' + pairedDigits.slice(-4),
+          agent_id: agentId,
+        },
+      });
+      return c.json(
+        {
+          error: 'owner_phone_collision',
+          message:
+            'owner_phone não pode ser o mesmo número da instância WhatsApp. Como o WhatsApp não recebe mensagens enviadas pra si mesmo, isso causaria o agente a tratar TODOS os clientes como dono.',
+        },
+        400,
+      );
+    }
+  }
+
   // 2. (re)create the connection row
   const secret = randomBytes(24).toString('hex');
   const encrypted = encrypt(apiKey);
@@ -653,6 +681,15 @@ publicWebhook.post('/:secret', async (c) => {
   const ownerDigits = (a.ownerPhone || '').replace(/\D/g, '');
   const isOwner = ownerDigits.length > 0 && inboundDigits === ownerDigits;
   const sessionId = isOwner ? `wa-owner:${inbound.phone}` : `wa:${inbound.phone}`;
+
+  // Counter every owner-mode flip — sudden spike or unexpected slug
+  // means a bad owner_phone config (or, if our checkInstance gap let
+  // it through, a leak). Watch via /metrics.
+  if (isOwner) {
+    void import('~/lib/metrics').then(({ bumpCounter }) => {
+      bumpCounter('axon_whatsapp_owner_mode_total', { agent: a.slug });
+    });
+  }
 
   // ─── Buffer & debounce ─────────────────────────────────────
   // Real users hit "send" 2-3 times in a row ("Oi" → "estou procurando" →

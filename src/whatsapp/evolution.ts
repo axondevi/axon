@@ -43,12 +43,17 @@ async function evoFetch(
   }
 }
 
-/** Verify the instance is reachable + the API key works. */
+/**
+ * Verify the instance is reachable + the API key works. Also returns
+ * the paired WhatsApp phone (when Evolution exposes it) so the
+ * register flow can refuse owner_phone collisions before they create
+ * a privacy disaster.
+ */
 export async function checkInstance(opts: {
   instanceUrl: string;
   instanceName: string;
   apiKey: string;
-}): Promise<{ ok: boolean; status?: string; error?: string }> {
+}): Promise<{ ok: boolean; status?: string; pairedPhone?: string; error?: string }> {
   try {
     const res = await evoFetch(opts.instanceUrl, `/instance/connectionState/${encodeURIComponent(opts.instanceName)}`, {
       method: 'GET',
@@ -59,9 +64,17 @@ export async function checkInstance(opts: {
       return { ok: false, error: `Evolution responded ${res.status}: ${text.slice(0, 200)}` };
     }
     const data: any = await res.json().catch(() => ({}));
-    // shape: { instance: { state: 'open' | 'connecting' | 'close' } } or similar
     const state = data?.instance?.state || data?.state || 'unknown';
-    return { ok: true, status: String(state) };
+    // Evolution exposes the paired number on `instance.owner` (string
+    // like "5511995432538@s.whatsapp.net") once a real device pairs.
+    // We strip the JID suffix to get just the digits. Returns undefined
+    // when the instance is in the pre-pair `connecting`/`close` states.
+    let pairedPhone: string | undefined;
+    const ownerJid = data?.instance?.owner || data?.owner || data?.instance?.profileName;
+    if (typeof ownerJid === 'string' && ownerJid.includes('@')) {
+      pairedPhone = ownerJid.split('@')[0]?.replace(/\D/g, '') || undefined;
+    }
+    return { ok: true, status: String(state), pairedPhone };
   } catch (err: any) {
     return { ok: false, error: err.message || String(err) };
   }
