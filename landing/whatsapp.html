@@ -274,6 +274,81 @@
         color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap;
       }
 
+      /* ─── Brain panel — 3-section layout (Wave 3) ─────────────── */
+      .brain-section {
+        margin-top: 8px; padding-top: 8px;
+        border-top: 1px dashed rgba(124,92,255,0.2);
+      }
+      .brain-section:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+      .brain-section-title {
+        font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+        text-transform: uppercase; color: var(--accent-2);
+        margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+      }
+
+      /* Fact chips with usado/carregado state */
+      .fact-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 7px; border-radius: 10px;
+        font-size: 11px; margin: 2px 4px 2px 0;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .fact-chip.used {
+        background: rgba(37,211,102,0.12);
+        color: var(--whatsapp);
+        border: 1px solid rgba(37,211,102,0.4);
+      }
+      .fact-chip.loaded {
+        background: var(--bg-card);
+        color: var(--text-muted);
+        border: 1px dashed var(--border);
+      }
+      .fact-chip .ind { font-size: 9px; }
+
+      /* Business info excerpt block */
+      .biz-excerpt {
+        margin-top: 4px; padding: 6px 9px;
+        background: rgba(37,211,102,0.06);
+        border-left: 2px solid var(--whatsapp);
+        font-size: 11px; color: var(--text-dim);
+        font-family: 'JetBrains Mono', monospace;
+        border-radius: 0 4px 4px 0;
+      }
+
+      /* Context excerpt — system_prompt preview */
+      .ctx-excerpt {
+        margin-top: 4px; padding: 8px 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace; font-size: 11px;
+        color: var(--text-dim); white-space: pre-wrap;
+        max-height: 200px; overflow-y: auto;
+        line-height: 1.5;
+      }
+      .ctx-toggle {
+        background: none; border: none; color: var(--text-muted);
+        cursor: pointer; padding: 2px 6px; font-size: 11px;
+        font-family: inherit; border-radius: 3px;
+      }
+      .ctx-toggle:hover { color: var(--accent-2); }
+
+      /* Token / cost mini-bar */
+      .token-bar {
+        display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        color: var(--text-muted);
+      }
+      .token-bar strong { color: var(--text-dim); }
+
+      /* Knowledge usage rates in health pill detail */
+      .health-detail-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;
+        font-size: 11px; margin-top: 6px;
+      }
+      .health-detail-grid > div { color: var(--text-muted); }
+      .health-detail-grid strong { color: var(--text); font-family: 'JetBrains Mono', monospace; }
+
       /* ─── Score badge on assistant bubble ─────────────────────── */
       .score-badge {
         display: inline-flex; align-items: center; gap: 3px;
@@ -1149,12 +1224,12 @@
       function renderBrainPanel(m) {
         if (!state.openBrainIds.has(m.id)) return '';
         const meta = m.meta;
+
+        // ─── 1. Top-line pills (intent, routing, mode, cache, batching)
         const intent = meta.intent;
         const intentClass = intent ? `intent-${intent}` : '';
-        const intentLabel = intent ? `${intent}` : null;
-
         const pills = [];
-        if (intentLabel) pills.push(`<span class="brain-pill ${intentClass}">🎯 ${intentLabel}</span>`);
+        if (intent) pills.push(`<span class="brain-pill ${intentClass}">🎯 ${intent}</span>`);
         if (meta.routed_agent) pills.push(`<span class="brain-pill">🚦 ${escapeHtml(meta.routed_agent)}</span>`);
         if (meta.owner_mode) pills.push('<span class="brain-pill owner">👤 modo dono</span>');
         if (meta.cache_hit) {
@@ -1165,17 +1240,114 @@
           pills.push(`<span class="brain-pill">📥 ${meta.buffered_msgs} msgs juntas</span>`);
         }
 
+        const factsLoaded = Array.isArray(meta.facts_loaded) ? meta.facts_loaded : [];
+        const factsUsed = Array.isArray(meta.facts_used) ? meta.facts_used : [];
+        const factsUsedSet = new Set(factsUsed);
         const tools = Array.isArray(meta.tool_calls) ? meta.tool_calls : [];
         const offered = Array.isArray(meta.tools_offered) ? meta.tools_offered : [];
-        const facts = Array.isArray(meta.facts_used) ? meta.facts_used : [];
 
-        // Eval section — show issues + axes when present.
+        // ─── 2. SECTION: Contexto carregado ────────────────────────
+        // Everything that went INTO the LLM's prompt this turn — facts
+        // loaded, business_info hits, summary, raw context excerpt.
+        const ctxExcerpt = meta.context_excerpt || '';
+        const ctxOpen = state.openContextIds && state.openContextIds.has(m.id);
+        const businessLine = meta.business_info_used
+          ? `<div class="brain-row"><span class="brain-label">Business info</span>
+              <span class="brain-pill" style="color:var(--whatsapp);border-color:rgba(37,211,102,0.4);">📚 usado</span></div>
+              ${meta.business_info_excerpt
+                ? `<div class="biz-excerpt">${escapeHtml(meta.business_info_excerpt)}</div>`
+                : ''}`
+          : (meta.context_chars > 200
+              ? `<div class="brain-row"><span class="brain-label">Business info</span>
+                  <span style="color:var(--text-muted);font-size:11px;">disponível, mas agente não referenciou</span></div>`
+              : '');
+
+        const factsBlock = factsLoaded.length
+          ? `<div class="brain-row" style="align-items:flex-start;">
+              <span class="brain-label">Memória</span>
+              <div style="flex:1;">
+                ${factsLoaded.map(k => `<span class="fact-chip ${factsUsedSet.has(k) ? 'used' : 'loaded'}">
+                  <span class="ind">${factsUsedSet.has(k) ? '✓' : '○'}</span>${escapeHtml(k)}
+                </span>`).join('')}
+                <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+                  ${factsUsed.length}/${factsLoaded.length} fatos usados na resposta
+                </div>
+              </div>
+            </div>`
+          : `<div class="brain-row"><span class="brain-label">Memória</span>
+              <span style="color:var(--text-muted);font-size:11px;">contato sem fatos extraídos ainda</span></div>`;
+
+        const summaryLine = meta.memory_summary_used
+          ? `<div class="brain-row"><span class="brain-label">Resumo</span>
+              <span class="brain-pill cache">📝 resumo de memória usado</span></div>`
+          : '';
+
+        const contextSection = `
+          <div class="brain-section">
+            <div class="brain-section-title">📥 Contexto carregado</div>
+            ${factsBlock}
+            ${summaryLine}
+            ${businessLine}
+            <div class="brain-row" style="margin-top:6px;">
+              <span class="brain-label">System prompt</span>
+              <span style="color:var(--text-muted);font-size:11px;">${meta.context_chars || 0} chars · ~${meta.tokens_in_estimate || 0} tokens</span>
+              <button class="ctx-toggle" onclick="toggleContextExcerpt('${m.id}')">${ctxOpen ? 'esconder' : 'ver prompt injetado'}</button>
+            </div>
+            ${ctxOpen && ctxExcerpt ? `<div class="ctx-excerpt">${escapeHtml(ctxExcerpt)}</div>` : ''}
+          </div>
+        `;
+
+        // ─── 3. SECTION: Raciocínio ────────────────────────────────
+        // What the agent DECIDED to do — tools called, iterations, finish.
+        const toolsBlock = tools.length
+          ? `<div class="brain-row" style="align-items:flex-start;">
+              <span class="brain-label">Tools</span>
+              <div style="flex:1;">
+                ${tools.map(t => `
+                  <div style="margin:2px 0;">
+                    <span class="${t.ok ? 'brain-tool-ok' : 'brain-tool-err'}">${t.ok ? '✓' : '✗'}</span>
+                    <strong style="color:var(--text);">${escapeHtml(t.name)}</strong>
+                    <span style="color:var(--text-muted);">(${escapeHtml(JSON.stringify(t.args || {}).slice(0, 80))})</span>
+                    ${t.ms ? `<span style="color:var(--text-muted);"> · ${t.ms}ms</span>` : ''}
+                    ${t.cost_usdc && parseFloat(t.cost_usdc) > 0 ? `<span style="color:var(--text-muted);"> · $${t.cost_usdc}</span>` : ''}
+                    ${t.error ? `<div style="color:var(--danger);font-size:11px;margin-left:18px;">↳ ${escapeHtml(t.error)}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>`
+          : `<div class="brain-row">
+              <span class="brain-label">Tools</span>
+              <span style="color:var(--text-muted);font-size:11px;">nenhuma · resposta direta do contexto</span>
+            </div>`;
+
+        const offeredLine = offered.length && offered.length !== tools.length
+          ? `<div class="brain-row">
+              <span class="brain-label">Disponíveis</span>
+              <span style="color:var(--text-muted);font-size:11px;">selector ofereceu ${offered.length}: ${offered.slice(0, 8).map(escapeHtml).join(', ')}${offered.length > 8 ? '…' : ''}</span>
+            </div>`
+          : '';
+
+        const reasoningSection = `
+          <div class="brain-section">
+            <div class="brain-section-title">🧠 Raciocínio</div>
+            ${pills.length ? `<div class="brain-row">${pills.join('')}</div>` : ''}
+            ${toolsBlock}
+            ${offeredLine}
+            <div class="token-bar">
+              <span><strong>${meta.iterations ?? '?'}</strong> iter</span>
+              <span><strong>${meta.provider || '?'}</strong></span>
+              <span><strong>${meta.latency_ms || '?'}ms</strong> latência</span>
+              <span><strong>$${meta.cost_usdc || '0'}</strong></span>
+              <span>~${meta.tokens_in_estimate || 0} in / ${meta.tokens_out_estimate || 0} out tokens</span>
+              ${meta.finish_reason ? `<span>finish=<strong>${escapeHtml(meta.finish_reason)}</strong></span>` : ''}
+            </div>
+          </div>
+        `;
+
+        // ─── 4. SECTION: Avaliação (judge) ─────────────────────────
         const ev = meta.eval;
         let evalSection = '';
         if (ev) {
-          const issues = Array.isArray(ev.issues) && ev.issues.length
-            ? `<ul class="eval-issues">${ev.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
-            : '';
           const axes = [
             ['respondeu_pergunta', 'respondeu'],
             ['usou_tools_certas', 'tools certas'],
@@ -1190,76 +1362,55 @@
           const halluc = ev.alucinou
             ? `<span class="axis-pill fail">✗ alucinou</span>`
             : `<span class="axis-pill pass">✓ não alucinou</span>`;
+          const issues = Array.isArray(ev.issues) && ev.issues.length
+            ? `<ul class="eval-issues">${ev.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
+            : '';
           evalSection = `
-            <div class="brain-row" style="margin-top:8px;">
-              <span class="brain-label">Avaliação</span>
-              <strong style="color:var(--text);">${ev.score}/100</strong>
-              <span style="color:var(--text-muted);font-size:11px;">· julgado por ${escapeHtml(ev.judged_by || '?')}</span>
+            <div class="brain-section">
+              <div class="brain-section-title">📊 Avaliação · ${ev.score}/100 (${ev.veredito})</div>
+              <div class="eval-axes">${axes}${halluc}</div>
+              ${issues}
+              <div style="font-size:10px;color:var(--text-muted);margin-top:6px;">julgado por ${escapeHtml(ev.judged_by || '?')} · ${ev.judged_at ? new Date(ev.judged_at).toLocaleString('pt-BR') : ''}</div>
             </div>
-            <div class="eval-axes">${axes}${halluc}</div>
-            ${issues}
+          `;
+        } else {
+          evalSection = `
+            <div class="brain-section">
+              <div class="brain-section-title">📊 Avaliação</div>
+              <span style="color:var(--text-muted);font-size:11px;">judge ainda não rodou — aparece em ~5s</span>
+            </div>
           `;
         }
 
-        const footer = [
-          meta.provider ? `provider: ${escapeHtml(meta.provider)}` : '',
-          meta.iterations !== undefined ? `${meta.iterations} iter` : '',
-          meta.latency_ms ? `${meta.latency_ms}ms` : '',
-          meta.cost_usdc ? `$${meta.cost_usdc}` : '',
-          meta.finish_reason ? `finish=${escapeHtml(meta.finish_reason)}` : '',
-        ].filter(Boolean).join(' · ');
-
         return `
           <div class="brain-panel open">
-            ${pills.length ? `<div class="brain-row">${pills.join('')}</div>` : ''}
-
-            ${tools.length ? `
-              <div class="brain-row" style="align-items:flex-start;">
-                <span class="brain-label">Tools</span>
-                <div style="flex:1;">
-                  ${tools.map(t => `
-                    <div style="margin:2px 0;">
-                      <span class="${t.ok ? 'brain-tool-ok' : 'brain-tool-err'}">${t.ok ? '✓' : '✗'}</span>
-                      <strong style="color:var(--text);">${escapeHtml(t.name)}</strong>
-                      <span style="color:var(--text-muted);">(${escapeHtml(JSON.stringify(t.args || {}).slice(0, 80))})</span>
-                      ${t.ms ? `<span style="color:var(--text-muted);"> · ${t.ms}ms</span>` : ''}
-                      ${t.cost_usdc && parseFloat(t.cost_usdc) > 0 ? `<span style="color:var(--text-muted);"> · $${t.cost_usdc}</span>` : ''}
-                      ${t.error ? `<div style="color:var(--danger);font-size:11px;margin-left:18px;">↳ ${escapeHtml(t.error)}</div>` : ''}
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-            ` : `
-              <div class="brain-row">
-                <span class="brain-label">Tools</span>
-                <span style="color:var(--text-muted);font-size:11px;">nenhuma · resposta direta</span>
-              </div>
-            `}
-
-            ${offered.length && offered.length !== tools.length ? `
-              <div class="brain-row">
-                <span class="brain-label">Disponíveis</span>
-                <span style="color:var(--text-muted);font-size:11px;">selector ofereceu ${offered.length}: ${offered.slice(0, 8).map(escapeHtml).join(', ')}${offered.length > 8 ? '…' : ''}</span>
-              </div>
-            ` : ''}
-
-            ${facts.length ? `
-              <div class="brain-row">
-                <span class="brain-label">Memória</span>
-                <div>${facts.map(f => `<span class="brain-pill">${escapeHtml(f)}</span>`).join(' ')}</div>
-              </div>
-            ` : ''}
-
+            ${contextSection}
+            ${reasoningSection}
             ${evalSection}
-
-            <div class="brain-footer">${footer}</div>
           </div>
         `;
       }
 
+      window.toggleContextExcerpt = (msgId) => {
+        if (!state.openContextIds) state.openContextIds = new Set();
+        if (state.openContextIds.has(msgId)) state.openContextIds.delete(msgId);
+        else state.openContextIds.add(msgId);
+        render();
+      };
+
       function renderHealthPill() {
         const h = state.health;
-        if (!h || h.avg_score === null || h.avg_score === undefined) return '';
+        if (!h || h.avg_score === null || h.avg_score === undefined) {
+          // Even before judge has 5+ scored turns, knowledge-use rates
+          // can be informative. Show a smaller pill with just those.
+          if (h && (h.memory_use_rate !== null || h.business_info_use_rate !== null)) {
+            const parts = [];
+            if (h.memory_use_rate !== null) parts.push(`memória ${h.memory_use_rate}%`);
+            if (h.business_info_use_rate !== null) parts.push(`business info ${h.business_info_use_rate}%`);
+            return `<span class="health-pill mid" title="Saúde de avaliação ainda em coleta — precisa de 5+ turnos avaliados">📚 ${parts.join(' · ')}</span>`;
+          }
+          return '';
+        }
         const score = h.avg_score;
         const cls = score >= 85 ? 'high' : score >= 70 ? 'mid' : 'low';
         let trendStr = '';
@@ -1268,9 +1419,26 @@
           else if (h.score_trend < -1) trendStr = `<span class="trend-down">↘ ${h.score_trend}</span>`;
           else trendStr = '<span class="trend-flat">→ estável</span>';
         }
-        const tip = h.top_issues && h.top_issues.length
-          ? 'Top issues: ' + h.top_issues.slice(0, 3).map(i => `${i.issue} (${i.count}×)`).join(' · ')
-          : `${h.total_judged} turnos avaliados nos últimos 100`;
+        // Build a multi-line tooltip with all aggregates the operator
+        // actually cares about: top issues + knowledge-use rates +
+        // cost-per-resolved-arc when available.
+        const tipLines = [];
+        if (h.memory_use_rate !== null && h.memory_use_rate !== undefined) {
+          tipLines.push(`Memória usada em ${h.memory_use_rate}% das respostas`);
+        }
+        if (h.business_info_use_rate !== null && h.business_info_use_rate !== undefined) {
+          tipLines.push(`Business info usado em ${h.business_info_use_rate}% das respostas`);
+        }
+        if (h.cost_per_resolved_arc !== null && h.cost_per_resolved_arc !== undefined) {
+          tipLines.push(`Custo por conversa resolvida: $${h.cost_per_resolved_arc}`);
+        }
+        if (h.avg_context_chars) {
+          tipLines.push(`Contexto médio: ${h.avg_context_chars} chars`);
+        }
+        if (h.top_issues && h.top_issues.length) {
+          tipLines.push('Top issues: ' + h.top_issues.slice(0, 3).map(i => `${i.issue} (${i.count}×)`).join(', '));
+        }
+        const tip = tipLines.join('\n') || `${h.total_judged} turnos avaliados nos últimos 100`;
         return `<span class="health-pill ${cls}" title="${escapeHtml(tip)}">
           🧠 saúde ${score}/100 ${trendStr}
         </span>`;

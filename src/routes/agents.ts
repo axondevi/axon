@@ -9,7 +9,7 @@
 import { Hono } from 'hono';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '~/db';
-import { agents, requests, agentMessages, users, wallets, whatsappConnections } from '~/db/schema';
+import { agents, requests, agentMessages, users, wallets, whatsappConnections, contactMemory } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { decrypt } from '~/lib/crypto';
 import { AGENT_TEMPLATES, getTemplate, AXON_SOUL_PROMPT } from '~/agents/templates';
@@ -699,6 +699,83 @@ app.get('/:id/health', async (c) => {
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
+  // Knowledge-use aggregates — independent of judge eval, computed
+  // across ALL recent assistant turns that have meta. Tells the operator
+  // whether the agent is actually USING what's been stored in memory and
+  // configured in business_info, not just sitting on it.
+  const withMeta = rows.filter((r) => r.meta && typeof r.meta === 'object').slice(0, 100);
+  let memoryUseHits = 0;
+  let memoryUseEligible = 0;       // turns where memory had at least one fact loaded
+  let businessUseHits = 0;
+  let businessUseEligible = 0;     // turns where business_info was used in injection
+  let totalContextChars = 0;
+  for (const r of withMeta) {
+    const m = r.meta as Record<string, unknown>;
+    const factsLoaded = Array.isArray(m.facts_loaded) ? m.facts_loaded : [];
+    const factsUsed = Array.isArray(m.facts_used) ? m.facts_used : [];
+    if (factsLoaded.length > 0) {
+      memoryUseEligible++;
+      if (factsUsed.length > 0) memoryUseHits++;
+    }
+    // We can't tell from here whether business_info was non-empty per
+    // turn (the field isn't stored). Approximate: if any turn ever shows
+    // business_info_used=true, treat all turns as eligible. For agents
+    // with empty business_info this whole rate stays 0.
+    if (m.business_info_used === true) businessUseHits++;
+    if (typeof m.context_chars === 'number') totalContextChars += m.context_chars;
+  }
+  // Eligibility for business_info: count any turn where context_chars > 200
+  // as eligible (a non-trivial system prompt). Avoids dividing by zero
+  // and gives a usable percentage for agents with business_info filled in.
+  businessUseEligible = withMeta.filter((r) => {
+    const m = r.meta as Record<string, unknown>;
+    return typeof m.context_chars === 'number' && m.context_chars > 200;
+  }).length;
+
+  const memoryUseRate = memoryUseEligible > 0
+    ? Math.round((memoryUseHits / memoryUseEligible) * 100)
+    : null;
+  const businessInfoUseRate = businessUseEligible > 0
+    ? Math.round((businessUseHits / businessUseEligible) * 100)
+    : null;
+  const avgContextChars = withMeta.length > 0
+    ? Math.round(totalContextChars / withMeta.length)
+    : null;
+
+  // Cost-per-resolved-arc: pull contact_memory rows where arc.state='resolved'
+  // and sum cost_usdc from their assistant turns. Useful "is this agent
+  // economically viable?" signal.
+  const resolvedContacts = await db
+    .select({ phone: contactMemory.phone })
+    .from(contactMemory)
+    .where(and(
+      eq(contactMemory.agentId, a.id),
+      // jsonb path: arc->>'state' = 'resolved'
+      sql`${contactMemory.arc}->>'state' = 'resolved'`,
+    ))
+    .limit(50);
+  let costPerResolvedArc: number | null = null;
+  if (resolvedContacts.length > 0) {
+    const sessionIds = resolvedContacts.map((c) => 'wa:' + c.phone);
+    // Pull just the cost field from each session's assistant rows.
+    const costRows = await db
+      .select({ meta: agentMessages.meta })
+      .from(agentMessages)
+      .where(and(
+        eq(agentMessages.agentId, a.id),
+        eq(agentMessages.role, 'assistant'),
+        sql`${agentMessages.sessionId} IN (${sql.raw(sessionIds.map((s) => `'${s.replace(/'/g, "''")}'`).join(','))})`,
+      ))
+      .limit(2000);
+    let totalCost = 0;
+    for (const row of costRows) {
+      const m = row.meta as Record<string, unknown> | null;
+      const c = m && typeof m.cost_usdc === 'string' ? parseFloat(m.cost_usdc) : 0;
+      if (Number.isFinite(c)) totalCost += c;
+    }
+    costPerResolvedArc = parseFloat((totalCost / resolvedContacts.length).toFixed(6));
+  }
+
   if (judged.length < 5) {
     return c.json({
       avg_score: null,
@@ -707,6 +784,10 @@ app.get('/:id/health', async (c) => {
       total_assistant_turns: rows.length,
       top_issues: [],
       bucket_counts: { great: 0, ok: 0, ok_com_ressalva: 0, ruim: 0 },
+      memory_use_rate: memoryUseRate,
+      business_info_use_rate: businessInfoUseRate,
+      avg_context_chars: avgContextChars,
+      cost_per_resolved_arc: costPerResolvedArc,
     });
   }
 
@@ -756,6 +837,10 @@ app.get('/:id/health', async (c) => {
     total_assistant_turns: rows.length,
     top_issues: topIssues,
     bucket_counts: bucketCounts,
+    memory_use_rate: memoryUseRate,
+    business_info_use_rate: businessInfoUseRate,
+    avg_context_chars: avgContextChars,
+    cost_per_resolved_arc: costPerResolvedArc,
   });
 });
 

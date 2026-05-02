@@ -32,6 +32,14 @@ import { pushToBuffer, mergeBufferedText, anyAudio, type BufferedMessage } from 
 import { classifyIntent, pickRoutedAgentId, loadRoutedAgent, type RoutesTo } from '~/agents/intent-router';
 import { contactMemory } from '~/db/schema';
 import { judgeTurn, judgeArc, buildTraceString } from '~/agents/judge';
+import {
+  detectUsedFacts,
+  detectBusinessInfoUsed,
+  detectSummaryUsed,
+  estimateTokens,
+  contextExcerpt,
+  type FactLike,
+} from '~/agents/knowledge-use';
 
 // ─── Owner-authed sub-router (mounted under /v1/agents) ────
 export const ownerWhatsapp = new Hono();
@@ -999,9 +1007,19 @@ async function processBufferedTurn(opts: {
     // Single source of truth for "what happened on this turn". Stored
     // ONLY on the assistant row so it doesn't bloat user-side messages.
     // The customer never sees this; only the operator's brain dashboard.
-    const factsUsed: string[] = memory && Array.isArray(memory.facts)
-      ? (memory.facts as Array<{ key: string }>).slice(0, 12).map((f) => f.key)
-      : [];
+    //
+    // Knowledge-use detection: distinguish facts that were LOADED into
+    // context vs facts the agent actually REFERENCED in its reply. Same
+    // for business_info and the rolling memory summary. Pure heuristic
+    // (text match), no LLM call — runs in <1ms.
+    const factsArr = (memory && Array.isArray(memory.facts) ? memory.facts : []) as FactLike[];
+    const factsLoaded = factsArr.slice(0, 20).map((f) => f.key);
+    const factsUsed = detectUsedFacts(factsArr, reply);
+    const businessInfoSource = isOwner ? a.businessInfo : runtimeAgent.businessInfo;
+    const businessHit = detectBusinessInfoUsed(businessInfoSource, reply);
+    const summaryUsed = !isOwner && memory ? detectSummaryUsed(memory.summary, reply) : false;
+    const ctxChars = augmentedSystemPrompt.length;
+
     const turnMeta = {
       intent: traceIntent,
       routed_agent: traceRoutedAgentName,
@@ -1021,7 +1039,18 @@ async function processBufferedTurn(opts: {
       finish_reason: result.finish_reason,
       provider: result.provider,
       cost_usdc: result.total_cost_usdc,
+
+      // Retrieval / knowledge-use signals (Wave 3)
+      facts_loaded: factsLoaded,
       facts_used: factsUsed,
+      business_info_used: businessHit.used,
+      business_info_excerpt: businessHit.excerpt,
+      memory_summary_used: summaryUsed,
+      context_chars: ctxChars,
+      context_excerpt: contextExcerpt(augmentedSystemPrompt),
+      tokens_in_estimate: estimateTokens(augmentedSystemPrompt) + estimateTokens(mergedText),
+      tokens_out_estimate: estimateTokens(reply),
+
       buffered_msgs: msgs.length,
       latency_ms: result.latency_ms,
       runtime_agent_id: runtimeAgent.id,
