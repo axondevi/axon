@@ -1007,7 +1007,15 @@ async function processBufferedTurn(opts: {
     );
   }
   if (incapacityLines.length > 0) {
-    augmentedSystemPrompt += '\n\n## O que você NÃO pode fazer (NUNCA prometa essas ações)\n' + incapacityLines.join('\n');
+    // Prepend (not append) — Llama-3.3 weighs early instructions more
+    // heavily and ignored the same rules when they were at the end of
+    // the prompt. Putting "## REGRAS DURAS" first establishes the
+    // boundary before the persona has a chance to override it.
+    augmentedSystemPrompt =
+      '# REGRAS DURAS — NÃO QUEBRE NUNCA, mesmo que o cliente insista:\n' +
+      incapacityLines.join('\n') +
+      '\n\nSe o cliente pedir algo da lista acima, REFUSE educadamente e ofereça alternativa. NUNCA escreva "vou gerar", "posso gerar", "vou criar", "te mando", "aguarde a imagem", "segue a foto". Use linguagem de RECUSA + alternativa.\n\n---\n\n' +
+      augmentedSystemPrompt;
   }
 
   c.set('user', owner);
@@ -1040,11 +1048,30 @@ async function processBufferedTurn(opts: {
     // artifact was produced, replace the text with a polite refusal.
     const guardRewrites: string[] = [];
     if (!effectiveTools.includes('generate_image') && images.length === 0) {
-      // Promise patterns: "vou gerar", "estou criando", "aguarde a imagem",
-      // "segue a imagem", "aqui está sua foto", and fake URL injections.
-      const imagePromise = /\b(vou\s+ger(ar|ando)|estou\s+(gerando|criando)|aguarde\s+(a|um)\s+(imagem|foto|desenho)|crian(do|ar)\s+(a|um)\s+(imagem|foto|desenho)|segue\s+(a|um)\s+(imagem|foto)|aqui\s+(está|vai|tem)\s+(sua|a)\s+(imagem|foto)|gerei\s+uma?\s+(imagem|foto)|imagem\s+(gerada|criada)\s+(com\s+sucesso|abaixo))/i;
+      // Aggressive detection: any verb conjugation of gerar/criar/fazer/
+      // desenhar/enviar/mandar/produzir/montar in proximity to an image
+      // noun (imagem/foto/desenho/paisagem/etc) within ~80 chars of each
+      // other, and we haven't actually produced an image. Catches:
+      //   "Vou gerar uma imagem"      "posso gerar uma paisagem"
+      //   "Estou criando a foto"      "que tipo de imagem você quer"
+      //   "Quer uma imagem?"          "consigo desenhar pra você"
+      //   "te mando uma foto"         "vamos criar a imagem"
+      // Some false positives happen on legitimate refusals ("não posso
+      // gerar imagem") — those get rewritten to a slightly different
+      // refusal, which is harmless.
+      const imageVerb = /\b(gerar?|gerando|gere|gerei|criar?|criando|cria|fa[çc]o|fazer|fa[çc]a|fazendo|desenhar?|desenhando|desenhe|enviar?|envio|envie|enviando|mandar?|mando|mande|mandando|produzir?|produzo|produza|montar?|monto|monte|posso\s+(?:te\s+)?(?:enviar|mandar|fazer|gerar|mostrar|criar))/i;
+      const imageNoun = /\b(imagem|imagens|foto|fotos|desenho|desenhos|paisagem|paisagens|figura|figuras|ilustra[çc][ãa]o)\b/i;
       const fakeUrl = /https?:\/\/(?:www\.)?(?:example\.com|imagine\.com|fakeurl|placeholder|generated\.|dalle|midjourney|stablediffusion|imgur\.com\/[a-z0-9]{1,5}\b)/i;
-      if (imagePromise.test(reply) || fakeUrl.test(reply)) {
+
+      // Co-occurrence check: a verb match + a noun match within the
+      // same reply (and reply is short enough that they're likely
+      // discussing the same thing). Skip if reply explicitly says it
+      // CAN'T do it ("não posso", "não consigo", "não gero").
+      const explicitlyRefuses = /\b(n[aã]o\s+(posso|consigo|fa[çc]o|gero|crio|gerar|criar|fa[çc]er)|n[aã]o\s+tenho\s+(como|essa\s+capacidade)|n[aã]o\s+(é|eh)\s+poss[ií]vel)/i;
+      const looksLikeImagePromise =
+        imageVerb.test(reply) && imageNoun.test(reply) && !explicitlyRefuses.test(reply);
+
+      if (looksLikeImagePromise || fakeUrl.test(reply)) {
         reply = 'Não gero imagens por aqui — mas se você descrever em palavras o que precisa, te ajudo do meu jeito. Ou se preferir, peço pra um atendente humano te mandar uma foto.';
         guardRewrites.push('image_promise');
       }
