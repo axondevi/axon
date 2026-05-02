@@ -15,6 +15,7 @@ const isActive = (path: string) => currentPath.startsWith(path);
 
     <div class="nav-links">
       <a href="/learn" class:list={['nav-link', { active: currentPath === '/learn' || currentPath === '/learn/' }]}>Início</a>
+      <a href="/learn/blog" class:list={['nav-link', { active: isActive('/learn/blog') }]}>Blog</a>
       <a href="/learn/playground" class:list={['nav-link nav-link-accent', { active: isActive('/learn/playground') }]}>◆ Playground</a>
       <a href="/learn/tutorials" class:list={['nav-link', { active: isActive('/learn/tutorials') }]}>Tutoriais</a>
       <a href="/learn/guides" class:list={['nav-link', { active: isActive('/learn/guides') }]}>Guias</a>

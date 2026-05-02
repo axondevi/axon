@@ -1,0 +1,498 @@
+{
+  "$comment": "Curated topic queue for the Nexus Inovation daily blog. Each entry produces ONE PT-BR post + ONE EN post (same topic_id). The cron generator picks the lowest id where published_at IS NULL. Once published_at is set, the topic is locked — guarantees zero repetition by design.",
+  "topics": [
+    {
+      "id": 1,
+      "slug_pt": "whatsapp-ia-atendimento-24h",
+      "slug_en": "whatsapp-ai-customer-service-247",
+      "title_pt": "WhatsApp + IA: como vender 24h sem ninguém na bancada",
+      "title_en": "WhatsApp + AI: how SMBs sell 24/7 without staffing a chat team",
+      "category": "casos_de_uso",
+      "tags": [
+        "whatsapp",
+        "atendimento",
+        "automacao",
+        "smb"
+      ],
+      "angle_pt": "Mostre o ganho concreto: 30-40% das vendas de pequenos negócios chegam fora do expediente. Quantifique perda. Mostre fluxo end-to-end: cliente manda mensagem 23h → agente responde + agenda + cobra PIX → dono acorda com venda fechada.",
+      "angle_en": "Lead with the SMB pain: 30-40% of inbound happens off-hours, often lost. Show end-to-end: customer messages at 11pm → AI agent answers + books + invoices → owner wakes up to a closed deal. Anchor in concrete numbers, no buzzwords.",
+      "published_at": "2026-05-02T21:53:52.936Z"
+    },
+    {
+      "id": 2,
+      "slug_pt": "agente-ia-clinica-cadastro-silencioso",
+      "slug_en": "ai-agent-clinic-silent-patient-onboarding",
+      "title_pt": "Cadastro silencioso: como a IA monta a ficha do paciente sem questionário",
+      "title_en": "Silent onboarding: how AI builds the patient chart without forms",
+      "category": "casos_de_uso",
+      "tags": [
+        "clinica",
+        "saude",
+        "cadastro",
+        "ficha"
+      ],
+      "angle_pt": "A diferença entre formulário (cliente abandona) e extração silenciosa (IA pega CPF, plano, alergia ao longo da conversa). Mostrar exemplo real de extração: cliente diz 'sou alérgica a dipirona' → vira slot estruturado.",
+      "angle_en": "Contrast clinic onboarding forms (high abandonment) with silent slot extraction during natural chat. Show example: patient says 'allergic to dipirona' → structured field auto-filled.",
+      "published_at": null
+    },
+    {
+      "id": 3,
+      "slug_pt": "pix-no-chat-cobrando-sem-fricao",
+      "slug_en": "in-chat-checkout-payments-without-redirects",
+      "title_pt": "PIX no chat: como cobrar sem mandar cliente pra outro app",
+      "title_en": "Chat-native checkout: closing payments without external redirects",
+      "category": "casos_de_uso",
+      "tags": [
+        "pix",
+        "pagamento",
+        "conversao",
+        "ecommerce"
+      ],
+      "angle_pt": "Toda redireção pra link externo perde 20-40% conversão. PIX gerado dentro da conversa (QR + copia-e-cola) fecha mais. Stats reais sobre drop-off.",
+      "angle_en": "Every redirect to a payment portal loses 20-40% conversion. Stripe Link, Apple Pay, in-chat QRs in BR — pattern: keep the customer in the conversation. Real drop-off stats.",
+      "published_at": null
+    },
+    {
+      "id": 4,
+      "slug_pt": "groq-vs-openai-vs-claude-pme",
+      "slug_en": "groq-vs-openai-vs-claude-for-smbs",
+      "title_pt": "Groq vs OpenAI vs Claude pra PME: latência, custo e qualidade comparados",
+      "title_en": "Groq vs OpenAI vs Claude for SMBs: latency, cost and quality compared",
+      "category": "comparativos",
+      "tags": [
+        "llm",
+        "comparativo",
+        "groq",
+        "openai",
+        "claude"
+      ],
+      "angle_pt": "Tabela com números reais: latência média, custo por 1M tokens, suporte PT-BR, qualidade em casos de WhatsApp/atendimento. Recomendação prática (Groq 70b pra atendimento, Claude pra raciocínio).",
+      "angle_en": "Real numbers table: median latency, $/1M tokens, multilingual quality, function-calling reliability. Practical recommendations by use case.",
+      "published_at": null
+    },
+    {
+      "id": 5,
+      "slug_pt": "lgpd-ia-empresa-pequena-checklist",
+      "slug_en": "data-privacy-ai-small-business-checklist",
+      "title_pt": "LGPD e IA na empresa pequena: checklist de 8 itens pra não tomar multa",
+      "title_en": "Data privacy & AI for small business: an 8-point checklist to stay compliant",
+      "category": "ia_para_negocio",
+      "tags": [
+        "lgpd",
+        "privacidade",
+        "compliance",
+        "regulacao"
+      ],
+      "angle_pt": "Práticas: não logar dados sensíveis, anonimizar antes de mandar pra LLM, retenção limitada, direito ao esquecimento. Conector com LGPD art. específicos. Sem juridiquês — direto ao ponto.",
+      "angle_en": "Anchor in GDPR + state laws (CCPA/Brazilian LGPD parallel). Concrete: no PII logging, anonymization before LLM, retention limits, deletion APIs. Practical, no lawyer-speak.",
+      "published_at": null
+    },
+    {
+      "id": 6,
+      "slug_pt": "5-sinais-loja-precisa-agente-ia",
+      "slug_en": "5-signs-your-store-needs-ai-agent-now",
+      "title_pt": "5 sinais que sua loja precisa de agente IA hoje (não amanhã)",
+      "title_en": "5 signs your store needs an AI agent today (not next quarter)",
+      "category": "ia_para_negocio",
+      "tags": [
+        "sinais",
+        "decisao",
+        "smb",
+        "atendimento"
+      ],
+      "angle_pt": "Cada sinal = situação concreta + número estimado de vendas perdidas. Ex: respondendo mensagem 30min depois (perde 60%), repetindo info pro mesmo cliente (frustra), erro de horário/preço (devolução), etc.",
+      "angle_en": "Each signal = concrete scenario + estimated lost revenue. E.g.: replying 30min late (60% drop-off), retelling info to same customer, schedule/price errors leading to refunds.",
+      "published_at": null
+    },
+    {
+      "id": 7,
+      "slug_pt": "voz-ia-whatsapp-ptt-bidirecional",
+      "slug_en": "voice-ai-whatsapp-bidirectional-ptt",
+      "title_pt": "Voz no WhatsApp: cliente fala, agente responde — voice memo bidirecional",
+      "title_en": "Voice on WhatsApp: customer speaks, AI replies — bidirectional voice memos",
+      "category": "casos_de_uso",
+      "tags": [
+        "voz",
+        "whatsapp",
+        "ptt",
+        "audio"
+      ],
+      "angle_pt": "Brasileiro adora áudio (60% das mensagens em alguns nichos). Pipeline: STT (Deepgram) → LLM → TTS (Cartesia) → voice memo nativo. Latência <2s. Usado por clínicas e e-commerce.",
+      "angle_en": "Voice messaging adoption is rising globally. Pipeline: streaming STT → LLM → streaming TTS → native voice memo. <2s latency target. Use cases: support, scheduling, basic Q&A.",
+      "published_at": null
+    },
+    {
+      "id": 8,
+      "slug_pt": "visao-computacional-cliente-manda-foto",
+      "slug_en": "computer-vision-when-customers-send-photos",
+      "title_pt": "Visão computacional: cliente manda foto, agente entende e responde",
+      "title_en": "Computer vision: when customers send photos, agents understand and respond",
+      "category": "casos_de_uso",
+      "tags": [
+        "visao",
+        "vision",
+        "imagem",
+        "multimodal"
+      ],
+      "angle_pt": "Clínica recebe foto de exame, loja recebe foto de produto procurado, marketplace recebe foto de defeito. Como Gemini Vision lê e o agente continua a conversa naturalmente. Quotas e custos.",
+      "angle_en": "Clinic receives lab result photo, store receives product photo, marketplace receives defect photo. How vision LLMs parse and the agent continues naturally. Quotas + cost discussion.",
+      "published_at": null
+    },
+    {
+      "id": 9,
+      "slug_pt": "memoria-cliente-nunca-repete",
+      "slug_en": "contact-memory-customers-never-repeat-themselves",
+      "title_pt": "Memória do contato: cliente nunca mais repete dados pra você",
+      "title_en": "Contact memory: customers never have to repeat themselves",
+      "category": "casos_de_uso",
+      "tags": [
+        "memoria",
+        "crm",
+        "personalizacao"
+      ],
+      "angle_pt": "Diferença entre chatbot stateless e agente com memória durável (per-contato + per-conta). Exemplo: dia 30 ele lembra do tamanho de calçado do cliente, da alergia, do plano. ROI da personalização.",
+      "angle_en": "Stateless chatbot vs durable per-contact memory. Day-30 example: agent remembers shoe size, dietary restriction, insurance plan. ROI of personalization (typically +20-30% retention).",
+      "published_at": null
+    },
+    {
+      "id": 10,
+      "slug_pt": "handoff-humano-quando-ia-falha",
+      "slug_en": "human-handoff-when-ai-fails",
+      "title_pt": "Quando IA falha: handoff humano sem o cliente perceber",
+      "title_en": "When AI fails: graceful human handoff (the customer barely notices)",
+      "category": "tutoriais",
+      "tags": [
+        "handoff",
+        "fallback",
+        "humano"
+      ],
+      "angle_pt": "Sinais que o agente deve passar pra humano (frustração, tópico fora do treinamento, valor alto). Como pausar o agente automaticamente quando dono entra na conversa. UX da transição.",
+      "angle_en": "Signals that should trigger handoff (frustration, out-of-domain, high-value). Auto-pausing the agent when the owner replies manually. Transition UX best practices.",
+      "published_at": null
+    },
+    {
+      "id": 11,
+      "slug_pt": "agente-multiagente-recepcionista-vendedor",
+      "slug_en": "multi-agent-routing-receptionist-vs-sales",
+      "title_pt": "Multi-agente: roteando entre recepcionista, vendedor e suporte",
+      "title_en": "Multi-agent routing: receptionist vs sales vs support",
+      "category": "tutoriais",
+      "tags": [
+        "multi-agente",
+        "roteamento",
+        "intent"
+      ],
+      "angle_pt": "Front-door agent classifica intent (vendas/suporte/agendamento), passa pra agente especializado. Exemplo: clínica com triagem + agendamento + financeiro como agentes separados.",
+      "angle_en": "Front-door agent classifies intent and routes to specialists. Example: clinic with triage + scheduling + billing as separate agents. Sticky routing per contact.",
+      "published_at": null
+    },
+    {
+      "id": 12,
+      "slug_pt": "custos-llm-sem-perder-qualidade",
+      "slug_en": "cutting-llm-costs-without-losing-quality",
+      "title_pt": "Cortando custo de LLM sem perder qualidade: 7 técnicas",
+      "title_en": "Cutting LLM costs without sacrificing quality: 7 techniques",
+      "category": "tutoriais",
+      "tags": [
+        "custo",
+        "otimizacao",
+        "cache",
+        "performance"
+      ],
+      "angle_pt": "Cache semântico, fallback de modelo, prompt engineering, structured output, batch, streaming, model routing por dificuldade. Cada técnica com ganho típico em %.",
+      "angle_en": "Semantic cache, model fallback, prompt compression, structured output, batching, streaming, difficulty-based routing. Each with typical % savings.",
+      "published_at": null
+    },
+    {
+      "id": 13,
+      "slug_pt": "agendamento-ia-zero-friccao",
+      "slug_en": "ai-scheduling-zero-friction",
+      "title_pt": "Agendamento por IA: do 'que horas tem?' até confirmação em 4 mensagens",
+      "title_en": "AI scheduling: from 'do you have time?' to confirmed appointment in 4 messages",
+      "category": "casos_de_uso",
+      "tags": [
+        "agendamento",
+        "calendario",
+        "vendas"
+      ],
+      "angle_pt": "Fluxo 4-passos: cliente pergunta → IA propõe slots → cliente escolhe → IA confirma + manda PDF de comprovante. Integração com calendário do dono. Casos de no-show reduzido.",
+      "angle_en": "4-step flow: customer asks → AI proposes slots → customer picks → AI confirms + sends PDF receipt. Owner-calendar integration. No-show reduction case studies.",
+      "published_at": null
+    },
+    {
+      "id": 14,
+      "slug_pt": "agente-confiavel-prevencao-alucinacao",
+      "slug_en": "trustworthy-agents-preventing-hallucinations",
+      "title_pt": "Agente confiável: como prevenir alucinação em produção",
+      "title_en": "Trustworthy agents: preventing hallucinations in production",
+      "category": "tutoriais",
+      "tags": [
+        "seguranca",
+        "alucinacao",
+        "guardrails"
+      ],
+      "angle_pt": "Capability guards (não promete o que não pode), output guardrails (rewrite de promessa falsa), business_info como ground truth, judge LLM pós-resposta. Exemplo real de cada um.",
+      "angle_en": "Capability guards (refuse what's not possible), output guardrails (rewrite false promises), grounding in business_info, post-response judge LLM. Real example for each.",
+      "published_at": null
+    },
+    {
+      "id": 15,
+      "slug_pt": "wpp-business-vs-agente-proprio",
+      "slug_en": "wabusiness-vs-custom-ai-agent",
+      "title_pt": "WhatsApp Business vs agente próprio: quando faz sentido cada um",
+      "title_en": "WhatsApp Business vs custom AI agent: when each makes sense",
+      "category": "comparativos",
+      "tags": [
+        "whatsapp-business",
+        "comparativo",
+        "decisao"
+      ],
+      "angle_pt": "WPP Business resolve catálogo + respostas rápidas. Agente IA resolve atendimento conversacional + cadastro + venda. Cada um pra que tipo de negócio. Quando vale combinar.",
+      "angle_en": "WhatsApp Business covers catalog + canned replies. Custom AI agents handle conversational sales + onboarding + checkout. When each fits, when to combine.",
+      "published_at": null
+    },
+    {
+      "id": 16,
+      "slug_pt": "cluster-de-clientes-tags-automaticas",
+      "slug_en": "auto-tagging-customer-segmentation-with-ai",
+      "title_pt": "Tags automáticas: como IA segmenta clientes em VIP, moroso, novo, churned",
+      "title_en": "Auto-tagging: AI-driven customer segmentation (VIP, slow-payer, new, churned)",
+      "category": "ia_para_negocio",
+      "tags": [
+        "segmentacao",
+        "crm",
+        "tags",
+        "marketing"
+      ],
+      "angle_pt": "Sinais que disparam tag automática (frequência, ticket médio, sentimento, atraso pagamento). Exemplo: cliente parou de responder 60d → tag 'churned' → workflow de reengajamento.",
+      "angle_en": "Signals that auto-trigger tags (frequency, AOV, sentiment, payment delay). Example: 60-day silence → 'churned' tag → re-engagement workflow.",
+      "published_at": null
+    },
+    {
+      "id": 17,
+      "slug_pt": "agente-cobrar-inadimplencia-sem-atrito",
+      "slug_en": "ai-debt-collection-without-friction",
+      "title_pt": "Cobrança inteligente: agente que lembra inadimplente sem irritar",
+      "title_en": "Smart collections: AI that nudges late payers without pushing them away",
+      "category": "casos_de_uso",
+      "tags": [
+        "cobranca",
+        "inadimplencia",
+        "tom"
+      ],
+      "angle_pt": "Tom + timing são tudo. Lembrete D-3, D, D+5 escalando educadamente. Plano de pagamento via PIX parcelado direto no chat. Stats de recuperação.",
+      "angle_en": "Tone + timing matter. D-3, D, D+5 reminders escalating politely. Installment plans negotiated in-chat. Recovery rate stats.",
+      "published_at": null
+    },
+    {
+      "id": 18,
+      "slug_pt": "pdfs-gerados-pelo-agente-comprovante-ficha",
+      "slug_en": "ai-generated-pdfs-receipts-and-records",
+      "title_pt": "PDFs gerados pelo agente: comprovante, ficha, contrato sob demanda",
+      "title_en": "AI-generated PDFs: receipts, records, contracts on demand",
+      "category": "tutoriais",
+      "tags": [
+        "pdf",
+        "documentos",
+        "automacao"
+      ],
+      "angle_pt": "Tool generate_pdf: cliente pede comprovante de agendamento → agente cria PDF profissional + manda no chat. Casos: clínica (ficha), comércio (recibo), advocacia (contrato).",
+      "angle_en": "generate_pdf tool: customer asks for appointment receipt → agent generates professional PDF in-chat. Use cases: clinic (records), retail (receipts), legal (contracts).",
+      "published_at": null
+    },
+    {
+      "id": 19,
+      "slug_pt": "primeiro-agente-em-1-hora",
+      "slug_en": "first-ai-agent-in-1-hour",
+      "title_pt": "Seu primeiro agente em 1 hora: do persona ao primeiro cliente atendido",
+      "title_en": "Your first AI agent in 1 hour: from persona to first served customer",
+      "category": "tutoriais",
+      "tags": [
+        "primeiro-agente",
+        "tutorial",
+        "iniciante"
+      ],
+      "angle_pt": "Walk-through: escolher persona → ajustar prompt → conectar WhatsApp → testar com você mesmo → ativar pra clientes reais. Cada passo com print + dica de erro comum.",
+      "angle_en": "Walk-through: pick persona → tune prompt → connect WhatsApp → test with yourself → flip live. Step-by-step with screenshots + common pitfalls.",
+      "published_at": null
+    },
+    {
+      "id": 20,
+      "slug_pt": "metricas-agente-funciona-mesmo",
+      "slug_en": "ai-agent-metrics-that-actually-matter",
+      "title_pt": "Como medir se seu agente IA funciona de verdade: 6 métricas",
+      "title_en": "Measuring AI agent success: 6 metrics that actually matter",
+      "category": "ia_para_negocio",
+      "tags": [
+        "metricas",
+        "kpi",
+        "analytics"
+      ],
+      "angle_pt": "First-response time, resolução em 1 turno, handoff rate, sentimento, conversão de venda, custo por interação. Como cada um se calcula. Benchmarks por vertical.",
+      "angle_en": "First-response time, single-turn resolution, handoff rate, sentiment, sales conversion, cost-per-interaction. How to calculate. Vertical benchmarks.",
+      "published_at": null
+    },
+    {
+      "id": 21,
+      "slug_pt": "voz-personalizada-clonagem-etica",
+      "slug_en": "personalized-voice-ethical-cloning",
+      "title_pt": "Voz personalizada: clonagem ética + uso consciente em IA",
+      "title_en": "Personalized voice: ethical cloning + responsible AI deployment",
+      "category": "ia_para_negocio",
+      "tags": [
+        "voz",
+        "clonagem",
+        "etica",
+        "consentimento"
+      ],
+      "angle_pt": "Quando faz sentido clonar voz do dono (autenticidade), quando NÃO faz (escala/spam). Disclosure, consentimento, casos de uso (clínica) vs casos arriscados (vendas frias).",
+      "angle_en": "When voice cloning is appropriate (authenticity at scale) vs when it isn't (cold outreach/spam). Disclosure, consent, healthy use cases.",
+      "published_at": null
+    },
+    {
+      "id": 22,
+      "slug_pt": "embeddings-rag-sem-mistério",
+      "slug_en": "embeddings-rag-without-the-buzzwords",
+      "title_pt": "Embeddings e RAG sem mistério: o que de fato resolve no seu negócio",
+      "title_en": "Embeddings and RAG without the buzzwords: what actually solves business problems",
+      "category": "tutoriais",
+      "tags": [
+        "embeddings",
+        "rag",
+        "busca"
+      ],
+      "angle_pt": "Quando RAG é a resposta certa (FAQ enorme, documentos longos), quando não é (info que cabe no prompt). Stack típica: embedding + vector DB + retrieval + prompt. Custo vs qualidade.",
+      "angle_en": "When RAG is the right answer (large FAQ, long docs), when it isn't (info fits in prompt). Typical stack. Cost vs quality.",
+      "published_at": null
+    },
+    {
+      "id": 23,
+      "slug_pt": "agente-vende-no-instagram-tambem",
+      "slug_en": "extending-ai-agents-to-instagram-direct",
+      "title_pt": "O agente também vende no Instagram (e não só no WhatsApp)",
+      "title_en": "Extending your AI agent to Instagram DM (not just WhatsApp)",
+      "category": "tutoriais",
+      "tags": [
+        "instagram",
+        "multicanal",
+        "messaging"
+      ],
+      "angle_pt": "Princípio: separar lógica de canal. Mesmo cérebro de agente, adapters diferentes (WhatsApp/Instagram/web/email). Exemplo prático com webhooks.",
+      "angle_en": "Principle: separate agent core from channel adapters. Same brain, different I/O (WhatsApp/Instagram/web/email). Practical example with webhooks.",
+      "published_at": null
+    },
+    {
+      "id": 24,
+      "slug_pt": "tom-do-agente-formal-vs-informal",
+      "slug_en": "agent-tone-formal-vs-casual",
+      "title_pt": "Tom do agente: formal ou informal? Como decidir e ajustar",
+      "title_en": "Agent tone: formal or casual? How to decide and tune",
+      "category": "ia_para_negocio",
+      "tags": [
+        "tom",
+        "persona",
+        "ux"
+      ],
+      "angle_pt": "Tom alinhado ao tom do cliente real, não ao tom que dono ACHA bonito. Sinal: jeito do cliente escrever (você/tu, gírias, emojis). Detecção automática + sticky por contato.",
+      "angle_en": "Match the customer's tone, not the owner's preference. Signal: customer's writing style (formality markers, emojis, slang). Auto-detect + sticky per contact.",
+      "published_at": null
+    },
+    {
+      "id": 25,
+      "slug_pt": "playbook-clinica-medica-implementacao-ia",
+      "slug_en": "medical-clinic-ai-implementation-playbook",
+      "title_pt": "Playbook: implementando IA na clínica em 30 dias",
+      "title_en": "Playbook: rolling out AI in your medical clinic in 30 days",
+      "category": "casos_de_uso",
+      "tags": [
+        "clinica",
+        "playbook",
+        "saude",
+        "implementacao"
+      ],
+      "angle_pt": "Semana 1: persona + business_info. Semana 2: triagem + agendamento. Semana 3: lembrete + cobrança. Semana 4: relatórios. Métricas em cada etapa.",
+      "angle_en": "Week 1: persona + business info. Week 2: triage + scheduling. Week 3: reminders + billing. Week 4: reporting. Metrics at each milestone.",
+      "published_at": null
+    },
+    {
+      "id": 26,
+      "slug_pt": "comercio-ecommerce-recuperar-carrinho",
+      "slug_en": "ecommerce-cart-recovery-with-ai-on-whatsapp",
+      "title_pt": "E-commerce: recuperando carrinho abandonado pelo WhatsApp",
+      "title_en": "E-commerce: recovering abandoned carts via WhatsApp",
+      "category": "casos_de_uso",
+      "tags": [
+        "ecommerce",
+        "carrinho",
+        "recuperacao"
+      ],
+      "angle_pt": "Hook do agente: 'Vi que você quase fechou o pedido X. Quer descontinho?' Lift típico de 15-25% na recuperação. Janela ideal de envio. Sem ser spam.",
+      "angle_en": "Hook: 'Noticed you almost checked out X — interested in a small discount?' Typical 15-25% recovery lift. Ideal send window. Avoiding spam vibes.",
+      "published_at": null
+    },
+    {
+      "id": 27,
+      "slug_pt": "advocacia-ia-triagem-cliente-novo",
+      "slug_en": "law-firm-ai-intake-and-triage",
+      "title_pt": "Advocacia: IA na triagem de cliente novo e em coleta de documentos",
+      "title_en": "Law firm AI: intake triage and document collection",
+      "category": "casos_de_uso",
+      "tags": [
+        "advocacia",
+        "triagem",
+        "documentos"
+      ],
+      "angle_pt": "Cliente pergunta sobre causa → IA triage por área → coleta documentos relevantes → marca consulta com advogado certo. Ganho de tempo da equipe.",
+      "angle_en": "Client describes their case → AI triages by practice area → collects relevant documents → books with the right lawyer. Team time saved.",
+      "published_at": null
+    },
+    {
+      "id": 28,
+      "slug_pt": "salao-beleza-agendamento-ia",
+      "slug_en": "salon-spa-ai-scheduling-and-upsell",
+      "title_pt": "Salão de beleza: agente que agenda + upsell de pacote no chat",
+      "title_en": "Salon/spa: AI that books + upsells packages in chat",
+      "category": "casos_de_uso",
+      "tags": [
+        "salao",
+        "spa",
+        "upsell"
+      ],
+      "angle_pt": "Reconhece cliente recorrente, sugere serviços complementares (cabelo + manicure), oferece pacote mensal. Tom acolhedor. Métricas reais de upsell.",
+      "angle_en": "Recognizes repeat client, suggests complementary services (hair + nails), pitches monthly package. Warm tone. Real upsell metrics.",
+      "published_at": null
+    },
+    {
+      "id": 29,
+      "slug_pt": "psicologo-terapeuta-limites-ia",
+      "slug_en": "therapist-coach-ai-boundaries",
+      "title_pt": "Psicólogo / terapeuta: até onde a IA atende e onde precisa parar",
+      "title_en": "Therapists & coaches: where AI helps and where it must stop",
+      "category": "ia_para_negocio",
+      "tags": [
+        "saude-mental",
+        "etica",
+        "limites"
+      ],
+      "angle_pt": "IA cobre marcação + lembrete + financeiro. NÃO cobre conteúdo terapêutico, suicidal ideation (handoff humano imediato). Compliance ético.",
+      "angle_en": "AI handles scheduling + reminders + billing. Does NOT handle therapeutic content or suicidal ideation (immediate human handoff). Ethical compliance.",
+      "published_at": null
+    },
+    {
+      "id": 30,
+      "slug_pt": "imobiliaria-ia-qualifica-lead-rapido",
+      "slug_en": "real-estate-ai-fast-lead-qualification",
+      "title_pt": "Imobiliária: IA qualifica lead em 5 minutos antes do corretor falar",
+      "title_en": "Real estate: AI qualifies the lead in 5 minutes before the agent calls",
+      "category": "casos_de_uso",
+      "tags": [
+        "imobiliaria",
+        "lead",
+        "qualificacao"
+      ],
+      "angle_pt": "IA pergunta orçamento, região, tipo, prazo. Filtra. Só passa pra corretor lead quente com perfil completo. ROI: corretor gasta 10x menos tempo com cold leads.",
+      "angle_en": "AI gathers budget, region, type, timeline. Qualifies. Only hot, fully-profiled leads reach the agent. ROI: 10x less time on cold leads.",
+      "published_at": null
+    }
+  ]
+}

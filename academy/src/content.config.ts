@@ -79,10 +79,46 @@ const paths = defineCollection({
   }),
 });
 
+// ============== BLOG (daily auto-generated AI posts, PT + EN) ==============
+// Every topic in scripts/blog-topics.json produces TWO files: <slug>.pt.md
+// and <slug>.en.md, sharing the same topic_id so cross-language linking
+// just swaps the suffix. The cron generator commits new files daily;
+// existing ones are never overwritten.
+const blog = defineCollection({
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/blog' }),
+  schema: z.object({
+    title: z.string(),
+    subtitle: z.string().optional(),
+    description: z.string().max(240),
+    lang: z.enum(['pt-BR', 'en']).default('pt-BR'),
+    category: z.enum([
+      'casos_de_uso',
+      'tutoriais',
+      'ia_para_negocio',
+      'comparativos',
+      'noticias',
+    ]),
+    publishedAt: z.date(),
+    updatedAt: z.date().optional(),
+    /** Stable topic id from blog-topics.json — pairs PT and EN versions. */
+    topicId: z.number(),
+    /** Counterpart slug in the other language; allows lang-toggle on the post page. */
+    counterpartSlug: z.string().optional(),
+    tags: z.array(z.string()).default([]),
+    /** "ai-generated" / "human" / "hybrid" — surfaces in the disclaimer. */
+    authorshipMode: z.enum(['ai-generated', 'human', 'hybrid']).default('ai-generated'),
+    /** Time-to-read estimate in minutes. */
+    readMinutes: z.number().default(5),
+    featured: z.boolean().default(false),
+    draft: z.boolean().default(false),
+  }),
+});
+
 export const collections = {
   tutorials,
   guides,
   recipes,
   glossary,
   paths,
+  blog,
 };

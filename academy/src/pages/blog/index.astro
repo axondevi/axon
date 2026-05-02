@@ -1,0 +1,246 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+// Pull all non-draft blog posts, newest first.
+const all = (await getCollection('blog', (p) => !p.data.draft))
+  .sort((a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime());
+
+const categoryLabels: Record<string, string> = {
+  casos_de_uso: 'Casos de uso',
+  tutoriais: 'Tutoriais',
+  ia_para_negocio: 'IA pra negócio',
+  comparativos: 'Comparativos',
+  noticias: 'Notícias',
+};
+
+// Pair PT and EN posts of the same topic so the user can toggle.
+type Post = (typeof all)[number];
+const ptPosts = all.filter((p) => p.data.lang === 'pt-BR');
+const enPosts = all.filter((p) => p.data.lang === 'en');
+---
+
+<BaseLayout
+  title="Blog — Nexus Inovation"
+  description="Artigos diários sobre IA pra pequenos e médios negócios — atendimento, vendas, automação, integrações. Conteúdo em PT-BR e English."
+>
+  <div class="container">
+    <header class="page-header">
+      <div class="ph-eyebrow">Nexus Inovation Blog</div>
+      <h1>IA pra negócio, todo dia.</h1>
+      <p>{ptPosts.length} artigos em PT-BR · {enPosts.length} in English. Casos de uso, tutoriais e comparativos práticos.</p>
+      <div class="lang-toggle">
+        <button class="lang-btn active" data-lang="pt-BR">🇧🇷 PT-BR</button>
+        <button class="lang-btn" data-lang="en">🇺🇸 English</button>
+      </div>
+    </header>
+
+    {ptPosts.length === 0 && enPosts.length === 0 && (
+      <div class="empty-state">
+        <h3>Em breve</h3>
+        <p>Os primeiros artigos estão chegando. Volte amanhã.</p>
+      </div>
+    )}
+
+    <section class="posts-section" data-lang-section="pt-BR">
+      <div class="post-grid">
+        {ptPosts.map((p: Post) => (
+          <a href={`/learn/blog/${p.id.replace(/\.(md|mdx)$/, '')}`} class="post-card">
+            <div class="post-meta">
+              <span class="post-cat">{categoryLabels[p.data.category] ?? p.data.category}</span>
+              <span class="post-date">
+                {new Date(p.data.publishedAt).toLocaleDateString('pt-BR', {
+                  day: '2-digit', month: 'short', year: 'numeric',
+                })}
+              </span>
+            </div>
+            <h2 class="post-title">{p.data.title}</h2>
+            <p class="post-desc">{p.data.description}</p>
+            <div class="post-footer">
+              <span class="post-time">{p.data.readMinutes} min de leitura</span>
+              <span class="post-arrow">→</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <section class="posts-section" data-lang-section="en" hidden>
+      <div class="post-grid">
+        {enPosts.map((p: Post) => (
+          <a href={`/learn/blog/${p.id.replace(/\.(md|mdx)$/, '')}`} class="post-card">
+            <div class="post-meta">
+              <span class="post-cat">{categoryLabels[p.data.category] ?? p.data.category}</span>
+              <span class="post-date">
+                {new Date(p.data.publishedAt).toLocaleDateString('en-US', {
+                  day: '2-digit', month: 'short', year: 'numeric',
+                })}
+              </span>
+            </div>
+            <h2 class="post-title">{p.data.title}</h2>
+            <p class="post-desc">{p.data.description}</p>
+            <div class="post-footer">
+              <span class="post-time">{p.data.readMinutes} min read</span>
+              <span class="post-arrow">→</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Lang toggle — toggles which section is visible. Persists choice in
+    // localStorage so the user lands on the same lang next visit.
+    const KEY = 'nexus.blog.lang';
+    function applyLang(lang: string) {
+      const sections = document.querySelectorAll<HTMLElement>('[data-lang-section]');
+      sections.forEach((s) => {
+        const match = s.dataset.langSection === lang;
+        s.hidden = !match;
+      });
+      const buttons = document.querySelectorAll<HTMLButtonElement>('.lang-btn');
+      buttons.forEach((b) => b.classList.toggle('active', b.dataset.lang === lang));
+      localStorage.setItem(KEY, lang);
+    }
+
+    // Restore saved preference (default PT-BR for our market)
+    const saved = localStorage.getItem(KEY) || 'pt-BR';
+    applyLang(saved);
+
+    document.querySelectorAll<HTMLButtonElement>('.lang-btn').forEach((b) => {
+      b.addEventListener('click', () => {
+        const lang = b.dataset.lang || 'pt-BR';
+        applyLang(lang);
+      });
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: var(--content-wide, 1200px);
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+  }
+
+  .page-header {
+    margin-bottom: 2.5rem;
+  }
+  .ph-eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-2, #19d5c6);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  .page-header h1 {
+    margin: 0 0 0.75rem 0;
+    font-size: clamp(2rem, 4vw, 2.6rem);
+  }
+  .page-header p {
+    color: var(--text-tertiary, #9a9aa4);
+    font-size: 1.05rem;
+    margin: 0 0 1.25rem;
+  }
+  .lang-toggle {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-card, #16161a);
+    border: 1px solid var(--border, #25252b);
+    border-radius: 8px;
+  }
+  .lang-btn {
+    background: transparent;
+    color: var(--text-tertiary, #9a9aa4);
+    border: none;
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .lang-btn:hover { color: var(--text, #eeeef0); }
+  .lang-btn.active {
+    background: var(--accent, #7c5cff);
+    color: white;
+  }
+
+  .post-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+  .post-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: var(--bg-card, #16161a);
+    border: 1px solid var(--border, #25252b);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .post-card:hover {
+    border-color: var(--accent, #7c5cff);
+    transform: translateY(-2px);
+  }
+  .post-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-tertiary, #9a9aa4);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .post-cat {
+    color: var(--accent-2, #19d5c6);
+    font-weight: 600;
+  }
+  .post-title {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.3;
+    color: var(--text, #eeeef0);
+  }
+  .post-desc {
+    color: var(--text-tertiary, #9a9aa4);
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .post-footer {
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border, #25252b);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-tertiary, #9a9aa4);
+  }
+  .post-arrow {
+    color: var(--accent, #7c5cff);
+    font-weight: 600;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    background: var(--bg-card, #16161a);
+    border: 1px solid var(--border, #25252b);
+    border-radius: 12px;
+  }
+  .empty-state h3 { margin: 0 0 0.5rem; color: var(--text, #eeeef0); }
+  .empty-state p { margin: 0; color: var(--text-tertiary, #9a9aa4); }
+</style>

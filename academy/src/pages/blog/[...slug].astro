@@ -1,0 +1,260 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({
+    // The id includes ".pt"/".en" before the .md extension. We strip the
+    // .md/.mdx but KEEP the lang tag so PT and EN posts of the same topic
+    // get distinct URLs (slug_pt and slug_en in topics.json are already
+    // unique per language, so .pt/.en here is just a defensive guard).
+    params: { slug: post.id.replace(/\.(md|mdx)$/, '') },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+
+const isPt = post.data.lang === 'pt-BR';
+
+// Format the publication date in the post's own locale.
+const publishedFmt = new Date(post.data.publishedAt).toLocaleDateString(
+  isPt ? 'pt-BR' : 'en-US',
+  { day: 'numeric', month: 'long', year: 'numeric' },
+);
+
+// Locate the counterpart slug — same topicId, opposite language. Used
+// to render the toggle button at the top of the post.
+let counterpartUrl: string | null = null;
+if (post.data.counterpartSlug) {
+  const all = await getCollection('blog');
+  const counterpart = all.find(
+    (p) =>
+      p.data.topicId === post.data.topicId &&
+      p.data.lang !== post.data.lang,
+  );
+  if (counterpart) {
+    counterpartUrl = `/learn/blog/${counterpart.id.replace(/\.(md|mdx)$/, '')}`;
+  }
+}
+
+const categoryLabels: Record<string, string> = isPt
+  ? {
+      casos_de_uso: 'Casos de uso',
+      tutoriais: 'Tutoriais',
+      ia_para_negocio: 'IA pra negócio',
+      comparativos: 'Comparativos',
+      noticias: 'Notícias',
+    }
+  : {
+      casos_de_uso: 'Use cases',
+      tutoriais: 'Tutorials',
+      ia_para_negocio: 'AI for business',
+      comparativos: 'Comparisons',
+      noticias: 'News',
+    };
+const catLabel = categoryLabels[post.data.category] ?? post.data.category;
+---
+
+<BaseLayout title={`${post.data.title} — Nexus Inovation`} description={post.data.description}>
+  <article class="post-wrap">
+    <header class="post-header">
+      <a href="/learn/blog" class="back-link">{isPt ? '← Voltar pro blog' : '← Back to blog'}</a>
+      <div class="post-cat-row">
+        <span class="post-cat">{catLabel}</span>
+        <span class="post-date">{publishedFmt}</span>
+        <span class="post-time">
+          {post.data.readMinutes} {isPt ? 'min de leitura' : 'min read'}
+        </span>
+      </div>
+      <h1>{post.data.title}</h1>
+      {post.data.subtitle && <p class="post-subtitle">{post.data.subtitle}</p>}
+      {counterpartUrl && (
+        <a class="lang-counterpart" href={counterpartUrl}>
+          {isPt ? '🇺🇸 Read in English' : '🇧🇷 Ler em português'}
+        </a>
+      )}
+    </header>
+
+    <div class="post-body">
+      <Content />
+    </div>
+
+    <footer class="post-footer">
+      <div class="tags">
+        {post.data.tags.map((t: string) => <span class="tag">#{t}</span>)}
+      </div>
+      <div class="cta-card">
+        <h3>{isPt ? 'Pronto pra ter um agente assim?' : 'Ready to deploy an agent like this?'}</h3>
+        <p>
+          {isPt
+            ? 'Conecte seu WhatsApp em 5 minutos. Sem cartão, primeiro contato grátis.'
+            : 'Connect your WhatsApp in 5 minutes. No credit card, first contact on us.'}
+        </p>
+        <a class="cta-btn" href="https://nexusinovation.com.br/build">
+          {isPt ? 'Criar meu agente →' : 'Build my agent →'}
+        </a>
+      </div>
+    </footer>
+  </article>
+</BaseLayout>
+
+<style>
+  .post-wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 4rem;
+  }
+
+  .post-header { margin-bottom: 2.5rem; }
+  .back-link {
+    display: inline-block;
+    color: var(--text-tertiary, #9a9aa4);
+    text-decoration: none;
+    font-size: 13px;
+    margin-bottom: 1.25rem;
+  }
+  .back-link:hover { color: var(--text, #eeeef0); }
+  .post-cat-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary, #9a9aa4);
+    margin-bottom: 0.75rem;
+  }
+  .post-cat {
+    color: var(--accent-2, #19d5c6);
+    font-weight: 600;
+  }
+  .post-header h1 {
+    font-size: clamp(2rem, 4vw, 2.6rem);
+    line-height: 1.2;
+    margin: 0 0 0.5rem;
+    color: var(--text, #eeeef0);
+  }
+  .post-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-tertiary, #9a9aa4);
+    margin: 0 0 1rem;
+  }
+  .lang-counterpart {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 6px 12px;
+    background: var(--bg-card, #16161a);
+    border: 1px solid var(--border, #25252b);
+    border-radius: 6px;
+    color: var(--text, #eeeef0);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .lang-counterpart:hover {
+    border-color: var(--accent, #7c5cff);
+  }
+
+  .post-body {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: var(--text, #eeeef0);
+  }
+  .post-body :global(h1) { display: none; } /* H1 already in header */
+  .post-body :global(h2) {
+    font-size: 1.5rem;
+    margin: 2.5rem 0 1rem;
+    color: var(--text, #eeeef0);
+  }
+  .post-body :global(h3) {
+    font-size: 1.2rem;
+    margin: 2rem 0 0.75rem;
+    color: var(--text, #eeeef0);
+  }
+  .post-body :global(p) { margin: 0 0 1rem; }
+  .post-body :global(a) {
+    color: var(--accent-2, #19d5c6);
+    text-decoration: underline;
+  }
+  .post-body :global(a:hover) { color: var(--accent, #7c5cff); }
+  .post-body :global(ul), .post-body :global(ol) {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+  .post-body :global(li) { margin-bottom: 0.5rem; }
+  .post-body :global(blockquote) {
+    border-left: 3px solid var(--accent, #7c5cff);
+    margin: 1.5rem 0;
+    padding: 0.5rem 1rem;
+    color: var(--text-tertiary, #9a9aa4);
+  }
+  .post-body :global(code) {
+    background: var(--bg-card, #16161a);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9em;
+  }
+  .post-body :global(pre) {
+    background: var(--bg-card, #16161a);
+    border: 1px solid var(--border, #25252b);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  .post-body :global(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  .post-body :global(em) { color: var(--text-tertiary, #9a9aa4); font-size: 0.9em; }
+
+  .post-footer {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border, #25252b);
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+  }
+  .tag {
+    color: var(--accent-2, #19d5c6);
+    background: rgba(25, 213, 198, 0.08);
+    border: 1px solid rgba(25, 213, 198, 0.25);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+  }
+
+  .cta-card {
+    background: linear-gradient(135deg, rgba(124, 92, 255, 0.1), rgba(25, 213, 198, 0.05));
+    border: 1px solid rgba(124, 92, 255, 0.3);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+  }
+  .cta-card h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+  }
+  .cta-card p {
+    margin: 0 0 1.25rem;
+    color: var(--text-tertiary, #9a9aa4);
+  }
+  .cta-btn {
+    display: inline-block;
+    padding: 12px 28px;
+    background: var(--accent, #7c5cff);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  .cta-btn:hover { opacity: 0.9; }
+</style>

@@ -1,0 +1,81 @@
+# Daily Nexus Inovation blog post — runs at 12:00 UTC (09:00 BR / GMT-3),
+# picks the next pending topic from scripts/blog-topics.json, generates
+# a PT-BR + EN article, rebuilds the academy, and pushes the result to
+# main. Cloudflare Pages auto-deploys on push.
+#
+# Anti-repetition is enforced by the generator script itself: published
+# topic ids are locked, recent titles flow into the prompt as a "do not
+# overlap" instruction.
+#
+# Manual trigger via workflow_dispatch is supported so you can preview a
+# post on demand without waiting for the scheduled time.
+
+name: blog-daily
+
+on:
+  schedule:
+    # 12:00 UTC = 09:00 America/Sao_Paulo. Cron uses UTC.
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+# Single run at a time — if a daily run is still going (rare), the next
+# manual trigger will queue. Avoids racing on the same topic.
+concurrency:
+  group: blog-daily
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          # Need a token that can push back; default GITHUB_TOKEN is fine
+          # since `contents: write` is granted above.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.3.13
+
+      - name: Setup Node (for Astro build)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install academy deps
+        run: cd academy && npm ci
+
+      - name: Generate today's post (PT + EN)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BLOG_GEN_MODEL: ${{ vars.BLOG_GEN_MODEL || 'gemini-2.5-flash-lite' }}
+        run: bun run scripts/generate-blog-post.ts
+
+      - name: Rebuild academy
+        run: cd academy && npm run build
+
+      - name: Commit and push
+        run: |
+          git config user.name "Nexus Inovation Blog Bot"
+          git config user.email "blog-bot@users.noreply.github.com"
+          git add scripts/blog-topics.json academy/src/content/blog landing/learn
+          if git diff --cached --quiet; then
+            echo "No changes to commit (no pending topics or generator skipped)."
+            exit 0
+          fi
+          # Pull the title of today's PT post for the commit subject
+          NEW_PT=$(git diff --cached --name-only | grep -E '^academy/src/content/blog/pt/.*\.md$' | head -1)
+          if [ -n "$NEW_PT" ]; then
+            TITLE=$(grep -m1 '^title:' "$NEW_PT" | sed 's/title:[[:space:]]*//' | sed 's/^"//;s/"$//')
+            MSG="blog: $TITLE"
+          else
+            MSG="blog: daily post $(date -u +%Y-%m-%d)"
+          fi
+          git commit -m "$MSG"
+          git push
