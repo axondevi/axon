@@ -1028,34 +1028,68 @@ async function processBufferedTurn(opts: {
   // its tools array — the customer waits forever and the judge flags
   // alucinou:true. Append explicit "NÃO posso fazer X" lines for every
   // sensitive capability NOT in the effective toolkit.
-  const incapacityLines: string[] = [];
+  // Capability boundaries split into two camps so the LLM doesn't
+  // confuse "refuse generation request" with "react to received media":
+  //
+  //   refuseLines      → things the agent CAN'T do (generate image / pix /
+  //                      web search). Trailing instruction: REFUSE.
+  //   mustReactLines   → things the agent MUST do when input arrives
+  //                      (acknowledge sent photos/audio). Trailing
+  //                      instruction: REACT, never deflect.
+  //
+  // Previously these were one list under "REGRAS DURAS" with a trailing
+  // "REFUSE educadamente" — which polluted the photo-react carve-out
+  // with refusal language and made the agent reply "não posso receber
+  // exames" to clinic clients sending exam photos. Splitting fixes it.
+  const refuseLines: string[] = [];
+  const mustReactLines: string[] = [];
+
   if (!effectiveTools.includes('generate_image')) {
-    incapacityLines.push(
+    refuseLines.push(
       '- **Imagens (geração)**: você NÃO gera, edita nem desenha imagens NOVAS. Se o cliente PEDIR pra você criar/gerar/desenhar/produzir uma imagem ("gera uma foto de X", "faz um desenho de Y"), RECUSE educadamente e ofereça alternativa em texto. NUNCA escreva "vou gerar", "aguarde a imagem", "estou criando".',
-      '- **OBRIGATÓRIO — foto que o cliente ENVIOU**: quando a mensagem do cliente começa com `[CLIENTE ENVIOU FOTO]` ou `[CLIENTE ENVIOU UMA FOTO...]`, isso significa que ele MANDOU uma imagem e a descrição automática (o que aparece na foto) vem logo depois. **Trate essa descrição como SE VOCÊ TIVESSE VISTO A FOTO.** A primeira frase da sua resposta DEVE mencionar especificamente o que está na foto (cite detalhes concretos: cor, objeto, pessoa, documento, número, conteúdo do texto se houver). SÓ DEPOIS você pode redirecionar/perguntar/pedir contexto. NÃO peça pra ele descrever em palavras — a descrição JÁ ESTÁ na mensagem dele. NÃO ignore a foto e responda algo genérico sobre seu papel — isso quebra a confiança do cliente. Mesmo que a foto pareça off-topic, comente primeiro depois redirecione (ex.: "Vi a foto desses pingentes lindos — mas aqui é a recepção da clínica, você precisa de algo daqui?"). Para clínicas: cliente pode mandar exame, receita, RX, prescrição, comprovante — leia o conteúdo da descrição com atenção e dê continuidade ao caso dele.',
     );
   }
   if (!effectiveTools.includes('generate_pix')) {
-    incapacityLines.push(
+    refuseLines.push(
       '- **Pagamento Pix in-chat**: você NÃO gera QR Pix. Se o cliente quiser pagar, oriente a entrar em contato com o atendente humano ou explicar o método de pagamento configurado.',
     );
   }
   if (!effectiveTools.includes('search_web') && !effectiveTools.includes('exa_search')) {
-    incapacityLines.push(
+    refuseLines.push(
       '- **Pesquisa web**: você NÃO pesquisa na internet. Responda apenas com base no que está nas Informações do negócio + memória do contato. Se o cliente perguntar algo que dependa de info externa, diga que não tem essa informação.',
     );
   }
-  if (incapacityLines.length > 0) {
-    // Prepend (not append) — Llama-3.3 weighs early instructions more
-    // heavily and ignored the same rules when they were at the end of
-    // the prompt. Putting "## REGRAS DURAS" first establishes the
-    // boundary before the persona has a chance to override it.
-    augmentedSystemPrompt =
-      '# REGRAS DURAS — NÃO QUEBRE NUNCA, mesmo que o cliente insista:\n' +
-      incapacityLines.join('\n') +
-      '\n\nSe o cliente pedir algo da lista acima, REFUSE educadamente e ofereça alternativa. NUNCA escreva "vou gerar", "posso gerar", "vou criar", "te mando", "aguarde a imagem", "segue a foto". Use linguagem de RECUSA + alternativa.\n\n---\n\n' +
-      augmentedSystemPrompt;
+
+  // Sent-photo reaction is ALWAYS required (independent of generate_image
+  // capability). Vision describes the image and inlines the description
+  // into the user message. The agent must read it and respond about the
+  // content — not deflect to its role, not refuse, not ask for a verbal
+  // description (the description is already there).
+  mustReactLines.push(
+    '- **Foto que o cliente ENVIOU**: quando a mensagem do cliente começa com `[CLIENTE ENVIOU FOTO]` ou `[CLIENTE ENVIOU UMA FOTO...]`, ele MANDOU uma imagem e a descrição automática (o que está visível na foto) vem logo depois. **Trate essa descrição como SE VOCÊ TIVESSE VISTO A FOTO COM SEUS PRÓPRIOS OLHOS.** A PRIMEIRA frase da sua resposta DEVE mencionar especificamente o que está na foto (cite detalhes concretos: cor, objeto, pessoa, documento, número, valor, conteúdo do texto se houver). SÓ DEPOIS você pode redirecionar/perguntar/pedir contexto. NÃO peça pra ele descrever em palavras — a descrição JÁ ESTÁ na mensagem dele. NÃO ignore a foto e responda algo genérico sobre seu papel — isso quebra a confiança do cliente. NÃO escreva "não posso receber fotos/exames/imagens por aqui" — você ACABOU DE RECEBER, e tem a descrição pra trabalhar com ela. Mesmo que a foto pareça off-topic, comente o conteúdo PRIMEIRO, depois redirecione (ex.: "Vi os pingentes na foto, ficaram lindos! Mas aqui é a recepção da clínica, você precisa de algo daqui?"). Para clínicas: exame, receita, RX, prescrição, comprovante — leia o conteúdo da descrição com atenção e dê continuidade (cite valores, nomes de medicação, datas, etc. e ajude o cliente).',
+  );
+  mustReactLines.push(
+    '- **Áudio que o cliente ENVIOU**: quando a mensagem começa com `[CLIENTE ENVIOU ÁUDIO]`, a transcrição vem logo depois. Trate como se ele tivesse digitado o conteúdo dessa transcrição. NÃO peça pra ele escrever em texto — você JÁ tem o que ele disse.',
+  );
+
+  const promptBlocks: string[] = [];
+  if (refuseLines.length > 0) {
+    promptBlocks.push(
+      '# REGRAS DURAS — coisas que você NÃO faz (RECUSE educadamente se o cliente pedir):\n' +
+        refuseLines.join('\n') +
+        '\n\nSe o cliente PEDIR algo desta lista, RECUSE educadamente e ofereça alternativa. NUNCA escreva "vou gerar", "posso gerar", "vou criar", "te mando", "aguarde a imagem", "segue a foto".',
+    );
   }
+  // mustReactLines is always non-empty (photo + audio) — emit unconditionally.
+  promptBlocks.push(
+    '# REGRAS OBRIGATÓRIAS — quando o cliente ENVIA mídia, você DEVE responder ao conteúdo (NÃO recuse, NÃO deflete):\n' +
+      mustReactLines.join('\n'),
+  );
+  // Prepend (not append) — Llama-3.3 weighs early instructions more
+  // heavily and ignored the same rules when they were at the end of
+  // the prompt. Putting these at the top establishes the boundary
+  // before the persona has a chance to override it.
+  augmentedSystemPrompt = promptBlocks.join('\n\n') + '\n\n---\n\n' + augmentedSystemPrompt;
 
   c.set('user', owner);
   c.set('axon:agent_id', runtimeAgent.id);
