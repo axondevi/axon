@@ -840,6 +840,13 @@ async function processBufferedTurn(opts: {
   let augmentedSystemPrompt: string;
   let memory: Awaited<ReturnType<typeof getOrCreateMemory>> | null = null;
   if (isOwner) {
+    // Owner também enxerga o business_info que ele mesmo configurou —
+    // útil pra perguntas tipo "qual o endereço que tá lá?" ou pra testar
+    // como a agente responderia a um cliente. Sem isso o owner-mode
+    // ignorava dados que o próprio dono tinha cadastrado no painel.
+    const ownerBusinessBlock = (a.businessInfo && a.businessInfo.trim())
+      ? `\n\n## Dados do negócio que o dono cadastrou (use como referência se ele perguntar)\n${a.businessInfo.trim()}`
+      : '';
     augmentedSystemPrompt = [
       `Você é o assistente pessoal de ${a.name ? `"${a.name}"` : 'do dono deste agente'}.`,
       `Está conversando DIRETAMENTE com o dono (não com um cliente).`,
@@ -856,7 +863,7 @@ async function processBufferedTurn(opts: {
       `3. NÃO tente descrever pixels nem inventar URLs — só confirme.`,
       ``,
       `Skip o "||" multi-bolha — fala normal, frase única quando der.`,
-    ].join('\n');
+    ].join('\n') + ownerBusinessBlock;
   } else {
     // WhatsApp inbound has no URL ?ref=, so first-touch attribution can
     // only come from a different channel (web /agent/:slug?ref=...). Pass
