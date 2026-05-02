@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cadastre-se — Nexus Inovation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      :root {
+        --bg: #0a0a0b; --bg-card: #16161a; --bg-elev: #111114;
+        --border: #25252b; --text: #eeeef0; --text-dim: #9a9aa4; --text-muted: #6a6a76;
+        --accent: #7c5cff; --accent-2: #19d5c6; --danger: #ff5f57; --warn: #ffd60a;
+        --whatsapp: #25d366;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; min-height: 100%; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg); color: var(--text);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-height: 100vh; padding: 24px;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; font-weight: 800; font-size: 22px; }
+      .logo-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+      .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 36px 32px; max-width: 440px; width: 100%; box-shadow: 0 4px 32px rgba(0,0,0,0.3); }
+      h1 { margin: 0 0 8px; font-size: 22px; font-weight: 700; }
+      .subtitle { color: var(--text-dim); font-size: 14px; margin: 0 0 24px; }
+      .field { margin-bottom: 14px; }
+      .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+      .field input { width: 100%; background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 14px; font-family: inherit; }
+      .field input:focus { outline: none; border-color: var(--accent); }
+      .field .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+      .btn { width: 100%; background: var(--accent); color: white; border: none; border-radius: 8px; padding: 12px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+      .btn:hover:not(:disabled) { opacity: 0.9; }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .meta { margin-top: 18px; font-size: 13px; color: var(--text-dim); text-align: center; }
+      .meta a { color: var(--accent-2); text-decoration: none; }
+      .alert { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+      .alert.error { background: rgba(255, 95, 87, 0.1); border: 1px solid rgba(255, 95, 87, 0.4); color: var(--danger); }
+      .alert.success { background: rgba(37, 211, 102, 0.1); border: 1px solid rgba(37, 211, 102, 0.4); color: var(--whatsapp); }
+      .alert.info { background: rgba(124, 92, 255, 0.1); border: 1px solid rgba(124, 92, 255, 0.4); color: var(--accent); }
+      .perks { margin: 12px 0 18px; padding-left: 18px; color: var(--text-dim); font-size: 13px; }
+      .perks li { margin-bottom: 4px; }
+    </style>
+  </head>
+  <body>
+    <div class="brand"><span class="logo-dot"></span><span>Nexus Inovation</span></div>
+
+    <div class="card">
+      <h1>Crie sua conta</h1>
+      <p class="subtitle">Comece grátis. Sem cartão de crédito.</p>
+
+      <ul class="perks">
+        <li>$0,50 USDC de crédito grátis pra testar</li>
+        <li>Conecte seu WhatsApp em 5 minutos</li>
+        <li>40 APIs (Vision, Voice, PIX, BrasilAPI, etc) num único endpoint</li>
+      </ul>
+
+      <div id="alert" class="alert" hidden></div>
+
+      <form id="signup-form" autocomplete="on">
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input id="email" type="email" autocomplete="email" required placeholder="voce@exemplo.com" />
+        </div>
+        <div class="field">
+          <label for="password">Senha</label>
+          <input id="password" type="password" autocomplete="new-password" required minlength="8" />
+          <div class="hint">Mínimo 8 caracteres.</div>
+        </div>
+        <button class="btn" type="submit" id="submit-btn">Criar conta grátis</button>
+      </form>
+
+      <div class="meta">
+        Já tem conta? <a href="/login">Entrar</a>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = 'https://axon-kedb.onrender.com';
+      let supabase = null;
+
+      function showAlert(kind, msg) {
+        const el = document.getElementById('alert');
+        el.className = `alert ${kind}`;
+        el.textContent = msg;
+        el.hidden = false;
+      }
+
+      async function bootstrap() {
+        const r = await fetch(API_BASE + '/v1/auth/supabase/config');
+        const cfg = await r.json();
+        if (!cfg.configured) {
+          showAlert('error', 'Login Supabase não configurado pelo operador. Cadastre via /v1/signup direto.');
+          return;
+        }
+        supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+      }
+
+      document.getElementById('signup-form').addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        if (!supabase) return;
+        const email = document.getElementById('email').value.trim().toLowerCase();
+        const password = document.getElementById('password').value;
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true; btn.textContent = 'Criando…';
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: location.origin + '/login' },
+          });
+          if (error) throw error;
+          // Email confirmation usually required. If session is null,
+          // user must click the email link before they can log in.
+          if (!data.session) {
+            showAlert('success', `Conta criada! Confirme seu e-mail (${email}) e depois faça login.`);
+            btn.textContent = 'Conta criada — confirme o e-mail';
+            return;
+          }
+          // Auto-confirm path: exchange immediately.
+          const r = await fetch(API_BASE + '/v1/auth/supabase/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: data.session.access_token }),
+          });
+          const ex = await r.json();
+          if (!r.ok || !ex.ok) throw new Error(ex.message || ex.error || `HTTP ${r.status}`);
+          localStorage.setItem('axon.apiKey', ex.api_key);
+          localStorage.setItem('axon_api_key', ex.api_key);
+          showAlert('success', 'Conta criada e logada!');
+          setTimeout(() => { location.href = '/dashboard'; }, 600);
+        } catch (e) {
+          showAlert('error', e.message || String(e));
+          btn.disabled = false; btn.textContent = 'Criar conta grátis';
+        }
+      });
+
+      bootstrap();
+    </script>
+  </body>
+</html>

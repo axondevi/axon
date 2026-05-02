@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conta — Nexus Inovation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      :root {
+        --bg: #0a0a0b; --bg-card: #16161a; --bg-elev: #111114; --bg-hover: #1c1c22;
+        --border: #25252b; --text: #eeeef0; --text-dim: #9a9aa4; --text-muted: #6a6a76;
+        --accent: #7c5cff; --accent-2: #19d5c6; --danger: #ff5f57; --warn: #ffd60a;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; min-height: 100%; }
+      body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+      a { color: var(--accent-2); text-decoration: none; }
+
+      header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--bg-elev);
+      }
+      .brand { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: 18px; }
+      .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+      .nav-link { color: var(--text-dim); font-size: 13px; padding: 6px 10px; }
+      .nav-link.active { color: var(--accent-2); }
+
+      main { max-width: 720px; margin: 0 auto; padding: 36px 24px 80px; }
+      h1 { margin: 0 0 4px; font-size: 22px; }
+      .subtitle { color: var(--text-dim); font-size: 14px; margin-bottom: 24px; }
+
+      .panel {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 18px;
+      }
+      .panel-header {
+        padding: 14px 18px; border-bottom: 1px solid var(--border);
+        font-weight: 600; font-size: 14px;
+      }
+      .panel-body { padding: 18px; }
+
+      .field-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 0; border-bottom: 1px solid var(--border);
+      }
+      .field-row:last-child { border-bottom: none; }
+      .field-label { font-size: 13px; color: var(--text-dim); }
+      .field-value {
+        font-size: 13px; color: var(--text);
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      .keyline {
+        display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      }
+      .key-display {
+        flex: 1; min-width: 200px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 10px 12px; font-family: 'JetBrains Mono', monospace;
+        font-size: 13px; color: var(--text);
+      }
+      .btn-mini {
+        padding: 8px 14px;
+        background: var(--bg-elev);
+        color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        font-size: 12px; cursor: pointer; font-family: inherit;
+      }
+      .btn-mini:hover { border-color: var(--accent); }
+      .btn-mini.primary { background: var(--accent); color: white; border-color: var(--accent); }
+      .btn-mini.danger { color: var(--danger); border-color: rgba(255, 95, 87, 0.4); }
+      .btn-mini.danger:hover { border-color: var(--danger); }
+
+      .alert {
+        padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 14px;
+      }
+      .alert.success { background: rgba(25, 213, 198, 0.1); border: 1px solid rgba(25, 213, 198, 0.4); color: var(--accent-2); }
+      .alert.error { background: rgba(255, 95, 87, 0.1); border: 1px solid rgba(255, 95, 87, 0.4); color: var(--danger); }
+      .alert.warn { background: rgba(255, 214, 10, 0.1); border: 1px solid rgba(255, 214, 10, 0.4); color: var(--warn); font-size: 12px; }
+
+      .key-help {
+        font-size: 12px; color: var(--text-muted); margin-top: 8px;
+      }
+      .key-help code { color: var(--accent-2); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span class="logo-dot"></span> Nexus Inovation</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <a class="nav-link" href="/dashboard">Painel</a>
+        <a class="nav-link" href="/whatsapp">Brain</a>
+        <a class="nav-link" href="/contacts">Contatos</a>
+        <a class="nav-link active" href="/account">Conta</a>
+        <button class="btn-mini" onclick="logout()" style="margin-left:8px;">Sair</button>
+      </div>
+    </header>
+
+    <main>
+      <h1>Sua conta</h1>
+      <div class="subtitle">Email, API key e configurações.</div>
+
+      <div id="alert-area"></div>
+
+      <div class="panel">
+        <div class="panel-header">Identidade</div>
+        <div class="panel-body">
+          <div class="field-row">
+            <span class="field-label">E-mail</span>
+            <span class="field-value" id="email-display">—</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">User ID</span>
+            <span class="field-value" id="userid-display" style="font-size:11px;color:var(--text-muted)">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">API Key</div>
+        <div class="panel-body">
+          <div class="alert warn">
+            ⚠️ Esta chave dá acesso total à sua conta. <strong>Não compartilhe.</strong> Use só em scripts e integrações suas.
+          </div>
+
+          <div class="keyline">
+            <div class="key-display" id="key-display">ax_live_••••••••••••••••</div>
+            <button class="btn-mini" id="reveal-btn">Revelar</button>
+            <button class="btn-mini primary" id="copy-btn">Copiar</button>
+            <button class="btn-mini danger" id="rotate-btn">Regenerar</button>
+          </div>
+
+          <div class="key-help">
+            Use no header <code>x-api-key</code> em chamadas pra <code>https://axon-kedb.onrender.com/v1/*</code>.
+            Regenerar invalida a chave atual em 5 minutos — atualize seus scripts.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Sessão</div>
+        <div class="panel-body">
+          <div class="field-row">
+            <span class="field-label">Status</span>
+            <span class="field-value" id="session-status">verificando…</span>
+          </div>
+          <div style="margin-top:14px;">
+            <button class="btn-mini danger" onclick="logout()">Encerrar sessão</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const API_BASE = 'https://axon-kedb.onrender.com';
+      const STORAGE_KEY = 'axon.apiKey';
+      const STORAGE_KEY_LEGACY = 'axon_api_key';
+
+      let supabase = null;
+      let revealed = false;
+      let currentKey = '';
+
+      function showAlert(kind, msg) {
+        const el = document.createElement('div');
+        el.className = `alert ${kind}`;
+        el.textContent = msg;
+        document.getElementById('alert-area').replaceChildren(el);
+        setTimeout(() => el.remove(), 5000);
+      }
+
+      function maskKey(k) {
+        if (!k) return '—';
+        return k.slice(0, 8) + '•'.repeat(20) + k.slice(-4);
+      }
+
+      function renderKey() {
+        document.getElementById('key-display').textContent = revealed && currentKey ? currentKey : maskKey(currentKey);
+        document.getElementById('reveal-btn').textContent = revealed ? 'Ocultar' : 'Revelar';
+      }
+
+      async function bootstrap() {
+        // Need Supabase session for the API
+        const cfg = await fetch(API_BASE + '/v1/auth/supabase/config').then((r) => r.json());
+        if (!cfg.configured) {
+          showAlert('error', 'Supabase não configurado pelo operador.');
+          return;
+        }
+        supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { location.href = '/login'; return; }
+
+        document.getElementById('email-display').textContent = session.user.email || '—';
+        document.getElementById('userid-display').textContent = session.user.id;
+        document.getElementById('session-status').textContent = 'Autenticado via Supabase';
+
+        currentKey = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY_LEGACY) || '';
+        if (!currentKey) {
+          // We have Supabase session but no local API key — exchange now.
+          const r = await fetch(API_BASE + '/v1/auth/supabase/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: session.access_token }),
+          });
+          const data = await r.json();
+          if (r.ok && data.ok) {
+            currentKey = data.api_key;
+            localStorage.setItem(STORAGE_KEY, currentKey);
+            localStorage.setItem(STORAGE_KEY_LEGACY, currentKey);
+          }
+        }
+        renderKey();
+      }
+
+      document.getElementById('reveal-btn').addEventListener('click', () => {
+        revealed = !revealed;
+        renderKey();
+      });
+
+      document.getElementById('copy-btn').addEventListener('click', async () => {
+        if (!currentKey) return;
+        await navigator.clipboard.writeText(currentKey);
+        showAlert('success', 'API key copiada pra área de transferência.');
+      });
+
+      document.getElementById('rotate-btn').addEventListener('click', async () => {
+        if (!confirm('Regenerar a API key invalida a chave atual em 5 minutos. Atualize seus scripts depois. Continuar?')) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { location.href = '/login'; return; }
+        const r = await fetch(API_BASE + '/v1/auth/supabase/rotate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': currentKey,
+          },
+          body: JSON.stringify({ access_token: session.access_token }),
+        });
+        const data = await r.json();
+        if (!r.ok || !data.ok) {
+          showAlert('error', data.message || data.error || 'Falhou ao regenerar.');
+          return;
+        }
+        currentKey = data.api_key;
+        localStorage.setItem(STORAGE_KEY, currentKey);
+        localStorage.setItem(STORAGE_KEY_LEGACY, currentKey);
+        revealed = true;
+        renderKey();
+        showAlert('success', 'Nova API key gerada. A anterior fica válida por 5 min de grace.');
+      });
+
+      window.logout = async () => {
+        if (supabase) await supabase.auth.signOut();
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY_LEGACY);
+        location.href = '/login';
+      };
+
+      bootstrap();
+    </script>
+  </body>
+</html>

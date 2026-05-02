@@ -278,6 +278,15 @@ export async function ensureCriticalSchema() {
   // so existing rows retain their semantics.
   await db.execute(sql`ALTER TABLE "contact_documents" ADD COLUMN IF NOT EXISTS "direction" text NOT NULL DEFAULT 'inbound'`);
 
+  // 0027: users.api_key_encrypted + users.supabase_user_id — first part
+  // lets us return the API key to a Supabase-authenticated user across
+  // sessions (instead of rotating on every email login); second is the
+  // explicit FK between Axon user and Supabase auth.users row, useful
+  // when the user changes their email in Supabase later.
+  await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "api_key_encrypted" text`);
+  await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "supabase_user_id" uuid`);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_supabase_user_idx" ON "users"("supabase_user_id") WHERE "supabase_user_id" IS NOT NULL`);
+
   // 0026: appointments — one row per agent-confirmed customer booking.
   // Created by the schedule_appointment tool when the agent reaches
   // agreement in chat; consumed by a daily cron that sends D-1 reminders.

@@ -37,11 +37,25 @@ export const users = pgTable(
     // the old hash is null'd and only the current one works.
     prevApiKeyHash: text('prev_api_key_hash'),
     prevApiKeyExpiresAt: timestamp('prev_api_key_expires_at'),
+    // API key in encrypted form (MASTER_ENCRYPTION_KEY). Distinct from
+    // api_key_hash (which is a plain SHA-256 used for fast auth lookup).
+    // We persist encrypted only for users who authenticated via a
+    // verified channel (Supabase Auth, Privy) — this lets us return the
+    // key on subsequent email logins instead of rotating every time.
+    // NULL for legacy users created via /v1/signup before this column
+    // existed; they still authenticate via the hash.
+    apiKeyEncrypted: text('api_key_encrypted'),
+    // Optional Supabase Auth user UUID linking the Axon user to the
+    // Supabase auth.users row. Same email match also works (we use it
+    // as a fallback) but the explicit link is durable across email
+    // changes inside Supabase.
+    supabaseUserId: uuid('supabase_user_id'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => ({
     apiKeyIdx: uniqueIndex('users_api_key_idx').on(t.apiKeyHash),
     emailIdx: uniqueIndex('users_email_idx').on(t.email),
+    supabaseUserIdx: uniqueIndex('users_supabase_user_idx').on(t.supabaseUserId),
     tierExpIdx: index('users_tier_exp_idx').on(t.tierExpiresAt),
   }),
 );
