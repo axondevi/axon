@@ -187,10 +187,14 @@ app.get('/me/export', async (c) => {
 
   audit(c, 'user.account.export', { target_user_id: user.id });
 
-  return c.json({
+  // Hono's c.json calls JSON.stringify which throws on BigInt — and we
+  // have several bigint columns (wallet balance, costs, payouts).
+  // Stringify ourselves with a BigInt-aware replacer and ship the
+  // result with the right content-type.
+  const payload = {
     exported_at: new Date().toISOString(),
     user_id: user.id,
-    user: stripCreds(userRow, ['apiKeyHash']),
+    user: stripCreds(userRow, ['apiKeyHash', 'prevApiKeyHash']),
     wallet: walletRow,
     transactions: txRows,
     requests: reqRows,
@@ -203,6 +207,13 @@ app.get('/me/export', async (c) => {
     webhook_deliveries: webhookDeliveryRows,
     policy: policyRow,
     voices: voices,
+  };
+  const json = JSON.stringify(payload, (_k, v) =>
+    typeof v === 'bigint' ? v.toString() : v,
+  );
+  return c.body(json, 200, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-disposition': `attachment; filename="axon-export-${user.id}.json"`,
   });
 });
 
