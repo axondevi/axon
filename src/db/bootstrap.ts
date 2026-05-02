@@ -190,6 +190,14 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "user_voices_user_idx" ON "user_voices" ("user_id")`);
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "user_voices_user_ext_idx" ON "user_voices" ("user_id", "external_id")`);
 
+  // 0020a: users.deleted_at for soft-delete / GDPR right-to-be-forgotten.
+  await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp`);
+
+  // 0020b: api key rotation — keep prev hash valid for a window so the
+  // user can rotate without instant lockout of in-flight clients.
+  await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "prev_api_key_hash" text`);
+  await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "prev_api_key_expires_at" timestamp`);
+
   // 0020: admin_audit_log — append-only privileged-action ledger.
   // Used by ops/compliance: who credited what, who changed which
   // policy, who rotated their API key, who deleted their account.
@@ -213,6 +221,19 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "audit_target_idx" ON "admin_audit_log" ("target_user_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "audit_action_idx" ON "admin_audit_log" ("action")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "audit_created_idx" ON "admin_audit_log" ("created_at" DESC)`);
+
+  // 0021: user_mfa — TOTP 2FA per RFC 6238.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "user_mfa" (
+      "user_id"          uuid PRIMARY KEY REFERENCES "users"("id") ON DELETE CASCADE,
+      "secret_cipher"    text NOT NULL,
+      "verified_at"      timestamp,
+      "last_counter"     bigint,
+      "recovery_cipher"  text,
+      "created_at"       timestamp NOT NULL DEFAULT NOW(),
+      "updated_at"       timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 export async function ensureSystemRows() {

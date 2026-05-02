@@ -27,6 +27,16 @@ export const users = pgTable(
     tier: text('tier').notNull().default('free'),
     tierExpiresAt: timestamp('tier_expires_at'),
     tierAutoRenew: boolean('tier_auto_renew').notNull().default(true),
+    // Soft-delete: when set, the user is treated as deleted by every
+    // authed query (apiKeyAuth refuses login). PII is wiped at delete
+    // time but the row stays for FK integrity (transactions, requests,
+    // settlements all point here, and we need them for accounting).
+    deletedAt: timestamp('deleted_at'),
+    // Previous api_key_hash kept valid for prevApiKeyExpiresAt window
+    // so a user can rotate without an instant lockout. After expiry,
+    // the old hash is null'd and only the current one works.
+    prevApiKeyHash: text('prev_api_key_hash'),
+    prevApiKeyExpiresAt: timestamp('prev_api_key_expires_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => ({
@@ -597,3 +607,28 @@ export const adminAuditLog = pgTable(
   }),
 );
 export type AuditLogRow = typeof adminAuditLog.$inferSelect;
+
+// ─── User MFA (TOTP per RFC 6238) ────────────────────────────────────
+// One row per user that has 2FA enabled. Secret stored encrypted via
+// MASTER_ENCRYPTION_KEY (same envelope as wallet seed). Verified-at
+// is set the first time the user proves they have the device — until
+// then, login still works without 2FA so a half-finished setup doesn't
+// brick the account.
+export const userMfa = pgTable('user_mfa', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  // AES-GCM ciphertext of the base32-decoded TOTP secret (20 bytes).
+  secretCipher: text('secret_cipher').notNull(),
+  verifiedAt: timestamp('verified_at'),
+  // Last-used counter — protects against immediate replay of the same
+  // 6-digit code within the 30-second window.
+  lastCounter: bigint('last_counter', { mode: 'bigint' }),
+  // Recovery codes (also encrypted as a single JSON blob). Each code
+  // is consumed on use; we don't track individual rows because the
+  // set is small (8-10) and rotation is rare.
+  recoveryCipher: text('recovery_cipher'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+export type UserMfa = typeof userMfa.$inferSelect;

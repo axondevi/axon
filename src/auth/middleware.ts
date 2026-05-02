@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono';
-import { eq } from 'drizzle-orm';
+import { eq, or, and, isNotNull, gt } from 'drizzle-orm';
 import { timingSafeEqual } from 'node:crypto';
 import { db } from '~/db';
 import { users } from '~/db/schema';
@@ -14,13 +14,30 @@ export async function apiKeyAuth(c: Context, next: Next) {
   const key = header.startsWith('Bearer ') ? header.slice(7) : header;
   const hash = hashApiKey(key);
 
+  // Accept either the current hash OR the previous-rotated hash if it's
+  // still inside the grace window. Single SELECT — Postgres returns at
+  // most one row because hashes are unique per user.
+  const now = new Date();
   const [user] = await db
     .select()
     .from(users)
-    .where(eq(users.apiKeyHash, hash))
+    .where(
+      or(
+        eq(users.apiKeyHash, hash),
+        and(
+          eq(users.prevApiKeyHash, hash),
+          isNotNull(users.prevApiKeyExpiresAt),
+          gt(users.prevApiKeyExpiresAt, now),
+        ),
+      ),
+    )
     .limit(1);
 
   if (!user) throw Errors.unauthorized();
+  // Soft-delete sentinel — once `deleted_at` is set, the row exists
+  // for FK integrity (transactions, requests) but the holder is
+  // GDPR-deleted. Treat the API key as revoked.
+  if (user.deletedAt) throw Errors.unauthorized();
 
   c.set('user', user);
   await next();

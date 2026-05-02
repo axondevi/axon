@@ -39,6 +39,8 @@ import webhookSubsRoutes from '~/routes/webhook-subs';
 import { affiliateRoutes } from '~/routes/affiliate';
 import voicesRoutes from '~/routes/voices';
 import auditRoutes from '~/routes/audit';
+import meRoutes from '~/routes/me';
+import mfaRoutes from '~/routes/mfa';
 
 const app = new Hono();
 
@@ -188,6 +190,8 @@ v1.route('/checkout', checkoutRoutes);  // POST /v1/checkout/pix + status pollin
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 v1.route('/affiliate', affiliateRoutes);  // earnings + agent list for referrers
 v1.route('/voices', voicesRoutes);        // picker / preview / clone / delete
+v1.route('/users', meRoutes);             // GET /me, GET /me/export, DELETE /me
+v1.route('/auth/2fa', mfaRoutes);         // TOTP setup / verify / check / disable
 app.route('/v1', v1);
 
 // ─── Error handler ────────────────────────────────────
