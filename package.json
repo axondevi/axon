@@ -46,7 +46,7 @@
   "dependencies": {
     "@hono/node-server": "^1.13.0",
     "@types/pdfkit": "^0.17.6",
-    "drizzle-orm": "^0.36.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.6.0",
     "ioredis": "^5.4.1",
     "jose": "^6.2.3",
