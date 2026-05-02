@@ -97,6 +97,20 @@ app.get('/', (c) =>
 );
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
+// Build probe — public, no auth. Lets the brain UI (and operators with a
+// curl) verify which feature wave is actually live. The very existence of
+// this endpoint means the brain instrumentation deploy went through.
+app.get('/build', (c) => c.json({
+  features: {
+    brain_meta: true,        // agent_messages.meta JSONB persisted per turn
+    judge_layer: true,       // src/agents/judge.ts active
+    arc_evaluation: true,    // contact_memory.arc per-conversation
+    health_endpoint: true,   // /v1/agents/:id/health
+    patches_endpoint: true,  // /v1/agents/:id/patches + /apply
+  },
+  built_at: new Date().toISOString(),
+}));
+
 // Readiness — checks DB and Redis are reachable. Use for k8s/Railway probes.
 app.get('/health/ready', async (c) => {
   try {
