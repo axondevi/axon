@@ -17,6 +17,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
+import { log } from '~/lib/logger';
 import { encrypt, decrypt } from '~/lib/crypto';
 import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound } from '~/whatsapp/evolution';
 import { recordSentId, isSentByUs } from '~/whatsapp/sent-ids';
@@ -617,12 +618,20 @@ publicWebhook.post('/:secret', async (c) => {
   let userSentAudio = false;
   if (inbound.kind === 'image' && inbound.messageKey && inbound.messageRaw) {
     try {
+      const mediaStart = Date.now();
       const media = await fetchMessageMedia({
         instanceUrl: conn.instanceUrl,
         instanceName: conn.instanceName,
         apiKey: connApiKey,
         message: inbound.messageRaw,
         messageKey: inbound.messageKey,
+      });
+      log.info('whatsapp.media.image', {
+        ok: media.ok,
+        ms: Date.now() - mediaStart,
+        bytes: media.bytes?.length ?? 0,
+        mime: media.mimeType ?? null,
+        error: media.error ?? null,
       });
       if (media.ok && media.bytes && media.mimeType) {
         const { describeImage } = await import('~/llm/vision');
@@ -635,12 +644,39 @@ publicWebhook.post('/:secret', async (c) => {
           inboundText = `[CLIENTE ENVIOU FOTO]\nDescrição automática: ${desc.description}` +
             (inbound.text ? `\nLegenda do cliente: "${inbound.text}"` : '');
         } else {
-          inboundText = inbound.text ||
-            '[CLIENTE ENVIOU FOTO mas não consegui processar a imagem agora — peça pra ele descrever ou tentar de novo.]';
+          // The agent will see this enriched user-message and reply
+          // accordingly — natural language, not the bracketed system
+          // marker. Picks one of three messages so the same user
+          // doesn't get the identical fallback line repeatedly when
+          // they retry. Audit + counter so ops can spot the issue
+          // before the user reports it.
+          log.warn('whatsapp.image.describe_failed', {
+            error: desc.error ?? null,
+            skipped: !!desc.skipped,
+            mime: media.mimeType,
+            bytes: media.bytes.length,
+            agent_id: conn.agentId,
+          });
+          const callerCaption = inbound.text || '';
+          if (callerCaption) {
+            inboundText = `[CLIENTE ENVIOU UMA FOTO com a legenda] ${callerCaption}`;
+          } else {
+            inboundText =
+              '[CLIENTE ENVIOU UMA FOTO sem legenda — peça gentilmente pra ele descrever em uma frase o que tá na imagem ou enviar de novo.]';
+          }
         }
+      } else {
+        // Download itself failed — Evolution returned no bytes. Tell the
+        // agent to ask gently, same as above.
+        inboundText = inbound.text ||
+          '[CLIENTE ENVIOU UMA FOTO mas não consegui baixar — peça pra ele tentar enviar de novo, ou descrever em texto.]';
       }
-    } catch {
-      inboundText = inbound.text || '[CLIENTE ENVIOU FOTO — não consegui baixar.]';
+    } catch (err) {
+      log.warn('whatsapp.image.exception', {
+        error: err instanceof Error ? err.message : String(err),
+        agent_id: conn.agentId,
+      });
+      inboundText = inbound.text || '[CLIENTE ENVIOU UMA FOTO — peça pra ele descrever em texto.]';
     }
   }
   if (inbound.kind === 'audio' && inbound.messageKey && inbound.messageRaw) {
