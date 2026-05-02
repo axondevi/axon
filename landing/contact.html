@@ -285,6 +285,24 @@
         color: var(--text-dim); font-size: 13px;
       }
 
+      /* ─── Appointments ─────────────────────── */
+      .apt-card {
+        padding: 12px 14px;
+        margin-bottom: 8px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .apt-card:last-child { margin-bottom: 0; }
+      .apt-when {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 6px;
+      }
+      .apt-when strong { font-size: 13px; }
+      .apt-desc { font-size: 13px; color: var(--text); }
+      .apt-loc { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+      .apt-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
       /* ─── Login (shared) ──────────────────────── */
       .login-wrap {
         display: flex; align-items: center; justify-content: center;
@@ -343,6 +361,7 @@
         phone: urlPhone,
         contact: null,
         documents: [],
+        appointments: [],
         storageConfigured: true,
         loading: false,
         error: null,
@@ -558,6 +577,8 @@
             </div>
           </div>
 
+          ${renderAppointmentsSection()}
+
           <div class="two-col">
             <div class="panel">
               <div class="panel-header">
@@ -584,6 +605,58 @@
                 </button>
               </div>
               <div>${renderDocs()}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderAppointmentsSection() {
+        const apts = (state.appointments || []).slice().sort((a, b) =>
+          new Date(b.scheduled_for).getTime() - new Date(a.scheduled_for).getTime(),
+        );
+        const upcoming = apts.filter((a) => new Date(a.scheduled_for).getTime() > Date.now() && (a.status === 'confirmed' || a.status === 'pending'));
+        const past = apts.filter((a) => !(new Date(a.scheduled_for).getTime() > Date.now() && (a.status === 'confirmed' || a.status === 'pending')));
+        const statusLabel = (s) => ({ confirmed: '🟢 confirmado', pending: '🟡 pendente', cancelled: '⚪ cancelado', done: '✅ concluído', no_show: '❌ não compareceu' }[s] || s);
+        const statusColor = (s) => ({ confirmed: '#19d5c6', pending: '#ffd60a', cancelled: '#9a9aa4', done: '#25d366', no_show: '#ff5f57' }[s] || '#9a9aa4');
+        if (apts.length === 0) {
+          return `
+            <div class="panel" style="margin-bottom:22px;">
+              <div class="panel-header">
+                Agendamentos
+                <span class="meta">nenhum agendamento ainda</span>
+              </div>
+              <div class="panel-body" style="padding:20px;color:var(--text-muted);font-size:13px;">
+                Quando o agente confirmar um horário com este contato, aparece aqui — e o sistema manda lembrete 1 dia antes.
+              </div>
+            </div>`;
+        }
+        const renderApt = (a) => {
+          const dt = new Date(a.scheduled_for);
+          const fmt = dt.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+          const reminders = Array.isArray(a.reminders_sent) ? a.reminders_sent : [];
+          return `
+            <div class="apt-card">
+              <div class="apt-when">
+                <strong>${escape(fmt)}</strong>
+                <span style="color:${statusColor(a.status)};font-size:11px;">${escape(statusLabel(a.status))}</span>
+              </div>
+              <div class="apt-desc">${escape(a.description || '(sem descrição)')}</div>
+              ${a.location ? `<div class="apt-loc">📍 ${escape(a.location)}</div>` : ''}
+              <div class="apt-meta">
+                ${a.duration_minutes ? `${a.duration_minutes} min` : ''}
+                ${reminders.length ? ` · lembretes: ${reminders.join(', ')}` : ''}
+              </div>
+            </div>`;
+        };
+        return `
+          <div class="panel" style="margin-bottom:22px;">
+            <div class="panel-header">
+              Agendamentos
+              <span class="meta">${upcoming.length} próximo(s) · ${past.length} no histórico</span>
+            </div>
+            <div class="panel-body">
+              ${upcoming.length ? `<h4 style="margin:0 0 8px;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;">Próximos</h4>${upcoming.map(renderApt).join('')}` : ''}
+              ${past.length ? `<h4 style="margin:14px 0 8px;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Histórico</h4>${past.map(renderApt).join('')}` : ''}
             </div>
           </div>
         `;
@@ -741,12 +814,14 @@
         state.error = null;
         render();
         try {
-          const [contact, docs] = await Promise.all([
+          const [contact, docs, apts] = await Promise.all([
             api(`/v1/agents/${state.selectedAgentId}/contacts/${encodeURIComponent(state.phone)}`),
             api(`/v1/agents/${state.selectedAgentId}/contacts/${encodeURIComponent(state.phone)}/documents`),
+            api(`/v1/agents/${state.selectedAgentId}/contacts/${encodeURIComponent(state.phone)}/appointments`).catch(() => ({ appointments: [] })),
           ]);
           state.contact = contact;
           state.documents = docs.documents || [];
+          state.appointments = apts.appointments || [];
           state.storageConfigured = docs.storage_configured !== false;
         } catch (e) {
           state.error = e.message;

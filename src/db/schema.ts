@@ -544,6 +544,60 @@ export const contactDocuments = pgTable(
 );
 export type ContactDocument = typeof contactDocuments.$inferSelect;
 
+// ─── Appointments + reminders ─────────────────────────────────
+// One row per scheduled customer appointment. The agent inserts these
+// via the `schedule_appointment` tool when it confirms a booking in
+// chat. A daily cron job sweeps for `scheduled_for` ~24h ahead and
+// fires a reminder via Evolution sendText, marking the reminder code
+// (e.g. 'd-1') in `reminders_sent` so it never double-sends.
+//
+// Status lifecycle: confirmed → done (after the appointment passes,
+// a future cron can flip it) | cancelled (customer cancels) | no_show.
+export const appointments = pgTable(
+  'appointments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    /** Soft-link to contact_memory; nullable so an appointment survives if
+     *  the contact gets purged (LGPD soft-delete). The phone column below
+     *  is the durable identifier. */
+    contactMemoryId: uuid('contact_memory_id')
+      .references(() => contactMemory.id, { onDelete: 'set null' }),
+    /** Phone digits-only (e.g. "5511995432538") — the actual delivery target. */
+    contactPhone: text('contact_phone').notNull(),
+    /** Best-effort copy of the contact's display name at booking time. */
+    contactName: text('contact_name'),
+
+    /** Wall-clock timestamp of the appointment. timestamptz keeps timezone
+     *  fidelity for cross-zone reads (the cron compares to UTC NOW()). */
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull(),
+    durationMinutes: integer('duration_minutes').default(30),
+    description: text('description'),
+    location: text('location'),
+
+    /** 'confirmed' | 'pending' | 'cancelled' | 'done' | 'no_show'. Default
+     *  confirmed since the agent only inserts after agreement in chat. */
+    status: text('status').notNull().default('confirmed'),
+
+    /** Reminder tags already fired. Shape: ['d-1', 'd-2h']. The cron
+     *  appends here when it sends each reminder type, so re-runs are
+     *  idempotent. */
+    remindersSent: jsonb('reminders_sent').notNull().default(sql`'[]'::jsonb`),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    agentIdx: index('appointments_agent_idx').on(t.agentId),
+    contactIdx: index('appointments_contact_idx').on(t.contactMemoryId),
+    scheduledIdx: index('appointments_scheduled_idx').on(t.scheduledFor),
+    statusIdx: index('appointments_status_idx').on(t.status),
+  }),
+);
+export type Appointment = typeof appointments.$inferSelect;
+
 // ─── Pix Payments (MercadoPago integration) ───────────────────
 // Tracks pending → approved/expired/cancelled lifecycle of Pix charges.
 // When status flips to 'approved', credit() in wallet/service.ts writes

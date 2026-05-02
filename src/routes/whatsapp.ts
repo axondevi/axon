@@ -1232,6 +1232,12 @@ async function processBufferedTurn(opts: {
 
   c.set('user', owner);
   c.set('axon:agent_id', runtimeAgent.id);
+  // Contact context for tools that need to know who the customer is —
+  // schedule_appointment uses these to insert the appointment row
+  // without forcing the LLM to repeat the phone in args.
+  (c as any).set('axon:contact_phone', inbound.phone);
+  (c as any).set('axon:contact_memory_id', memory?.id ?? null);
+  (c as any).set('axon:contact_name', memory?.displayName ?? inbound.pushName ?? null);
 
   let reply: string;
   let images: NonNullable<Awaited<ReturnType<typeof runAgent>>['images']> = [];

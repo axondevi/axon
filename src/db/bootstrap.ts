@@ -277,6 +277,31 @@ export async function ensureCriticalSchema() {
   // sent) from 'outbound' (agent generated and sent). Default 'inbound'
   // so existing rows retain their semantics.
   await db.execute(sql`ALTER TABLE "contact_documents" ADD COLUMN IF NOT EXISTS "direction" text NOT NULL DEFAULT 'inbound'`);
+
+  // 0026: appointments — one row per agent-confirmed customer booking.
+  // Created by the schedule_appointment tool when the agent reaches
+  // agreement in chat; consumed by a daily cron that sends D-1 reminders.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "appointments" (
+      "id"                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "agent_id"            uuid NOT NULL REFERENCES "agents"("id") ON DELETE CASCADE,
+      "contact_memory_id"   uuid REFERENCES "contact_memory"("id") ON DELETE SET NULL,
+      "contact_phone"       text NOT NULL,
+      "contact_name"        text,
+      "scheduled_for"       timestamptz NOT NULL,
+      "duration_minutes"    integer DEFAULT 30,
+      "description"         text,
+      "location"            text,
+      "status"              text NOT NULL DEFAULT 'confirmed',
+      "reminders_sent"      jsonb NOT NULL DEFAULT '[]'::jsonb,
+      "created_at"          timestamp NOT NULL DEFAULT NOW(),
+      "updated_at"          timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "appointments_agent_idx" ON "appointments"("agent_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "appointments_contact_idx" ON "appointments"("contact_memory_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "appointments_scheduled_idx" ON "appointments"("scheduled_for")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "appointments_status_idx" ON "appointments"("status")`);
 }
 
 export async function ensureSystemRows() {

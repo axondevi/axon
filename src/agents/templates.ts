@@ -69,6 +69,8 @@ export const CORE_TOOLS: string[] = [
   'embed_text',
   'generate_image',
   'generate_pix',
+  'generate_pdf',
+  'schedule_appointment',
   // New free tools — broadly useful so we ship them by default
   'geocode_address',
   'route_distance',

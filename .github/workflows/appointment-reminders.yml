@@ -1,0 +1,48 @@
+# Daily appointment reminders — runs at 11:00 UTC (08:00 BR / GMT-3),
+# hits the backend cron endpoint that sweeps appointments scheduled
+# 18-30h ahead and fires a D-1 WhatsApp reminder via Evolution.
+#
+# Idempotent: each appointment's reminders_sent[] tags 'd-1' after
+# successful send, so re-runs (or workflow_dispatch) won't double-fire.
+#
+# Manual trigger via workflow_dispatch is supported — accepts a `force`
+# input that bypasses the time window (useful for testing with an
+# appointment outside the next-day window).
+#
+# Required secret: ADMIN_API_KEY (same value as on Render).
+
+name: appointment-reminders
+
+on:
+  schedule:
+    # 11:00 UTC = 08:00 America/Sao_Paulo. Cron uses UTC.
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Bypass time window (1=yes, 0=no)'
+        required: false
+        default: '0'
+
+concurrency:
+  group: appointment-reminders
+  cancel-in-progress: false
+
+jobs:
+  fire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger backend cron endpoint
+        run: |
+          QS=""
+          if [ "${{ github.event.inputs.force }}" = "1" ]; then
+            QS="?force=1"
+          fi
+          echo "POST https://axon-kedb.onrender.com/v1/admin/cron/appointment-reminders$QS"
+          curl -fsS -X POST \
+            "https://axon-kedb.onrender.com/v1/admin/cron/appointment-reminders$QS" \
+            -H "x-admin-key: ${{ secrets.ADMIN_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' | tee response.json
+          # Pretty-print summary
+          python -c "import json; d=json.load(open('response.json')); print(f'sent={d.get(\"sent\")} skipped={d.get(\"skipped\")} failed={d.get(\"failed\")} found={d.get(\"found\")}')"

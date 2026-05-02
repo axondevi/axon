@@ -217,6 +217,37 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     // No buildRequest — generate_pix is intercepted server-side and routed to
     // our internal MercadoPago wrapper, NOT to handleCall.
   },
+  schedule_appointment: {
+    description:
+      'Schedule a customer appointment. Call this when you and the customer have AGREED on a specific date and time. The system will automatically send the customer a reminder one day before the appointment via WhatsApp. ' +
+      'Required: scheduled_for_iso (ISO 8601 timestamp WITH timezone, e.g. "2026-05-04T13:00:00-03:00") and description (e.g. "Consulta com Dra. Elisa"). ' +
+      'Optional: duration_minutes (default 30), location (address/room). ' +
+      'Customer phone is taken automatically from the WhatsApp context. ' +
+      'After calling this, confirm the booking to the customer in PT-BR — e.g. "Pronto, agendamento confirmado pra [data], qualquer coisa só me chamar."',
+    parameters: {
+      type: 'object',
+      properties: {
+        scheduled_for_iso: {
+          type: 'string',
+          description: 'ISO 8601 datetime with timezone offset (e.g. "2026-05-04T13:00:00-03:00" for Brazilian time).',
+        },
+        description: {
+          type: 'string',
+          description: 'Short label, e.g. "Consulta clínica geral", "Corte de cabelo + barba", "Visita ao imóvel".',
+        },
+        duration_minutes: {
+          type: 'integer',
+          description: 'Duration in minutes. Defaults to 30 if omitted.',
+        },
+        location: {
+          type: 'string',
+          description: 'Optional address, room, or video link.',
+        },
+      },
+      required: ['scheduled_for_iso', 'description'],
+    },
+    // No buildRequest — handled in the runtime special-case (DB insert).
+  },
   generate_pdf: {
     description:
       'Generate a PDF document and deliver it to the customer over WhatsApp. ' +
@@ -952,6 +983,67 @@ export async function runAgent(opts: {
           cost_usdc: '0',
           ...(result.ok ? {} : { error: result.error || 'unknown' }),
         });
+        continue;
+      }
+
+      // ─── Special-case: schedule_appointment ─────────────────────────
+      // Inserts an appointments row. The contact phone / memory_id / name
+      // are NOT in tool args (LLM shouldn't have to repeat them) — they
+      // come from `c.set('axon:contact_*')` set by the channel handler
+      // (whatsapp.ts) before calling runAgent. The daily reminder cron
+      // sweeps appointments table independently.
+      if (tc.function.name === 'schedule_appointment') {
+        try {
+          const phone = c.get('axon:contact_phone' as never) as string | undefined;
+          const memoryId = c.get('axon:contact_memory_id' as never) as string | undefined;
+          const name = c.get('axon:contact_name' as never) as string | undefined;
+          if (!phone || !agentId) {
+            const errMsg = 'missing contact context — schedule_appointment can only be called from a channel that sets contact phone';
+            history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: errMsg }) });
+            toolCallsExecuted.push({ name: 'schedule_appointment', args, ok: false, cost_usdc: '0', error: errMsg });
+            continue;
+          }
+          const isoStr = String(args.scheduled_for_iso || '').trim();
+          const scheduledFor = new Date(isoStr);
+          if (Number.isNaN(scheduledFor.getTime())) {
+            throw new Error(`invalid scheduled_for_iso: ${isoStr}`);
+          }
+          const description = String(args.description || '').trim().slice(0, 200);
+          if (!description) throw new Error('description is required');
+          const duration = typeof args.duration_minutes === 'number' && args.duration_minutes > 0
+            ? Math.min(Math.round(args.duration_minutes), 480) : 30;
+          const location = args.location ? String(args.location).slice(0, 200) : null;
+
+          const { db } = await import('~/db');
+          const { appointments } = await import('~/db/schema');
+          const [inserted] = await db.insert(appointments).values({
+            agentId,
+            contactMemoryId: memoryId || null,
+            contactPhone: phone,
+            contactName: name || null,
+            scheduledFor,
+            durationMinutes: duration,
+            description,
+            location,
+            status: 'confirmed',
+          }).returning({ id: appointments.id });
+
+          history.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify({
+              ok: true,
+              id: inserted?.id,
+              scheduled_for: scheduledFor.toISOString(),
+              note: 'Appointment registered. Reminder will fire 1 day before. Confirm to the customer in PT-BR (e.g. "Pronto, te marquei pra [data], qualquer coisa só me chamar 📅").',
+            }),
+          });
+          toolCallsExecuted.push({ name: 'schedule_appointment', args, ok: true, cost_usdc: '0' });
+        } catch (err: any) {
+          const errMsg = err?.message || String(err);
+          history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: errMsg }) });
+          toolCallsExecuted.push({ name: 'schedule_appointment', args, ok: false, cost_usdc: '0', error: errMsg });
+        }
         continue;
       }
 
