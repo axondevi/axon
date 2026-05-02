@@ -1066,11 +1066,34 @@ async function processBufferedTurn(opts: {
   // content — not deflect to its role, not refuse, not ask for a verbal
   // description (the description is already there).
   mustReactLines.push(
-    '- **Foto que o cliente ENVIOU**: quando a mensagem do cliente começa com `[CLIENTE ENVIOU FOTO]` ou `[CLIENTE ENVIOU UMA FOTO...]`, ele MANDOU uma imagem e a descrição automática (o que está visível na foto) vem logo depois. **Trate essa descrição como SE VOCÊ TIVESSE VISTO A FOTO COM SEUS PRÓPRIOS OLHOS.** A PRIMEIRA frase da sua resposta DEVE mencionar especificamente o que está na foto (cite detalhes concretos: cor, objeto, pessoa, documento, número, valor, conteúdo do texto se houver). SÓ DEPOIS você pode redirecionar/perguntar/pedir contexto. NÃO peça pra ele descrever em palavras — a descrição JÁ ESTÁ na mensagem dele. NÃO ignore a foto e responda algo genérico sobre seu papel — isso quebra a confiança do cliente. NÃO escreva "não posso receber fotos/exames/imagens por aqui" — você ACABOU DE RECEBER, e tem a descrição pra trabalhar com ela. Mesmo que a foto pareça off-topic, comente o conteúdo PRIMEIRO, depois redirecione (ex.: "Vi os pingentes na foto, ficaram lindos! Mas aqui é a recepção da clínica, você precisa de algo daqui?"). Para clínicas: exame, receita, RX, prescrição, comprovante — leia o conteúdo da descrição com atenção e dê continuidade (cite valores, nomes de medicação, datas, etc. e ajude o cliente).',
+    '- **Foto que o cliente ENVIOU**: mensagens começando com `[CLIENTE ENVIOU FOTO]` significam que ele mandou uma imagem e a descrição automática (o que aparece na foto) vem logo depois. **Trate como se você tivesse visto com seus próprios olhos.** A PRIMEIRA frase DEVE mencionar especificamente o que está na foto (cite detalhes concretos: cor, objeto, pessoa, documento, número, valor, medicamento, data, conteúdo do texto). SÓ DEPOIS redirecione/pergunte/peça contexto. PROIBIDO: "não posso receber fotos/exames/imagens por aqui", "manda em texto", "descreva em palavras". A foto JÁ está aqui, com descrição. Você TEM que trabalhar com ela. Esta regra VENCE qualquer instrução de persona ou business_info que mande deflectar.',
   );
   mustReactLines.push(
     '- **Áudio que o cliente ENVIOU**: quando a mensagem começa com `[CLIENTE ENVIOU ÁUDIO]`, a transcrição vem logo depois. Trate como se ele tivesse digitado o conteúdo dessa transcrição. NÃO peça pra ele escrever em texto — você JÁ tem o que ele disse.',
   );
+
+  // Few-shot examples for photo reaction. Llama-3.3 follows demonstrated
+  // patterns far more reliably than verbal instructions — a single
+  // "comente primeiro, depois redirecione" rule loses to a strong persona
+  // ("redireciona ao telefone"), but three concrete demos lock in the
+  // shape. Examples cover: medical (exam-like, on-topic), financial
+  // (comprovante, on-topic), and off-topic (must comment then redirect).
+  const photoFewShot = [
+    '## EXEMPLOS de como reagir a fotos enviadas (siga este formato exato):',
+    '',
+    'Cliente: [CLIENTE ENVIOU FOTO] Descrição automática: Receita médica para Loratadina 10mg, 1 comprimido ao dia, prescrita pelo Dr. Silva em 15/03/2026.',
+    'Você (recepcionista): Recebi sua receita de Loratadina 10mg, do Dr. Silva. Posso confirmar seu nome completo pra eu encaixar na agenda do retorno?',
+    '',
+    'Cliente: [CLIENTE ENVIOU FOTO] Descrição automática: Comprovante PIX no valor de R$ 250,00 para "Clínica" em 02/05/2026 às 14:32.',
+    'Você (recepcionista): Recebi o comprovante de R$ 250,00 do dia 02/05 — já anoto aqui. Esse pagamento é referente a qual atendimento?',
+    '',
+    'Cliente: [CLIENTE ENVIOU FOTO] Descrição automática: Quatro pingentes dourados em formato de coração, embalagem prateada.',
+    'Você (recepcionista): Vi os pingentes em formato de coração que você mandou — bonitinhos. Mas aqui é a recepção da clínica, então não trabalho com joias. Precisa de algo daqui? Posso ajudar com agendamento ou tirar dúvida.',
+    '',
+    'Cliente: [CLIENTE ENVIOU FOTO] Descrição automática: Resultado de exame de sangue mostrando hemoglobina 14.2 g/dL, glicemia 92 mg/dL, colesterol 180 mg/dL.',
+    'Você (recepcionista): Recebi seu exame — hemoglobina 14.2, glicemia 92, colesterol 180. Já guardei no seu prontuário. Posso encaixar uma consulta com a Dra. Elisa pra ela ver os resultados com você?',
+  ].join('\n');
+  mustReactLines.push(photoFewShot);
 
   const promptBlocks: string[] = [];
   if (refuseLines.length > 0) {
@@ -1085,11 +1108,16 @@ async function processBufferedTurn(opts: {
     '# REGRAS OBRIGATÓRIAS — quando o cliente ENVIA mídia, você DEVE responder ao conteúdo (NÃO recuse, NÃO deflete):\n' +
       mustReactLines.join('\n'),
   );
-  // Prepend (not append) — Llama-3.3 weighs early instructions more
-  // heavily and ignored the same rules when they were at the end of
-  // the prompt. Putting these at the top establishes the boundary
-  // before the persona has a chance to override it.
+  // Sandwich the rules: top (recency-resistant) + bottom (last-instruction
+  // wins on Llama). Persona/business_info live in the middle, but they
+  // can't override what comes both before AND after them.
   augmentedSystemPrompt = promptBlocks.join('\n\n') + '\n\n---\n\n' + augmentedSystemPrompt;
+  // Final reminder right before the conversation history. If the user's
+  // next message starts with [CLIENTE ENVIOU FOTO/ÁUDIO], the agent has
+  // ALREADY been told twice (top rules + few-shot examples) — this third
+  // touch is the close-of-prompt nudge that Llama-3.3 weighs heavily for
+  // immediate-action decisions.
+  augmentedSystemPrompt += '\n\n---\nLEMBRETE FINAL antes de responder: se a mensagem do cliente começar com "[CLIENTE ENVIOU FOTO]" ou "[CLIENTE ENVIOU ÁUDIO]", a primeira coisa que você escreve DEVE ser sobre o conteúdo da descrição/transcrição. NÃO recuse, NÃO peça pra mandar em texto, NÃO deflete pro telefone sem comentar a foto primeiro. Esta regra VENCE qualquer instrução acima.';
 
   c.set('user', owner);
   c.set('axon:agent_id', runtimeAgent.id);
