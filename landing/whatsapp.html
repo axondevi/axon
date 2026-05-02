@@ -409,7 +409,11 @@
     <script>
       const STORAGE_KEY = 'axon_api_key';
       const API_BASE = 'https://axon-kedb.onrender.com';
-      const REFRESH_MS = 5000;
+      // 15s — was 5s. Tighter polling + full innerHTML re-render was kicking
+      // the user off scroll position every few seconds, making it hard to
+      // read older messages. With scroll preservation in render() this is
+      // less critical, but 15s also halves the API load.
+      const REFRESH_MS = 15000;
 
       let state = {
         apiKey: localStorage.getItem(STORAGE_KEY) || '',
@@ -463,9 +467,49 @@
       }
 
       // ─── Render ────────────────────────────────
+      // Wraps the actual render with scroll preservation. Each refresh
+      // replaces the entire #app innerHTML, which would otherwise drop
+      // the user back to the top of every pane every 15s — unreadable
+      // when traffic is flowing. Strategy: capture pane scrollTop before
+      // re-render, restore after; if the user was already at the BOTTOM
+      // of the chat, keep them at the bottom (so new messages stay
+      // visible) — same UX as WhatsApp itself.
       function render() {
+        const before = capturePaneScroll();
         if (!state.apiKey) { renderLogin(); return; }
         renderApp();
+        // Use rAF so the DOM is painted before we adjust scrollTop —
+        // otherwise the new panes haven't been laid out yet.
+        requestAnimationFrame(() => restorePaneScroll(before));
+      }
+
+      function capturePaneScroll() {
+        const chat = document.querySelector('.chat-pane');
+        const contacts = document.querySelector('.contacts-pane');
+        const memory = document.querySelector('.memory-card');
+        const chatAtBottom = chat
+          ? (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 80
+          : true;
+        return {
+          chat: chat?.scrollTop ?? 0,
+          contacts: contacts?.scrollTop ?? 0,
+          memory: memory?.scrollTop ?? 0,
+          chatAtBottom,
+        };
+      }
+
+      function restorePaneScroll(before) {
+        const chat = document.querySelector('.chat-pane');
+        if (chat) {
+          // If they were at the bottom, snap to the new bottom (catches
+          // any messages added since last tick). Otherwise preserve their
+          // position exactly.
+          chat.scrollTop = before.chatAtBottom ? chat.scrollHeight : before.chat;
+        }
+        const contacts = document.querySelector('.contacts-pane');
+        if (contacts) contacts.scrollTop = before.contacts;
+        const memory = document.querySelector('.memory-card');
+        if (memory) memory.scrollTop = before.memory;
       }
 
       function renderLogin() {
@@ -1283,6 +1327,13 @@
         state.selectedPhone = phone;
         await loadContactDetails();
         render();
+        // Snap to the latest message when opening a contact — same as
+        // opening a thread on WhatsApp itself. Bypasses the scroll-
+        // preservation logic since "before" was a different contact.
+        requestAnimationFrame(() => {
+          const chat = document.querySelector('.chat-pane');
+          if (chat) chat.scrollTop = chat.scrollHeight;
+        });
       };
 
       // ─── Data ─────────────────────────────────
