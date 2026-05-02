@@ -1239,6 +1239,9 @@
         if (meta.buffered_msgs && meta.buffered_msgs > 1) {
           pills.push(`<span class="brain-pill">📥 ${meta.buffered_msgs} msgs juntas</span>`);
         }
+        if (Array.isArray(meta.guard_rewrites) && meta.guard_rewrites.length) {
+          pills.push(`<span class="brain-pill" style="color:var(--danger);border-color:rgba(255,95,87,0.5);" title="Output rewriter caught the LLM promising a capability it doesn't have. Original reply was discarded.">🛡️ guard: ${meta.guard_rewrites.join(', ')}</span>`);
+        }
 
         const factsLoaded = Array.isArray(meta.facts_loaded) ? meta.facts_loaded : [];
         const factsUsed = Array.isArray(meta.facts_used) ? meta.facts_used : [];

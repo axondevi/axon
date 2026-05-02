@@ -1030,6 +1030,33 @@ async function processBufferedTurn(opts: {
     images = result.images || [];
     pixPayments = result.pixPayments || [];
 
+    // ─── Output guardrail: catch capability hallucinations ─────────
+    // Even with explicit "NÃO prometa X" rules in the system prompt,
+    // Llama-3.3 sometimes still says "vou gerar uma imagem, aguarde"
+    // and then sits silent — leaving the customer waiting forever.
+    // Worse, it occasionally fabricates URLs ("aqui está sua imagem:
+    // https://example.com/abc123"). Post-process the reply: if it
+    // promises a capability the agent doesn't have AND no actual
+    // artifact was produced, replace the text with a polite refusal.
+    const guardRewrites: string[] = [];
+    if (!effectiveTools.includes('generate_image') && images.length === 0) {
+      // Promise patterns: "vou gerar", "estou criando", "aguarde a imagem",
+      // "segue a imagem", "aqui está sua foto", and fake URL injections.
+      const imagePromise = /\b(vou\s+ger(ar|ando)|estou\s+(gerando|criando)|aguarde\s+(a|um)\s+(imagem|foto|desenho)|crian(do|ar)\s+(a|um)\s+(imagem|foto|desenho)|segue\s+(a|um)\s+(imagem|foto)|aqui\s+(está|vai|tem)\s+(sua|a)\s+(imagem|foto)|gerei\s+uma?\s+(imagem|foto)|imagem\s+(gerada|criada)\s+(com\s+sucesso|abaixo))/i;
+      const fakeUrl = /https?:\/\/(?:www\.)?(?:example\.com|imagine\.com|fakeurl|placeholder|generated\.|dalle|midjourney|stablediffusion|imgur\.com\/[a-z0-9]{1,5}\b)/i;
+      if (imagePromise.test(reply) || fakeUrl.test(reply)) {
+        reply = 'Não gero imagens por aqui — mas se você descrever em palavras o que precisa, te ajudo do meu jeito. Ou se preferir, peço pra um atendente humano te mandar uma foto.';
+        guardRewrites.push('image_promise');
+      }
+    }
+    if (!effectiveTools.includes('generate_pix') && pixPayments.length === 0) {
+      const pixPromise = /\b(vou\s+gerar|aguarde|segue|aqui\s+(está|vai))\s+(o|um)\s+(pix|qr\s*code|qrcode)\b|\bgerei\s+(o|um)\s+pix\b/i;
+      if (pixPromise.test(reply)) {
+        reply = 'Pra fechar o pagamento por Pix, peço pra você combinar diretamente com nosso atendente — ele te manda o QR ou a chave certinha. Posso te ajudar com mais alguma coisa enquanto isso?';
+        guardRewrites.push('pix_promise');
+      }
+    }
+
     // ─── Build reasoning trace for the brain UI + judge ────────────
     // Single source of truth for "what happened on this turn". Stored
     // ONLY on the assistant row so it doesn't bloat user-side messages.
@@ -1081,6 +1108,11 @@ async function processBufferedTurn(opts: {
       buffered_msgs: msgs.length,
       latency_ms: result.latency_ms,
       runtime_agent_id: runtimeAgent.id,
+
+      // Output guard tripped — LLM tried to promise something it can't
+      // deliver. Surfaced in the brain panel so the operator can see
+      // when the model is being slippery on capability boundaries.
+      ...(guardRewrites.length ? { guard_rewrites: guardRewrites } : {}),
     };
 
     // Persist user side (no meta) + assistant side (with meta).
