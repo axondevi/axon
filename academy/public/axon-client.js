@@ -1,5 +1,5 @@
 /**
- * Axon Browser Client — standalone JS, zero dependencies.
+ * Nexus Inovation Browser Client — standalone JS, zero dependencies.
  * Handles signup, API calls, key storage, and balance checking.
  *
  * Usage in any page:

@@ -1,15 +1,15 @@
 ---
 title: Cache hit rates across 17 paid APIs — what we learned
-subtitle: Real data from 30 days of Axon traffic. Which APIs are cache goldmines, which are impossible.
+subtitle: Real data from 30 days of Nexus Inovation traffic. Which APIs are cache goldmines, which are impossible.
 description: Production data from 17 APIs showing cache hit rates by API type, and what it means for your agent's budget.
 lang: en
 timeMinutes: 7
-author: Axon Team
+author: Nexus Inovation Team
 publishedAt: 2026-04-25
 tags: [data, cache, ai-agents, economics]
 ---
 
-One of the earliest design bets we made with [Axon](https://axon-5zf.pages.dev) was to put an aggressive cache in front of every upstream API. When the same agent (or a different agent!) asks the same question, we serve the cached response at **50% of list price** — faster for the user, pure margin for us, zero cost against the upstream.
+One of the earliest design bets we made with [Nexus Inovation](https://axon-5zf.pages.dev) was to put an aggressive cache in front of every upstream API. When the same agent (or a different agent!) asks the same question, we serve the cached response at **50% of list price** — faster for the user, pure margin for us, zero cost against the upstream.
 
 The thesis was: *most agent traffic is more repeatable than you'd think.*
 
@@ -86,7 +86,7 @@ Three lessons:
 
 If your pipeline re-runs the same embedding 50 times during experimentation, you're saving 96% of your upstream cost automatically. If your pipeline has a bug that generates random UUIDs and puts them in queries, you've silently disabled caching.
 
-Use `x-axon-cache: hit/miss` headers to verify you're hitting cache when you expect to. It's in every Axon response.
+Use `x-axon-cache: hit/miss` headers to verify you're hitting cache when you expect to. It's in every Nexus Inovation response.
 
 ### 2. Prefer cacheable APIs in multi-step pipelines
 
@@ -106,4 +106,4 @@ We think transparency wins. If SerpAPI ever degrades, you'll see it in p95 laten
 
 Cache hit rate as a metric is noisy at small volumes. We show APIs with under 100 requests grayed out because the denominator is too small to trust. The rates above are all on APIs with >10k requests in the window.
 
-If you run an agent on Axon and want to contribute to these numbers — [$0.50 free credit here](https://axon-5zf.pages.dev).
+If you run an agent on Nexus Inovation and want to contribute to these numbers — [$0.50 free credit here](https://axon-5zf.pages.dev).

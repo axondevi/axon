@@ -1,12 +1,12 @@
 ---
 title: Criando seu Primeiro Agente de IA com APIs Brasileiras
 subtitle: Um agente funcional em Python que consulta CNPJ, CEP e FIPE — com LLM interpretando os dados. 30 minutos, 40 linhas, pronto pra produção.
-description: Construa um agente IA em Python que usa dados brasileiros reais (CNPJ, CEP, FIPE) através do Axon. Sem gerenciar múltiplas API keys.
+description: Construa um agente IA em Python que usa dados brasileiros reais (CNPJ, CEP, FIPE) através do Nexus Inovation. Sem gerenciar múltiplas API keys.
 category: brazil
 difficulty: iniciante
 lang: pt-BR
 timeMinutes: 30
-author: Axon Team
+author: Nexus Inovation Team
 publishedAt: 2026-04-24
 tags: [python, brasilapi, cnpj, cep, fipe, agentes, openai, langchain]
 featured: true
@@ -18,7 +18,7 @@ import Callout from '../../components/Callout.astro';
 import TryCall from '../../components/TryCall.astro';
 
 <Callout type="dica" title="QUER SÓ TESTAR ANTES?">
-Se quer ver o Axon funcionando <strong>agora mesmo no browser</strong>, sem instalar Python,
+Se quer ver o Nexus Inovation funcionando <strong>agora mesmo no browser</strong>, sem instalar Python,
 pula pro [Playground interativo](/learn/playground). Volta pra cá quando quiser
 construir o agente completo em Python.
 </Callout>
@@ -29,7 +29,7 @@ Ao final deste tutorial, você vai ter um **agente de IA funcional em Python** q
 - Valida CEPs e retorna dados de endereço
 - Consulta informações de bancos brasileiros
 - Usa um LLM (GPT-4o-mini) pra interpretar e responder em linguagem natural
-- Roda com **uma única chave de API** (Axon) — sem precisar se cadastrar em 10 serviços
+- Roda com **uma única chave de API** (Nexus Inovation) — sem precisar se cadastrar em 10 serviços
 
 **Tempo total:** 30 minutos. **Linhas de código:** ~40. **Custo pra rodar 100 perguntas:** menos de $0.05.
 
@@ -51,14 +51,14 @@ E retorna respostas naturais, usando dados reais e atualizados.
 
 - **Python 3.11+** instalado
 - Conhecimento básico de Python (saber o que é função e import basta)
-- Uma conta no Axon (criamos agora, leva 10 segundos)
+- Uma conta no Nexus Inovation (criamos agora, leva 10 segundos)
 - Uma chave OpenAI (ou pode usar Claude / Gemini / Ollama — veremos depois)
 
 <Callout type="dica">
 Não tem Python 3.11? Instale pelo [python.org](https://www.python.org/downloads/) (Windows/Mac) ou `brew install python@3.11` (Mac). No Windows, **marque "Add Python to PATH"** no instalador.
 </Callout>
 
-## Passo 1 — Criando a conta Axon
+## Passo 1 — Criando a conta Nexus Inovation
 
 Vai em **[axon-5zf.pages.dev](https://axon-5zf.pages.dev)**, digita seu email, e pronto. Em 10 segundos você tem:
 
@@ -122,7 +122,7 @@ AXON_KEY = os.getenv("AXON_KEY")
 AXON_URL = os.getenv("AXON_URL", "https://axon-kedb.onrender.com")
 
 def call_axon(api: str, endpoint: str, params: dict = None):
-    """Chama qualquer API através do Axon com uma única chave."""
+    """Chama qualquer API através do Nexus Inovation com uma única chave."""
     url = f"{AXON_URL}/v1/call/{api}/{endpoint}"
     headers = {"Authorization": f"Bearer {AXON_KEY}"}
     response = requests.get(url, headers=headers, params=params or {})
@@ -148,7 +148,7 @@ def consultar_bank(code: str) -> dict:
 ```
 
 <Callout type="porque">
-Observe que **não temos chave da BrasilAPI no código**. O Axon cuida disso. Trocar pra outra API (digamos, Receita Federal paga) seria mudar só `"brasilapi"` pra `"receitaws"`. Zero retrabalho.
+Observe que **não temos chave da BrasilAPI no código**. O Nexus Inovation cuida disso. Trocar pra outra API (digamos, Receita Federal paga) seria mudar só `"brasilapi"` pra `"receitaws"`. Zero retrabalho.
 </Callout>
 
 Testa rápido no terminal pra ver se funciona:
@@ -334,14 +334,14 @@ Note que na segunda pergunta, o agente **encadeia chamadas**: primeiro consulta 
 
 1. **Pergunta do usuário** chega pro LLM junto com a lista de ferramentas disponíveis.
 2. **LLM decide** se precisa chamar alguma ferramenta. Se sim, retorna `tool_calls`.
-3. **Executamos a ferramenta** localmente (que bate no Axon).
-4. **Axon bate na API real** (BrasilAPI, nesse caso — 100% gratuita, zero margem de custo pra você).
+3. **Executamos a ferramenta** localmente (que bate no Nexus Inovation).
+4. **Nexus Inovation bate na API real** (BrasilAPI, nesse caso — 100% gratuita, zero margem de custo pra você).
 5. **Resultado volta pro LLM** como nova mensagem.
 6. **LLM gera resposta final** em linguagem natural, baseada nos dados.
 
 ## Quanto custou?
 
-Axon retorna o header `x-axon-cost-usdc` em cada chamada. Pra ver:
+Nexus Inovation retorna o header `x-axon-cost-usdc` em cada chamada. Pra ver:
 
 ```python
 # em tools.py, adicione prints no call_axon:
@@ -359,17 +359,17 @@ Custos típicos:
 | Chamada GPT-4o-mini | $0.0015 a $0.006 |
 | **Total por pergunta típica** | **~$0.003 a $0.008** |
 
-Ou seja: **$1 dá pra rodar 125-330 perguntas**. Sua conta nova no Axon com $0.50 grátis já dá pra testar bastante.
+Ou seja: **$1 dá pra rodar 125-330 perguntas**. Sua conta nova no Nexus Inovation com $0.50 grátis já dá pra testar bastante.
 
-## Por que Axon em vez de chamar BrasilAPI direto?
+## Por que Nexus Inovation em vez de chamar BrasilAPI direto?
 
-Nesse tutorial você poderia substituir `call_axon` por `requests.get("https://brasilapi.com.br/...")` e funcionaria. Então por que usar Axon?
+Nesse tutorial você poderia substituir `call_axon` por `requests.get("https://brasilapi.com.br/...")` e funcionaria. Então por que usar Nexus Inovation?
 
 Porque em produção real:
 
-1. **Você vai querer rate limiting** — BrasilAPI limita rápido. Axon tem cache agressivo que reduz chamadas ao upstream em ~50-70%.
-2. **Você vai querer mais APIs** — só a OpenAI já duplica o problema. Com 5+ APIs, gerenciar chaves vira pesadelo. Com Axon: 1 chave.
-3. **Você vai querer métricas** — Axon dá dashboard com custo, latência, cache hit rate. Grátis.
+1. **Você vai querer rate limiting** — BrasilAPI limita rápido. Nexus Inovation tem cache agressivo que reduz chamadas ao upstream em ~50-70%.
+2. **Você vai querer mais APIs** — só a OpenAI já duplica o problema. Com 5+ APIs, gerenciar chaves vira pesadelo. Com Nexus Inovation: 1 chave.
+3. **Você vai querer métricas** — Nexus Inovation dá dashboard com custo, latência, cache hit rate. Grátis.
 4. **Você vai querer trocar APIs** — quer mudar de BrasilAPI paga pra Receita Federal direto? Muda um string. Sem refactor.
 
 ## Próximos passos
@@ -379,7 +379,7 @@ Porque em produção real:
 - `bancos` — consultar código de banco
 - `ddd` — listar cidades de um DDD
 
-Todas disponíveis no `brasilapi` do Axon. É copiar uma das funções existentes e trocar o endpoint.
+Todas disponíveis no `brasilapi` do Nexus Inovation. É copiar uma das funções existentes e trocar o endpoint.
 
 ### 2. Deploy
 Empacota em Docker + `uvicorn` com FastAPI, joga no Render (plano gratuito). Em 15 minutos vira API pública.

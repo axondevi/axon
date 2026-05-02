@@ -22,7 +22,7 @@ const {
 
 const siteUrl = 'https://axon-5zf.pages.dev';
 const canonicalUrl = canonical ?? new URL(Astro.url.pathname, siteUrl).href;
-const fullTitle = title.includes('Axon') ? title : `${title} — Axon Academy`;
+const fullTitle = title.includes('Nexus Inovation') ? title : `${title} — Nexus Inovation Academy`;
 ---
 
 <!DOCTYPE html>
@@ -42,7 +42,7 @@ const fullTitle = title.includes('Axon') ? title : `${title} — Axon Academy`;
   <meta property="og:description" content={description} />
   <meta property="og:url" content={canonicalUrl} />
   <meta property="og:image" content={new URL(image, siteUrl).href} />
-  <meta property="og:site_name" content="Axon Academy" />
+  <meta property="og:site_name" content="Nexus Inovation Academy" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />

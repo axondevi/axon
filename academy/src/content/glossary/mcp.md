@@ -23,7 +23,7 @@ MCP é tipo "USB-C pra LLMs": você escreve um **MCP server** uma vez, e ele fun
 
 ## Exemplo real
 
-`@axon/mcp-server` é um servidor MCP que expõe todas as 28 APIs do Axon como tools. Instalando no Claude Desktop, o Claude ganha poder de chamar SerpAPI, Firecrawl, OpenAI embeddings — tudo via comando de texto.
+`@axon/mcp-server` é um servidor MCP que expõe todas as 28 APIs do Nexus Inovation como tools. Instalando no Claude Desktop, o Claude ganha poder de chamar SerpAPI, Firecrawl, OpenAI embeddings — tudo via comando de texto.
 
 ## Quem adotou
 

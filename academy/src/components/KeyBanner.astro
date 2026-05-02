@@ -1,5 +1,5 @@
 ---
-// Compact banner showing current Axon key + balance. Auto-hides if no key.
+// Compact banner showing current Nexus Inovation key + balance. Auto-hides if no key.
 ---
 
 <div class="key-banner" id="key-banner" hidden>
@@ -7,7 +7,7 @@
     <div class="kb-status">
       <span class="kb-dot"></span>
       <span class="kb-text">
-        <span class="kb-label">Conectado ao Axon como</span>
+        <span class="kb-label">Conectado ao Nexus Inovation como</span>
         <code class="kb-key"></code>
       </span>
     </div>
@@ -78,7 +78,7 @@
     }
 
     logoutBtn?.addEventListener('click', () => {
-      if (confirm('Sair do Axon? Sua API key será removida deste browser.')) {
+      if (confirm('Sair do Nexus Inovation? Sua API key será removida deste browser.')) {
         client.clearKey();
       }
     });

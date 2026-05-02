@@ -1,10 +1,10 @@
 ---
-title: Why we built Axon
+title: Why we built Nexus Inovation
 subtitle: AI agents need to buy things. Credit cards don't fit agents. x402 does. So we built the aggregation layer.
-description: The origin story of Axon — why credit cards and subscriptions break for autonomous agents, and why we bet on x402 + USDC.
+description: The origin story of Nexus Inovation — why credit cards and subscriptions break for autonomous agents, and why we bet on x402 + USDC.
 lang: en
 timeMinutes: 4
-author: Axon Team
+author: Nexus Inovation Team
 publishedAt: 2026-04-21
 tags: [ai-agents, x402, usdc, stablecoin, api-gateway]
 ---
@@ -45,12 +45,12 @@ x402 solves the payment. But it only works for APIs that adopt it. And it doesn'
 
 ## So we built the layer above
 
-**[Axon](https://axon-5zf.pages.dev)** is a universal gateway between agents and paid APIs. One endpoint. One USDC wallet on Base. Every paid API routed through one integration.
+**[Nexus Inovation](https://axon-5zf.pages.dev)** is a universal gateway between agents and paid APIs. One endpoint. One USDC wallet on Base. Every paid API routed through one integration.
 
 An agent that wants to research a topic:
 
 ```ts
-const axon = new Axon({ apiKey: process.env.AXON_KEY });
+const axon = new Nexus Inovation({ apiKey: process.env.AXON_KEY });
 
 const search = await axon.call('serpapi', 'search', { q: 'top AI news' });
 const scraped = await axon.call('firecrawl', 'scrape', undefined, {
@@ -86,4 +86,4 @@ Get a free $0.50 to start at [axon-5zf.pages.dev](https://axon-5zf.pages.dev).
 
 If you're building an agent that buys things, we'd like to talk to you. DM on [Twitter](https://twitter.com/axondevia) or email us directly.
 
-— the Axon team
+— the Nexus Inovation team

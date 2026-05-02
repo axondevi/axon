@@ -1,12 +1,12 @@
 ---
 title: Build a Self-Paying Research Agent in 20 Lines
 subtitle: A working agent that searches, scrapes, and synthesizes — paying its own USDC per call. No SerpAPI signup. No Firecrawl subscription.
-description: Ship a real autonomous research agent using Axon + Vercel AI SDK. One API key, USDC wallet, 20 lines of code.
+description: Ship a real autonomous research agent using Nexus Inovation + Vercel AI SDK. One API key, USDC wallet, 20 lines of code.
 category: agents
 difficulty: intermediario
 lang: en
 timeMinutes: 15
-author: Axon Team
+author: Nexus Inovation Team
 publishedAt: 2026-04-23
 updatedAt: 2026-04-24
 tags: [tutorial, ai-agents, vercel-ai-sdk, x402, self-paying]
@@ -28,7 +28,7 @@ By the end of this tutorial you'll have a research agent that:
 No SerpAPI account. No Firecrawl subscription. No manual API key juggling.
 
 <Callout type="porque">
-This tutorial showcases the **self-paying agent** pattern that Axon was built for. Each tool call is atomically debited in USDC from the agent's own wallet. The agent literally cannot spend more than you deposited.
+This tutorial showcases the **self-paying agent** pattern that Nexus Inovation was built for. Each tool call is atomically debited in USDC from the agent's own wallet. The agent literally cannot spend more than you deposited.
 </Callout>
 
 ## Prerequisites
@@ -45,13 +45,13 @@ You need two environment variables:
 ## The whole agent
 
 ```ts
-import { Axon } from '@axon/client';
+import { Nexus Inovation } from '@axon/client';
 import { axonTool } from '@axon/vercel-ai';
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 
-const axon = new Axon({ apiKey: process.env.AXON_KEY! });
+const axon = new Nexus Inovation({ apiKey: process.env.AXON_KEY! });
 
 const search = axonTool(axon, 'serpapi', 'search', {
   description: 'Search the web.',
@@ -80,14 +80,14 @@ That's the entire agent. Three moving parts.
 
 ## What just happened
 
-**1. Axon wraps paid APIs.** `axonTool(axon, 'serpapi', 'search', ...)` creates a Vercel AI SDK tool that, when called, hits Axon → SerpAPI → back. You never see a SerpAPI key. The cost is debited from your Axon wallet in USDC.
+**1. Nexus Inovation wraps paid APIs.** `axonTool(axon, 'serpapi', 'search', ...)` creates a Vercel AI SDK tool that, when called, hits Nexus Inovation → SerpAPI → back. You never see a SerpAPI key. The cost is debited from your Nexus Inovation wallet in USDC.
 
 **2. The LLM picks which tool to call and when.** `generateText` with `tools:` and `maxSteps: 8` lets the LLM decide: call `search`, look at results, call `scrape` on the most promising, summarize. This is the ReAct pattern you already know from LangChain — but with no local agent loop code.
 
-**3. The wallet makes it autonomous.** Every call debits USDC atomically. If the agent tries to spend more than you deposited, Axon returns `402 insufficient_funds` and the agent stops. You set a budget, the agent works within it.
+**3. The wallet makes it autonomous.** Every call debits USDC atomically. If the agent tries to spend more than you deposited, Nexus Inovation returns `402 insufficient_funds` and the agent stops. You set a budget, the agent works within it.
 
 <Callout type="dica">
-For tighter budget control, use Axon's policy engine: `max_request_cost_micro`, `daily_budget_micro`, per-API caps. Your agent can rampage within limits you set.
+For tighter budget control, use Nexus Inovation's policy engine: `max_request_cost_micro`, `daily_budget_micro`, per-API caps. Your agent can rampage within limits you set.
 </Callout>
 
 ## Running it
@@ -112,7 +112,7 @@ Sources:
 
 ## What you actually paid
 
-Axon returns `x-axon-cost-usdc` on every call. Typical run:
+Nexus Inovation returns `x-axon-cost-usdc` on every call. Typical run:
 
 - 1× search  = $0.0055
 - 3× scrape  = $0.0165
@@ -139,7 +139,7 @@ Two things stop the agent from burning your wallet by default, one upgrade for p
 
 ## Going further
 
-- Swap `gpt-4o-mini` for `claude-sonnet-4-6` via `@ai-sdk/anthropic` — Axon bills both through the same wallet
+- Swap `gpt-4o-mini` for `claude-sonnet-4-6` via `@ai-sdk/anthropic` — Nexus Inovation bills both through the same wallet
 - Add `axon.call('voyage', 'embeddings', ...)` to build a RAG layer on top
 - Cache the whole agent loop: same question in 5 minutes = 80% cache hit = ~$0.005
 

@@ -27,7 +27,7 @@
         },
         "author": {
           "type": "string",
-          "default": "Axon Team"
+          "default": "Nexus Inovation Team"
         },
         "publishedAt": {
           "anyOf": [

@@ -19,11 +19,24 @@ Patterns SKIPPED (case-sensitive matters here):
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / 'landing'
+REPO = Path(__file__).resolve().parent.parent
+
+# Targets:
+# - landing/*.html (top-level pages on Cloudflare Pages root)
+# - academy/src/**/*.{astro,md,ts,mjs} (Astro source, builds into landing/learn/)
+TARGETS = [
+    *sorted((REPO / 'landing').glob('*.html')),
+    *sorted((REPO / 'academy' / 'src').rglob('*.astro')),
+    *sorted((REPO / 'academy' / 'src').rglob('*.md')),
+    *sorted((REPO / 'academy' / 'src').rglob('*.mdx')),
+    *sorted((REPO / 'academy' / 'src').rglob('*.ts')),
+    *sorted((REPO / 'academy' / 'src').rglob('*.mjs')),
+    *sorted((REPO / 'academy' / 'src').rglob('*.css')),
+]
 
 PATTERNS = [
     # Capital "Axon" as a standalone brand word.
-    # \b avoids `AxonUI` / `AxonI18n` (followed by letter).
+    # \b avoids `AxonUI` / `AxonI18n` / `AxonClient` (followed by letter).
     (re.compile(r'\bAxon\b'), 'Nexus Inovation'),
     # Lowercase brand text inside header elements:
     # `> axon<` / `>axon<` (with optional whitespace, inside <a>/<div>/<span>).
@@ -32,7 +45,7 @@ PATTERNS = [
 
 count_files = 0
 count_subs = 0
-for path in sorted(ROOT.glob('*.html')):
+for path in TARGETS:
     text = path.read_text(encoding='utf-8')
     new = text
     file_subs = 0
@@ -43,6 +56,7 @@ for path in sorted(ROOT.glob('*.html')):
         path.write_text(new, encoding='utf-8')
         count_files += 1
         count_subs += file_subs
-        print(f'  {path.name}: {file_subs} subs')
+        rel = path.relative_to(REPO)
+        print(f'  {rel}: {file_subs} subs')
 
 print(f'\nTotal: {count_files} files, {count_subs} substitutions')
