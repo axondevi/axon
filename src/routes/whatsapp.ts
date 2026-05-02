@@ -19,7 +19,7 @@ import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { log } from '~/lib/logger';
 import { encrypt, decrypt } from '~/lib/crypto';
-import { checkInstance, setWebhook, sendText, sendMedia, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound } from '~/whatsapp/evolution';
+import { checkInstance, setWebhook, sendText, sendMedia, sendVoice, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound } from '~/whatsapp/evolution';
 import { recordSentId, isSentByUs } from '~/whatsapp/sent-ids';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
@@ -1020,6 +1020,11 @@ async function processBufferedTurn(opts: {
     if (r && (r as any).messageId) recordSentId((r as any).messageId);
     return r;
   };
+  const sendOurVoice = async (args: Parameters<typeof sendVoice>[0]) => {
+    const r = await sendVoice(args).catch(() => ({ ok: false } as const));
+    if (r && (r as any).messageId) recordSentId((r as any).messageId);
+    return r;
+  };
 
   // ─── Send any generated images first (out-of-band from text reply) ─
   for (const img of images) {
@@ -1101,15 +1106,12 @@ async function processBufferedTurn(opts: {
         let bin = '';
         for (let i = 0; i < tts.audioBytes.length; i++) bin += String.fromCharCode(tts.audioBytes[i]);
         const base64 = btoa(bin);
-        await sendOurMedia({
+        await sendOurVoice({
           instanceUrl: conn.instanceUrl,
           instanceName: conn.instanceName,
           apiKey,
           number: inbound.phone,
           base64Data: base64,
-          mediatype: 'audio',
-          mimetype: 'audio/mpeg',
-          fileName: 'voz.mp3',
           delayMs: 800,
         });
         textWasReplaced = true;

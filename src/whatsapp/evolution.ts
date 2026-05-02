@@ -416,6 +416,53 @@ export async function sendMedia(opts: {
 }
 
 /**
+ * Send a native voice/PTT message — renders as a waveform bubble com
+ * ícone de microfone, igual quando o usuário grava áudio. Usa o endpoint
+ * dedicado `/message/sendWhatsAppAudio/{instance}` que Evolution v2.x
+ * converte pra OGG/Opus internamente.
+ *
+ * `sendMedia` com mediatype:'audio' renderiza como ARQUIVO de áudio
+ * (player retangular tipo upload), não voice memo. Pra PTT use esta.
+ */
+export async function sendVoice(opts: {
+  instanceUrl: string;
+  instanceName: string;
+  apiKey: string;
+  number: string;
+  /** Base64 raw (sem prefix `data:`). MP3 ou OGG, Evolution aceita ambos. */
+  base64Data: string;
+  delayMs?: number;
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const body: Record<string, unknown> = {
+    number: opts.number,
+    audio: opts.base64Data,
+    delay: opts.delayMs ?? 1200,
+    encoding: true,
+  };
+  try {
+    const res = await evoFetch(
+      opts.instanceUrl,
+      `/message/sendWhatsAppAudio/${encodeURIComponent(opts.instanceName)}`,
+      {
+        method: 'POST',
+        apiKey: opts.apiKey,
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, error: `sendWhatsAppAudio ${res.status}: ${text.slice(0, 200)}` };
+    }
+    const data: any = await res.json().catch(() => ({}));
+    const messageId: string | undefined =
+      data?.key?.id || data?.message?.key?.id || data?.id || undefined;
+    return { ok: true, messageId };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+/**
  * Download attached media (image / audio / document / video) from an
  * Evolution `messages.upsert` payload.
  *
