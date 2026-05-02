@@ -983,6 +983,33 @@ async function processBufferedTurn(opts: {
     ? Array.from(new Set([...baseTools, ...ownerExtraTools]))
     : baseTools;
 
+  // ─── Capability guards ────────────────────────────────────────
+  // Stop the agent from claiming it'll do things the toolkit doesn't
+  // support. Without this, the LLM happily promises "vou gerar uma
+  // imagem, aguarde" then sits silent because generate_image isn't in
+  // its tools array — the customer waits forever and the judge flags
+  // alucinou:true. Append explicit "NÃO posso fazer X" lines for every
+  // sensitive capability NOT in the effective toolkit.
+  const incapacityLines: string[] = [];
+  if (!effectiveTools.includes('generate_image')) {
+    incapacityLines.push(
+      '- **Imagens**: você NÃO gera, edita nem desenha imagens. Se o cliente pedir uma foto/imagem/desenho, peça uma descrição em palavras ou redirecione para a forma de comunicação adequada (ex: "te mando o catálogo em PDF se preferir"). NUNCA escreva "vou gerar", "aguarde a imagem", "estou criando".',
+    );
+  }
+  if (!effectiveTools.includes('generate_pix')) {
+    incapacityLines.push(
+      '- **Pagamento Pix in-chat**: você NÃO gera QR Pix. Se o cliente quiser pagar, oriente a entrar em contato com o atendente humano ou explicar o método de pagamento configurado.',
+    );
+  }
+  if (!effectiveTools.includes('search_web') && !effectiveTools.includes('exa_search')) {
+    incapacityLines.push(
+      '- **Pesquisa web**: você NÃO pesquisa na internet. Responda apenas com base no que está nas Informações do negócio + memória do contato. Se o cliente perguntar algo que dependa de info externa, diga que não tem essa informação.',
+    );
+  }
+  if (incapacityLines.length > 0) {
+    augmentedSystemPrompt += '\n\n## O que você NÃO pode fazer (NUNCA prometa essas ações)\n' + incapacityLines.join('\n');
+  }
+
   c.set('user', owner);
   c.set('axon:agent_id', runtimeAgent.id);
 
