@@ -53,7 +53,7 @@
     "pdfkit": "^0.18.0",
     "pg": "^8.13.0",
     "viem": "^2.21.0",
-    "zod": "^3.23.8"
+    "zod": "^4.4.2"
   },
   "optionalDependencies": {
     "@turnkey/sdk-server": "^2.0.0"
