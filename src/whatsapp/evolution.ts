@@ -95,8 +95,11 @@ export async function setWebhook(opts: {
         webhook: {
           enabled: true,
           url: opts.webhookUrl,
-          // Only the events Axon needs — keep payload chatter minimal
-          events: ['MESSAGES_UPSERT'],
+          // CALL is needed so the agent can intercept incoming voice/video
+          // calls (Baileys can't actually answer them) and redirect the
+          // caller to send an audio message instead — keeps the WhatsApp
+          // number feeling like a real attendant instead of going silent.
+          events: ['MESSAGES_UPSERT', 'CALL'],
           webhookByEvents: false,
           webhookBase64: false,
         },
@@ -202,7 +205,7 @@ export async function createInstance(opts: {
       body.webhook = {
         enabled: true,
         url: opts.webhookUrl,
-        events: ['MESSAGES_UPSERT'],
+        events: ['MESSAGES_UPSERT', 'CALL'],
         webhookByEvents: false,
         webhookBase64: false,
       };
@@ -600,4 +603,92 @@ export function extractInbound(payload: any): InboundMessage | null {
 
   // Reactions, edits, stickers, locations, contacts — drop for now.
   return null;
+}
+
+/**
+ * Incoming WhatsApp voice/video call event.
+ *
+ * Baileys (and Evolution by extension) cannot actually ANSWER calls — there's
+ * no SRTP support on the client side. But it does receive the offer signal,
+ * which lets the agent: (a) reject the offer so the caller doesn't sit on
+ * an endless ring, (b) send a voice memo right after explaining how to talk
+ * to the agent (the call number IS the chat number, so the redirect lands
+ * in the same WhatsApp thread).
+ */
+export interface InboundCall {
+  callId: string;
+  callerPhone: string;   // digits only (e.g. "5511999999999")
+  isVideo: boolean;
+  status: string;        // 'offer' | 'accept' | 'reject' | 'timeout' (Evolution varies)
+  fromMe: boolean;
+}
+
+/**
+ * Parse a CALL webhook payload from Evolution.
+ *
+ * Evolution v2 emits two shapes for the call event depending on build:
+ *   - Newer:  { event: 'call', data: [ { id, from, isVideo, status, ... } ] }
+ *   - Older:  { event: 'CALL', data: { id, from, isVideo, status, ... } }
+ * We tolerate both. Group calls (`@g.us`) are dropped — a group can't
+ * receive a redirect voice memo from us anyway.
+ */
+export function extractCallEvent(payload: any): InboundCall | null {
+  if (!payload) return null;
+  const event = payload.event || payload.type;
+  if (event !== 'call' && event !== 'CALL') return null;
+  const data = payload.data;
+  const entry = Array.isArray(data) ? data[0] : data;
+  if (!entry || typeof entry !== 'object') return null;
+  const fromJid: string | undefined = entry.from || entry.callFrom || entry.chatId;
+  if (!fromJid || typeof fromJid !== 'string') return null;
+  if (fromJid.endsWith('@g.us')) return null;
+  const callerPhone = (fromJid.split('@')[0] || '').replace(/\D/g, '');
+  if (!callerPhone) return null;
+  return {
+    callId: String(entry.id || entry.callId || ''),
+    callerPhone,
+    isVideo: !!entry.isVideo,
+    status: String(entry.status || 'offer'),
+    fromMe: !!entry.fromMe,
+  };
+}
+
+/**
+ * Best-effort reject of an incoming WhatsApp call.
+ *
+ * Evolution v2 exposes baileys' `rejectCall` over HTTP at
+ * `POST /call/reject/{instance}`. Some builds don't expose it (404) or
+ * use a slightly different path — we tolerate failure silently because
+ * even without a successful reject, the call just rings out as a missed
+ * call (which is fine — the caller still gets the redirect voice memo).
+ */
+export async function rejectCall(opts: {
+  instanceUrl: string;
+  instanceName: string;
+  apiKey: string;
+  callId: string;
+  callerPhone: string;     // digits only
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!opts.callId) return { ok: false, error: 'no callId' };
+  try {
+    const res = await evoFetch(
+      opts.instanceUrl,
+      `/call/reject/${encodeURIComponent(opts.instanceName)}`,
+      {
+        method: 'POST',
+        apiKey: opts.apiKey,
+        body: JSON.stringify({
+          callId: opts.callId,
+          callFrom: `${opts.callerPhone}@s.whatsapp.net`,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, error: `rejectCall ${res.status}: ${text.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message || String(err) };
+  }
 }

@@ -19,7 +19,7 @@ import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { log } from '~/lib/logger';
 import { encrypt, decrypt } from '~/lib/crypto';
-import { checkInstance, setWebhook, sendText, sendMedia, sendVoice, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound } from '~/whatsapp/evolution';
+import { checkInstance, setWebhook, sendText, sendMedia, sendVoice, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound, extractCallEvent, rejectCall } from '~/whatsapp/evolution';
 import { recordSentId, isSentByUs } from '~/whatsapp/sent-ids';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
 import {
@@ -561,6 +561,24 @@ publicWebhook.post('/:secret', async (c) => {
     .where(eq(whatsappConnections.id, conn.id))
     .catch(() => {});
 
+  // ─── CALL event: caller dialed the WhatsApp number ───────────────
+  // Baileys can't answer calls (no SRTP), so a normal call would just
+  // ring out and feel like a dead number. We intercept the offer:
+  //   1. Best-effort reject (so the caller doesn't sit on an endless ring)
+  //   2. Send a voice memo redirect explaining the agent answers by audio
+  // Same WhatsApp number, same thread — the redirect lands as a voice
+  // message right after the missed-call notification.
+  const callEv = extractCallEvent(payload);
+  if (callEv && !callEv.fromMe && callEv.status === 'offer') {
+    void handleIncomingCall({ c, conn, callEv }).catch((err) => {
+      log.warn('whatsapp.call.redirect_failed', {
+        error: err instanceof Error ? err.message : String(err),
+        agent_id: conn.agentId,
+      });
+    });
+    return c.json({ ok: true, call_redirected: true });
+  }
+
   // Body already drained as `payload` above for the replay guard; reuse.
   const inbound = extractInbound(payload);
   if (!inbound) return c.json({ ignored: 'unsupported_event' });
@@ -842,6 +860,26 @@ async function processBufferedTurn(opts: {
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
   const messages: ChatMessage[] = [...priorMessages, { role: 'user', content: mergedText }];
+
+  // ─── First-contact spoken greeting (fire-and-forget) ──────────────
+  // Brand-new contact gets a quick voice memo introducing the agent —
+  // the same way a real attendant would say "oi, sou a Camila, como
+  // posso ajudar?" before the real conversation starts. We kick this
+  // off in parallel with the LLM call (which takes 2-5s), then await
+  // it right before the actual reply so the greeting always lands
+  // first. Skipped for owner mode (no point introducing yourself to
+  // your own boss) and when voice is disabled on the agent.
+  const isFirstContact = priorMessages.length === 0 && !isOwner;
+  const voiceEnabledOnAgent = (a as { voiceEnabled?: boolean }).voiceEnabled !== false;
+  const greetingPromise: Promise<void> | null =
+    isFirstContact && voiceEnabledOnAgent
+      ? sendFirstContactGreeting({
+          conn,
+          apiKey: connApiKey,
+          agent: a,
+          callerPhone: inbound.phone,
+        })
+      : null;
 
   // ─── System prompt assembly ────────────────────────────────
   // Owner mode: replace the public persona with a personal-assistant prompt.
@@ -1243,6 +1281,13 @@ async function processBufferedTurn(opts: {
     return r;
   };
 
+  // ─── Wait for the first-contact greeting (if any) so it lands BEFORE
+  // any reply bubble. Greeting was kicked off in parallel with the LLM
+  // call — by now it's usually already done.
+  if (greetingPromise) {
+    await greetingPromise.catch(() => {/* silent */});
+  }
+
   // ─── Send any generated images first (out-of-band from text reply) ─
   for (const img of images) {
     await sendOurMedia({
@@ -1397,6 +1442,178 @@ export function splitReply(text: string): string[] {
   }
 
   return [trimmed];
+}
+
+/**
+ * Convert raw audio bytes to base64 — Evolution's sendVoice expects the
+ * audio body as base64 (no `data:audio/...;base64,` prefix). We do this
+ * char-by-char to keep the function pure (Bun has Buffer but the runtime
+ * doesn't always; btoa is universal).
+ */
+function audioBytesToBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+/**
+ * Handle an incoming WhatsApp call — reject (best-effort) and send a
+ * voice memo redirect that asks the caller to send an audio message
+ * instead. Runs detached from the webhook response so Evolution gets its
+ * 200 back immediately while the TTS + send happen in the background.
+ *
+ * Skips silently when:
+ *   - Agent is paused (owner muted via dashboard)
+ *   - Agent is not public yet
+ *   - voiceEnabled is false (owner disabled audio replies — sending a
+ *     voice memo redirect would contradict that policy)
+ *   - TTS fails (no Cartesia/ElevenLabs key) — falls back to a text
+ *     message so the caller still gets some redirect signal.
+ */
+async function handleIncomingCall(opts: {
+  c: any;
+  conn: typeof whatsappConnections.$inferSelect;
+  callEv: { callId: string; callerPhone: string; isVideo: boolean };
+}): Promise<void> {
+  const { conn, callEv } = opts;
+
+  let connApiKey: string;
+  try {
+    connApiKey = decrypt(conn.apiKey);
+  } catch {
+    return;
+  }
+
+  // Best-effort reject so the caller doesn't sit on an endless ring.
+  // Failure here is fine — the call rings out as missed and the redirect
+  // voice memo still lands.
+  void rejectCall({
+    instanceUrl: conn.instanceUrl,
+    instanceName: conn.instanceName,
+    apiKey: connApiKey,
+    callId: callEv.callId,
+    callerPhone: callEv.callerPhone,
+  }).catch(() => {});
+
+  const [agentRow] = await db.select().from(agents).where(eq(agents.id, conn.agentId)).limit(1);
+  if (!agentRow) return;
+  if (agentRow.pausedAt) return;
+  if (!agentRow.public) return;
+
+  void import('~/lib/metrics').then(({ bumpCounter }) => {
+    bumpCounter('axon_whatsapp_call_redirected_total', { agent: agentRow.slug });
+  });
+
+  // Use the persona's voice if configured, else Cartesia default. Same
+  // voice the agent uses for replies — keeps identity consistent.
+  let voiceId: string | undefined;
+  const override = (agentRow as { voiceIdOverride?: string | null }).voiceIdOverride;
+  if (override && override.trim()) {
+    voiceId = override.trim();
+  } else if (agentRow.personaId) {
+    try {
+      const { personas } = await import('~/db/schema');
+      const [persona] = await db.select().from(personas).where(eq(personas.id, agentRow.personaId)).limit(1);
+      voiceId = persona?.voiceIdElevenlabs || undefined;
+    } catch {/* fall through to default */}
+  }
+
+  // Single-turn redirect line — short, friendly, action-oriented.
+  // Keep it under ~5s of audio (Cartesia ~600ms generation for this length).
+  const agentName = (agentRow.name || '').trim() || 'a Camila';
+  const redirectText =
+    `Oi! Aqui é ${agentName}. Por aqui eu não consigo atender ligação, mas se você ` +
+    `me mandar um áudio aqui no WhatsApp eu te respondo na hora, beleza?`;
+
+  const voiceAllowed = (agentRow as { voiceEnabled?: boolean }).voiceEnabled !== false;
+  let sentAsVoice = false;
+  if (voiceAllowed) {
+    try {
+      const { synthesizeSpeech } = await import('~/voice');
+      const tts = await synthesizeSpeech({ text: redirectText, voiceId });
+      if (tts.ok && tts.audioBytes) {
+        const base64 = audioBytesToBase64(tts.audioBytes);
+        const r = await sendVoice({
+          instanceUrl: conn.instanceUrl,
+          instanceName: conn.instanceName,
+          apiKey: connApiKey,
+          number: callEv.callerPhone,
+          base64Data: base64,
+          delayMs: 800,
+        });
+        if (r.ok) {
+          if (r.messageId) recordSentId(r.messageId);
+          sentAsVoice = true;
+        }
+      }
+    } catch {/* fall through to text */}
+  }
+
+  // Text fallback — agent without TTS configured, or TTS failed.
+  // Always send so the caller gets SOME signal even on the failure path.
+  if (!sentAsVoice) {
+    const r = await sendText({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey: connApiKey,
+      number: callEv.callerPhone,
+      text: redirectText,
+      delayMs: 800,
+    });
+    if (r.ok && r.messageId) recordSentId(r.messageId);
+  }
+}
+
+/**
+ * Send a short spoken greeting to a brand-new contact — voice memo with
+ * the agent's persona voice introducing itself. Lands as a voice memo
+ * just before the actual reply so the conversation starts the way a
+ * real attendant would: a quick hello, then the substantive answer.
+ *
+ * Failures are silent — if Cartesia is unreachable or voice is misconfigured,
+ * we just skip the greeting and let the regular reply flow handle the turn.
+ */
+async function sendFirstContactGreeting(opts: {
+  conn: typeof whatsappConnections.$inferSelect;
+  apiKey: string;
+  agent: typeof agents.$inferSelect;
+  callerPhone: string;
+}): Promise<void> {
+  const { conn, apiKey, agent: a, callerPhone } = opts;
+
+  let voiceId: string | undefined;
+  const override = (a as { voiceIdOverride?: string | null }).voiceIdOverride;
+  if (override && override.trim()) {
+    voiceId = override.trim();
+  } else if (a.personaId) {
+    try {
+      const { personas } = await import('~/db/schema');
+      const [persona] = await db.select().from(personas).where(eq(personas.id, a.personaId)).limit(1);
+      voiceId = persona?.voiceIdElevenlabs || undefined;
+    } catch {/* fall through to TTS default voice */}
+  }
+
+  const agentName = (a.name || '').trim() || 'a Camila';
+  const greetingText = `Oi, tudo bem? Aqui é ${agentName}, prazer falar com você. Pode mandar sua dúvida que eu já te respondo.`;
+
+  try {
+    const { synthesizeSpeech } = await import('~/voice');
+    const tts = await synthesizeSpeech({ text: greetingText, voiceId });
+    if (!tts.ok || !tts.audioBytes) return;
+    const base64 = audioBytesToBase64(tts.audioBytes);
+    const r = await sendVoice({
+      instanceUrl: conn.instanceUrl,
+      instanceName: conn.instanceName,
+      apiKey,
+      number: callerPhone,
+      base64Data: base64,
+      delayMs: 600,
+    });
+    if (r.ok && r.messageId) recordSentId(r.messageId);
+    void import('~/lib/metrics').then(({ bumpCounter }) => {
+      bumpCounter('axon_whatsapp_greeting_sent_total', { agent: a.slug });
+    });
+  } catch {/* silent */}
 }
 
 // Helper — derive the public webhook URL for an instance secret.
