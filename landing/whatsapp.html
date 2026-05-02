@@ -1178,7 +1178,7 @@
         const tip = h.top_issues && h.top_issues.length
           ? 'Top issues: ' + h.top_issues.slice(0, 3).map(i => `${i.issue} (${i.count}×)`).join(' · ')
           : `${h.total_judged} turnos avaliados nos últimos 100`;
-        return `<span class="health-pill ${cls}" title="${escapeHtml(tip)}" onclick="alert('${escapeHtml(tip).replace(/'/g, '\\\\\\'')}')">
+        return `<span class="health-pill ${cls}" title="${escapeHtml(tip)}">
           🧠 saúde ${score}/100 ${trendStr}
         </span>`;
       }
