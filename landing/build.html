@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Build · Axon Agents</title>
+    <title>Build · Nexus Inovation Agents</title>
     <meta name="description" content="Construa agentes de IA customizados em minutos. Templates prontos pra e-commerce, jurídico, pesquisa, conteúdo, finanças." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -288,7 +288,7 @@
   <body>
     <header>
       <div class="container">
-        <a href="/" class="brand"><span class="logo-dot"></span> axon</a>
+        <a href="/" class="brand"><span class="logo-dot"></span> nexusinovation</a>
         <nav>
           <a href="/explore" data-pt="Explorar" data-en="Explore">Explorar</a>
           <a href="/build" aria-current="page" data-pt="Criar" data-en="Build">Criar</a>
@@ -308,7 +308,7 @@
       <div class="build-hero">
         <div>
           <h1 data-pt="Construa seu agente de IA" data-en="Build your AI agent">Construa seu agente de IA</h1>
-          <p data-pt="Escolha um template, personalize prompt e ferramentas, compartilhe a URL. Cada chamada é paga da sua carteira Axon — sem hospedagem extra, sem infra." data-en="Pick a template, customize the prompt and tools, share the URL. Each call is paid from your Axon wallet — no extra hosting, no infra.">Escolha um template, personalize prompt e ferramentas, compartilhe a URL. Cada chamada é paga da sua carteira Axon — sem hospedagem extra, sem infra.</p>
+          <p data-pt="Escolha um template, personalize prompt e ferramentas, compartilhe a URL. Cada chamada é paga da sua carteira Nexus Inovation — sem hospedagem extra, sem infra." data-en="Pick a template, customize the prompt and tools, share the URL. Each call is paid from your Nexus Inovation wallet — no extra hosting, no infra.">Escolha um template, personalize prompt e ferramentas, compartilhe a URL. Cada chamada é paga da sua carteira Nexus Inovation — sem hospedagem extra, sem infra.</p>
         </div>
         <div class="actions">
           <button class="ar-btn" id="how-it-works" style="background:rgba(124,92,255,0.12);border-color:rgba(124,92,255,0.5);" data-pt="Como funciona" data-en="How it works">Como funciona</button>
@@ -324,7 +324,7 @@
           </div>
           <div>
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:6px;">Uma cobrança</div>
-            <div style="font-size:13px;color:var(--text);line-height:1.5;">40 APIs por trás, 1 wallet USDC na frente. Axon abstrai tudo — cliente paga em um lugar só.</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.5;">40 APIs por trás, 1 wallet USDC na frente. Nexus Inovation abstrai tudo — cliente paga em um lugar só.</div>
           </div>
           <div>
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:6px;">4 canais</div>
@@ -502,7 +502,7 @@ Estacionamento: gratuito por 1h"></textarea>
 
           <div class="row">
             <div class="field">
-              <label for="b-paymode">Quem paga as chamadas? <span class="info-tip" data-tip="Você (owner) = visitantes não precisam de conta. Visitante = cada um usa sua própria carteira Axon.">?</span></label>
+              <label for="b-paymode">Quem paga as chamadas? <span class="info-tip" data-tip="Você (owner) = visitantes não precisam de conta. Visitante = cada um usa sua própria carteira Nexus Inovation.">?</span></label>
               <select id="b-paymode">
                 <option value="visitor">Visitante (cada um usa carteira própria)</option>
                 <option value="owner">Eu (você paga por todos — ideal pra embed/WhatsApp)</option>
@@ -518,13 +518,13 @@ Estacionamento: gratuito por 1h"></textarea>
 
           <div class="row">
             <div class="field">
-              <label for="b-tier">Plano mínimo (sua assinatura) <span class="info-tip" data-tip="Seu plano Axon precisa ser pelo menos esse pra manter o agente no ar. Templates premium exigem Pro/Team.">?</span></label>
+              <label for="b-tier">Plano mínimo (sua assinatura) <span class="info-tip" data-tip="Seu plano Nexus Inovation precisa ser pelo menos esse pra manter o agente no ar. Templates premium exigem Pro/Team.">?</span></label>
               <select id="b-tier">
                 <option value="free">Free — qualquer um pode hospedar</option>
                 <option value="pro">Pro — assinatura $20/mês necessária</option>
                 <option value="team">Team — assinatura $100/mês necessária</option>
               </select>
-              <div class="hint">Seu plano Axon precisa ser pelo menos este pra agente ficar ativo.</div>
+              <div class="hint">Seu plano Nexus Inovation precisa ser pelo menos este pra agente ficar ativo.</div>
             </div>
             <div class="field">
               <label for="b-lang">Idioma da interface <span class="info-tip" data-tip="Idioma das labels do chat público (botão Enviar, placeholder, etc). 'Auto' detecta browser do visitante.">?</span></label>
@@ -561,7 +561,7 @@ Estacionamento: gratuito por 1h"></textarea>
                 <div class="field">
                   <label for="b-aff-payout">Quanto pagar por contato (USDC)</label>
                   <input type="number" id="b-aff-payout" step="0.01" min="0" max="5" value="0.20" />
-                  <div class="hint">Sugestão: $0.10 a $0.50 por novo contato. Sai do seu saldo Axon.</div>
+                  <div class="hint">Sugestão: $0.10 a $0.50 por novo contato. Sai do seu saldo Nexus Inovation.</div>
                 </div>
               </div>
             </div>
@@ -1323,7 +1323,7 @@ Estacionamento: gratuito por 1h"></textarea>
             if (!blob) return;
             const fd = new FormData();
             fd.append('name', name);
-            fd.append('description', 'Cloned via Axon builder');
+            fd.append('description', 'Cloned via Nexus Inovation builder');
             fd.append('audio', blob, 'sample.webm');
             actions.querySelector('#vp-rec-upload').textContent = 'Enviando…';
             actions.querySelector('#vp-rec-upload').disabled = true;
@@ -1696,7 +1696,7 @@ Estacionamento: gratuito por 1h"></textarea>
             '<button id="ti-copy" style="background:var(--accent);color:#0a0a0b;border:0;padding:8px 14px;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">Copy snippet</button>' +
           '</div>' +
           '<p style="color:var(--text-muted);font-size:12px;margin:14px 0 0;line-height:1.5;">' +
-            '<strong style="color:var(--text);">Note:</strong> this API requires the agent to be in <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">pay_mode=owner</code>. You pay for every call from your wallet, daily budget cap protects against runaway. For visitor-paid agents, customers must use their own Axon API key via <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">/v1/call/*</code>.' +
+            '<strong style="color:var(--text);">Note:</strong> this API requires the agent to be in <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">pay_mode=owner</code>. You pay for every call from your wallet, daily budget cap protects against runaway. For visitor-paid agents, customers must use their own Nexus Inovation API key via <code style="background:var(--bg-elev);padding:1px 4px;border-radius:3px;">/v1/call/*</code>.' +
           '</p>' +
           '</div>';
         const wrap = document.createElement('div');
@@ -1906,7 +1906,7 @@ Estacionamento: gratuito por 1h"></textarea>
             <h3 style="margin:0;font-size:20px;display:flex;align-items:center;gap:8px;"><span style="color:#25d366;font-size:14px;">●</span> Connect WhatsApp via Evolution</h3>
           </div>
           <p style="color:var(--text-muted);font-size:13px;margin:6px 0 22px;line-height:1.5;">
-            Você traz sua própria instância Evolution (auto-hospedada ou de um provedor). Axon registra um webhook nela — e cada mensagem que chegar no seu WhatsApp será respondida pelo agente <strong>${escape(name)}</strong> em segundos.
+            Você traz sua própria instância Evolution (auto-hospedada ou de um provedor). Nexus Inovation registra um webhook nela — e cada mensagem que chegar no seu WhatsApp será respondida pelo agente <strong>${escape(name)}</strong> em segundos.
           </p>
 
           <div class="field" style="margin-bottom:14px;">
@@ -1922,7 +1922,7 @@ Estacionamento: gratuito por 1h"></textarea>
           <div class="field" style="margin-bottom:18px;">
             <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:6px;">API key</label>
             <input id="wa-key" type="password" placeholder="••••••••••••••••" style="width:100%;box-sizing:border-box;background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:6px;font-size:13px;font-family:JetBrains Mono,monospace;" />
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Salva criptografada no Axon. Nunca é exposta de novo após o save.</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Salva criptografada no Nexus Inovation. Nunca é exposta de novo após o save.</div>
           </div>
 
           <p id="wa-err" style="color:#f87171;font-size:12px;margin:0 0 12px;display:none;"></p>
@@ -2376,7 +2376,7 @@ Estacionamento: gratuito por 1h"></textarea>
         const el = document.getElementById('tools-grid');
         const selected = new Set(formState.allowed_tools || []);
         let html = `<div style="margin-bottom:10px;padding:8px 10px;background:rgba(124,92,255,0.06);border:1px solid rgba(124,92,255,0.25);border-radius:6px;font-size:11px;color:var(--text-dim);">
-          <strong style="color:var(--text);">📦 Pacote Axon Pro</strong> — todo agente novo já vem com ${CORE_TOOLS_DEFAULT.size} ferramentas pré-ativadas (consultas BR, busca, financeiro, multimodal). Pinte verde abaixo. Você pode tirar/adicionar manualmente.
+          <strong style="color:var(--text);">📦 Pacote Nexus Inovation Pro</strong> — todo agente novo já vem com ${CORE_TOOLS_DEFAULT.size} ferramentas pré-ativadas (consultas BR, busca, financeiro, multimodal). Pinte verde abaixo. Você pode tirar/adicionar manualmente.
         </div>`;
         for (const [cat, tools] of Object.entries(TOOL_CATALOG)) {
           html += `<div class="tool-cat">${cat}</div>`;
@@ -2579,16 +2579,16 @@ Estacionamento: gratuito por 1h"></textarea>
         wrap.style.cssText = 'position:fixed;inset:0;background:rgba(8,8,12,0.85);z-index:1500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);';
         wrap.innerHTML = `
           <div style="background:var(--bg);padding:32px 36px;border-radius:14px;max-width:760px;width:100%;max-height:88vh;overflow-y:auto;">
-            <h2 style="margin:0 0 10px;font-size:24px;letter-spacing:-0.01em;">Como o Axon Agent funciona</h2>
+            <h2 style="margin:0 0 10px;font-size:24px;letter-spacing:-0.01em;">Como o Nexus Inovation Agent funciona</h2>
             <p style="color:var(--text-dim);font-size:14px;margin:0 0 24px;line-height:1.6;">
-              Você vende a INTELIGÊNCIA. Axon faz toda a infra — APIs, billing, custódia, observabilidade.
+              Você vende a INTELIGÊNCIA. Nexus Inovation faz toda a infra — APIs, billing, custódia, observabilidade.
             </p>
 
             <div style="display:flex;flex-direction:column;gap:14px;">
               <div style="display:flex;gap:14px;align-items:start;">
                 <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--accent);color:#0a0a0b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">1</div>
                 <div>
-                  <div style="font-weight:600;font-size:15px;margin-bottom:4px;">Cliente cria 1 conta Axon</div>
+                  <div style="font-weight:600;font-size:15px;margin-bottom:4px;">Cliente cria 1 conta Nexus Inovation</div>
                   <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">Email + bônus de \$0.50. Tem um wallet USDC na hora. Sem cartão, sem CPF, sem bureaucracia.</div>
                 </div>
               </div>
@@ -2621,7 +2621,7 @@ Estacionamento: gratuito por 1h"></textarea>
                 <div style="width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--accent);color:#0a0a0b;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">5</div>
                 <div>
                   <div style="font-weight:600;font-size:15px;margin-bottom:4px;">1 cobrança no wallet do cliente</div>
-                  <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">Cliente NUNCA cria conta em OpenAI, Tavily, Stability, BrasilAPI, etc. Axon orquestra os 40 upstreams, cobra tudo do wallet USDC dele em uma só linha. <code style="background:var(--bg-elev);padding:2px 5px;border-radius:3px;font-size:11px;">subscription_charge -\$20.00</code> ou <code style="background:var(--bg-elev);padding:2px 5px;border-radius:3px;font-size:11px;">debit -\$0.0021 brasilapi/cnpj</code>.</div>
+                  <div style="color:var(--text-dim);font-size:13px;line-height:1.5;">Cliente NUNCA cria conta em OpenAI, Tavily, Stability, BrasilAPI, etc. Nexus Inovation orquestra os 40 upstreams, cobra tudo do wallet USDC dele em uma só linha. <code style="background:var(--bg-elev);padding:2px 5px;border-radius:3px;font-size:11px;">subscription_charge -\$20.00</code> ou <code style="background:var(--bg-elev);padding:2px 5px;border-radius:3px;font-size:11px;">debit -\$0.0021 brasilapi/cnpj</code>.</div>
                 </div>
               </div>
             </div>

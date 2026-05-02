@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Axon · Painel</title>
+    <title>Nexus Inovation · Painel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -1317,7 +1317,7 @@
             showPayModeFix(card, agentId, agentName, closeOverlay);
             return;
           }
-          // Backend returns 503 with "Axon Evolution server not configured"
+          // Backend returns 503 with "Nexus Inovation Evolution server not configured"
           // when AXON_EVOLUTION_URL/KEY env vars are unset → fall back to
           // the manual "Modo avançado" flow.
           if (/evolution server not configured|auto_provision_unavailable/i.test(msg)) {
@@ -1722,7 +1722,7 @@
       function renderLogin(err) {
         document.getElementById('app').innerHTML = `
           <div class="login-wrap">
-            <h1>Painel Axon</h1>
+            <h1>Painel Nexus Inovation</h1>
             <p>Cole sua API key pra acessar seus agentes, carteira e histórico.</p>
             ${err ? `<div class="error">${err}</div>` : ''}
             <input type="text" id="base" placeholder="https://axon-kedb.onrender.com" />
@@ -1784,7 +1784,7 @@
         const root = document.getElementById('app');
         root.innerHTML = `
           <header>
-            <div class="brand"><span class="logo-dot"></span> axon</div>
+            <div class="brand"><span class="logo-dot"></span> nexusinovation</div>
             <nav style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
               <a href="/build" style="color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;border-radius:5px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);" data-pt="+ Criar agente" data-en="+ New agent">+ Criar agente</a>
               <a href="/whatsapp" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">💬 WhatsApp</a>
@@ -2467,7 +2467,7 @@
       ];
 
       const AGENT_SYSTEM_PROMPT = [
-        "You are an agent inside the Axon dashboard — an API gateway for AI agents. You don't just answer: you BUILD useful outputs.",
+        "You are an agent inside the Nexus Inovation dashboard — an API gateway for AI agents. You don't just answer: you BUILD useful outputs.",
         "",
         "## Language (CRITICAL)",
         "The user can write to you in ANY language: Portuguese (PT-BR/PT-PT), English, Spanish, French, etc. NEVER refuse a request, ask the user to switch language, or say you only work in English. Always proceed.",
@@ -2517,7 +2517,7 @@
         "- embed_text: 512-dim embedding (Voyage AI)",
         "",
         "## Economics (the user pays)",
-        "API tool calls cost $0.0003 - $0.01 from the user's Axon wallet. Local tools (calculate / get_datetime / run_js) are FREE — use them liberally.",
+        "API tool calls cost $0.0003 - $0.01 from the user's Nexus Inovation wallet. Local tools (calculate / get_datetime / run_js) are FREE — use them liberally.",
         "Never call the same tool with the same arguments twice in one turn.",
         "",
         "Current date: " + new Date().toISOString().slice(0,10) + "."
@@ -3214,7 +3214,7 @@
         modal.innerHTML = `
           <div class="modal-card">
             <h3>Chat with an agent</h3>
-            <p>This chat runs on your Axon wallet. Each message costs about <strong>$0.001-$0.01</strong> depending on which tools the agent decides to call.</p>
+            <p>This chat runs on your Nexus Inovation wallet. Each message costs about <strong>$0.001-$0.01</strong> depending on which tools the agent decides to call.</p>
             <p><strong>Safety caps:</strong></p>
             <ul>
               <li><strong>$${SOFT_CAP.toFixed(2)}</strong> soft cap per session — you confirm to continue past it</li>
@@ -3283,7 +3283,7 @@
         return sys ? [sys, ...cleaned] : cleaned;
       }
 
-      // Streaming chat completion against Groq via Axon. Calls onPartial each time
+      // Streaming chat completion against Groq via Nexus Inovation. Calls onPartial each time
       // the accumulated message changes so the UI can render text + tool calls
       // as they arrive. Returns the same shape as the old non-streaming version
       // so the rest of the agent loop is unchanged.
@@ -3404,7 +3404,7 @@
         const tool = AGENT_TOOLS.find((t) => t.function.name === name);
         if (!tool) throw new Error('Unknown tool: ' + name);
 
-        // Local tools run in the browser — no Axon cost, no network
+        // Local tools run in the browser — no Nexus Inovation cost, no network
         if (tool._local) {
           const t0 = Date.now();
           try {
