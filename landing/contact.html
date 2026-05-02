@@ -720,8 +720,9 @@
       // ─── Loaders ───────────────────────────────
       async function loadAgents() {
         try {
-          const data = await api('/v1/agents');
-          state.agents = data.agents || [];
+          const r = await api('/v1/agents');
+          // Backend returns { data: [...] } — same shape used by whatsapp.html.
+          state.agents = r.data || r.agents || [];
           if (!state.selectedAgentId && state.agents.length > 0) {
             state.selectedAgentId = state.agents[0].id;
             localStorage.setItem(AGENT_KEY, state.selectedAgentId);

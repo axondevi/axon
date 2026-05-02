@@ -461,8 +461,11 @@
       // ─── Loaders ───────────────────────────────
       async function loadAgents() {
         try {
-          const data = await api('/v1/agents');
-          state.agents = data.agents || [];
+          const r = await api('/v1/agents');
+          // Backend returns { data: [...] } — same shape used by
+          // whatsapp.html. Was previously trying r.agents which always
+          // came back undefined → 0 contatos even with real data.
+          state.agents = r.data || r.agents || [];
           if (state.agents.length > 0) {
             const exists = state.agents.some((a) => a.id === state.selectedAgentId);
             if (!exists) {

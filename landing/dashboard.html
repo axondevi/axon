@@ -1089,6 +1089,7 @@
             <div class="agent-actions">
               <a class="agent-btn" href="/agent-preview/${escapeAttr(a.slug)}" target="_blank" title="Pré-visualizar e testar agente antes de conectar WhatsApp" style="border-color:rgba(124,92,255,0.4);color:var(--accent);">🧪 Testar</a>
               <a class="agent-btn" href="/whatsapp" title="Ver memória, contatos e conversas">🧠 Cérebro</a>
+              <a class="agent-btn" href="/contacts" title="Base de contatos: ficha estruturada, documentos categorizados, histórico" style="border-color:rgba(25,213,198,0.4);color:var(--accent-2);">👥 Contatos</a>
               <button class="agent-btn" onclick="openWhatsappModal('${escapeAttr(a.id)}', '${escapeAttr(a.name)}')">💬 WhatsApp</button>
               <button class="agent-btn" id="pause-btn-${escapeAttr(a.id)}" onclick="togglePauseAgent('${escapeAttr(a.id)}', '${escapeAttr(a.name)}', ${a.paused ? 'true' : 'false'})" title="${a.paused ? 'Agente pausado — clique pra retomar' : 'Pausar agente (para de responder no WhatsApp)'}" style="${a.paused ? 'background:rgba(255,214,10,0.15);border-color:rgba(255,214,10,0.5);color:#ffd60a;' : ''}">${a.paused ? '▶️ Retomar' : '⏸️ Pausar'}</button>
               <a class="agent-btn" href="/build?edit=${escapeAttr(a.id)}" title="Editar prompt, ferramentas, cor">⚙ Editar</a>
@@ -1787,6 +1788,7 @@
             <nav style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
               <a href="/build" style="color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;border-radius:5px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.3);" data-pt="+ Criar agente" data-en="+ New agent">+ Criar agente</a>
               <a href="/whatsapp" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;">💬 WhatsApp</a>
+              <a href="/contacts" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="👥 Contatos" data-en="👥 Contacts">👥 Contatos</a>
               <a href="/explore" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="Explorar" data-en="Explore">Explorar</a>
               <a href="/upgrade" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="Planos" data-en="Plans">Planos</a>
               <a href="/learn/" style="color:var(--text-dim);text-decoration:none;font-size:13px;padding:6px 10px;" data-pt="Tutoriais" data-en="Tutorials">Tutoriais</a>
