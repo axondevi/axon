@@ -1063,15 +1063,27 @@ async function processBufferedTurn(opts: {
       const imageNoun = /\b(imagem|imagens|foto|fotos|desenho|desenhos|paisagem|paisagens|figura|figuras|ilustra[çc][ãa]o)\b/i;
       const fakeUrl = /https?:\/\/(?:www\.)?(?:example\.com|imagine\.com|fakeurl|placeholder|generated\.|dalle|midjourney|stablediffusion|imgur\.com\/[a-z0-9]{1,5}\b)/i;
 
-      // Co-occurrence check: a verb match + a noun match within the
-      // same reply (and reply is short enough that they're likely
-      // discussing the same thing). Skip if reply explicitly says it
-      // CAN'T do it ("não posso", "não consigo", "não gero").
-      const explicitlyRefuses = /\b(n[aã]o\s+(posso|consigo|fa[çc]o|gero|crio|gerar|criar|fa[çc]er)|n[aã]o\s+tenho\s+(como|essa\s+capacidade)|n[aã]o\s+(é|eh)\s+poss[ií]vel)/i;
-      const looksLikeImagePromise =
-        imageVerb.test(reply) && imageNoun.test(reply) && !explicitlyRefuses.test(reply);
+      // PER-SENTENCE check, not per-reply. The LLM was emitting things
+      // like "infelizmente, não posso criar uma imagem... Posso gerar
+      // uma paisagem, um objeto" — the refusal AND the offer in the
+      // same reply. A whole-reply refusal-check passed because of the
+      // "não posso criar" up front, letting the offer in the next
+      // sentence slip through. Splitting by sentence-terminator
+      // catches the offer sentence on its own.
+      const explicitlyRefuses = /\b(n[aã]o\s+(posso|consigo|fa[çc]o|gero|crio|gerar|criar|fa[çc]er|envio|mando|tenho)|n[aã]o\s+tenho\s+(como|essa\s+capacidade)|n[aã]o\s+(é|eh)\s+poss[ií]vel|infelizmente|n[aã]o\s+gero)/i;
+      const sentences = reply
+        .split(/[.!?;\n]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 4);
+      let promisingSentence = false;
+      for (const s of sentences) {
+        if (imageVerb.test(s) && imageNoun.test(s) && !explicitlyRefuses.test(s)) {
+          promisingSentence = true;
+          break;
+        }
+      }
 
-      if (looksLikeImagePromise || fakeUrl.test(reply)) {
+      if (promisingSentence || fakeUrl.test(reply)) {
         reply = 'Não gero imagens por aqui — mas se você descrever em palavras o que precisa, te ajudo do meu jeito. Ou se preferir, peço pra um atendente humano te mandar uma foto.';
         guardRewrites.push('image_promise');
       }
