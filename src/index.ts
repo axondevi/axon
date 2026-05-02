@@ -258,12 +258,28 @@ ensureSystemRows().catch((err) => {
   log.error('bootstrap_failed', { error: (err as Error).message });
 });
 
-// Graceful shutdown — Railway/Fly send SIGTERM before killing the container.
+// Graceful shutdown — Render/Railway/Fly send SIGTERM before killing
+// the container. Drain Postgres pool first so in-flight queries either
+// commit or fail cleanly with a connection error (rather than the
+// process disappearing mid-write). 5s overall budget; if drain hangs,
+// kill anyway so the orchestrator's SIGKILL doesn't take effect at a
+// random instruction.
 let shuttingDown = false;
+const SHUTDOWN_TIMEOUT_MS = 5_000;
 const shutdown = async (signal: string) => {
   if (shuttingDown) return;
   shuttingDown = true;
   log.info('shutdown_begin', { signal });
+  const deadline = Date.now() + SHUTDOWN_TIMEOUT_MS;
+  try {
+    const { drainPool } = await import('~/db');
+    await Promise.race([
+      drainPool(),
+      new Promise((r) => setTimeout(r, deadline - Date.now())),
+    ]);
+  } catch {
+    // best-effort
+  }
   try {
     await redis.quit();
   } catch {
