@@ -18,7 +18,7 @@
  */
 import { db } from '~/db';
 import { contactDocuments } from '~/db/schema';
-import { putObject } from '~/storage/r2';
+import { putObject } from '~/storage/supabase-storage';
 import { classifyDocument, type DocType } from '~/agents/doc-classifier';
 import { log } from '~/lib/logger';
 import { randomUUID } from 'node:crypto';
@@ -95,21 +95,16 @@ export async function saveContactDocument(opts: {
   const ext = extensionForMime(opts.mimeType, opts.filename);
   const storageKey = `documents/${opts.agentId}/${opts.contactMemoryId}/${documentId}.${ext}`;
 
-  // 1. Upload to R2.
+  // 1. Upload to R2 (best-effort — zero-cost mode runs without R2).
+  // When R2 isn't configured, we still want the row indexed so the
+  // owner's dashboard shows the doc with its classification + extracted
+  // text (the original file stays in the customer's WhatsApp thread,
+  // not lost — just not centralized).
   const upload = await putObject({
     key: storageKey,
     bytes: opts.bytes,
     mimeType: opts.mimeType,
   });
-
-  if (upload.skipped) {
-    log.info('document_vault.skipped', {
-      reason: 'no_r2_envs',
-      mime: opts.mimeType,
-      bytes: opts.bytes.length,
-    });
-    return { ok: false, skippedNoStorage: true };
-  }
 
   // 2. Classify (independent of upload outcome — we still index the doc
   // even if R2 hiccups, so the extracted text isn't lost).

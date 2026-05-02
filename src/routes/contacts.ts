@@ -22,7 +22,7 @@ import {
   deleteContact,
   type ContactFact,
 } from '~/agents/contact-memory';
-import { presignGet, isStorageConfigured } from '~/storage/r2';
+import { presignGet, isStorageConfigured } from '~/storage/supabase-storage';
 
 export const ownerContacts = new Hono();
 
