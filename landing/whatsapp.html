@@ -659,6 +659,7 @@
             </div>
             <div class="header-actions">
               <a href="/dashboard" class="nav-link">← Dashboard</a>
+              <a href="/contacts" class="nav-link">Contatos</a>
               <select class="agent-select" id="agent-sel" onchange="onAgentChange(this.value)">
                 ${state.agents.map(a => `
                   <option value="${a.id}" ${a.id === state.selectedAgentId ? 'selected' : ''}>${escapeHtml(a.name)}</option>

@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon · Contato</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/_ui-kit.css" />
+    <script src="/_ui-kit.js" defer></script>
+    <style>
+      :root {
+        --bg: #0a0a0b;
+        --bg-elev: #111114;
+        --bg-card: #16161a;
+        --bg-hover: #1c1c22;
+        --border: #25252b;
+        --text: #eeeef0;
+        --text-dim: #9a9aa4;
+        --text-muted: #6a6a76;
+        --accent: #7c5cff;
+        --accent-2: #19d5c6;
+        --whatsapp: #25d366;
+        --danger: #ff5f57;
+        --warn: #ffd60a;
+        --radius: 10px;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; min-height: 100%; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg); color: var(--text); line-height: 1.5;
+      }
+      a { color: var(--accent-2); text-decoration: none; }
+      a:hover { color: var(--text); }
+
+      /* ─── Header ──────────────────────────────── */
+      header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-elev);
+        position: sticky; top: 0; z-index: 10;
+      }
+      .brand { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: 18px; }
+      .brand a { color: var(--text); }
+      .logo-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      }
+      .header-actions { display: flex; gap: 12px; align-items: center; }
+      .agent-select {
+        background: var(--bg-card); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 6px 10px; font-size: 13px; font-family: inherit;
+      }
+      .key-chip {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px; color: var(--text-muted);
+        background: var(--bg-card); padding: 5px 8px;
+        border-radius: 5px; border: 1px solid var(--border);
+      }
+      .key-chip button {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; padding: 0 0 0 8px; font-size: 11px;
+      }
+      .nav-link { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+      .nav-link:hover { color: var(--text); }
+      .nav-link.active { color: var(--accent-2); }
+
+      /* ─── Page layout ─────────────────────────── */
+      main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 24px 24px 80px;
+      }
+      .back-link {
+        display: inline-flex; align-items: center; gap: 6px;
+        color: var(--text-dim); font-size: 13px;
+        margin-bottom: 18px;
+      }
+      .back-link:hover { color: var(--text); }
+
+      /* ─── Identity card ──────────────────────── */
+      .id-card {
+        display: flex; gap: 18px; align-items: center;
+        padding: 22px 24px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 22px;
+      }
+      .id-avatar {
+        width: 64px; height: 64px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 700; font-size: 22px;
+        flex-shrink: 0;
+      }
+      .id-main { flex: 1; min-width: 0; }
+      .id-name {
+        font-weight: 700; font-size: 20px; margin: 0 0 4px;
+      }
+      .id-phone {
+        color: var(--text-dim); font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .id-stats {
+        display: flex; gap: 16px; margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .id-stat {
+        font-size: 12px; color: var(--text-muted);
+      }
+      .id-stat strong { color: var(--text); font-weight: 600; }
+      .id-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .id-actions a, .id-actions button {
+        padding: 8px 14px;
+        background: var(--bg-elev); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        font-size: 13px; cursor: pointer; font-family: inherit;
+        text-decoration: none;
+      }
+      .id-actions a:hover, .id-actions button:hover {
+        background: var(--bg-hover); border-color: var(--accent);
+      }
+
+      .arc-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px; border-radius: 999px;
+        font-size: 11px; font-weight: 500;
+        border: 1px solid;
+      }
+      .arc-badge.progressing { color: #19d5c6; border-color: #19d5c640; background: #19d5c610; }
+      .arc-badge.closing     { color: #7c5cff; border-color: #7c5cff40; background: #7c5cff10; }
+      .arc-badge.resolved    { color: #25d366; border-color: #25d36640; background: #25d36610; }
+      .arc-badge.stuck       { color: #ffd60a; border-color: #ffd60a40; background: #ffd60a10; }
+      .arc-badge.frustrated  { color: #ff5f57; border-color: #ff5f5740; background: #ff5f5710; }
+      .tag-chip {
+        display: inline-block;
+        padding: 2px 8px; border-radius: 999px;
+        font-size: 11px; color: var(--accent-2);
+        background: #19d5c610; border: 1px solid #19d5c640;
+      }
+
+      /* ─── Two-column body ─────────────────────── */
+      .two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+        gap: 22px;
+      }
+      @media (max-width: 900px) {
+        .two-col { grid-template-columns: 1fr; }
+      }
+
+      .panel {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .panel-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600; font-size: 14px;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .panel-header .meta { color: var(--text-muted); font-weight: 400; font-size: 12px; }
+      .panel-body { padding: 14px 18px; }
+
+      /* ─── Ficha (profile + facts) ─────────────── */
+      .field-row {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+      }
+      .field-row:last-child { border-bottom: none; }
+      .field-label {
+        color: var(--text-dim);
+        font-weight: 500;
+      }
+      .field-value {
+        color: var(--text);
+        word-break: break-word;
+      }
+      .field-empty { color: var(--text-muted); font-style: italic; }
+
+      .ficha-section + .ficha-section { margin-top: 18px; }
+      .ficha-section h4 {
+        margin: 0 0 6px;
+        color: var(--text-dim); font-weight: 500;
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      }
+
+      .summary-box {
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 13px;
+        color: var(--text-dim);
+      }
+
+      /* ─── Documents ─────────────────────────── */
+      .doc-tabs {
+        display: flex; gap: 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .doc-tab {
+        flex: 1; padding: 10px 14px;
+        background: transparent; color: var(--text-dim);
+        border: none; border-bottom: 2px solid transparent;
+        cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500;
+      }
+      .doc-tab:hover { color: var(--text); }
+      .doc-tab.active {
+        color: var(--accent-2);
+        border-bottom-color: var(--accent-2);
+      }
+      .doc-group { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+      .doc-group:last-child { border-bottom: none; }
+      .doc-group-header {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+        color: var(--text-dim);
+        margin-bottom: 10px;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .doc-card {
+        display: grid;
+        grid-template-columns: 36px 1fr auto;
+        gap: 12px; align-items: center;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .doc-card:last-child { margin-bottom: 0; }
+      .doc-icon {
+        width: 32px; height: 32px;
+        background: var(--bg-hover);
+        border-radius: 6px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+      }
+      .doc-meta { min-width: 0; }
+      .doc-summary {
+        font-size: 13px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .doc-sub {
+        font-size: 11px; color: var(--text-muted);
+        margin-top: 2px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .doc-download {
+        padding: 5px 10px;
+        background: var(--accent); color: white;
+        border-radius: 6px;
+        font-size: 12px; font-weight: 500;
+        text-decoration: none;
+      }
+      .doc-download:hover { opacity: 0.9; color: white; }
+      .doc-download.disabled {
+        background: var(--bg-hover); color: var(--text-muted);
+        cursor: not-allowed; pointer-events: none;
+      }
+      .storage-warning {
+        padding: 10px 14px;
+        background: #ffd60a10;
+        border-bottom: 1px solid #ffd60a40;
+        color: var(--warn);
+        font-size: 12px;
+      }
+
+      .empty-state {
+        text-align: center; padding: 40px 20px;
+        color: var(--text-dim); font-size: 13px;
+      }
+
+      /* ─── Login (shared) ──────────────────────── */
+      .login-wrap {
+        display: flex; align-items: center; justify-content: center;
+        min-height: 100vh; padding: 20px;
+      }
+      .login-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 32px; max-width: 420px; width: 100%;
+      }
+      .login-card h2 { margin: 0 0 8px; font-size: 18px; }
+      .login-card p { margin: 0 0 20px; color: var(--text-dim); font-size: 13px; }
+      .login-card input {
+        width: 100%;
+        background: var(--bg-elev); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 10px 12px; font-size: 14px;
+        font-family: 'JetBrains Mono', monospace;
+        margin-bottom: 12px;
+      }
+      .login-card button {
+        width: 100%;
+        background: var(--accent); color: white;
+        border: none; border-radius: 6px;
+        padding: 10px 16px; font-size: 14px; font-weight: 600;
+        cursor: pointer;
+      }
+
+      @media (max-width: 640px) {
+        header { padding: 12px 16px; }
+        main { padding: 16px 14px 60px; }
+        .id-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+        .id-avatar { width: 56px; height: 56px; font-size: 18px; }
+        .field-row { grid-template-columns: 1fr; gap: 2px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const STORAGE_KEY = 'axon_api_key';
+      const AGENT_KEY = 'axon_selected_agent_id';
+      const API_BASE = 'https://axon-kedb.onrender.com';
+
+      // ─── URL params ─────────────────────────────
+      const params = new URLSearchParams(location.search);
+      const urlAgentId = params.get('agent') || '';
+      const urlPhone   = params.get('phone') || '';
+
+      const state = {
+        apiKey: localStorage.getItem(STORAGE_KEY) || '',
+        agents: [],
+        selectedAgentId: urlAgentId || localStorage.getItem(AGENT_KEY) || '',
+        phone: urlPhone,
+        contact: null,
+        documents: [],
+        storageConfigured: true,
+        loading: false,
+        error: null,
+        docTab: 'inbound', // 'inbound' | 'outbound'
+      };
+
+      // ─── Doc taxonomy → labels & icons ─────────
+      // Inbound types come from the Groq classifier; outbound from the
+      // generate_pdf doc_type_hint. We map both sets to the same UI shape.
+      const DOC_LABELS = {
+        // Inbound (customer sent)
+        exame: 'Exame',
+        receita: 'Receita',
+        comprovante: 'Comprovante',
+        identidade: 'Identidade',
+        contrato: 'Contrato',
+        atestado: 'Atestado',
+        foto_pessoal: 'Foto pessoal',
+        foto_produto: 'Foto de produto',
+        foto_imovel: 'Foto de imóvel',
+        comprovante_endereco: 'Comp. de endereço',
+        captura_de_tela: 'Captura de tela',
+        outro: 'Outros',
+        // Outbound (agent generated)
+        comprovante_gerado: 'Comprovante',
+        agendamento_gerado: 'Agendamento',
+        ficha_gerada: 'Ficha',
+        contrato_gerado: 'Contrato',
+        receita_gerada: 'Receita',
+        recibo_gerado: 'Recibo',
+        orientacao_gerada: 'Orientação',
+        outro_gerado: 'Outros',
+      };
+      const DOC_ICONS = {
+        exame: '🧪',
+        receita: '💊',
+        comprovante: '🧾',
+        identidade: '🪪',
+        contrato: '📜',
+        atestado: '📋',
+        foto_pessoal: '👤',
+        foto_produto: '🛍️',
+        foto_imovel: '🏠',
+        comprovante_endereco: '📮',
+        captura_de_tela: '🖼️',
+        outro: '📄',
+        comprovante_gerado: '🧾',
+        agendamento_gerado: '📅',
+        ficha_gerada: '🗂️',
+        contrato_gerado: '📜',
+        receita_gerada: '💊',
+        recibo_gerado: '🧾',
+        orientacao_gerada: '📝',
+        outro_gerado: '📄',
+      };
+
+      // ─── Profile slot labels ───────────────────
+      const PROFILE_FIELDS = [
+        ['nome_completo', 'Nome completo'],
+        ['cpf', 'CPF'],
+        ['email', 'E-mail'],
+        ['data_nascimento', 'Data de nascimento'],
+        ['endereco', 'Endereço'],
+        ['telefone_alternativo', 'Telefone alt.'],
+        ['plano_saude', 'Plano de saúde'],
+        ['alergias', 'Alergias'],
+        ['medicamentos_em_uso', 'Medicamentos'],
+        ['condicao_principal', 'Condição principal'],
+        ['forma_pagamento_preferida', 'Forma de pagamento'],
+        ['tamanho_padrao', 'Tamanho padrão'],
+        ['observacoes', 'Observações'],
+      ];
+
+      // ─── Helpers ───────────────────────────────
+      function escape(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]),
+        );
+      }
+      function initials(name, phone) {
+        const src = (name || '').trim();
+        if (src) {
+          const parts = src.split(/\s+/).slice(0, 2);
+          return parts.map((p) => p[0]).join('').toUpperCase();
+        }
+        return (phone || '').slice(-2);
+      }
+      function fmtDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: '2-digit',
+          hour: '2-digit', minute: '2-digit',
+        });
+      }
+      function fmtBytes(n) {
+        if (!n || n < 1024) return `${n || 0} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+        return `${(n / 1024 / 1024).toFixed(1)} MB`;
+      }
+
+      async function api(path, opts = {}) {
+        const r = await fetch(API_BASE + path, {
+          ...opts,
+          headers: {
+            'x-api-key': state.apiKey,
+            'Content-Type': 'application/json',
+            ...(opts.headers || {}),
+          },
+        });
+        if (!r.ok) {
+          if (r.status === 401) {
+            localStorage.removeItem(STORAGE_KEY);
+            state.apiKey = '';
+            render();
+          }
+          const body = await r.json().catch(() => ({}));
+          const parts = [String(r.status)];
+          if (body && body.error) parts.push(body.error);
+          if (body && body.message) parts.push(body.message);
+          else if (r.statusText) parts.push(r.statusText);
+          throw new Error(parts.join(' '));
+        }
+        return r.json();
+      }
+
+      // ─── Render ────────────────────────────────
+      function render() {
+        const app = document.getElementById('app');
+        if (!state.apiKey) { app.innerHTML = renderLogin(); return; }
+        app.innerHTML = renderApp();
+      }
+
+      function renderLogin() {
+        return `
+          <div class="login-wrap">
+            <div class="login-card">
+              <h2><span class="logo-dot"></span> Axon · Contato</h2>
+              <p>Cole sua API key pra abrir a ficha do contato.</p>
+              <input id="apiKeyInput" type="password" placeholder="ax_live_..." />
+              <button onclick="onSaveKey()">Entrar</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderApp() {
+        const k = state.apiKey;
+        const masked = k.length > 12 ? k.slice(0, 6) + '…' + k.slice(-4) : k;
+        const agentOpts = state.agents
+          .map((a) => `<option value="${escape(a.id)}" ${a.id === state.selectedAgentId ? 'selected' : ''}>${escape(a.name || a.slug)}</option>`)
+          .join('');
+
+        let body = '';
+        if (state.loading) {
+          body = `<div class="empty-state">Carregando contato…</div>`;
+        } else if (state.error) {
+          body = `<div class="empty-state" style="color:var(--danger)">Erro: ${escape(state.error)}</div>`;
+        } else if (!state.contact) {
+          body = `<div class="empty-state">Contato não encontrado.</div>`;
+        } else {
+          body = renderContact();
+        }
+
+        return `
+          <header>
+            <div class="brand"><span class="logo-dot"></span><a href="/">Axon</a></div>
+            <div class="header-actions">
+              <a class="nav-link" href="/whatsapp">Brain</a>
+              <a class="nav-link active" href="/contacts">Contatos</a>
+              <select class="agent-select" onchange="onAgentChange(this.value)">${agentOpts}</select>
+              <span class="key-chip">${escape(masked)}<button onclick="onLogout()" title="Sair">×</button></span>
+            </div>
+          </header>
+          <main>
+            <a class="back-link" href="/contacts">← Voltar para contatos</a>
+            ${body}
+          </main>
+        `;
+      }
+
+      function renderContact() {
+        const c = state.contact;
+        const arcState = c.arc?.state;
+        const arcLabel = {
+          progressing: '🟢 progredindo',
+          closing: '🟣 fechando',
+          resolved: '✅ resolvido',
+          stuck: '🟡 travado',
+          frustrated: '🔴 frustrado',
+        }[arcState];
+        const arcHtml = arcState ? `<span class="arc-badge ${escape(arcState)}">${arcLabel}</span>` : '';
+        const tags = Array.isArray(c.tags) ? c.tags : [];
+        const tagsHtml = tags.length
+          ? tags.map((t) => `<span class="tag-chip">${escape(t)}</span>`).join(' ')
+          : '';
+
+        return `
+          <div class="id-card">
+            <div class="id-avatar">${escape(initials(c.display_name, c.phone))}</div>
+            <div class="id-main">
+              <div class="id-name">${escape(c.display_name || 'Sem nome')}</div>
+              <div class="id-phone">+${escape(c.phone)}</div>
+              <div class="id-stats">
+                <span class="id-stat"><strong>${c.message_count || 0}</strong> mensagens</span>
+                <span class="id-stat">primeira: <strong>${fmtDate(c.first_contact_at)}</strong></span>
+                <span class="id-stat">última: <strong>${fmtDate(c.last_contact_at)}</strong></span>
+                ${arcHtml ? `<span class="id-stat">${arcHtml}</span>` : ''}
+                ${tagsHtml ? `<span class="id-stat">${tagsHtml}</span>` : ''}
+              </div>
+            </div>
+            <div class="id-actions">
+              <a href="/whatsapp?phone=${encodeURIComponent(c.phone)}" title="Ver conversa no Brain">💬 Conversa</a>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <div class="panel">
+              <div class="panel-header">
+                Ficha do contato
+                <span class="meta">cadastrada silenciosamente</span>
+              </div>
+              <div class="panel-body">${renderFicha(c)}</div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                Documentos
+                <span class="meta">${state.documents.length} no total</span>
+              </div>
+              ${!state.storageConfigured ? `
+                <div class="storage-warning">
+                  Storage não configurado — texto extraído está visível, mas o download dos arquivos originais está desligado.
+                </div>` : ''}
+              <div class="doc-tabs">
+                <button class="doc-tab ${state.docTab === 'inbound' ? 'active' : ''}" onclick="onDocTab('inbound')">
+                  Recebidos (${state.documents.filter((d) => d.direction !== 'outbound').length})
+                </button>
+                <button class="doc-tab ${state.docTab === 'outbound' ? 'active' : ''}" onclick="onDocTab('outbound')">
+                  Enviados (${state.documents.filter((d) => d.direction === 'outbound').length})
+                </button>
+              </div>
+              <div>${renderDocs()}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderFicha(c) {
+        const profile = c.profile || {};
+        const profileHtml = PROFILE_FIELDS.map(([key, label]) => {
+          const v = profile[key];
+          let display = '';
+          if (Array.isArray(v) && v.length > 0) display = v.join(', ');
+          else if (typeof v === 'string' && v.trim()) display = v;
+          if (!display) return '';
+          return `
+            <div class="field-row">
+              <div class="field-label">${escape(label)}</div>
+              <div class="field-value">${escape(display)}</div>
+            </div>`;
+        }).filter(Boolean).join('');
+
+        const profileEmpty = !profileHtml;
+
+        const facts = Array.isArray(c.facts) ? c.facts : [];
+        const factsHtml = facts.length
+          ? facts.map((f) => `
+              <div class="field-row">
+                <div class="field-label">${escape(f.key)}</div>
+                <div class="field-value">${escape(f.value)}</div>
+              </div>`).join('')
+          : '';
+
+        const summaryHtml = c.summary ? `
+          <div class="ficha-section">
+            <h4>Resumo de interações</h4>
+            <div class="summary-box">${escape(c.summary)}</div>
+          </div>` : '';
+
+        return `
+          <div class="ficha-section">
+            <h4>Perfil estruturado</h4>
+            ${profileEmpty
+              ? '<div class="field-empty">A ficha será preenchida conforme o cliente compartilhar dados pessoais durante a conversa.</div>'
+              : profileHtml}
+          </div>
+          ${factsHtml ? `
+            <div class="ficha-section">
+              <h4>Outros fatos</h4>
+              ${factsHtml}
+            </div>` : ''}
+          ${summaryHtml}
+        `;
+      }
+
+      function renderDocs() {
+        const list = state.documents.filter((d) =>
+          state.docTab === 'outbound' ? d.direction === 'outbound' : d.direction !== 'outbound',
+        );
+        if (list.length === 0) {
+          const txt = state.docTab === 'outbound'
+            ? 'O agente ainda não gerou documentos pra esse contato.'
+            : 'O cliente ainda não enviou documentos.';
+          return `<div class="empty-state">${txt}</div>`;
+        }
+        // Group by doc_type
+        const groups = {};
+        for (const d of list) {
+          const t = d.doc_type || 'outro';
+          (groups[t] ||= []).push(d);
+        }
+        const orderedTypes = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+        return orderedTypes.map((t) => {
+          const items = groups[t];
+          const label = DOC_LABELS[t] || t;
+          const icon = DOC_ICONS[t] || '📄';
+          return `
+            <div class="doc-group">
+              <div class="doc-group-header">
+                <span>${escape(label)}</span>
+                <span>${items.length} ${items.length === 1 ? 'item' : 'itens'}</span>
+              </div>
+              ${items.map((d) => renderDocCard(d, icon)).join('')}
+            </div>`;
+        }).join('');
+      }
+
+      function renderDocCard(d, icon) {
+        const has = !!d.download_url;
+        const fname = d.filename || `${d.id?.slice(0, 8)}.bin`;
+        return `
+          <div class="doc-card">
+            <div class="doc-icon">${icon}</div>
+            <div class="doc-meta">
+              <div class="doc-summary">${escape(d.summary || fname)}</div>
+              <div class="doc-sub">${escape(fname)} · ${fmtBytes(d.byte_size)} · ${fmtDate(d.uploaded_at)}</div>
+            </div>
+            ${has
+              ? `<a class="doc-download" href="${escape(d.download_url)}" target="_blank" rel="noopener">Baixar</a>`
+              : `<span class="doc-download disabled" title="Storage não configurado ou upload falhou">—</span>`}
+          </div>
+        `;
+      }
+
+      // ─── Actions ───────────────────────────────
+      window.onSaveKey = async () => {
+        const v = document.getElementById('apiKeyInput').value.trim();
+        if (!v) return;
+        localStorage.setItem(STORAGE_KEY, v);
+        state.apiKey = v;
+        await loadAgents();
+        await loadContact();
+        render();
+      };
+
+      window.onLogout = () => {
+        if (confirm('Sair?')) {
+          localStorage.removeItem(STORAGE_KEY);
+          state.apiKey = '';
+          render();
+        }
+      };
+
+      window.onAgentChange = async (id) => {
+        state.selectedAgentId = id;
+        localStorage.setItem(AGENT_KEY, id);
+        // Switching agent invalidates this contact view — bounce to list.
+        window.location.href = '/contacts';
+      };
+
+      window.onDocTab = (tab) => {
+        state.docTab = tab;
+        render();
+      };
+
+      // ─── Loaders ───────────────────────────────
+      async function loadAgents() {
+        try {
+          const data = await api('/v1/agents');
+          state.agents = data.agents || [];
+          if (!state.selectedAgentId && state.agents.length > 0) {
+            state.selectedAgentId = state.agents[0].id;
+            localStorage.setItem(AGENT_KEY, state.selectedAgentId);
+          }
+        } catch (e) {
+          state.error = e.message;
+        }
+      }
+
+      async function loadContact() {
+        if (!state.selectedAgentId || !state.phone) {
+          state.error = 'Faltou agent ou phone na URL';
+          return;
+        }
+        state.loading = true;
+        state.error = null;
+        render();
+        try {
+          const [contact, docs] = await Promise.all([
+            api(`/v1/agents/${state.selectedAgentId}/contacts/${encodeURIComponent(state.phone)}`),
+            api(`/v1/agents/${state.selectedAgentId}/contacts/${encodeURIComponent(state.phone)}/documents`),
+          ]);
+          state.contact = contact;
+          state.documents = docs.documents || [];
+          state.storageConfigured = docs.storage_configured !== false;
+        } catch (e) {
+          state.error = e.message;
+          state.contact = null;
+        } finally {
+          state.loading = false;
+        }
+      }
+
+      // ─── Boot ──────────────────────────────────
+      (async function boot() {
+        if (state.apiKey) {
+          await loadAgents();
+          await loadContact();
+        }
+        render();
+      })();
+    </script>
+  </body>
+</html>

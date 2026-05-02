@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Axon · Contatos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/_ui-kit.css" />
+    <script src="/_ui-kit.js" defer></script>
+    <style>
+      :root {
+        --bg: #0a0a0b;
+        --bg-elev: #111114;
+        --bg-card: #16161a;
+        --bg-hover: #1c1c22;
+        --border: #25252b;
+        --text: #eeeef0;
+        --text-dim: #9a9aa4;
+        --text-muted: #6a6a76;
+        --accent: #7c5cff;
+        --accent-2: #19d5c6;
+        --whatsapp: #25d366;
+        --danger: #ff5f57;
+        --warn: #ffd60a;
+        --radius: 10px;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+      }
+      a { color: var(--accent-2); text-decoration: none; }
+      a:hover { color: var(--text); }
+
+      /* ─── Header ───────────────────────────────── */
+      header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-elev);
+        position: sticky; top: 0; z-index: 10;
+      }
+      .brand { display: flex; gap: 10px; align-items: center; font-weight: 800; font-size: 18px; }
+      .brand a { color: var(--text); }
+      .logo-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      }
+      .header-actions { display: flex; gap: 12px; align-items: center; }
+      .agent-select {
+        background: var(--bg-card); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 6px 10px; font-size: 13px; font-family: inherit;
+      }
+      .key-chip {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px; color: var(--text-muted);
+        background: var(--bg-card); padding: 5px 8px;
+        border-radius: 5px; border: 1px solid var(--border);
+      }
+      .key-chip button {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; padding: 0 0 0 8px; font-size: 11px;
+      }
+      .nav-link { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+      .nav-link:hover { color: var(--text); }
+      .nav-link.active { color: var(--accent-2); }
+
+      /* ─── Page layout ──────────────────────────── */
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 28px 24px 80px;
+      }
+      h1 {
+        font-size: 22px; font-weight: 700;
+        margin: 0 0 4px;
+      }
+      .subtitle {
+        color: var(--text-dim); font-size: 13px;
+        margin-bottom: 24px;
+      }
+
+      /* ─── Toolbar ─────────────────────────────── */
+      .toolbar {
+        display: flex; gap: 12px; align-items: center;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+      }
+      .search-input {
+        flex: 1; min-width: 240px;
+        background: var(--bg-card); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 10px 14px; font-size: 14px; font-family: inherit;
+      }
+      .search-input:focus { outline: none; border-color: var(--accent); }
+      .meta-count {
+        color: var(--text-muted); font-size: 13px;
+      }
+
+      /* ─── Contact list ────────────────────────── */
+      .contact-list {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .contact-row {
+        display: grid;
+        grid-template-columns: 44px 1fr auto auto;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 0.12s;
+        text-decoration: none;
+        color: var(--text);
+      }
+      .contact-row:last-child { border-bottom: none; }
+      .contact-row:hover { background: var(--bg-hover); }
+      .avatar {
+        width: 40px; height: 40px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 700; font-size: 15px;
+        text-transform: uppercase;
+      }
+      .contact-info { min-width: 0; }
+      .contact-name {
+        font-weight: 600; font-size: 14px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .contact-meta {
+        color: var(--text-muted); font-size: 12px;
+        margin-top: 2px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .contact-stats {
+        display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+        font-size: 12px; color: var(--text-dim);
+      }
+      .contact-stats .when {
+        font-size: 11px; color: var(--text-muted);
+      }
+      .contact-arrow {
+        color: var(--text-muted); font-size: 18px;
+      }
+
+      /* ─── Arc badges ──────────────────────────── */
+      .arc-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px; border-radius: 999px;
+        font-size: 11px; font-weight: 500;
+        border: 1px solid;
+      }
+      .arc-badge.progressing { color: #19d5c6; border-color: #19d5c640; background: #19d5c610; }
+      .arc-badge.closing     { color: #7c5cff; border-color: #7c5cff40; background: #7c5cff10; }
+      .arc-badge.resolved    { color: #25d366; border-color: #25d36640; background: #25d36610; }
+      .arc-badge.stuck       { color: #ffd60a; border-color: #ffd60a40; background: #ffd60a10; }
+      .arc-badge.frustrated  { color: #ff5f57; border-color: #ff5f5740; background: #ff5f5710; }
+
+      /* ─── Empty / loading / error ─────────────── */
+      .empty-state, .loading-state, .error-state {
+        text-align: center; padding: 60px 20px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text-dim);
+      }
+      .empty-state h3 { color: var(--text); margin: 0 0 8px; font-size: 16px; }
+      .empty-state p { margin: 0; font-size: 13px; }
+      .error-state { color: var(--danger); }
+
+      /* ─── Login screen (shared with whatsapp.html) ─── */
+      .login-wrap {
+        display: flex; align-items: center; justify-content: center;
+        min-height: 100vh; padding: 20px;
+      }
+      .login-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 32px; max-width: 420px; width: 100%;
+      }
+      .login-card h2 { margin: 0 0 8px; font-size: 18px; }
+      .login-card p { margin: 0 0 20px; color: var(--text-dim); font-size: 13px; }
+      .login-card input {
+        width: 100%;
+        background: var(--bg-elev); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 10px 12px; font-size: 14px;
+        font-family: 'JetBrains Mono', monospace;
+        margin-bottom: 12px;
+      }
+      .login-card button {
+        width: 100%;
+        background: var(--accent); color: white;
+        border: none; border-radius: 6px;
+        padding: 10px 16px; font-size: 14px; font-weight: 600;
+        cursor: pointer;
+      }
+      .login-card button:hover { opacity: 0.9; }
+
+      @media (max-width: 640px) {
+        header { padding: 12px 16px; }
+        main { padding: 18px 14px 60px; }
+        .contact-row {
+          grid-template-columns: 36px 1fr auto;
+          gap: 10px;
+          padding: 12px 14px;
+        }
+        .avatar { width: 34px; height: 34px; font-size: 13px; }
+        .contact-stats { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const STORAGE_KEY = 'axon_api_key';
+      const AGENT_KEY   = 'axon_selected_agent_id';
+      const API_BASE    = 'https://axon-kedb.onrender.com';
+
+      const state = {
+        apiKey: localStorage.getItem(STORAGE_KEY) || '',
+        agents: [],
+        selectedAgentId: localStorage.getItem(AGENT_KEY) || '',
+        contacts: [],
+        loading: false,
+        error: null,
+        search: '',
+      };
+
+      // ─── API helpers ───────────────────────────
+      async function api(path, opts = {}) {
+        const r = await fetch(API_BASE + path, {
+          ...opts,
+          headers: {
+            'x-api-key': state.apiKey,
+            'Content-Type': 'application/json',
+            ...(opts.headers || {}),
+          },
+        });
+        if (!r.ok) {
+          if (r.status === 401) {
+            localStorage.removeItem(STORAGE_KEY);
+            state.apiKey = '';
+            render();
+          }
+          const body = await r.json().catch(() => ({}));
+          const parts = [String(r.status)];
+          if (body && body.error) parts.push(body.error);
+          if (body && body.message) parts.push(body.message);
+          else if (r.statusText) parts.push(r.statusText);
+          throw new Error(parts.join(' '));
+        }
+        return r.json();
+      }
+
+      function escape(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]),
+        );
+      }
+
+      function initials(name, phone) {
+        const src = (name || '').trim();
+        if (src) {
+          const parts = src.split(/\s+/).slice(0, 2);
+          return parts.map((p) => p[0]).join('').toUpperCase();
+        }
+        return (phone || '').slice(-2);
+      }
+
+      function timeAgo(iso) {
+        if (!iso) return '—';
+        const ms = Date.now() - new Date(iso).getTime();
+        if (ms < 0) return 'agora';
+        const s = Math.floor(ms / 1000);
+        if (s < 60) return `há ${s}s`;
+        const m = Math.floor(s / 60);
+        if (m < 60) return `há ${m}min`;
+        const h = Math.floor(m / 60);
+        if (h < 24) return `há ${h}h`;
+        const d = Math.floor(h / 24);
+        if (d < 7) return `há ${d}d`;
+        const w = Math.floor(d / 7);
+        if (w < 4) return `há ${w}sem`;
+        return new Date(iso).toLocaleDateString('pt-BR');
+      }
+
+      // ─── Render ────────────────────────────────
+      function render() {
+        const app = document.getElementById('app');
+        if (!state.apiKey) { app.innerHTML = renderLogin(); return; }
+        app.innerHTML = renderApp();
+      }
+
+      function renderLogin() {
+        return `
+          <div class="login-wrap">
+            <div class="login-card">
+              <h2><span class="logo-dot"></span> Axon · Contatos</h2>
+              <p>Cole sua API key pra ver a base de contatos do agente.</p>
+              <input id="apiKeyInput" type="password" placeholder="ax_live_..." />
+              <button onclick="onSaveKey()">Entrar</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderApp() {
+        const agentOpts = state.agents
+          .map((a) => `<option value="${escape(a.id)}" ${a.id === state.selectedAgentId ? 'selected' : ''}>${escape(a.name || a.slug)}</option>`)
+          .join('');
+        const k = state.apiKey;
+        const masked = k.length > 12 ? k.slice(0, 6) + '…' + k.slice(-4) : k;
+
+        const filtered = filterContacts();
+        let body = '';
+        if (state.loading) {
+          body = `<div class="loading-state">Carregando contatos…</div>`;
+        } else if (state.error) {
+          body = `<div class="error-state">Erro: ${escape(state.error)}</div>`;
+        } else if (state.contacts.length === 0) {
+          body = `
+            <div class="empty-state">
+              <h3>Nenhum contato ainda</h3>
+              <p>Quando o agente atender o primeiro cliente no WhatsApp, ele aparece aqui.</p>
+            </div>`;
+        } else if (filtered.length === 0) {
+          body = `
+            <div class="empty-state">
+              <h3>Sem resultado</h3>
+              <p>Nada bate com "${escape(state.search)}".</p>
+            </div>`;
+        } else {
+          body = `<div class="contact-list">${filtered.map(renderContactRow).join('')}</div>`;
+        }
+
+        return `
+          <header>
+            <div class="brand"><span class="logo-dot"></span><a href="/">Axon</a></div>
+            <div class="header-actions">
+              <a class="nav-link" href="/whatsapp">Brain</a>
+              <a class="nav-link active" href="/contacts">Contatos</a>
+              <select class="agent-select" onchange="onAgentChange(this.value)">${agentOpts}</select>
+              <span class="key-chip">${escape(masked)}<button onclick="onLogout()" title="Sair">×</button></span>
+            </div>
+          </header>
+          <main>
+            <h1>Contatos</h1>
+            <div class="subtitle">Base completa de quem o agente atendeu — ficha estruturada e documentos por contato.</div>
+            <div class="toolbar">
+              <input
+                class="search-input"
+                placeholder="Buscar por nome ou telefone…"
+                value="${escape(state.search)}"
+                oninput="onSearch(this.value)"
+              />
+              <span class="meta-count">${filtered.length} de ${state.contacts.length} contatos</span>
+            </div>
+            ${body}
+          </main>
+        `;
+      }
+
+      function renderContactRow(c) {
+        const arcState = c.arc?.state;
+        const arcLabel = {
+          progressing: '🟢 progredindo',
+          closing: '🟣 fechando',
+          resolved: '✅ resolvido',
+          stuck: '🟡 travado',
+          frustrated: '🔴 frustrado',
+        }[arcState] || '';
+        const arcHtml = arcState
+          ? `<span class="arc-badge ${escape(arcState)}">${arcLabel}</span>`
+          : '';
+        const params = new URLSearchParams({
+          agent: state.selectedAgentId,
+          phone: c.phone,
+        });
+        return `
+          <a class="contact-row" href="/contact?${params.toString()}">
+            <div class="avatar">${escape(initials(c.display_name, c.phone))}</div>
+            <div class="contact-info">
+              <div class="contact-name">${escape(c.display_name || 'Sem nome')}</div>
+              <div class="contact-meta">+${escape(c.phone)} · ${c.message_count} msgs · ${c.facts_count || 0} fatos</div>
+            </div>
+            <div class="contact-stats">
+              ${arcHtml}
+              <span class="when">${escape(timeAgo(c.last_contact_at))}</span>
+            </div>
+            <span class="contact-arrow">→</span>
+          </a>
+        `;
+      }
+
+      function filterContacts() {
+        const q = state.search.trim().toLowerCase();
+        if (!q) return state.contacts;
+        return state.contacts.filter((c) => {
+          const name = (c.display_name || '').toLowerCase();
+          const phone = (c.phone || '').toLowerCase();
+          return name.includes(q) || phone.includes(q);
+        });
+      }
+
+      // ─── Actions ───────────────────────────────
+      window.onSaveKey = async () => {
+        const v = document.getElementById('apiKeyInput').value.trim();
+        if (!v) return;
+        localStorage.setItem(STORAGE_KEY, v);
+        state.apiKey = v;
+        await loadAgents();
+        await loadContacts();
+        render();
+      };
+
+      window.onLogout = () => {
+        if (confirm('Sair?')) {
+          localStorage.removeItem(STORAGE_KEY);
+          state.apiKey = '';
+          render();
+        }
+      };
+
+      window.onAgentChange = async (id) => {
+        state.selectedAgentId = id;
+        localStorage.setItem(AGENT_KEY, id);
+        await loadContacts();
+        render();
+      };
+
+      window.onSearch = (v) => {
+        state.search = v;
+        // Re-render only the list — preserve focus on search input.
+        // Cheap: full render, then refocus.
+        const sel = document.activeElement === document.querySelector('.search-input');
+        render();
+        if (sel) {
+          const inp = document.querySelector('.search-input');
+          if (inp) {
+            inp.focus();
+            inp.setSelectionRange(v.length, v.length);
+          }
+        }
+      };
+
+      // ─── Loaders ───────────────────────────────
+      async function loadAgents() {
+        try {
+          const data = await api('/v1/agents');
+          state.agents = data.agents || [];
+          if (state.agents.length > 0) {
+            const exists = state.agents.some((a) => a.id === state.selectedAgentId);
+            if (!exists) {
+              state.selectedAgentId = state.agents[0].id;
+              localStorage.setItem(AGENT_KEY, state.selectedAgentId);
+            }
+          }
+        } catch (e) {
+          state.error = e.message;
+        }
+      }
+
+      async function loadContacts() {
+        if (!state.selectedAgentId) return;
+        state.loading = true;
+        state.error = null;
+        render();
+        try {
+          const data = await api(`/v1/agents/${state.selectedAgentId}/contacts?limit=200`);
+          state.contacts = data.contacts || [];
+        } catch (e) {
+          state.error = e.message;
+          state.contacts = [];
+        } finally {
+          state.loading = false;
+        }
+      }
+
+      // ─── Boot ──────────────────────────────────
+      (async function boot() {
+        if (state.apiKey) {
+          await loadAgents();
+          await loadContacts();
+        }
+        render();
+      })();
+    </script>
+  </body>
+</html>
