@@ -137,14 +137,37 @@
       .memory-card {
         background: var(--bg-card);
         border-bottom: 1px solid var(--border);
-        padding: 18px 24px;
-        max-height: 40vh;
+        padding: 14px 24px;
+        max-height: 22vh;
         overflow-y: auto;
+        transition: max-height 0.18s ease-out, padding 0.18s ease-out;
+      }
+      .memory-card.collapsed {
+        max-height: 44px;          /* just enough for the header line */
+        overflow: hidden;
+        padding: 12px 24px;
       }
       .memory-card h2 {
-        font-size: 14px; font-weight: 600; margin: 0 0 14px;
+        font-size: 14px; font-weight: 600; margin: 0 0 12px;
         color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;
+        display: flex; align-items: center; gap: 8px;
       }
+      .memory-card.collapsed h2 { margin: 0; }
+      .memory-toggle {
+        margin-left: auto;
+        background: none; border: none; color: var(--text-muted);
+        cursor: pointer; padding: 2px 8px; font-size: 11px;
+        font-family: inherit; border-radius: 4px;
+      }
+      .memory-toggle:hover { color: var(--accent-2); background: rgba(25,213,198,0.06); }
+      .memory-toggle .chev { display: inline-block; transition: transform 0.15s; margin-right: 4px; }
+      .memory-card.collapsed .memory-toggle .chev { transform: rotate(-90deg); }
+      .memory-summary-line {
+        font-size: 11px; color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+        display: none;
+      }
+      .memory-card.collapsed .memory-summary-line { display: inline; }
       .mem-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -432,6 +455,10 @@
         health: null,
         patches: [],
         openBrainIds: new Set(),
+        // Memory card defaults to COLLAPSED so the chat (latest turns)
+        // dominates the viewport. The operator can click the chevron to
+        // expand on demand. Per-contact state survives refreshes.
+        memoryCollapsed: true,
       };
 
       let refreshTimer = null;
@@ -614,7 +641,7 @@
             </div>
 
             <div class="detail-pane">
-              <div class="memory-card">${renderMemory()}</div>
+              <div class="memory-card ${state.memoryCollapsed ? 'collapsed' : ''}">${renderMemory()}</div>
               <div class="chat-pane">${renderChat()}</div>
             </div>
           </main>
@@ -630,8 +657,26 @@
         const facts = Array.isArray(m.facts) ? m.facts : [];
         const tags = Array.isArray(m.tags) ? m.tags : [];
 
+        // One-line summary shown when the card is collapsed — gives the
+        // operator the gist (name + lang + #facts + #msgs) without
+        // sacrificing chat real estate. Click the chevron to expand.
+        const summaryLine = [
+          m.display_name || '—',
+          m.language || '—',
+          m.formality === 'auto' ? null : m.formality,
+          facts.length ? `${facts.length} fatos` : null,
+          `${m.message_count} msg`,
+        ].filter(Boolean).join(' · ');
+
         return `
-          <h2>🧠 Memória do contato <span class="info-tip" data-tip="Tudo que o agente sabe deste contato. Carregado automaticamente antes de cada resposta.">?</span></h2>
+          <h2>
+            <button class="memory-toggle" onclick="toggleMemoryCard()" title="Mostrar/esconder memória">
+              <span class="chev">▼</span>${state.memoryCollapsed ? 'expandir' : 'recolher'}
+            </button>
+            🧠 Memória do contato
+            <span class="memory-summary-line">· ${escapeHtml(summaryLine)}</span>
+            <span class="info-tip" data-tip="Tudo que o agente sabe deste contato. Carregado automaticamente antes de cada resposta.">?</span>
+          </h2>
           <div class="mem-grid">
             <div class="mem-row">
               <div class="mem-label">Nome</div>
@@ -1268,6 +1313,11 @@
       window.toggleBrain = (msgId) => {
         if (state.openBrainIds.has(msgId)) state.openBrainIds.delete(msgId);
         else state.openBrainIds.add(msgId);
+        render();
+      };
+
+      window.toggleMemoryCard = () => {
+        state.memoryCollapsed = !state.memoryCollapsed;
         render();
       };
 
