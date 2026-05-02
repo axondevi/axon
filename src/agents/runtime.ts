@@ -634,6 +634,8 @@ interface RunAgentResult {
     ok: boolean;
     cost_usdc: string;
     error?: string;
+    /** Wall-clock duration of the upstream call in ms (best effort). */
+    ms?: number;
   }>;
   iterations: number;
   finish_reason: 'stop' | 'max_iterations' | 'error';
@@ -642,6 +644,15 @@ interface RunAgentResult {
   cached?: boolean;
   /** Cosine similarity to cached entry (only set if cached=true). */
   cache_similarity?: number;
+  /** Subset of allowedTools the smart selector exposed for this turn.
+   *  Equal to allowedTools when no narrowing happened. */
+  tools_offered?: string[];
+  /** Provider that generated the FINAL assistant message. Useful for
+   *  the brain UI ("groq" / "gemini" / "cohere") and the judge layer. */
+  provider?: string;
+  /** Total wall-clock duration of runAgent() in ms — start to finish, including
+   *  cache lookup, LLM calls, and tool calls. */
+  latency_ms?: number;
   /**
    * Base64-encoded images produced by tool calls (currently only generate_image
    * via Stability). Caller (e.g. the WhatsApp webhook) is responsible for
@@ -691,6 +702,7 @@ export async function runAgent(opts: {
 }): Promise<RunAgentResult> {
   const { c, allowedTools, messages, ownerId, agentId, enableCache = true } = opts;
   let { systemPrompt } = opts;
+  const t0 = Date.now();
 
   // ─── Persona loading ─────────────────────────────────────────────
   // If the agent has a persona attached, fetch its prompt_fragment and
@@ -736,6 +748,7 @@ export async function runAgent(opts: {
         total_cost_usdc: '0.000000',
         cached: true,
         cache_similarity: cached.similarity,
+        latency_ms: Date.now() - t0,
       };
     }
   }
@@ -796,6 +809,7 @@ export async function runAgent(opts: {
   const generatedImages: NonNullable<RunAgentResult['images']> = [];
   const generatedPixPayments: NonNullable<RunAgentResult['pixPayments']> = [];
   let totalCostMicro = 0n;
+  let lastProvider: string | undefined;
 
   // Provider cascade — Groq (best tool calls) → Gemini (great + 1500/day
   // free) → Cohere (text fallback). When one rate-limits, the next picks
@@ -809,6 +823,7 @@ export async function runAgent(opts: {
       max_tokens: 4096,
       temperature: 0.3,
     });
+    lastProvider = llmResult.provider || lastProvider;
     const msg: ChatMessage = (llmResult.message as ChatMessage) ?? {};
 
     history.push(msg);
@@ -839,6 +854,9 @@ export async function runAgent(opts: {
         iterations: iter + 1,
         finish_reason: 'stop',
         total_cost_usdc: (Number(totalCostMicro) / 1_000_000).toFixed(6),
+        tools_offered: effectiveTools,
+        provider: lastProvider,
+        latency_ms: Date.now() - t0,
         ...(generatedImages.length ? { images: generatedImages } : {}),
         ...(generatedPixPayments.length ? { pixPayments: generatedPixPayments } : {}),
       };
@@ -930,6 +948,7 @@ export async function runAgent(opts: {
       const built: { params?: Record<string, unknown>; body?: unknown } =
         def.buildRequest ? def.buildRequest(args) : { params: args };
 
+      const tcStart = Date.now();
       try {
         const upstreamRes = await handleCall(c, {
           slug: upstream.api,
@@ -977,6 +996,7 @@ export async function runAgent(opts: {
           args,
           ok: upstreamRes.ok,
           cost_usdc: cost.toFixed(6),
+          ms: Date.now() - tcStart,
         });
         history.push({ role: 'tool', tool_call_id: tc.id, content: truncated });
       } catch (err: any) {
@@ -986,6 +1006,7 @@ export async function runAgent(opts: {
           ok: false,
           cost_usdc: '0',
           error: err.message || String(err),
+          ms: Date.now() - tcStart,
         });
         history.push({
           role: 'tool',
@@ -1003,6 +1024,9 @@ export async function runAgent(opts: {
     iterations: MAX_ITERATIONS,
     finish_reason: 'max_iterations',
     total_cost_usdc: (Number(totalCostMicro) / 1_000_000).toFixed(6),
+    tools_offered: effectiveTools,
+    provider: lastProvider,
+    latency_ms: Date.now() - t0,
     ...(generatedImages.length ? { images: generatedImages } : {}),
     ...(generatedPixPayments.length ? { pixPayments: generatedPixPayments } : {}),
   };

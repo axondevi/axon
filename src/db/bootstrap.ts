@@ -234,6 +234,12 @@ export async function ensureCriticalSchema() {
       "updated_at"       timestamp NOT NULL DEFAULT NOW()
     )
   `);
+
+  // 0022: agent_messages.meta + contact_memory.arc — drive the WhatsApp Brain
+  // reasoning panel + judge layer. Both nullable: old rows stay valid, new
+  // rows opt in. No backfill — the panel hides cleanly when meta is null.
+  await db.execute(sql`ALTER TABLE "agent_messages" ADD COLUMN IF NOT EXISTS "meta" jsonb`);
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "arc" jsonb`);
 }
 
 export async function ensureSystemRows() {

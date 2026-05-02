@@ -290,6 +290,10 @@ export const agentMessages = pgTable(
     content: text('content').notNull(),
     variant: text('variant'),                        // 'A' | 'B' for A/B testing
     visitorIp: text('visitor_ip'),                   // truncated /24 — kept for ratelimit forensics only
+    // Reasoning trace (assistant rows only): intent, routed_agent, tools_offered,
+    // tool_calls, cache_hit, provider, latency_ms, cost_usdc, facts_used, eval{...}.
+    // Drives the WhatsApp Brain "🧠 raciocínio" panel and the judge layer.
+    meta: jsonb('meta'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => ({
@@ -450,6 +454,12 @@ export const contactMemory = pgTable(
     // contact until the timestamp passes — gives the human time to handle
     // the conversation without the AI talking over them.
     humanPausedUntil: timestamp('human_paused_until'),
+
+    // Conversation arc verdict — recomputed by judge.judgeArc() every N
+    // turns. Shape: { state: 'progressing' | 'stuck' | 'frustrated' |
+    // 'closing' | 'resolved', signals: string[], updated_at, turn_count_at_eval }
+    // null = never evaluated yet (fewer than threshold turns).
+    arc: jsonb('arc'),
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

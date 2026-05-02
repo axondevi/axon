@@ -205,6 +205,140 @@
       }
       .empty-emoji { font-size: 32px; opacity: 0.5; margin-bottom: 12px; }
 
+      /* ─── Brain / reasoning panel ─────────────────────────────── */
+      .brain-toggle {
+        display: inline-flex; align-items: center; gap: 6px;
+        margin-top: 6px; padding: 0 4px;
+        background: none; border: none; color: var(--text-muted);
+        font-size: 11px; font-family: inherit; cursor: pointer;
+        border-radius: 4px;
+      }
+      .brain-toggle:hover { color: var(--accent-2); background: rgba(25,213,198,0.06); }
+      .brain-toggle .chev { transition: transform 0.15s; display: inline-block; }
+      .brain-toggle.open .chev { transform: rotate(90deg); }
+      .brain-panel {
+        margin-top: 6px;
+        background: rgba(124,92,255,0.04);
+        border: 1px solid rgba(124,92,255,0.18);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--text-dim);
+        display: none;
+      }
+      .brain-panel.open { display: block; }
+      .brain-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 4px 0; }
+      .brain-label { color: var(--text-muted); font-size: 10px;
+        text-transform: uppercase; letter-spacing: 0.04em; min-width: 78px; }
+      .brain-pill {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 7px; border-radius: 10px;
+        font-size: 11px; background: var(--bg-card);
+        border: 1px solid var(--border); color: var(--text-dim);
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .brain-pill.intent-sales { color: #ffd60a; border-color: rgba(255,214,10,0.4); }
+      .brain-pill.intent-personal { color: #19d5c6; border-color: rgba(25,213,198,0.4); }
+      .brain-pill.intent-support { color: #ff5f57; border-color: rgba(255,95,87,0.4); }
+      .brain-pill.cache { color: var(--accent-2); border-color: rgba(25,213,198,0.4); }
+      .brain-pill.owner { color: #ffd60a; border-color: rgba(255,214,10,0.4); }
+      .brain-tool-ok { color: var(--whatsapp); }
+      .brain-tool-err { color: var(--danger); }
+      .brain-footer {
+        margin-top: 6px; padding-top: 6px;
+        border-top: 1px dashed var(--border);
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap;
+      }
+
+      /* ─── Score badge on assistant bubble ─────────────────────── */
+      .score-badge {
+        display: inline-flex; align-items: center; gap: 3px;
+        padding: 1px 6px; border-radius: 8px; font-size: 10px;
+        font-weight: 600; margin-left: 6px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .score-badge.great { background: rgba(37,211,102,0.15); color: var(--whatsapp);
+        border: 1px solid rgba(37,211,102,0.4); }
+      .score-badge.ok { background: rgba(124,92,255,0.15); color: var(--accent);
+        border: 1px solid rgba(124,92,255,0.4); }
+      .score-badge.ok_com_ressalva { background: rgba(255,214,10,0.12); color: var(--warn);
+        border: 1px solid rgba(255,214,10,0.4); }
+      .score-badge.ruim { background: rgba(255,95,87,0.12); color: var(--danger);
+        border: 1px solid rgba(255,95,87,0.4); }
+      .score-badge.pending {
+        background: var(--bg-card); color: var(--text-muted);
+        border: 1px solid var(--border); animation: pulse 2s infinite;
+      }
+
+      .eval-issues {
+        margin: 4px 0 0; padding: 6px 8px;
+        background: rgba(255,95,87,0.06);
+        border-left: 2px solid var(--danger);
+        font-size: 11px; color: var(--text-dim);
+      }
+      .eval-issues li { margin: 2px 0; }
+      .eval-axes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+      .axis-pill {
+        font-size: 10px; padding: 1px 5px; border-radius: 3px;
+        background: var(--bg-card); border: 1px solid var(--border);
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .axis-pill.fail { color: var(--danger); border-color: rgba(255,95,87,0.4); }
+      .axis-pill.pass { color: var(--text-muted); }
+
+      /* ─── Health pill in conn-bar ────────────────────────────── */
+      .health-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px; border-radius: 14px;
+        font-size: 12px; font-weight: 600;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        cursor: pointer;
+      }
+      .health-pill.high { color: var(--whatsapp); border-color: rgba(37,211,102,0.4); }
+      .health-pill.mid { color: var(--warn); border-color: rgba(255,214,10,0.4); }
+      .health-pill.low { color: var(--danger); border-color: rgba(255,95,87,0.4); }
+      .trend-up { color: var(--whatsapp); }
+      .trend-down { color: var(--danger); }
+      .trend-flat { color: var(--text-muted); }
+
+      /* ─── Arc pill on contact ─────────────────────────────────── */
+      .arc-pill {
+        display: inline-block; padding: 1px 6px; border-radius: 8px;
+        font-size: 10px; font-weight: 600; margin-top: 4px;
+      }
+      .arc-progressing { background: rgba(37,211,102,0.12); color: var(--whatsapp); }
+      .arc-stuck { background: rgba(255,214,10,0.12); color: var(--warn); }
+      .arc-frustrated { background: rgba(255,95,87,0.12); color: var(--danger); }
+      .arc-closing { background: rgba(124,92,255,0.15); color: var(--accent); }
+      .arc-resolved { background: rgba(25,213,198,0.12); color: var(--accent-2); }
+
+      /* ─── Patches drawer ─────────────────────────────────────── */
+      .patches-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 8px; padding: 12px 14px; margin-top: 12px;
+      }
+      .patches-card h3 {
+        font-size: 12px; margin: 0 0 8px;
+        text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim);
+      }
+      .patch-item {
+        padding: 8px; border: 1px solid var(--border); border-radius: 6px;
+        margin: 6px 0; background: var(--bg);
+      }
+      .patch-issue { color: var(--danger); font-size: 11px;
+        font-family: 'JetBrains Mono', monospace; }
+      .patch-suggestion { color: var(--text); font-size: 13px; margin: 4px 0; }
+      .patch-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+      .patch-btn-apply {
+        background: var(--whatsapp); color: white; border: none;
+        padding: 5px 12px; border-radius: 5px; font-size: 11px;
+        font-weight: 600; cursor: pointer; font-family: inherit;
+      }
+      .patch-btn-apply:disabled { opacity: 0.4; cursor: not-allowed; background: var(--bg-card); color: var(--text-muted); }
+      .patch-applied { color: var(--text-muted); font-size: 11px; }
+
       /* Login screen ─────────────────────────── */
       .login-screen {
         display: flex; align-items: center; justify-content: center;
@@ -286,6 +420,14 @@
         memory: null,
         messages: [],
         whatsappConn: null,
+        // Brain instrumentation: agent-wide health summary + per-message
+        // brain panel toggle state. openBrainIds is a Set of message ids
+        // whose "🧠 raciocínio" panel is currently expanded — survives the
+        // 5s auto-refresh so the operator can keep one open while traffic
+        // flows in.
+        health: null,
+        patches: [],
+        openBrainIds: new Set(),
       };
 
       let refreshTimer = null;
@@ -390,6 +532,7 @@
             ${conn ? `<span style="color:var(--text-muted)">· ${escapeHtml(conn.instance_url || '')}</span>` : ''}
             ${conn ? `<span style="color:var(--text-muted)">· instância: ${escapeHtml(conn.instance_name || '')}</span>` : ''}
             ${conn && conn.owner_phone ? `<span style="color:var(--accent-2)" title="Quando você manda zap deste número, o agente vira seu assistente pessoal (gera imagens, etc).">· dono: +${escapeHtml(conn.owner_phone)} 👤</span>` : ''}
+            ${renderHealthPill()}
             ${connectButton}
             <span style="margin-left: ${connectButton ? '12px' : 'auto'}; color: var(--text-muted); font-size: 12px;">
               <span class="refresh-indicator"></span> atualiza a cada ${REFRESH_MS/1000}s
@@ -422,6 +565,7 @@
                     ${c.facts_count > 0 ? `<span class="badge facts" title="Informações que o agente lembra deste contato (ex: alergia, plano, idade)">${c.facts_count} fatos</span>` : ''}
                     <span style="margin-left: auto;">${relTime(c.last_contact_at)}</span>
                   </div>
+                  ${renderArcPill(c.arc)}
                 </div>
               `).join('')}
             </div>
@@ -851,15 +995,256 @@
           return '<div class="empty">Nenhuma mensagem com este contato ainda</div>';
         }
         return `
-          <h2>💬 Conversa (${msgs.length} mensagens)</h2>
+          <h2>💬 Conversa (${msgs.length} mensagens) <span class="info-tip" data-tip="Cada bolha do agente tem um botão 🧠 que abre o raciocínio: intent, tools usadas, custo, e nota dada por outro LLM avaliador.">?</span></h2>
+          ${renderPatchesCard()}
           ${msgs.map(m => `
             <div class="turn ${m.role}">
-              <div class="bubble">${escapeHtml(m.content)}</div>
-              <div class="turn-meta">${m.role === 'user' ? 'cliente' : '🤖 agente'} · ${relTime(m.created_at)}</div>
+              <div class="bubble">${escapeHtml(m.content)}${m.role === 'assistant' ? renderScoreBadge(m.meta) : ''}</div>
+              <div class="turn-meta">${m.role === 'user' ? 'cliente' : '🤖 agente'} · ${relTime(m.created_at)}${renderEvalAxes(m)}</div>
+              ${m.role === 'assistant' && m.meta ? renderBrainToggle(m) : ''}
+              ${m.role === 'assistant' && m.meta ? renderBrainPanel(m) : ''}
             </div>
           `).join('')}
         `;
       }
+
+      // ─── Brain instrumentation render helpers ─────────────────
+      // All take the message (or its meta) and return an HTML fragment.
+      // They tolerate null / missing fields so old messages and partial
+      // turns render cleanly without showing empty "—" rows.
+
+      function renderScoreBadge(meta) {
+        if (!meta) return '';
+        const ev = meta.eval;
+        if (!ev) {
+          // Judge hasn't run yet → show pulsing pending badge so the
+          // operator knows a verdict is coming. Becomes color-coded once
+          // the judge writes back (next refresh tick).
+          return '<span class="score-badge pending" title="Avaliação assíncrona — chega no próximo refresh">…</span>';
+        }
+        const cls = ev.veredito || 'ok';
+        const label = ev.score + '/100';
+        const tip = `Veredito: ${ev.veredito} · julgado por ${escapeHtml(ev.judged_by || '?')}`;
+        return `<span class="score-badge ${cls}" title="${tip}">${label}</span>`;
+      }
+
+      function renderEvalAxes(m) {
+        // Show the failed axes as little chips next to the timestamp so the
+        // operator can see at a glance WHY a turn was scored low — without
+        // having to expand the brain panel. We only render failures (not
+        // every axis that passed) to keep the row tight.
+        if (m.role !== 'assistant' || !m.meta || !m.meta.eval) return '';
+        const ev = m.meta.eval;
+        const fails = [];
+        if (!ev.respondeu_pergunta) fails.push('não respondeu');
+        if (!ev.usou_tools_certas) fails.push('tools erradas');
+        if (!ev.respeitou_business_info) fails.push('ignorou business info');
+        if (!ev.manteve_persona) fails.push('quebrou persona');
+        if (!ev.tom_adequado) fails.push('tom errado');
+        if (ev.alucinou) fails.push('alucinou');
+        if (fails.length === 0) return '';
+        return ' · ' + fails.map(f => `<span class="axis-pill fail">${f}</span>`).join(' ');
+      }
+
+      function renderBrainToggle(m) {
+        const isOpen = state.openBrainIds.has(m.id);
+        return `<button class="brain-toggle ${isOpen ? 'open' : ''}" onclick="toggleBrain('${m.id}')">
+          <span class="chev">▶</span> 🧠 ${isOpen ? 'fechar' : 'ver raciocínio'}
+        </button>`;
+      }
+
+      function renderBrainPanel(m) {
+        if (!state.openBrainIds.has(m.id)) return '';
+        const meta = m.meta;
+        const intent = meta.intent;
+        const intentClass = intent ? `intent-${intent}` : '';
+        const intentLabel = intent ? `${intent}` : null;
+
+        const pills = [];
+        if (intentLabel) pills.push(`<span class="brain-pill ${intentClass}">🎯 ${intentLabel}</span>`);
+        if (meta.routed_agent) pills.push(`<span class="brain-pill">🚦 ${escapeHtml(meta.routed_agent)}</span>`);
+        if (meta.owner_mode) pills.push('<span class="brain-pill owner">👤 modo dono</span>');
+        if (meta.cache_hit) {
+          const sim = meta.cache_similarity ? ` ${Math.round(meta.cache_similarity * 100)}%` : '';
+          pills.push(`<span class="brain-pill cache">💾 cache hit${sim}</span>`);
+        }
+        if (meta.buffered_msgs && meta.buffered_msgs > 1) {
+          pills.push(`<span class="brain-pill">📥 ${meta.buffered_msgs} msgs juntas</span>`);
+        }
+
+        const tools = Array.isArray(meta.tool_calls) ? meta.tool_calls : [];
+        const offered = Array.isArray(meta.tools_offered) ? meta.tools_offered : [];
+        const facts = Array.isArray(meta.facts_used) ? meta.facts_used : [];
+
+        // Eval section — show issues + axes when present.
+        const ev = meta.eval;
+        let evalSection = '';
+        if (ev) {
+          const issues = Array.isArray(ev.issues) && ev.issues.length
+            ? `<ul class="eval-issues">${ev.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
+            : '';
+          const axes = [
+            ['respondeu_pergunta', 'respondeu'],
+            ['usou_tools_certas', 'tools certas'],
+            ['respeitou_business_info', 'business info'],
+            ['manteve_persona', 'persona'],
+            ['tom_adequado', 'tom'],
+            ['pediu_clarificacao_quando_devia', 'clarificou'],
+          ].map(([k, label]) => {
+            const ok = ev[k];
+            return `<span class="axis-pill ${ok ? 'pass' : 'fail'}">${ok ? '✓' : '✗'} ${label}</span>`;
+          }).join('');
+          const halluc = ev.alucinou
+            ? `<span class="axis-pill fail">✗ alucinou</span>`
+            : `<span class="axis-pill pass">✓ não alucinou</span>`;
+          evalSection = `
+            <div class="brain-row" style="margin-top:8px;">
+              <span class="brain-label">Avaliação</span>
+              <strong style="color:var(--text);">${ev.score}/100</strong>
+              <span style="color:var(--text-muted);font-size:11px;">· julgado por ${escapeHtml(ev.judged_by || '?')}</span>
+            </div>
+            <div class="eval-axes">${axes}${halluc}</div>
+            ${issues}
+          `;
+        }
+
+        const footer = [
+          meta.provider ? `provider: ${escapeHtml(meta.provider)}` : '',
+          meta.iterations !== undefined ? `${meta.iterations} iter` : '',
+          meta.latency_ms ? `${meta.latency_ms}ms` : '',
+          meta.cost_usdc ? `$${meta.cost_usdc}` : '',
+          meta.finish_reason ? `finish=${escapeHtml(meta.finish_reason)}` : '',
+        ].filter(Boolean).join(' · ');
+
+        return `
+          <div class="brain-panel open">
+            ${pills.length ? `<div class="brain-row">${pills.join('')}</div>` : ''}
+
+            ${tools.length ? `
+              <div class="brain-row" style="align-items:flex-start;">
+                <span class="brain-label">Tools</span>
+                <div style="flex:1;">
+                  ${tools.map(t => `
+                    <div style="margin:2px 0;">
+                      <span class="${t.ok ? 'brain-tool-ok' : 'brain-tool-err'}">${t.ok ? '✓' : '✗'}</span>
+                      <strong style="color:var(--text);">${escapeHtml(t.name)}</strong>
+                      <span style="color:var(--text-muted);">(${escapeHtml(JSON.stringify(t.args || {}).slice(0, 80))})</span>
+                      ${t.ms ? `<span style="color:var(--text-muted);"> · ${t.ms}ms</span>` : ''}
+                      ${t.cost_usdc && parseFloat(t.cost_usdc) > 0 ? `<span style="color:var(--text-muted);"> · $${t.cost_usdc}</span>` : ''}
+                      ${t.error ? `<div style="color:var(--danger);font-size:11px;margin-left:18px;">↳ ${escapeHtml(t.error)}</div>` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : `
+              <div class="brain-row">
+                <span class="brain-label">Tools</span>
+                <span style="color:var(--text-muted);font-size:11px;">nenhuma · resposta direta</span>
+              </div>
+            `}
+
+            ${offered.length && offered.length !== tools.length ? `
+              <div class="brain-row">
+                <span class="brain-label">Disponíveis</span>
+                <span style="color:var(--text-muted);font-size:11px;">selector ofereceu ${offered.length}: ${offered.slice(0, 8).map(escapeHtml).join(', ')}${offered.length > 8 ? '…' : ''}</span>
+              </div>
+            ` : ''}
+
+            ${facts.length ? `
+              <div class="brain-row">
+                <span class="brain-label">Memória</span>
+                <div>${facts.map(f => `<span class="brain-pill">${escapeHtml(f)}</span>`).join(' ')}</div>
+              </div>
+            ` : ''}
+
+            ${evalSection}
+
+            <div class="brain-footer">${footer}</div>
+          </div>
+        `;
+      }
+
+      function renderHealthPill() {
+        const h = state.health;
+        if (!h || h.avg_score === null || h.avg_score === undefined) return '';
+        const score = h.avg_score;
+        const cls = score >= 85 ? 'high' : score >= 70 ? 'mid' : 'low';
+        let trendStr = '';
+        if (h.score_trend !== null && h.score_trend !== undefined) {
+          if (h.score_trend > 1) trendStr = `<span class="trend-up">↗ +${h.score_trend}</span>`;
+          else if (h.score_trend < -1) trendStr = `<span class="trend-down">↘ ${h.score_trend}</span>`;
+          else trendStr = '<span class="trend-flat">→ estável</span>';
+        }
+        const tip = h.top_issues && h.top_issues.length
+          ? 'Top issues: ' + h.top_issues.slice(0, 3).map(i => `${i.issue} (${i.count}×)`).join(' · ')
+          : `${h.total_judged} turnos avaliados nos últimos 100`;
+        return `<span class="health-pill ${cls}" title="${escapeHtml(tip)}" onclick="alert('${escapeHtml(tip).replace(/'/g, '\\\\\\'')}')">
+          🧠 saúde ${score}/100 ${trendStr}
+        </span>`;
+      }
+
+      function renderArcPill(arc) {
+        if (!arc || !arc.state) return '';
+        const labels = {
+          progressing: '📈 progredindo',
+          stuck: '⚠️ travada',
+          frustrated: '🚨 cliente frustrado',
+          closing: '🎯 perto de fechar',
+          resolved: '✅ resolvida',
+        };
+        const label = labels[arc.state] || arc.state;
+        const tip = (arc.signals || []).slice(0, 3).join(' · ') || '';
+        return `<span class="arc-pill arc-${arc.state}" title="${escapeHtml(tip)}">${label}</span>`;
+      }
+
+      function renderPatchesCard() {
+        const patches = state.patches || [];
+        const pending = patches.filter(p => !p.already_applied);
+        if (pending.length === 0) return '';
+        return `
+          <div class="patches-card">
+            <h3>🔧 Correções sugeridas (${pending.length}) <span class="info-tip" data-tip="O avaliador detectou padrões. Aplicar adiciona uma linha ao system_prompt do agente — você pode reverter editando o prompt no /build.">?</span></h3>
+            ${pending.map((p, i) => `
+              <div class="patch-item" id="patch-${i}">
+                <div class="patch-issue">⚠ ${escapeHtml(p.issue)} <span style="color:var(--text-muted);font-weight:400;">(${p.count}×)</span></div>
+                <div class="patch-suggestion">→ ${escapeHtml(p.patch_text)}</div>
+                <div class="patch-actions">
+                  <button class="patch-btn-apply" onclick="applyPatch(${i})">✓ aplicar correção</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      window.toggleBrain = (msgId) => {
+        if (state.openBrainIds.has(msgId)) state.openBrainIds.delete(msgId);
+        else state.openBrainIds.add(msgId);
+        render();
+      };
+
+      window.applyPatch = async (idx) => {
+        const patch = state.patches[idx];
+        if (!patch) return;
+        const el = document.getElementById('patch-' + idx);
+        const btn = el?.querySelector('.patch-btn-apply');
+        if (btn) { btn.disabled = true; btn.textContent = 'Aplicando…'; }
+        try {
+          const r = await api(`/v1/agents/${state.selectedAgentId}/patches/apply`, {
+            method: 'POST',
+            body: JSON.stringify({ patch_text: patch.patch_text }),
+          });
+          if (el) {
+            el.innerHTML = `<div class="patch-applied">✓ aplicado ao system_prompt (${r.system_prompt_length} chars)</div>`;
+          }
+          // Refresh next tick to pull the updated patches list (this one
+          // will now show as already_applied and be filtered out).
+          setTimeout(() => loadAgentData().then(render), 1500);
+        } catch (e) {
+          alert('Falhou: ' + e.message);
+          if (btn) { btn.disabled = false; btn.textContent = '✓ aplicar correção'; }
+        }
+      };
 
       // ─── Actions ───────────────────────────────
       window.doLogin = async () => {
@@ -880,7 +1265,7 @@
 
       window.logout = () => {
         localStorage.removeItem(STORAGE_KEY);
-        state = { ...state, apiKey: '', agents: [], selectedAgentId: null, contacts: [], selectedPhone: null, memory: null, messages: [], whatsappConn: null };
+        state = { ...state, apiKey: '', agents: [], selectedAgentId: null, contacts: [], selectedPhone: null, memory: null, messages: [], whatsappConn: null, health: null, patches: [], openBrainIds: new Set() };
         stopRefresh();
         render();
       };
@@ -916,15 +1301,19 @@
 
       async function loadAgentData() {
         if (!state.selectedAgentId) return;
-        const [contacts, conn] = await Promise.all([
+        const [contacts, conn, health, patches] = await Promise.all([
           api(`/v1/agents/${state.selectedAgentId}/contacts`).catch(() => ({ contacts: [] })),
           api(`/v1/agents/${state.selectedAgentId}/whatsapp`).catch(() => ({ connected: false })),
+          api(`/v1/agents/${state.selectedAgentId}/health`).catch(() => null),
+          api(`/v1/agents/${state.selectedAgentId}/patches`).catch(() => ({ patches: [] })),
         ]);
         state.contacts = contacts.contacts || [];
         // Keep the conn object whenever an Evolution row exists — that way
         // we can distinguish "row exists but not yet paired" (pending_pairing)
         // from "no row at all" (clean slate). Only null out when truly absent.
         state.whatsappConn = (conn.connected || conn.pending_pairing) ? conn : null;
+        state.health = health;
+        state.patches = patches?.patches || [];
         if (state.selectedPhone) await loadContactDetails();
       }
 

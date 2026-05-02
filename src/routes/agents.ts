@@ -657,6 +657,215 @@ app.get('/:id/analytics', async (c) => {
   });
 });
 
+// Agent health — Wave 2C of brain instrumentation.
+//
+// Aggregates the judge eval verdicts across the last N assistant turns
+// into a single dashboard pill: "saúde 84% ↗ +6 vs semana passada".
+// Plus the top recurring issues so the operator can spot patterns
+// (e.g. "agente ignorou alergia salva: 4×").
+//
+// Returns nulls when there's no data yet (fewer than 5 judged turns) —
+// frontend hides the pill in that case rather than showing "0%".
+app.get('/:id/health', async (c) => {
+  const user = c.get('user') as { id: string };
+  const idOrSlug = c.req.param('id');
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+
+  // Pull the last 100 assistant turns with eval populated. We do this in two
+  // SELECTs because Drizzle's jsonb path operators don't play well with the
+  // generic builder — easier to filter in JS.
+  const rows = await db
+    .select({ meta: agentMessages.meta, createdAt: agentMessages.createdAt })
+    .from(agentMessages)
+    .where(and(eq(agentMessages.agentId, a.id), eq(agentMessages.role, 'assistant')))
+    .orderBy(desc(agentMessages.createdAt))
+    .limit(200);
+
+  const judged = rows
+    .map((r) => {
+      const meta = r.meta as { eval?: { score?: number; issues?: string[]; veredito?: string } } | null;
+      if (!meta?.eval || typeof meta.eval.score !== 'number') return null;
+      return {
+        score: meta.eval.score,
+        issues: Array.isArray(meta.eval.issues) ? meta.eval.issues : [],
+        veredito: meta.eval.veredito,
+        createdAt: r.createdAt as Date,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  if (judged.length < 5) {
+    return c.json({
+      avg_score: null,
+      score_trend: null,
+      total_judged: judged.length,
+      total_assistant_turns: rows.length,
+      top_issues: [],
+      bucket_counts: { great: 0, ok: 0, ok_com_ressalva: 0, ruim: 0 },
+    });
+  }
+
+  const last = judged.slice(0, 100);
+  const avgScore = Math.round(last.reduce((s, x) => s + x.score, 0) / last.length);
+
+  // Trend: last 7 days avg vs previous 7 days avg. Slice by createdAt.
+  const now = Date.now();
+  const week = 7 * 24 * 3600 * 1000;
+  const thisWeek = last.filter((x) => now - x.createdAt.getTime() < week);
+  const lastWeek = last.filter(
+    (x) => now - x.createdAt.getTime() >= week && now - x.createdAt.getTime() < 2 * week,
+  );
+  let trend: number | null = null;
+  if (thisWeek.length >= 3 && lastWeek.length >= 3) {
+    const a1 = thisWeek.reduce((s, x) => s + x.score, 0) / thisWeek.length;
+    const a2 = lastWeek.reduce((s, x) => s + x.score, 0) / lastWeek.length;
+    trend = Math.round(a1 - a2);
+  }
+
+  // Top recurring issues. Lowercase + collapse whitespace so near-duplicates
+  // ("não confirmou horário" vs "Não confirmou horário ") count together.
+  const issueCounts = new Map<string, number>();
+  for (const t of last) {
+    for (const raw of t.issues) {
+      const k = String(raw).toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!k) continue;
+      issueCounts.set(k, (issueCounts.get(k) || 0) + 1);
+    }
+  }
+  const topIssues = Array.from(issueCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([issue, count]) => ({ issue, count }));
+
+  const bucketCounts = { great: 0, ok: 0, ok_com_ressalva: 0, ruim: 0 };
+  for (const t of last) {
+    if (t.veredito && t.veredito in bucketCounts) {
+      bucketCounts[t.veredito as keyof typeof bucketCounts]++;
+    }
+  }
+
+  return c.json({
+    avg_score: avgScore,
+    score_trend: trend,
+    total_judged: last.length,
+    total_assistant_turns: rows.length,
+    top_issues: topIssues,
+    bucket_counts: bucketCounts,
+  });
+});
+
+// Improvement loop — Wave 2D.
+//
+// GET → list of suggested system_prompt patches based on recurring issues.
+// POST /apply → owner approves a patch; it gets appended to the agent's
+// system_prompt as a "## Correções aprendidas" section. Idempotent —
+// duplicate text isn't appended twice.
+app.get('/:id/patches', async (c) => {
+  const user = c.get('user') as { id: string };
+  const idOrSlug = c.req.param('id');
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+
+  // Reuse the same scan as /health but only surface issues that hit ≥3 times.
+  // Each one becomes a suggested patch the owner can accept.
+  const rows = await db
+    .select({ meta: agentMessages.meta })
+    .from(agentMessages)
+    .where(and(eq(agentMessages.agentId, a.id), eq(agentMessages.role, 'assistant')))
+    .orderBy(desc(agentMessages.createdAt))
+    .limit(200);
+
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const meta = r.meta as { eval?: { issues?: string[] } } | null;
+    if (!meta?.eval?.issues) continue;
+    for (const raw of meta.eval.issues) {
+      const k = String(raw).toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!k) continue;
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+  }
+
+  // Map issue → suggested patch text. Keep it simple: turn the issue into
+  // an instruction. If the issue is already in the system_prompt verbatim,
+  // skip — owner already accepted it.
+  const currentPrompt = a.systemPrompt || '';
+  const patches = Array.from(counts.entries())
+    .filter(([, n]) => n >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([issue, count]) => ({
+      issue,
+      count,
+      patch_text: issueToPatchText(issue),
+      already_applied: currentPrompt.toLowerCase().includes(issueToPatchText(issue).toLowerCase().slice(0, 40)),
+    }));
+
+  return c.json({ patches });
+});
+
+app.post('/:id/patches/apply', async (c) => {
+  const user = c.get('user') as { id: string };
+  const idOrSlug = c.req.param('id');
+  const body = await c.req.json().catch(() => ({} as any));
+  const patchText = String(body?.patch_text || '').trim();
+  if (!patchText) {
+    return c.json({ error: 'bad_request', message: 'patch_text required' }, 400);
+  }
+  if (patchText.length > 500) {
+    return c.json({ error: 'bad_request', message: 'patch_text too long (max 500)' }, 400);
+  }
+
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+
+  // Append to a stable section so multiple patches accumulate cleanly. If
+  // the section already contains this text, no-op (idempotent).
+  const SECTION = '\n\n## Correções aprendidas\n';
+  const current = a.systemPrompt || '';
+  if (current.toLowerCase().includes(patchText.toLowerCase().slice(0, 60))) {
+    return c.json({ ok: true, applied: false, reason: 'already_present' });
+  }
+  const newPrompt = current.includes(SECTION)
+    ? current.replace(SECTION, SECTION + `- ${patchText}\n`)
+    : current + SECTION + `- ${patchText}\n`;
+
+  // Hard cap so we don't let the prompt grow unboundedly via patches.
+  if (newPrompt.length > 16000) {
+    return c.json({ error: 'prompt_too_long', message: 'system_prompt would exceed 16000 chars' }, 400);
+  }
+
+  await db.update(agents).set({ systemPrompt: newPrompt, updatedAt: new Date() }).where(eq(agents.id, a.id));
+  return c.json({ ok: true, applied: true, system_prompt_length: newPrompt.length });
+});
+
+/** Turn a judge issue into a short imperative correction line. */
+function issueToPatchText(issue: string): string {
+  const trimmed = issue.trim().replace(/\s+/g, ' ');
+  // Most issues already start with "não X" or "ignorou X" — flip into "Sempre X" / "Sempre confirmar X".
+  if (/^não\s+/i.test(trimmed)) {
+    return 'Sempre ' + trimmed.replace(/^não\s+/i, '').replace(/^.{1}/, (c) => c.toLowerCase());
+  }
+  if (/^ignor(ou|ar)\s+/i.test(trimmed)) {
+    return 'Sempre considerar ' + trimmed.replace(/^ignor(ou|ar)\s+/i, '').replace(/^.{1}/, (c) => c.toLowerCase());
+  }
+  // Default: "Atenção: " + literal
+  return 'Atenção: ' + trimmed;
+}
+
 // Knowledge Cache stats — owner-only
 // Returns: { entries, total_hits, cost_saved_usdc, hit_rate_pct }
 // Used by dashboard to show "your agent saved you $X via semantic cache".
@@ -707,6 +916,9 @@ app.get('/:id/messages', async (c) => {
       content: m.content,
       variant: m.variant,
       created_at: m.createdAt,
+      // Reasoning trace + judge eval (assistant rows only). Null for old
+      // rows or any user row — the brain UI hides the panel when null.
+      meta: m.meta ?? null,
     })),
     count: rows.length,
   });

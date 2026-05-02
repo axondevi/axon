@@ -31,6 +31,7 @@ import {
 import { pushToBuffer, mergeBufferedText, anyAudio, type BufferedMessage } from '~/whatsapp/buffer';
 import { classifyIntent, pickRoutedAgentId, loadRoutedAgent, type RoutesTo } from '~/agents/intent-router';
 import { contactMemory } from '~/db/schema';
+import { judgeTurn, judgeArc, buildTraceString } from '~/agents/judge';
 
 // ─── Owner-authed sub-router (mounted under /v1/agents) ────
 export const ownerWhatsapp = new Hono();
@@ -900,6 +901,10 @@ async function processBufferedTurn(opts: {
   // Owner mode skips routing entirely — when the OWNER is talking, they
   // get the personal-assistant prompt directly, no triage.
   let runtimeAgent = a;
+  // Captured for the brain UI — the intent verdict that drove this turn,
+  // even when no routing was configured. null means "not classified".
+  let traceIntent: string | null = null;
+  let traceRoutedAgentName: string | null = null;
   if (!isOwner && memory && a.routesTo) {
     let routedId: string | null = null;
     let intent = (memory.routeIntent as 'sales' | 'personal' | 'support' | 'unknown' | null) || null;
@@ -907,12 +912,14 @@ async function processBufferedTurn(opts: {
     // Already routed in a previous turn → reuse without reclassifying.
     if (memory.routedAgentId) {
       routedId = memory.routedAgentId as string;
+      traceIntent = intent;
     } else {
       // First time seeing routing-enabled traffic for this contact: classify
       // and persist. classifyIntent ~300ms — kept BEFORE runAgent so the
       // specialized agent's full prompt+persona+tools all take effect on
       // this very turn (not the next one).
       intent = await classifyIntent(mergedText);
+      traceIntent = intent;
       const target = pickRoutedAgentId(a.routesTo as RoutesTo, intent);
       if (target) {
         routedId = target;
@@ -936,6 +943,7 @@ async function processBufferedTurn(opts: {
           return;
         }
         runtimeAgent = routed;
+        traceRoutedAgentName = routed.name || null;
         // Re-augment system prompt using the routed agent's prompt — but
         // KEEP the contact memory context block + the routed agent's own
         // businessInfo (address, hours, prices, etc).
@@ -987,17 +995,56 @@ async function processBufferedTurn(opts: {
     images = result.images || [];
     pixPayments = result.pixPayments || [];
 
-    // Persist both sides of the turn
+    // ─── Build reasoning trace for the brain UI + judge ────────────
+    // Single source of truth for "what happened on this turn". Stored
+    // ONLY on the assistant row so it doesn't bloat user-side messages.
+    // The customer never sees this; only the operator's brain dashboard.
+    const factsUsed: string[] = memory && Array.isArray(memory.facts)
+      ? (memory.facts as Array<{ key: string }>).slice(0, 12).map((f) => f.key)
+      : [];
+    const turnMeta = {
+      intent: traceIntent,
+      routed_agent: traceRoutedAgentName,
+      owner_mode: isOwner,
+      cache_hit: !!result.cached,
+      cache_similarity: result.cache_similarity,
+      tools_offered: result.tools_offered || effectiveTools,
+      tool_calls: (result.tool_calls_executed || []).map((t) => ({
+        name: t.name,
+        args: t.args,
+        ok: t.ok,
+        ms: t.ms,
+        cost_usdc: t.cost_usdc,
+        ...(t.error ? { error: t.error } : {}),
+      })),
+      iterations: result.iterations,
+      finish_reason: result.finish_reason,
+      provider: result.provider,
+      cost_usdc: result.total_cost_usdc,
+      facts_used: factsUsed,
+      buffered_msgs: msgs.length,
+      latency_ms: result.latency_ms,
+      runtime_agent_id: runtimeAgent.id,
+    };
+
+    // Persist user side (no meta) + assistant side (with meta).
     db.insert(agentMessages).values({
       agentId: a.id, sessionId, role: 'user',
       content: mergedText.slice(0, 4000),
       visitorIp: 'whatsapp',
     }).catch(() => {});
-    db.insert(agentMessages).values({
-      agentId: a.id, sessionId, role: 'assistant',
-      content: reply.slice(0, 4000),
-      visitorIp: 'whatsapp',
-    }).catch(() => {});
+
+    // Insert assistant row WITH meta and capture the id so the judge can
+    // patch eval into it asynchronously after persistence.
+    const assistantRowPromise = db
+      .insert(agentMessages)
+      .values({
+        agentId: a.id, sessionId, role: 'assistant',
+        content: reply.slice(0, 4000),
+        visitorIp: 'whatsapp',
+        meta: turnMeta as unknown as Record<string, unknown>,
+      })
+      .returning({ id: agentMessages.id });
 
     if (memory) {
       void recordTurn(a.id, inbound.phone).catch(() => {});
@@ -1008,6 +1055,42 @@ async function processBufferedTurn(opts: {
         currentMemory: memory,
       }).catch(() => {});
     }
+
+    // ─── Fire-and-forget judge layer ──────────────────────────────
+    // Doesn't block the customer reply path. Adds eval to meta after
+    // persistence; arc verdict on contact_memory recomputed every 5 turns.
+    void (async () => {
+      try {
+        const inserted = await assistantRowPromise.catch(() => null);
+        const messageId = inserted?.[0]?.id;
+        if (messageId) {
+          const trace = buildTraceString(turnMeta);
+          await judgeTurn({
+            messageId,
+            systemPrompt: augmentedSystemPrompt,
+            userMessage: mergedText,
+            agentReply: reply,
+            trace,
+            responseProvider: result.provider,
+          });
+        }
+        if (memory) {
+          // Pull recent transcript for arc judge.
+          const recent = await db
+            .select({ role: agentMessages.role, content: agentMessages.content })
+            .from(agentMessages)
+            .where(and(eq(agentMessages.agentId, a.id), eq(agentMessages.sessionId, sessionId)))
+            .orderBy(desc(agentMessages.createdAt))
+            .limit(20);
+          await judgeArc({
+            agentId: a.id,
+            phone: inbound.phone,
+            recentMessages: recent.reverse(),
+            turnCount: (memory.messageCount || 0) + 1,
+          });
+        }
+      } catch { /* judge is best-effort; never bubble */ }
+    })();
   } catch {
     reply = '🤖 Desculpe, tive um problema técnico. Tente de novo em alguns segundos.';
   }

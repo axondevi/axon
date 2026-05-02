@@ -57,6 +57,7 @@ ownerContacts.get('/:id/contacts', async (c) => {
       first_contact_at: r.firstContactAt,
       last_contact_at: r.lastContactAt,
       facts_count: Array.isArray(r.facts) ? (r.facts as unknown[]).length : 0,
+      arc: r.arc ?? null,
     })),
     limit,
     offset,
@@ -84,6 +85,7 @@ ownerContacts.get('/:id/contacts/:phone', async (c) => {
     message_count: m.messageCount,
     first_contact_at: m.firstContactAt,
     last_contact_at: m.lastContactAt,
+    arc: m.arc ?? null,
   });
 });
 
