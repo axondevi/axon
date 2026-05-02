@@ -49,6 +49,81 @@ export interface ContactFact {
   source: 'llm' | 'manual';
 }
 
+/**
+ * Structured profile — canonical slots filled silently across turns.
+ *
+ * Distinct from `facts` (free-form) — this has a fixed schema so the
+ * dashboard renders a typed "ficha do cliente" with proper fields. The
+ * extractor fills empty slots only; manual edits via PATCH are sticky
+ * and never overwritten by future extractions.
+ *
+ * Designed to cover the most common BR small-business scenarios (clínica,
+ * comércio, serviços). Free-form domain-specific extras still live in
+ * `facts` for flexibility.
+ */
+export interface ContactProfile {
+  // Universal identity
+  nome_completo?: string;
+  cpf?: string;
+  email?: string;
+  data_nascimento?: string;       // BR dd/mm/yyyy or ISO yyyy-mm-dd
+  endereco?: string;
+  telefone_alternativo?: string;
+
+  // Health context (clinics, dental, vet, etc)
+  plano_saude?: string;
+  alergias?: string[];
+  medicamentos_em_uso?: string[];
+  condicao_principal?: string;
+
+  // Commerce context (shops, stores)
+  forma_pagamento_preferida?: string;
+  tamanho_padrao?: string;
+
+  // Catchall for nuance the slots above can't capture
+  observacoes?: string;
+}
+
+/** Slots that are arrays. Used by the merger to dedupe/normalize. */
+const PROFILE_ARRAY_KEYS = new Set<keyof ContactProfile>([
+  'alergias',
+  'medicamentos_em_uso',
+]);
+
+/** All slot keys — used to validate the LLM's structured output. */
+const PROFILE_KEYS = new Set<keyof ContactProfile>([
+  'nome_completo',
+  'cpf',
+  'email',
+  'data_nascimento',
+  'endereco',
+  'telefone_alternativo',
+  'plano_saude',
+  'alergias',
+  'medicamentos_em_uso',
+  'condicao_principal',
+  'forma_pagamento_preferida',
+  'tamanho_padrao',
+  'observacoes',
+]);
+
+/** Per-slot human label for the system-prompt rendering ("ficha do contato"). */
+const PROFILE_LABELS: Record<keyof ContactProfile, string> = {
+  nome_completo: 'Nome completo',
+  cpf: 'CPF',
+  email: 'E-mail',
+  data_nascimento: 'Data de nascimento',
+  endereco: 'Endereço',
+  telefone_alternativo: 'Telefone alternativo',
+  plano_saude: 'Plano de saúde',
+  alergias: 'Alergias',
+  medicamentos_em_uso: 'Medicamentos em uso',
+  condicao_principal: 'Condição principal',
+  forma_pagamento_preferida: 'Forma de pagamento preferida',
+  tamanho_padrao: 'Tamanho padrão',
+  observacoes: 'Observações',
+};
+
 // ─── Read / load ───────────────────────────────────────────
 
 /**
@@ -121,6 +196,27 @@ export function buildMemoryContext(m: ContactMemory): string {
     lines.push(`- Tags: ${tags.join(', ')}`);
   }
 
+  // Render structured profile slots BEFORE the free-form facts. The
+  // agent reads these as ground-truth identifiers (CPF, plano, alergias)
+  // and uses them to personalize without re-asking — the same
+  // information across many turns reaches the model in stable shape.
+  const profile = (m.profile && typeof m.profile === 'object' ? (m.profile as ContactProfile) : {}) || {};
+  const profileLines: string[] = [];
+  for (const key of PROFILE_KEYS) {
+    const v = profile[key];
+    if (v === undefined || v === null) continue;
+    if (Array.isArray(v)) {
+      if (v.length === 0) continue;
+      profileLines.push(`  • ${PROFILE_LABELS[key]}: ${v.join(', ')}`);
+    } else if (typeof v === 'string' && v.trim()) {
+      profileLines.push(`  • ${PROFILE_LABELS[key]}: ${v}`);
+    }
+  }
+  if (profileLines.length > 0) {
+    lines.push('- Ficha do contato (cadastrado silenciosamente, use como verdade):');
+    lines.push(...profileLines);
+  }
+
   const facts = Array.isArray(m.facts) ? (m.facts as ContactFact[]) : [];
   if (facts.length > 0) {
     // Sort: manual first, then by recency, take 20
@@ -131,7 +227,7 @@ export function buildMemoryContext(m: ContactMemory): string {
         return (b.extracted_at || '').localeCompare(a.extracted_at || '');
       })
       .slice(0, 20);
-    lines.push('- Fatos conhecidos:');
+    lines.push('- Outros fatos conhecidos:');
     for (const f of sorted) {
       lines.push(`  • ${f.key}: ${f.value}`);
     }
@@ -173,7 +269,7 @@ export async function recordTurn(agentId: string, phone: string): Promise<void> 
 
 // ─── LLM-driven fact extraction ────────────────────────────
 
-const EXTRACTION_SYSTEM_PROMPT = `You analyze a customer-support conversation and extract durable facts about the customer that the assistant should remember for future interactions.
+const EXTRACTION_SYSTEM_PROMPT = `You analyze a Brazilian customer-support WhatsApp conversation and silently extract durable customer info that the assistant should remember.
 
 Output STRICT JSON only — no prose, no markdown:
 {
@@ -182,25 +278,52 @@ Output STRICT JSON only — no prose, no markdown:
     "display_name": "Pedro Silva" or null,
     "language": "pt-br" | "en" | "es" or null,
     "formality": "formal" | "informal" or null
+  },
+  "profile_slots": {
+    "nome_completo":              "..." | null,
+    "cpf":                        "123.456.789-00" | null,
+    "email":                      "p@x.com" | null,
+    "data_nascimento":            "dd/mm/yyyy" | null,
+    "endereco":                   "..." | null,
+    "telefone_alternativo":       "..." | null,
+    "plano_saude":                "..." | null,
+    "alergias":                   ["..."] | null,
+    "medicamentos_em_uso":        ["..."] | null,
+    "condicao_principal":         "..." | null,
+    "forma_pagamento_preferida":  "..." | null,
+    "tamanho_padrao":             "..." | null,
+    "observacoes":                "..." | null
   }
 }
 
-Rules for extracting facts:
-- Extract ONLY durable, future-useful facts. Skip greetings, politeness, current questions.
-- Keys are short snake_case nouns: name, email, delivery_address, allergy, preferred_payment, product_owned, profession, vehicle, pet_name, dietary_restriction, birthday, contact_preference, etc.
-- Values are concise (under 80 chars). No long sentences.
-- If user introduces themselves ("Sou o Pedro"), set profile.display_name.
-- Detect language from user's writing (pt-br for Portuguese, en for English, es for Spanish).
-- Detect formality: "tu/você" formal vs "ce/mano" informal in PT.
-- Return EMPTY arrays/null for fields with no signal. Don't invent.
+profile_slots is the structured "ficha do cliente" — fill ONLY when the user message clearly mentions the slot. NEVER infer / guess. Examples that DO trigger a slot:
+- "meu cpf é 123.456.789-00" → cpf
+- "sou alérgico a dipirona" → alergias: ["dipirona"]
+- "tomo losartana 50mg de manhã" → medicamentos_em_uso: ["losartana 50mg"]
+- "tenho unimed" / "particular" → plano_saude
+- "diabetes tipo 2" / "depressão" → condicao_principal
+- "moro na rua X 100, SP" → endereco
+- "nasci em 12/03/1985" → data_nascimento
+- "uso PIX" / "pago no cartão" → forma_pagamento_preferida
+- "tamanho 42" / "M" → tamanho_padrao
+
+Rules:
+- Extract ONLY durable, future-useful info. Skip greetings, politeness, current questions.
+- profile_slots are typed slots — do NOT use these as fact keys; use facts for everything else.
+- facts keys are short snake_case nouns for things outside the slot list (profession, pet_name, vehicle, family member names, dietary preference, etc).
+- All values concise (under 80 chars). No long sentences.
+- Return EMPTY arrays / null for fields with no signal. Don't invent.
 - Maximum 5 new facts per call.
 
-Examples of good extraction:
-User: "Oi, sou o Pedro Silva. Sou alérgico a lactose. Moro em Belo Horizonte."
-Output: {"facts":[{"key":"allergy","value":"lactose"},{"key":"city","value":"Belo Horizonte"}],"profile":{"display_name":"Pedro Silva","language":"pt-br","formality":null}}
+Examples:
+User: "Oi, sou o Pedro Silva. CPF 123.456.789-00. Sou alérgico a dipirona e tomo losartana."
+Output: {"facts":[],"profile":{"display_name":"Pedro Silva","language":"pt-br","formality":null},"profile_slots":{"nome_completo":"Pedro Silva","cpf":"123.456.789-00","alergias":["dipirona"],"medicamentos_em_uso":["losartana"]}}
+
+User: "Trabalho como dentista, tenho um gato chamado Felix"
+Output: {"facts":[{"key":"profession","value":"dentista"},{"key":"pet_name","value":"Felix"}],"profile":{},"profile_slots":{}}
 
 User: "Quanto custa a consulta?"
-Output: {"facts":[],"profile":{}}`;
+Output: {"facts":[],"profile":{},"profile_slots":{}}`;
 
 interface ExtractResult {
   facts: Array<{ key: string; value: string }>;
@@ -209,6 +332,47 @@ interface ExtractResult {
     language?: string | null;
     formality?: string | null;
   };
+  profile_slots?: Partial<Record<keyof ContactProfile, unknown>>;
+}
+
+/**
+ * Merge LLM-extracted profile_slots into the existing profile, filling
+ * EMPTY slots only — manual edits (set via owner PATCH) are sticky and
+ * never overwritten by extraction. Strings get sanitized + length-capped;
+ * arrays deduped + capped at 10 items × 80 chars.
+ */
+function mergeProfileSlots(
+  existing: ContactProfile,
+  incoming: Partial<Record<keyof ContactProfile, unknown>>,
+): { changed: boolean; profile: ContactProfile } {
+  const next: ContactProfile = { ...existing };
+  let changed = false;
+  for (const key of PROFILE_KEYS) {
+    const raw = incoming[key];
+    if (raw === undefined || raw === null) continue;
+    if (PROFILE_ARRAY_KEYS.has(key)) {
+      const arr = Array.isArray(raw) ? raw : [raw];
+      const cleaned = arr
+        .map((x) => String(x ?? '').slice(0, 80).trim())
+        .filter(Boolean);
+      if (cleaned.length === 0) continue;
+      const existingArr = (next[key] as string[] | undefined) ?? [];
+      // Don't overwrite — merge unique
+      const merged = Array.from(new Set([...existingArr, ...cleaned])).slice(0, 10);
+      if (merged.length !== existingArr.length) {
+        (next as any)[key] = merged;
+        changed = true;
+      }
+    } else {
+      // Scalar slot — fill ONLY if empty (sticky).
+      if (next[key]) continue;
+      const value = String(raw).slice(0, 200).trim();
+      if (!value) continue;
+      (next as any)[key] = value;
+      changed = true;
+    }
+  }
+  return { changed, profile: next };
 }
 
 async function callExtractor(userMessage: string, currentFacts: ContactFact[]): Promise<ExtractResult | null> {
@@ -349,6 +513,18 @@ export async function extractFactsFromTurn(opts: {
   if (profile.formality && profile.formality !== currentMemory.formality) {
     if (['formal', 'informal'].includes(profile.formality)) {
       updates.formality = profile.formality;
+    }
+  }
+
+  // Merge structured profile slots — fill empty slots only.
+  if (result.profile_slots && typeof result.profile_slots === 'object') {
+    const currentProfile =
+      (currentMemory.profile && typeof currentMemory.profile === 'object'
+        ? (currentMemory.profile as ContactProfile)
+        : {}) || {};
+    const merged = mergeProfileSlots(currentProfile, result.profile_slots);
+    if (merged.changed) {
+      updates.profile = merged.profile as unknown as object;
     }
   }
 

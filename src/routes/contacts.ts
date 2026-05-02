@@ -82,6 +82,7 @@ ownerContacts.get('/:id/contacts/:phone', async (c) => {
     formality: m.formality,
     tags: m.tags,
     facts: m.facts,
+    profile: m.profile ?? {},
     summary: m.summary,
     message_count: m.messageCount,
     first_contact_at: m.firstContactAt,

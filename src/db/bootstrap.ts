@@ -266,6 +266,12 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_documents_agent_idx" ON "contact_documents"("agent_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_documents_doc_type_idx" ON "contact_documents"("doc_type")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_documents_uploaded_at_idx" ON "contact_documents"("uploaded_at")`);
+
+  // 0024: contact_memory.profile — structured slot store. Distinct from
+  // `facts` (free-form): profile has a fixed schema so the dashboard
+  // can render a typed "ficha do cliente". Default '{}' so existing
+  // rows keep working.
+  await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "profile" jsonb NOT NULL DEFAULT '{}'::jsonb`);
 }
 
 export async function ensureSystemRows() {

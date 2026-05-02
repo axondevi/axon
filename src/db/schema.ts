@@ -461,6 +461,14 @@ export const contactMemory = pgTable(
     // null = never evaluated yet (fewer than threshold turns).
     arc: jsonb('arc'),
 
+    // Structured profile slots — canonical fields the LLM fills silently
+    // across turns. Distinct from `facts` (free-form key/value): profile
+    // has a fixed schema so the dashboard can render a proper "ficha do
+    // cliente" with typed fields. Shape: ContactProfile (see contact-memory.ts).
+    // Empty `{}` on first contact; LLM extracts new slots ONLY when empty
+    // — manual owner edits are sticky and never overwritten by extraction.
+    profile: jsonb('profile').notNull().default(sql`'{}'::jsonb`),
+
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
