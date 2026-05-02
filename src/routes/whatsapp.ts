@@ -643,6 +643,10 @@ publicWebhook.post('/:secret', async (c) => {
   // The agent then responds normally to that enriched text.
   let inboundText = inbound.text;
   let userSentAudio = false;
+  // Set when an image / PDF is successfully fetched + extracted. The
+  // buffer carries this through to processBufferedTurn, which fires
+  // saveContactDocument fire-and-forget after contact_memory is loaded.
+  let mediaForVault: import('~/whatsapp/buffer').BufferedMessage['mediaForVault'] = undefined;
   if (inbound.kind === 'image' && inbound.messageKey && inbound.messageRaw) {
     try {
       const mediaStart = Date.now();
@@ -670,6 +674,15 @@ publicWebhook.post('/:secret', async (c) => {
         if (desc.ok && desc.description) {
           inboundText = `[CLIENTE ENVIOU FOTO]\nDescrição automática: ${desc.description}` +
             (inbound.text ? `\nLegenda do cliente: "${inbound.text}"` : '');
+          // Capture for the vault — the bytes + extraction become a row
+          // on contact_documents after the turn is dispatched.
+          mediaForVault = {
+            bytes: media.bytes,
+            mimeType: media.mimeType,
+            filename: undefined,
+            callerCaption: inbound.text || undefined,
+            extractedText: desc.description,
+          };
         } else {
           // The agent will see this enriched user-message and reply
           // accordingly — natural language, not the bracketed system
@@ -732,6 +745,71 @@ publicWebhook.post('/:secret', async (c) => {
       inboundText = '[CLIENTE ENVIOU ÁUDIO — não consegui baixar.]';
     }
   }
+  // ─── PDF / document inbound: extract text + send to vault ──────
+  // Only PDFs are processed for now (Gemini multimodal handles inline_data
+  // mime=application/pdf directly). docx / xlsx / etc. fall through to a
+  // generic enrichment so the LLM at least knows something was sent —
+  // future work: convert via libreoffice or similar. The vault still
+  // saves the original file for the owner to download.
+  if (inbound.kind === 'document' && inbound.messageKey && inbound.messageRaw) {
+    try {
+      const media = await fetchMessageMedia({
+        instanceUrl: conn.instanceUrl,
+        instanceName: conn.instanceName,
+        apiKey: connApiKey,
+        message: inbound.messageRaw,
+        messageKey: inbound.messageKey,
+      });
+      const docMime = inbound.documentMimeType || media.mimeType || 'application/octet-stream';
+      const docFilename = inbound.documentFilename || undefined;
+      log.info('whatsapp.media.document', {
+        ok: media.ok,
+        bytes: media.bytes?.length ?? 0,
+        mime: docMime,
+        filename: docFilename || null,
+      });
+      if (media.ok && media.bytes) {
+        const isPdf = /^application\/pdf\b/i.test(docMime);
+        let extracted = '';
+        if (isPdf) {
+          const { describePdf } = await import('~/llm/vision');
+          const r = await describePdf({
+            pdfBytes: media.bytes,
+            contextHint: inbound.text || undefined,
+            filename: docFilename,
+          });
+          if (r.ok && r.description) {
+            extracted = r.description;
+            inboundText = `[CLIENTE ENVIOU PDF${docFilename ? ` "${docFilename}"` : ''}]\nConteúdo: ${r.description}` +
+              (inbound.text ? `\nLegenda do cliente: "${inbound.text}"` : '');
+          }
+        }
+        if (!extracted) {
+          // Either non-PDF doc or PDF extraction failed — still acknowledge
+          // and stash for the vault. Filename + caption guide the agent.
+          const fileLabel = docFilename ? ` "${docFilename}"` : '';
+          inboundText = `[CLIENTE ENVIOU DOCUMENTO${fileLabel}${docMime ? ` (${docMime})` : ''}]` +
+            (inbound.text ? `\nLegenda do cliente: "${inbound.text}"` : '');
+        }
+        mediaForVault = {
+          bytes: media.bytes,
+          mimeType: docMime,
+          filename: docFilename,
+          callerCaption: inbound.text || undefined,
+          extractedText: extracted || (inbound.text || `Documento ${docFilename || docMime}`),
+        };
+      } else {
+        inboundText = inbound.text ||
+          '[CLIENTE ENVIOU DOCUMENTO mas não consegui baixar — peça pra ele tentar enviar de novo.]';
+      }
+    } catch (err) {
+      log.warn('whatsapp.document.exception', {
+        error: err instanceof Error ? err.message : String(err),
+        agent_id: conn.agentId,
+      });
+      inboundText = '[CLIENTE ENVIOU DOCUMENTO — não consegui processar.]';
+    }
+  }
 
   // Resolve agent + owner — needed to compute the session bucket BEFORE
   // we decide whether to buffer (owner conversations live in their own
@@ -772,6 +850,7 @@ publicWebhook.post('/:secret', async (c) => {
       inboundText,
       receivedAt: Date.now(),
       userSentAudio,
+      mediaForVault,
     },
     async (_sk, msgs) => {
       await processBufferedTurn({
@@ -934,6 +1013,38 @@ async function processBufferedTurn(opts: {
     if (memory && a.affiliateEnabled && a.affiliatePayoutMicro > 0n && memory.referredByUserId && !memory.affiliatePaidAt) {
       const { payoutAffiliateIfPending } = await import('~/affiliates');
       void payoutAffiliateIfPending({ agentId: a.id, contactId: memory.id }).catch(() => {});
+    }
+
+    // ─── Document vault (silent CRM persistence) ───────────────────
+    // Any photo / PDF the customer sent in this buffered batch gets
+    // uploaded to R2 + classified + indexed on contact_documents.
+    // Fire-and-forget so upload latency / classifier blips don't block
+    // the agent reply. Only runs in customer mode (owner sends to their
+    // own bot for testing — no point indexing those).
+    if (memory) {
+      for (const m of msgs) {
+        const v = m.mediaForVault;
+        if (!v) continue;
+        void (async () => {
+          try {
+            const { saveContactDocument } = await import('~/whatsapp/document-vault');
+            await saveContactDocument({
+              agentId: a.id,
+              contactMemoryId: memory!.id,
+              bytes: v.bytes,
+              mimeType: v.mimeType,
+              filename: v.filename,
+              callerCaption: v.callerCaption,
+              extractedText: v.extractedText,
+            });
+          } catch (err) {
+            log.warn('whatsapp.document_vault.exception', {
+              error: err instanceof Error ? err.message : String(err),
+              agent_id: a.id,
+            });
+          }
+        })();
+      }
     }
   }
 

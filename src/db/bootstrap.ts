@@ -240,6 +240,32 @@ export async function ensureCriticalSchema() {
   // rows opt in. No backfill — the panel hides cleanly when meta is null.
   await db.execute(sql`ALTER TABLE "agent_messages" ADD COLUMN IF NOT EXISTS "meta" jsonb`);
   await db.execute(sql`ALTER TABLE "contact_memory" ADD COLUMN IF NOT EXISTS "arc" jsonb`);
+
+  // 0023: contact_documents — silent doc vault. Every PDF/image a contact
+  // sends is uploaded to R2 and indexed here with LLM-classified doc_type.
+  // Idempotent: IF NOT EXISTS on table + each index. Safe to re-run on every
+  // boot. FK to contact_memory(id) and agents(id) cascades on delete so
+  // disconnecting an agent or removing a contact also wipes their docs.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "contact_documents" (
+      "id"                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "contact_memory_id"  uuid NOT NULL REFERENCES "contact_memory"("id") ON DELETE CASCADE,
+      "agent_id"           uuid NOT NULL REFERENCES "agents"("id") ON DELETE CASCADE,
+      "filename"           text,
+      "mime_type"          text NOT NULL,
+      "byte_size"          integer NOT NULL,
+      "storage_key"        text NOT NULL,
+      "doc_type"           text NOT NULL DEFAULT 'outro',
+      "extracted_text"     text,
+      "summary"            text,
+      "caller_caption"     text,
+      "uploaded_at"        timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_documents_contact_idx" ON "contact_documents"("contact_memory_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_documents_agent_idx" ON "contact_documents"("agent_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_documents_doc_type_idx" ON "contact_documents"("doc_type")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "contact_documents_uploaded_at_idx" ON "contact_documents"("uploaded_at")`);
 }
 
 export async function ensureSystemRows() {

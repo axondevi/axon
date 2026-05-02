@@ -210,3 +210,126 @@ export async function describeImage(opts: {
   // Unreachable; the loop returns from each branch.
   return { ok: false, error: 'unreachable' };
 }
+
+/**
+ * Extract text content from a PDF using Gemini multimodal.
+ *
+ * Gemini accepts `application/pdf` in `inline_data` directly — no need for
+ * pdf-parse / pdfjs. The model OCRs scanned PDFs too, which is critical
+ * for clinical context (cliente fotografa exame de papel e gera PDF).
+ *
+ * Returns the structured PT-BR transcription of the document's contents
+ * (key fields: nome, valores, datas, medicamentos, números, conclusões).
+ * Caller (document-vault) feeds this into the classifier to tag doc_type
+ * and into the LLM context as `[CLIENTE ENVIOU PDF] Conteúdo: ...`.
+ *
+ * Same env / model / quota path as describeImage — controlled by
+ * GEMINI_API_KEY + GEMINI_VISION_MODEL.
+ */
+export async function describePdf(opts: {
+  /** Raw PDF bytes. */
+  pdfBytes: ArrayBuffer | Uint8Array;
+  /** Optional caption — typically the WhatsApp document caption if any. */
+  contextHint?: string;
+  /** Optional filename for additional context (e.g. "exame_sangue.pdf"). */
+  filename?: string;
+}): Promise<VisionResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    log.info('vision.pdf.skipped', { reason: 'no_api_key' });
+    return { ok: false, skipped: true };
+  }
+  const bytes = opts.pdfBytes instanceof ArrayBuffer
+    ? new Uint8Array(opts.pdfBytes)
+    : opts.pdfBytes;
+  // Gemini limits inline_data to ~20MB. PDFs can be heavier than photos
+  // (multi-page scans). Reject with clear error so caller can fall back
+  // to text-only persistence.
+  if (bytes.length > 18 * 1024 * 1024) {
+    return { ok: false, error: `pdf too large: ${bytes.length} bytes (limit 18MB)` };
+  }
+  const base64 = Buffer.from(bytes).toString('base64');
+  const sanitizedHint = opts.contextHint
+    ? opts.contextHint.slice(0, 200).replace(/[\r\n"]+/g, ' ').trim()
+    : '';
+  const sanitizedFilename = opts.filename
+    ? opts.filename.slice(0, 80).replace(/[\r\n"]+/g, ' ').trim()
+    : '';
+  const prompt = [
+    'Você é um extrator de informação de documentos para um assistente WhatsApp brasileiro.',
+    'Leia o PDF anexo e descreva em PT-BR (máx 6 frases) o conteúdo PRINCIPAL,',
+    'priorizando: tipo de documento, nomes de pessoa/empresa, valores, datas,',
+    'medicamentos/dosagens (se for médico), números relevantes (CPF, CNPJ, processos),',
+    'conclusões/resultados. Vá direto, SEM markdown, SEM "este PDF mostra".',
+    'Se for ilegível ou em branco, diga "documento ilegível".',
+    sanitizedFilename ? `Nome do arquivo: "${sanitizedFilename}"` : '',
+    sanitizedHint ? `Contexto do cliente: "${sanitizedHint}"` : '',
+  ].filter(Boolean).join('\n');
+  const body = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: 'application/pdf', data: base64 } },
+        ],
+      },
+    ],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 400 },
+  };
+  const model = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash-lite';
+  const startedAt = Date.now();
+  log.info('vision.pdf.start', {
+    model, bytes: bytes.length, has_caption: !!sanitizedHint, has_filename: !!sanitizedFilename,
+  });
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+      const res = await fetch(
+        `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: 'POST',
+          signal: ctl.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      );
+      clearTimeout(timer);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        const retryable = res.status >= 500 || res.status === 429;
+        log.warn('vision.pdf.api_error', {
+          attempt, status: res.status, retryable, body: text.slice(0, 240),
+        });
+        if (retryable && attempt < 2) continue;
+        return { ok: false, error: `gemini ${res.status}: ${text.slice(0, 200)}` };
+      }
+      const data: any = await res.json();
+      const description: string | undefined =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!description) {
+        const finish = data?.candidates?.[0]?.finishReason;
+        const block = data?.promptFeedback?.blockReason;
+        log.warn('vision.pdf.no_text', { attempt, finish, block });
+        return {
+          ok: false,
+          error: block ? `safety_block:${block}` : `no_text${finish ? ':' + finish : ''}`,
+        };
+      }
+      log.info('vision.pdf.ok', {
+        ms: Date.now() - startedAt,
+        bytes_in: bytes.length,
+        chars_out: description.length,
+        attempt,
+      });
+      return { ok: true, description: description.trim().slice(0, 1200) };
+    } catch (err: any) {
+      const retryable =
+        err?.name === 'AbortError' || /fetch failed|network/i.test(err?.message || '');
+      log.warn('vision.pdf.error', { attempt, retryable, error: err.message || String(err) });
+      if (retryable && attempt < 2) continue;
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+  return { ok: false, error: 'unreachable' };
+}

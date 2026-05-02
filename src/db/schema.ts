@@ -474,6 +474,63 @@ export const contactMemory = pgTable(
 );
 export type ContactMemory = typeof contactMemory.$inferSelect;
 
+// ─── Contact Documents (silent CRM doc vault) ─────────────────
+// Every PDF / photo a contact sends is uploaded to R2, classified by an
+// LLM (exame/receita/comprovante/identidade/contrato/foto_pessoal/foto_produto/
+// comprovante_endereco/outro), and indexed here. The dashboard surfaces this
+// per-contact so the owner can see all docs that customer ever sent without
+// scrolling the chat.
+//
+// extracted_text holds the raw text (PDF text via Gemini multimodal, image
+// description via Vision) — same string that gets injected into the LLM
+// system prompt context. Keeps a single source of truth.
+//
+// Storage: Cloudflare R2, key shape "documents/<agent_id>/<contact_id>/<id>.<ext>".
+export const contactDocuments = pgTable(
+  'contact_documents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactMemoryId: uuid('contact_memory_id')
+      .notNull()
+      .references(() => contactMemory.id, { onDelete: 'cascade' }),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+
+    // File metadata
+    filename: text('filename'),                       // best-effort, may be null
+    mimeType: text('mime_type').notNull(),
+    byteSize: integer('byte_size').notNull(),
+
+    // R2 object key — full path inside the bucket
+    storageKey: text('storage_key').notNull(),
+
+    // LLM-classified taxonomy. Default 'outro' so unclassifiable docs still
+    // get persisted and remain visible to the owner.
+    docType: text('doc_type').notNull().default('outro'),
+
+    // Raw extracted text (Vision description for images, Gemini multimodal
+    // PDF text for documents). Same string injected into the LLM prompt.
+    extractedText: text('extracted_text'),
+
+    // One-line LLM-generated summary the dashboard shows in the list.
+    summary: text('summary'),
+
+    // Original caption / accompanying message text (rare for media but
+    // possible — WhatsApp lets the user caption images and documents).
+    callerCaption: text('caller_caption'),
+
+    uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    contactIdx: index('contact_documents_contact_idx').on(t.contactMemoryId),
+    agentIdx: index('contact_documents_agent_idx').on(t.agentId),
+    docTypeIdx: index('contact_documents_doc_type_idx').on(t.docType),
+    uploadedAtIdx: index('contact_documents_uploaded_at_idx').on(t.uploadedAt),
+  }),
+);
+export type ContactDocument = typeof contactDocuments.$inferSelect;
+
 // ─── Pix Payments (MercadoPago integration) ───────────────────
 // Tracks pending → approved/expired/cancelled lifecycle of Pix charges.
 // When status flips to 'approved', credit() in wallet/service.ts writes

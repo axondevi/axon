@@ -1,0 +1,166 @@
+/**
+ * Document Vault — silent persistence of customer-sent attachments.
+ *
+ * Why this exists:
+ * Today every photo / PDF a contact sends gets described inline (Vision /
+ * Gemini) and dropped after the LLM call. The owner has no way to see
+ * "all exames that customer X ever sent" without scrolling the chat. The
+ * vault saves the BYTES to R2, classifies the doc_type via a small LLM,
+ * and indexes it on contact_documents — feeding a per-contact dashboard
+ * panel grouped by type.
+ *
+ * The customer never sees this happen — same conversation, same agent
+ * reply. Saving runs fire-and-forget after the reply is dispatched, so
+ * upload latency or classifier failure can't degrade the chat experience.
+ *
+ * No-op when R2_* envs aren't configured — we still skip-log so ops can
+ * see why uploads are missing in the dashboard.
+ */
+import { db } from '~/db';
+import { contactDocuments } from '~/db/schema';
+import { putObject } from '~/storage/r2';
+import { classifyDocument, type DocType } from '~/agents/doc-classifier';
+import { log } from '~/lib/logger';
+import { randomUUID } from 'node:crypto';
+
+export interface SaveDocumentResult {
+  ok: boolean;
+  documentId?: string;
+  storageKey?: string;
+  docType?: DocType;
+  /** True when storage isn't configured — caller should keep behaving normally. */
+  skippedNoStorage?: boolean;
+  error?: string;
+}
+
+/**
+ * Map a MIME type to a sensible filename extension. Used to build the R2
+ * storage key suffix so signed-URL downloads land with a usable extension
+ * (browsers / native clients pick their renderer based on extension).
+ */
+function extensionForMime(mimeType: string, fallbackFilename?: string): string {
+  // Honor the original filename's extension if it looks reasonable —
+  // preserves rare formats (e.g. .heic, .webp) we don't have an explicit
+  // mapping for.
+  if (fallbackFilename) {
+    const m = fallbackFilename.match(/\.([a-z0-9]{2,5})$/i);
+    if (m) return m[1].toLowerCase();
+  }
+  const map: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/pjpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+    'image/gif': 'gif',
+  };
+  return map[mimeType.toLowerCase()] || 'bin';
+}
+
+/**
+ * Persist a customer-sent attachment to R2 + the contact_documents index.
+ *
+ * Caller has already extracted text (Vision description for images, Gemini
+ * multimodal text for PDFs) so we don't re-do the extraction here — keeps
+ * this function fast and avoids double-charging Gemini.
+ *
+ * Steps:
+ *   1. Build storage key under documents/<agent>/<contact>/<doc>.<ext>
+ *   2. Upload bytes to R2
+ *   3. Classify doc_type via Groq (~200ms)
+ *   4. Insert row
+ *
+ * Failure modes:
+ *   - No R2 envs → skip upload, skip insert, return ok:false skippedNoStorage
+ *   - R2 upload fails → still insert row with empty storage_key + log warn
+ *     so dashboard shows "extraction available, file lost" instead of
+ *     pretending nothing happened
+ *   - Classifier fails → fall back to docType='outro' with extracted-text
+ *     trimmed as summary
+ */
+export async function saveContactDocument(opts: {
+  agentId: string;
+  contactMemoryId: string;
+  bytes: Uint8Array;
+  mimeType: string;
+  filename?: string;
+  callerCaption?: string;
+  /** Already-extracted text (Vision description / PDF transcript). */
+  extractedText: string;
+}): Promise<SaveDocumentResult> {
+  const documentId = randomUUID();
+  const ext = extensionForMime(opts.mimeType, opts.filename);
+  const storageKey = `documents/${opts.agentId}/${opts.contactMemoryId}/${documentId}.${ext}`;
+
+  // 1. Upload to R2.
+  const upload = await putObject({
+    key: storageKey,
+    bytes: opts.bytes,
+    mimeType: opts.mimeType,
+  });
+
+  if (upload.skipped) {
+    log.info('document_vault.skipped', {
+      reason: 'no_r2_envs',
+      mime: opts.mimeType,
+      bytes: opts.bytes.length,
+    });
+    return { ok: false, skippedNoStorage: true };
+  }
+
+  // 2. Classify (independent of upload outcome — we still index the doc
+  // even if R2 hiccups, so the extracted text isn't lost).
+  const classification = await classifyDocument({
+    extractedText: opts.extractedText,
+    mimeType: opts.mimeType,
+    filename: opts.filename,
+    callerCaption: opts.callerCaption,
+  });
+
+  // 3. Insert row. Use empty string for storage_key on upload failure so
+  // the column NOT NULL constraint stays satisfied; UI checks for empty
+  // and disables the download link.
+  try {
+    await db.insert(contactDocuments).values({
+      id: documentId,
+      contactMemoryId: opts.contactMemoryId,
+      agentId: opts.agentId,
+      filename: opts.filename?.slice(0, 200) || null,
+      mimeType: opts.mimeType,
+      byteSize: opts.bytes.length,
+      storageKey: upload.ok ? storageKey : '',
+      docType: classification.docType,
+      extractedText: opts.extractedText.slice(0, 10000),
+      summary: classification.summary,
+      callerCaption: opts.callerCaption?.slice(0, 500) || null,
+    });
+  } catch (err: any) {
+    log.warn('document_vault.insert_failed', {
+      error: err?.message || String(err),
+      agent_id: opts.agentId,
+    });
+    return { ok: false, error: err?.message || String(err) };
+  }
+
+  log.info('document_vault.saved', {
+    document_id: documentId,
+    doc_type: classification.docType,
+    bytes: opts.bytes.length,
+    mime: opts.mimeType,
+    upload_ok: upload.ok,
+  });
+
+  void import('~/lib/metrics').then(({ bumpCounter }) => {
+    bumpCounter('axon_document_vault_saved_total', { doc_type: classification.docType });
+  });
+
+  return {
+    ok: true,
+    documentId,
+    storageKey: upload.ok ? storageKey : undefined,
+    docType: classification.docType,
+  };
+}

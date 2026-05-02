@@ -541,12 +541,16 @@ export async function fetchMessageMedia(opts: {
 export interface InboundMessage {
   phone: string;
   pushName: string;
-  kind: 'text' | 'image' | 'audio';
-  text: string;                  // caption for media, transcript-target empty for audio
+  kind: 'text' | 'image' | 'audio' | 'document';
+  text: string;                  // caption for media, transcript-target empty for audio/doc
   messageKey?: any;              // for media re-fetch
   messageRaw?: any;              // for media re-fetch
   fromMe: boolean;               // true if WhatsApp account itself sent it (us OR a human typing)
   messageId?: string;            // Evolution's message ID — used to dedupe our own sends
+  /** For 'document' kind: the file's MIME, used to gate PDF extraction. */
+  documentMimeType?: string;
+  /** For 'document' kind: original WhatsApp filename if any. */
+  documentFilename?: string;
 }
 export function extractInbound(payload: any): InboundMessage | null {
   if (!payload) return null;
@@ -598,6 +602,38 @@ export function extractInbound(payload: any): InboundMessage | null {
       messageRaw: m,
       fromMe,
       messageId,
+    };
+  }
+
+  // Document messages (PDF, etc). Two shapes Baileys may emit:
+  //   m.documentMessage                   — plain document
+  //   m.documentWithCaptionMessage.message.documentMessage  — with caption
+  // We unwrap both. Only PDFs are processed downstream for now (the
+  // describePdf path uses Gemini multimodal). Other types (docx, xlsx)
+  // get persisted to the vault as raw files but skip text extraction —
+  // the dashboard still shows them; the LLM just sees a generic
+  // "[CLIENTE ENVIOU DOCUMENTO]" enrichment.
+  const docMsg =
+    m.documentMessage ||
+    (m.documentWithCaptionMessage && m.documentWithCaptionMessage.message?.documentMessage) ||
+    null;
+  if (docMsg) {
+    const captionRaw =
+      (typeof docMsg.caption === 'string' && docMsg.caption) ||
+      (typeof m.documentWithCaptionMessage?.message?.documentMessage?.caption === 'string' &&
+        m.documentWithCaptionMessage.message.documentMessage.caption) ||
+      '';
+    return {
+      phone,
+      pushName: data.pushName || '',
+      kind: 'document',
+      text: captionRaw,
+      messageKey,
+      messageRaw: m,
+      fromMe,
+      messageId,
+      documentMimeType: typeof docMsg.mimetype === 'string' ? docMsg.mimetype : undefined,
+      documentFilename: typeof docMsg.fileName === 'string' ? docMsg.fileName : undefined,
     };
   }
 

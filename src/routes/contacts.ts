@@ -10,9 +10,9 @@
  * Auth: requires the agent's owner (apiKeyAuth + ownership check).
  */
 import { Hono } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { db } from '~/db';
-import { agents } from '~/db/schema';
+import { agents, contactDocuments } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import {
   listContacts,
@@ -22,6 +22,7 @@ import {
   deleteContact,
   type ContactFact,
 } from '~/agents/contact-memory';
+import { presignGet, isStorageConfigured } from '~/storage/r2';
 
 export const ownerContacts = new Hono();
 
@@ -86,6 +87,72 @@ ownerContacts.get('/:id/contacts/:phone', async (c) => {
     first_contact_at: m.firstContactAt,
     last_contact_at: m.lastContactAt,
     arc: m.arc ?? null,
+  });
+});
+
+// ─── List documents the contact ever sent ─────────────────────────
+//
+// Returns docs grouped by doc_type with a fresh presigned URL each call
+// (default 1h expiry). The list is the source of truth for the dashboard
+// "Documentos do contato" panel: receita / exame / comprovante / etc.
+//
+// `storage_configured: false` means R2 isn't set up yet — UI can show
+// "Configure Cloudflare R2 in env to enable file downloads" instead of
+// dead links. Rows still come through (we always insert metadata, even
+// when upload fails).
+ownerContacts.get('/:id/contacts/:phone/documents', async (c) => {
+  const user = c.get('user') as { id: string };
+  const agentId = c.req.param('id');
+  const phone = c.req.param('phone');
+  await requireOwnedAgent(user.id, agentId);
+
+  const memory = await getContact(agentId, phone);
+  if (!memory) {
+    // Contact doesn't exist yet → no docs, return empty list (don't 404
+    // — the dashboard wants to render "0 docs" cleanly without an error
+    // banner for new contacts).
+    return c.json({
+      documents: [],
+      storage_configured: isStorageConfigured(),
+    });
+  }
+
+  const rows = await db
+    .select()
+    .from(contactDocuments)
+    .where(
+      and(
+        eq(contactDocuments.contactMemoryId, memory.id),
+        eq(contactDocuments.agentId, agentId),
+      ),
+    )
+    .orderBy(desc(contactDocuments.uploadedAt))
+    .limit(200);
+
+  const limitDefault = 3600;
+  const documents = rows.map((r) => {
+    let downloadUrl: string | null = null;
+    if (r.storageKey) {
+      const signed = presignGet({ key: r.storageKey, expiresIn: limitDefault });
+      if (signed.ok) downloadUrl = signed.url || null;
+    }
+    return {
+      id: r.id,
+      filename: r.filename,
+      mime_type: r.mimeType,
+      byte_size: r.byteSize,
+      doc_type: r.docType,
+      summary: r.summary,
+      caller_caption: r.callerCaption,
+      uploaded_at: r.uploadedAt,
+      download_url: downloadUrl,
+      download_expires_in_seconds: downloadUrl ? limitDefault : null,
+    };
+  });
+
+  return c.json({
+    documents,
+    storage_configured: isStorageConfigured(),
   });
 });
 

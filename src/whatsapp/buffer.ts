@@ -26,6 +26,24 @@ export interface BufferedMessage {
   inboundText: string;
   receivedAt: number;
   userSentAudio: boolean;
+  /**
+   * Optional payload for document-vault persistence. Set by the webhook
+   * handler on photo / PDF inbounds AFTER extraction succeeds. Read by
+   * processBufferedTurn after contact_memory is loaded — it then fires
+   * saveContactDocument fire-and-forget so the bytes + classification
+   * land on contact_documents without blocking the agent reply.
+   *
+   * Bytes are kept in memory during the buffer window (default 3s) — at
+   * MAX_BUFFERED=8 messages × ~5MB typical photo, the worst-case footprint
+   * per session is ~40MB which is fine for a single-instance Render deploy.
+   */
+  mediaForVault?: {
+    bytes: Uint8Array;
+    mimeType: string;
+    filename?: string;
+    callerCaption?: string;
+    extractedText: string;
+  };
 }
 
 interface ConversationBuffer {
