@@ -1077,7 +1077,7 @@ async function processBufferedTurn(opts: {
   const voiceAllowed = (runtimeAgent as { voiceEnabled?: boolean }).voiceEnabled !== false;
   if (userSentAudio && reply.trim().length > 0 && voiceAllowed) {
     try {
-      const { synthesizeSpeech } = await import('~/voice/elevenlabs');
+      const { synthesizeSpeech } = await import('~/voice');
       let voiceId: string | undefined;
       // Resolution order:
       //   1. agent.voice_id_override — owner picked a specific voice
