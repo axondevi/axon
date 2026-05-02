@@ -147,6 +147,21 @@
       const STORAGE_KEY_LEGACY = 'axon_api_key'; // matches whatsapp.html / contacts.html
 
       let supabase = null;
+      let supabaseReady = false;
+
+      // Disable any button that requires Supabase until init finishes,
+      // so the user doesn't click and silently get no feedback.
+      function setReady(ready) {
+        supabaseReady = ready;
+        ['submit-btn', 'magic-btn'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.disabled = !ready;
+            if (!ready) el.style.opacity = '0.5';
+            else el.style.opacity = '';
+          }
+        });
+      }
 
       function showAlert(kind, msg) {
         const el = document.getElementById('alert');
@@ -157,6 +172,21 @@
       function clearAlert() { document.getElementById('alert').hidden = true; }
 
       async function bootstrap() {
+        setReady(false);
+        // Wait for the Supabase CDN script to load. In rare network conditions
+        // (slow CDN, mid-load click) window.supabase is undefined when our
+        // bootstrap fires — without this guard, click handlers would silently
+        // do nothing.
+        let waited = 0;
+        while (!window.supabase && waited < 5000) {
+          await new Promise((r) => setTimeout(r, 100));
+          waited += 100;
+        }
+        if (!window.supabase) {
+          showAlert('error', 'Não consegui carregar o cliente Supabase do CDN. Tente recarregar a página.');
+          return;
+        }
+
         // 1. Fetch Supabase config from backend
         try {
           const r = await fetch(API_BASE + '/v1/auth/supabase/config');
@@ -166,6 +196,7 @@
             return;
           }
           supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+          setReady(true);
         } catch (e) {
           showAlert('error', 'Não consegui carregar config de auth: ' + e.message);
           return;
@@ -224,18 +255,27 @@
 
       document.getElementById('magic-btn').addEventListener('click', async () => {
         clearAlert();
-        if (!supabase) return;
+        if (!supabaseReady || !supabase) {
+          showAlert('error', 'Auth ainda carregando — aguarde 1 segundo e tente de novo.');
+          return;
+        }
         const email = document.getElementById('email').value.trim().toLowerCase();
         if (!email) { showAlert('error', 'Digite seu e-mail acima.'); return; }
+        const btn = document.getElementById('magic-btn');
+        const orig = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Enviando…';
         try {
           const { error } = await supabase.auth.signInWithOtp({
             email,
             options: { emailRedirectTo: location.origin + '/login' },
           });
           if (error) throw error;
-          showAlert('success', `Link mágico enviado pra ${email}. Cheque sua caixa de entrada.`);
+          showAlert('success', `Link mágico enviado pra ${email}. Cheque sua caixa de entrada (e a pasta de spam).`);
         } catch (e) {
-          showAlert('error', e.message || String(e));
+          showAlert('error', 'Falha: ' + (e.message || String(e)) + '. Verifique se o domínio está nos Redirect URLs do Supabase.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = orig;
         }
       });
 

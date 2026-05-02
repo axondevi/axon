@@ -523,31 +523,19 @@
         </div>
       </section>
 
-      <!-- WAITLIST / CTA -->
+      <!-- CTA -->
       <section class="waitlist" id="waitlist">
-        <div class="container">
-          <h2>Comece em 30 segundos.</h2>
-          <p>
-            Drop your email — you'll get an API key, a USDC deposit address,
-            and $0.50 in credits. Enough to run ~200 paid calls before you
-            decide to add more.
+        <div class="container" style="text-align:center;">
+          <h2 data-pt="Comece em 30 segundos." data-en="Start in 30 seconds.">Comece em 30 segundos.</h2>
+          <p data-pt="E-mail + senha. Você ganha $0,50 em créditos USDC e API key automática. Sem cartão, sem assinatura." data-en="Email + password. You get $0.50 USDC credit and an auto-issued API key. No card, no subscription.">
+            E-mail + senha. Você ganha $0,50 em créditos USDC e API key automática. Sem cartão, sem assinatura.
           </p>
-          <form class="waitlist-form" id="signup-form" onsubmit="return submitSignup(event)">
-            <label for="signup-email" class="sr-only">Email address</label>
-            <input
-              type="email"
-              id="signup-email"
-              name="email"
-              placeholder="you@startup.dev"
-              aria-label="Email address"
-              required
-            />
-            <button type="submit" class="btn btn-primary" id="signup-btn">
-              Get my API key
-            </button>
-          </form>
-          <small id="signup-status" style="display: block; margin-top: 12px; min-height: 22px;">
-            No cards. No subscription. MIT-licensed, open source.
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px;">
+            <a href="/signup" class="btn btn-primary" data-pt="Criar conta grátis →" data-en="Create free account →" style="padding:12px 28px;font-weight:600;">Criar conta grátis →</a>
+            <a href="/login" class="btn" data-pt="Já tenho conta" data-en="I already have an account" style="padding:12px 28px;background:transparent;border:1px solid var(--border);color:var(--text);">Já tenho conta</a>
+          </div>
+          <small style="display:block;margin-top:14px;color:var(--text-muted);font-size:12px;">
+            <span data-pt="Sem cartão. Sem mensalidade. Open-source MIT." data-en="No card. No monthly fee. MIT-licensed open source.">Sem cartão. Sem mensalidade. Open-source MIT.</span>
           </small>
         </div>
       </section>
