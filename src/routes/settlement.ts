@@ -53,6 +53,13 @@ app.post('/run', adminAuth, async (c) => {
     // no body → yesterday
   }
   const results = await settleAll(period);
+  const { audit } = await import('~/lib/audit');
+  audit(c, 'admin.settlement.run', {
+    meta: {
+      period,
+      results: results.map((r) => ({ ...r, owedMicro: r.owedMicro.toString() })),
+    },
+  });
   return c.json({
     ok: true,
     period,
@@ -69,6 +76,8 @@ app.post('/:id/paid', adminAuth, async (c) => {
   const { paid_ref } = await c.req.json<{ paid_ref: string }>();
   if (!paid_ref) throw Errors.badRequest('paid_ref is required');
   await markPaid(id, paid_ref);
+  const { audit } = await import('~/lib/audit');
+  audit(c, 'admin.settlement.mark_paid', { meta: { settlement_id: id, paid_ref } });
   return c.json({ ok: true });
 });
 

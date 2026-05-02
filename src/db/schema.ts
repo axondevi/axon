@@ -558,3 +558,42 @@ export const userVoices = pgTable(
   }),
 );
 export type UserVoice = typeof userVoices.$inferSelect;
+
+// ─── Admin audit log ─────────────────────────────────────────────────
+// Append-only record of every privileged action: admin creates a user,
+// credits a wallet, changes a policy, marks a settlement paid, runs
+// /reset-signup-limit, etc. Plus user-side privileged actions: API
+// key rotation, account deletion, 2FA setup. We keep ONE table for
+// both kinds because the question "who did this and when" is the same
+// either way.
+//
+// `actor_user_id` is null when the action is gated only by ADMIN_API_KEY
+// (no user context). `target_user_id` is the affected user when one
+// makes sense (credit, policy, etc); otherwise null. `meta` captures
+// the request body / parameters / before-and-after deltas; small enough
+// for jsonb, big enough to reconstruct the action.
+//
+// Append-only by convention — there's no UPDATE or DELETE in any code
+// path. Operators can query directly for compliance asks.
+export const adminAuditLog = pgTable(
+  'admin_audit_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    actorUserId: uuid('actor_user_id'),
+    actorAdminKey: boolean('actor_admin_key').notNull().default(false),
+    targetUserId: uuid('target_user_id'),
+    action: text('action').notNull(),
+    requestId: text('request_id'),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    meta: jsonb('meta'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    actorIdx: index('audit_actor_idx').on(t.actorUserId),
+    targetIdx: index('audit_target_idx').on(t.targetUserId),
+    actionIdx: index('audit_action_idx').on(t.action),
+    createdIdx: index('audit_created_idx').on(t.createdAt),
+  }),
+);
+export type AuditLogRow = typeof adminAuditLog.$inferSelect;

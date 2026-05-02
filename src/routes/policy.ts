@@ -3,6 +3,7 @@ import { adminAuth } from '~/auth/middleware';
 import { loadPolicy, upsertPolicy, deletePolicy } from '~/policy/engine';
 import type { Policy } from '~/policy/types';
 import { Errors } from '~/lib/errors';
+import { audit } from '~/lib/audit';
 
 const app = new Hono();
 
@@ -18,14 +19,23 @@ app.put('/:user_id', adminAuth, async (c) => {
   const userId = c.req.param('user_id')!;
   const rules = (await c.req.json()) as Policy;
   validate(rules);
+  // Capture the old policy for the audit trail so reviewers can see
+  // the delta — not just the new state.
+  const previous = await loadPolicy(userId);
   await upsertPolicy(userId, rules);
+  audit(c, 'admin.policy.set', {
+    target_user_id: userId,
+    meta: { previous, next: rules },
+  });
   return c.json({ ok: true, user_id: userId, policy: rules });
 });
 
 // ─── DELETE /v1/admin/policy/:user_id ───────────────
 app.delete('/:user_id', adminAuth, async (c) => {
   const userId = c.req.param('user_id')!;
+  const previous = await loadPolicy(userId);
   await deletePolicy(userId);
+  audit(c, 'admin.policy.delete', { target_user_id: userId, meta: { previous } });
   return c.json({ ok: true });
 });
 

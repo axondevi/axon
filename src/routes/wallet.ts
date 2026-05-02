@@ -108,6 +108,12 @@ admin.post('/users', adminAuth, async (c) => {
     meta: { reason: 'signup_bonus' },
   });
 
+  const { audit } = await import('~/lib/audit');
+  audit(c, 'admin.user.create', {
+    target_user_id: user.id,
+    meta: { email: email ?? null, wallet_address: deposit.address },
+  });
+
   return c.json({
     user_id: user.id,
     api_key: rawKey,
@@ -130,6 +136,14 @@ admin.post('/credit', adminAuth, async (c) => {
     amountMicro: toMicro(amount_usdc),
     type: 'deposit',
     onchainTx: onchain_tx,
+  });
+  // Audit: admin-initiated credit is one of the most sensitive actions
+  // — record actor (admin key), target, amount, and the onchain reference
+  // when the credit was tied to a chain tx.
+  const { audit } = await import('~/lib/audit');
+  audit(c, 'admin.credit', {
+    target_user_id: user_id,
+    meta: { amount_usdc, onchain_tx: onchain_tx ?? null },
   });
   return c.json({ ok: true });
 });

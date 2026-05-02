@@ -178,6 +178,9 @@ app.post('/mercadopago', async (c) => {
       // Better to absorb a possibly-spoofed payload than create a retry storm.
       // Counter helps spot brute-force attempts in metrics.
       log.warn('mp_signature_invalid', { reason: v.reason });
+      void import('~/lib/metrics').then(({ bumpCounter }) => {
+        bumpCounter('axon_webhook_signature_failed_total', { provider: 'mercadopago' });
+      });
       return c.json({ ignored: 'signature_invalid' });
     }
   }

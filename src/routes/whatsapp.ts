@@ -503,6 +503,9 @@ publicWebhook.post('/:secret', async (c) => {
     : `wa:replay:${conn.id}:body:${createHash('sha256').update(rawBody).digest('hex').slice(0, 16)}`;
   const fresh = await redis.set(dedupKey, '1', 'EX', 600, 'NX');
   if (!fresh) {
+    void import('~/lib/metrics').then(({ bumpCounter }) => {
+      bumpCounter('axon_webhook_replay_total', { type: 'whatsapp' });
+    });
     return c.json({ ignored: 'replay' });
   }
   // Owner can mark a connection 'disabled' to mute the agent without deleting

@@ -189,6 +189,30 @@ export async function ensureCriticalSchema() {
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "user_voices_user_idx" ON "user_voices" ("user_id")`);
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "user_voices_user_ext_idx" ON "user_voices" ("user_id", "external_id")`);
+
+  // 0020: admin_audit_log — append-only privileged-action ledger.
+  // Used by ops/compliance: who credited what, who changed which
+  // policy, who rotated their API key, who deleted their account.
+  // Foreign keys deliberately omitted so a deleted user's audit
+  // trail survives — append-only means we never tombstone here.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "admin_audit_log" (
+      "id"               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "actor_user_id"    uuid,
+      "actor_admin_key"  boolean NOT NULL DEFAULT false,
+      "target_user_id"   uuid,
+      "action"           text NOT NULL,
+      "request_id"       text,
+      "ip"               text,
+      "user_agent"       text,
+      "meta"             jsonb,
+      "created_at"       timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "audit_actor_idx" ON "admin_audit_log" ("actor_user_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "audit_target_idx" ON "admin_audit_log" ("target_user_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "audit_action_idx" ON "admin_audit_log" ("action")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "audit_created_idx" ON "admin_audit_log" ("created_at" DESC)`);
 }
 
 export async function ensureSystemRows() {

@@ -78,6 +78,9 @@ export async function synthesizeSpeech(opts: {
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       log.warn('voice.synthesize.api_error', { status: res.status, body: errText.slice(0, 240) });
+      void import('~/lib/metrics').then(({ bumpCounter }) => {
+        bumpCounter('axon_upstream_failures_total', { provider: 'elevenlabs', kind: 'tts', status: String(res.status) });
+      });
       return { ok: false, error: `elevenlabs ${res.status}` };
     }
     const arrayBuffer = await res.arrayBuffer();

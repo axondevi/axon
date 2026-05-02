@@ -117,6 +117,34 @@ app.get('/', async (c) => {
   lines.push('# TYPE axon_settlements_pending_total gauge');
   lines.push(`axon_settlements_pending_total ${pending?.count ?? 0}`);
 
+  // ─── Dynamic counters from src/lib/metrics.ts ───────────
+  // These are bumped at incident points (app errors, upstream failures,
+  // webhook replays, signature mismatches). Exposed as Prometheus
+  // counters so a scraper can graph error rate by code/provider.
+  try {
+    const { readAllMetrics } = await import('~/lib/metrics');
+    const all = await readAllMetrics();
+    // Group by metric name so we emit the # HELP / # TYPE block once.
+    const byName: Record<string, typeof all> = {};
+    for (const r of all) {
+      (byName[r.name] ??= []).push(r);
+    }
+    for (const [name, rows] of Object.entries(byName)) {
+      lines.push('');
+      lines.push(`# HELP ${name} Counter (source: src/lib/metrics.ts bumpCounter)`);
+      lines.push(`# TYPE ${name} counter`);
+      for (const row of rows) {
+        const labelParts = Object.entries(row.labels)
+          .map(([k, v]) => `${k}="${escape(v)}"`)
+          .join(',');
+        const labelStr = labelParts ? `{${labelParts}}` : '';
+        lines.push(`${name}${labelStr} ${row.value}`);
+      }
+    }
+  } catch {
+    // metrics counter readout is best-effort; never fail the scrape
+  }
+
   return c.text(lines.join('\n') + '\n', 200, {
     'content-type': 'text/plain; version=0.0.4',
   });

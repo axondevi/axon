@@ -38,6 +38,7 @@ import metricsRoutes from '~/routes/metrics';
 import webhookSubsRoutes from '~/routes/webhook-subs';
 import { affiliateRoutes } from '~/routes/affiliate';
 import voicesRoutes from '~/routes/voices';
+import auditRoutes from '~/routes/audit';
 
 const app = new Hono();
 
@@ -140,6 +141,7 @@ app.route('/v1/admin', adminWalletRoutes);
 app.route('/v1/admin/policy', policyRoutes);
 app.route('/v1/admin/settlements', settlementRoutes);
 app.route('/v1/admin/operator', operatorRoutes);
+app.route('/v1/admin/audit', auditRoutes);
 
 // ─── Public signup (no auth, IP rate-limited) ─────────
 // MUST be mounted BEFORE the authed /v1 sub-router.
@@ -198,6 +200,13 @@ app.onError((err, c) => {
       status: err.status,
       message: err.message,
     });
+    // Counter so we can graph error rate by code in Prometheus.
+    void import('~/lib/metrics').then(({ bumpCounter }) => {
+      bumpCounter('axon_app_errors_total', {
+        code: err.code,
+        severity: err.status >= 500 ? 'error' : 'warn',
+      });
+    });
     return c.json(
       { error: err.code, message: err.message, meta: err.meta, request_id: rid },
       err.status as any,
@@ -208,6 +217,9 @@ app.onError((err, c) => {
     error: err.message,
     // stack only in dev — never leak to clients
     ...(env.NODE_ENV !== 'production' ? { stack: err.stack } : {}),
+  });
+  void import('~/lib/metrics').then(({ bumpCounter }) => {
+    bumpCounter('axon_app_errors_total', { code: 'unhandled', severity: 'error' });
   });
   return c.json(
     {
