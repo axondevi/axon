@@ -74,7 +74,7 @@ export interface ConversationArc {
 
 // ─── Per-turn rubric ───────────────────────────────────────
 
-const TURN_RUBRIC = `Você é um avaliador rigoroso de respostas de assistentes virtuais em WhatsApp.
+const TURN_RUBRIC = `Você é um avaliador rigoroso porém JUSTO de respostas de assistentes virtuais em WhatsApp.
 
 Receba o system_prompt, a mensagem do cliente, a resposta do agente, e o trace de execução (quais tools rodaram, custo, etc).
 Avalie em PT-BR, retornando APENAS um JSON válido nesta forma exata:
@@ -90,13 +90,40 @@ Avalie em PT-BR, retornando APENAS um JSON válido nesta forma exata:
   "issues": ["frase curta", ...]
 }
 
-Regras:
+Regras GERAIS:
 - "issues" deve ter no máximo 3 items, cada um em PT-BR, frase curta.
 - Não invente issues — só reporte o que efetivamente está errado na resposta.
 - Se a resposta foi correta e adequada, "issues" = [].
-- "alucinou" = true APENAS se o agente afirmou um fato (preço, horário, endereço) que não estava no system_prompt e não veio de tool result.
-- "pediu_clarificacao_quando_devia": true se a mensagem do cliente foi ambígua E o agente pediu clarificação. Se a mensagem foi clara, esse campo deve ser true (não havia clarificação pra pedir).
-- Cumprimentos, "oi", "tudo bem?" são clientes pedindo CONVERSA, não pergunta — agente cumprimentar de volta = respondeu_pergunta:true.
+
+Regras ESPECÍFICAS por axis (LEIA COM ATENÇÃO):
+
+usou_tools_certas:
+- DEFAULT = true. Só marque false quando claramente uma tool DEVERIA ter sido usada e não foi.
+- NÃO chamar tool quando a informação JÁ ESTÁ no system_prompt ou business_info é CORRETO — marque true.
+- Responder com fatos do business_info (preços, especialidades, horários, endereço) sem tool é CORRETO — marque true.
+- Cumprimentos, perguntas conversacionais, esclarecimentos não exigem tool — marque true.
+- Só marque false se: cliente perguntou algo factual EXTERNO ao negócio (clima, cotação, endereço aleatório) e o agente respondeu sem usar a tool disponível.
+
+respeitou_business_info:
+- DEFAULT = true. Só marque false se o agente CONTRADISSE algo do business_info (ex: prompt diz "fechado domingo" e agente disse "abrimos domingo").
+
+alucinou:
+- true APENAS se o agente afirmou um fato específico (preço, horário, endereço, nome de produto) que NÃO estava no system_prompt, NÃO estava no business_info, E NÃO veio de tool result.
+- Listar serviços/especialidades que estão no business_info NÃO é alucinação — é respeitar o prompt.
+- Se você não tem certeza se inventou ou não, marque false.
+
+pediu_clarificacao_quando_devia:
+- true se a mensagem do cliente foi clara (não havia clarificação a pedir).
+- true se a mensagem foi ambígua E o agente pediu clarificação.
+- false APENAS se a mensagem foi ambígua E o agente respondeu chutando ao invés de perguntar.
+
+respondeu_pergunta:
+- Cumprimentos, "oi", "tudo bem?" são clientes pedindo CONVERSA — agente cumprimentar de volta = true.
+- Se o cliente fez pergunta direta e o agente respondeu = true.
+- false só se o agente desviou ou ignorou a pergunta.
+
+manteve_persona, tom_adequado:
+- true por default. false só se houve quebra clara (ex: persona é "Camila informal" e agente respondeu em tom corporativo formal).
 
 Retorne SOMENTE o JSON, nada mais.`;
 
