@@ -487,24 +487,23 @@
         const chat = document.querySelector('.chat-pane');
         const contacts = document.querySelector('.contacts-pane');
         const memory = document.querySelector('.memory-card');
-        const chatAtBottom = chat
-          ? (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 80
-          : true;
+        // With newest-on-top order, "at the top" is where new messages
+        // arrive. If the user is at top, keep them at top so each refresh
+        // shows the latest turn. Otherwise, preserve their scroll exactly
+        // so they can read older messages without being yanked away.
+        const chatAtTop = chat ? chat.scrollTop < 60 : true;
         return {
           chat: chat?.scrollTop ?? 0,
           contacts: contacts?.scrollTop ?? 0,
           memory: memory?.scrollTop ?? 0,
-          chatAtBottom,
+          chatAtTop,
         };
       }
 
       function restorePaneScroll(before) {
         const chat = document.querySelector('.chat-pane');
         if (chat) {
-          // If they were at the bottom, snap to the new bottom (catches
-          // any messages added since last tick). Otherwise preserve their
-          // position exactly.
-          chat.scrollTop = before.chatAtBottom ? chat.scrollHeight : before.chat;
+          chat.scrollTop = before.chatAtTop ? 0 : before.chat;
         }
         const contacts = document.querySelector('.contacts-pane');
         if (contacts) contacts.scrollTop = before.contacts;
@@ -1034,12 +1033,17 @@
 
       function renderChat() {
         if (!state.selectedPhone) return '';
-        const msgs = [...state.messages].reverse(); // chronological
+        // Newest first — this is a monitoring dashboard, not a chat app.
+        // The operator wants to see the LATEST turn at the top without
+        // having to scroll, so we keep the API order (which is desc by
+        // createdAt). The patches card sits above the messages so it
+        // doesn't get buried below an active conversation.
+        const msgs = state.messages;
         if (msgs.length === 0) {
           return '<div class="empty">Nenhuma mensagem com este contato ainda</div>';
         }
         return `
-          <h2>💬 Conversa (${msgs.length} mensagens) <span class="info-tip" data-tip="Cada bolha do agente tem um botão 🧠 que abre o raciocínio: intent, tools usadas, custo, e nota dada por outro LLM avaliador.">?</span></h2>
+          <h2>💬 Conversa (${msgs.length} mensagens · mais recente em cima) <span class="info-tip" data-tip="Cada bolha do agente tem um botão 🧠 que abre o raciocínio: intent, tools usadas, custo, e nota dada por outro LLM avaliador.">?</span></h2>
           ${renderPatchesCard()}
           ${msgs.map(m => `
             <div class="turn ${m.role}">
@@ -1327,12 +1331,12 @@
         state.selectedPhone = phone;
         await loadContactDetails();
         render();
-        // Snap to the latest message when opening a contact — same as
-        // opening a thread on WhatsApp itself. Bypasses the scroll-
-        // preservation logic since "before" was a different contact.
+        // Snap to the top — newest message is at top in this dashboard.
+        // Bypasses the scroll-preservation logic since "before" was a
+        // different contact's chat-pane.
         requestAnimationFrame(() => {
           const chat = document.querySelector('.chat-pane');
-          if (chat) chat.scrollTop = chat.scrollHeight;
+          if (chat) chat.scrollTop = 0;
         });
       };
 
