@@ -912,7 +912,15 @@ export async function runAgent(opts: {
       messages: history as any,
       tools: tools.length ? tools : undefined,
       max_tokens: 4096,
-      temperature: 0.3,
+      // Higher temp + freq penalty = much less robotic repetition on
+      // multi-turn WhatsApp threads. Picked these by stress-testing
+      // 5+ "boa tarde" pings in a row — at temp 0.3 the agent kept
+      // re-greeting; at 0.75+freq_penalty 0.5 it shifted to a follow-
+      // up question on the second hit. Stays low enough that tool
+      // arguments (CEP, FIPE codes, etc) still parse correctly.
+      temperature: 0.75,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.3,
     });
     lastProvider = llmResult.provider || lastProvider;
     const msg: ChatMessage = (llmResult.message as ChatMessage) ?? {};

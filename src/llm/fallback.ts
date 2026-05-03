@@ -30,6 +30,12 @@ export interface LLMRequest {
   tools?: any[];
   max_tokens?: number;
   temperature?: number;
+  /** Penalize tokens already seen in the response — kills "Aqui é a
+   *  clínica… Aqui é a clínica…" type loops. 0–2 (OpenAI scale). */
+  frequency_penalty?: number;
+  /** Encourage the model to introduce new topics rather than retread
+   *  the same content. 0–2 (OpenAI scale). */
+  presence_penalty?: number;
 }
 
 export interface LLMResponse {
@@ -167,8 +173,19 @@ export async function chatCompletionWithFallback(req: LLMRequest): Promise<LLMRe
       model: provider.model,
       messages: req.messages,
       max_tokens: req.max_tokens ?? 4096,
-      temperature: req.temperature ?? 0.3,
+      // 0.7 is the chat sweet spot for Llama 3.3 — variety without
+      // breaking tool-call structure. The earlier 0.3 default was
+      // tuned for deterministic API gateway runs and made the WhatsApp
+      // persona sound like a stuck record.
+      temperature: req.temperature ?? 0.7,
     };
+    // Anti-repetition penalties — only attach when the caller asked
+    // for them so deterministic gateway calls (low temp, no penalties)
+    // still behave the way they always did. Both penalties are part
+    // of the OpenAI-compatible spec; Groq, Gemini (via OAI compat), and
+    // Cohere all accept them, and silently ignore unknown providers.
+    if (req.frequency_penalty !== undefined) body.frequency_penalty = req.frequency_penalty;
+    if (req.presence_penalty !== undefined) body.presence_penalty = req.presence_penalty;
     // Only attach tools if BOTH the request wants them AND the provider
     // supports them. This handles the text-only fallback path where Cohere
     // gets the request without tools to keep it from emitting empty action.
