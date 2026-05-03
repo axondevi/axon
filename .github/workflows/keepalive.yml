@@ -27,13 +27,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ping Evolution gateway
+      - name: Ping Axon Evolution gateway (dedicated)
         # 60s timeout absorbs the cold-start latency on the first hit
         # after a long idle. -f makes curl exit non-zero on 4xx/5xx so
         # the job goes red if the service is genuinely down.
         run: |
+          curl -sSf --max-time 60 https://axon-evolution.onrender.com/ \
+            -o /dev/null -w "axon-evolution: HTTP %{http_code} time=%{time_total}s\n"
+
+      - name: Ping Feirinha Evolution gateway (legacy)
+        # Kept around for connections paired BEFORE the dedicated
+        # axon-evolution server was set up — those instance_url values
+        # in whatsapp_connections still point here. Once all customers
+        # are migrated this step can drop.
+        run: |
           curl -sSf --max-time 60 https://evolution-api-feirinha.onrender.com/ \
-            -o /dev/null -w "evolution: HTTP %{http_code} time=%{time_total}s\n"
+            -o /dev/null -w "evolution-feirinha: HTTP %{http_code} time=%{time_total}s\n"
 
       - name: Ping Axon backend
         run: |
