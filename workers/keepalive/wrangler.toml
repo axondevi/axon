@@ -1,0 +1,13 @@
+name = "axon-keepalive"
+main = "src/index.ts"
+compatibility_date = "2026-04-24"
+
+# Ping every 2 minutes — well under Render free-tier 15min sleep
+# threshold and Cloudflare's free cron limits (1000 requests/day,
+# we use ~720, plenty of headroom).
+[triggers]
+crons = ["*/2 * * * *"]
+
+# Observability so failures are visible in Cloudflare dashboard.
+[observability]
+enabled = true
