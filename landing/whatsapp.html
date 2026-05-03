@@ -1609,7 +1609,29 @@
         const r = await api('/v1/agents');
         state.agents = r.data || [];
         if (state.agents.length === 0) {
-          alert('Nenhum agente nesta conta. Crie um em /build primeiro.');
+          // First-time visitor with zero agents — render a real CTA on
+          // the page instead of a blocking alert that disappears with
+          // no recovery path. The alert was easy to dismiss accidentally
+          // and left the user on a blank panel.
+          const root = document.getElementById('app');
+          if (root) {
+            root.innerHTML = `
+              <div style="max-width:560px;margin:80px auto;padding:48px 32px;text-align:center;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;">
+                <div style="font-size:48px;margin-bottom:16px;">🧠</div>
+                <h2 style="margin:0 0 12px;font-size:20px;">Nenhum agente nesta conta ainda</h2>
+                <p style="color:var(--text-dim);font-size:14px;margin:0 0 24px;line-height:1.55;">
+                  Esse painel mostra a saúde dos agentes que conversam pelo WhatsApp.
+                  Crie um primeiro pra ele virar visível aqui.
+                </p>
+                <a href="/build" style="display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;">
+                  + Criar primeiro agente
+                </a>
+                <div style="margin-top:18px;font-size:12px;color:var(--text-muted);">
+                  Já tem agente? <a href="/dashboard" style="color:var(--accent-2);">Volte ao dashboard</a>
+                </div>
+              </div>
+            `;
+          }
           return;
         }
         if (!state.selectedAgentId || !state.agents.find(a => a.id === state.selectedAgentId)) {

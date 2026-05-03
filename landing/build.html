@@ -2516,11 +2516,22 @@ Estacionamento: gratuito por 1h"></textarea>
       document.getElementById('b-save').addEventListener('click', async () => {
         const errEl = document.getElementById('b-err');
         errEl.textContent = '';
-        if (!formState.name.trim()) { errEl.textContent = 'Name is required'; return; }
+        // Validation failures previously only set inline text in #b-err
+        // which sits at the bottom of a long modal — scroll-blind users
+        // saw "Saving…" become "Save" again with no clue why. Toast +
+        // scroll-into-view so the failure is unmissable.
+        const failValidation = (msg) => {
+          errEl.textContent = msg;
+          errEl.style.color = 'var(--danger, #ff5f57)';
+          errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (window.AxonUI && AxonUI.toast) AxonUI.toast(msg, { type: 'error', title: 'Não consegui salvar' });
+        };
+        if (!formState.name.trim()) { failValidation('Nome do agente é obrigatório'); return; }
         if (!editingAgentId && !/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$/.test(formState.slug)) {
-          errEl.textContent = 'Slug must be 2-40 chars, lowercase letters/numbers/hyphens'; return;
+          failValidation('Slug precisa ter 2-40 caracteres: letras minúsculas, números, hífens');
+          return;
         }
-        if (!formState.system_prompt.trim()) { errEl.textContent = 'System prompt cannot be empty'; return; }
+        if (!formState.system_prompt.trim()) { failValidation('System prompt não pode ficar vazio'); return; }
         const btn = document.getElementById('b-save');
         btn.disabled = true; btn.textContent = 'Saving…';
         try {
@@ -2579,7 +2590,13 @@ Estacionamento: gratuito por 1h"></textarea>
           document.querySelector('.tab-bar button[data-tab="mine"]').click();
           if (createdAgent) showTestAgoraModal(createdAgent);
         } catch (e) {
+          // Save failure (backend rejection, slug already taken, etc) —
+          // surface to inline error box AND a toast so the operator
+          // can't miss it. errEl remains red from validation styling.
           errEl.textContent = e.message;
+          errEl.style.color = 'var(--danger, #ff5f57)';
+          errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (window.AxonUI && AxonUI.toast) AxonUI.toast(e.message, { type: 'error', title: 'Falha ao salvar' });
         } finally {
           btn.disabled = false; btn.textContent = 'Salvar agente';
         }

@@ -86,6 +86,25 @@
       }
       .metric-value .unit { font-size: 15px; color: var(--text-muted); margin-left: 8px; font-family: 'Inter', sans-serif; }
       .metric-sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+      /* Skeleton screens — shown on first paint while Promise.all
+         hydrates the metrics. Replaced wholesale by the real card
+         markup once data arrives. Shimmer is GPU-cheap and gives the
+         user a clear "loading" signal instead of "Carregando…". */
+      @keyframes skel-shimmer {
+        0%   { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+      .skel-bar {
+        background: linear-gradient(90deg,
+          rgba(255,255,255,0.04) 0%,
+          rgba(255,255,255,0.10) 50%,
+          rgba(255,255,255,0.04) 100%);
+        background-size: 200% 100%;
+        animation: skel-shimmer 1.4s ease-in-out infinite;
+        border-radius: 6px;
+        height: 32px; margin: 8px 0;
+      }
+      .skel-bar.skel-thin { height: 12px; margin-top: 6px; width: 70%; }
       .section { margin-bottom: 32px; }
       table { width: 100%; border-collapse: collapse; font-size: 14px; }
       th {
@@ -2004,7 +2023,12 @@
             <h1 data-pt="Painel" data-en="Dashboard">Painel</h1>
             <div id="next-action-hero"></div>
             <div id="deposit-hero-wrap"></div>
-            <div class="grid" id="metrics">Carregando…</div>
+            <div class="grid" id="metrics">
+              <div class="card metric-skel"><div class="metric-label">Saldo disponível</div><div class="metric-value skel-bar"></div><div class="metric-sub skel-bar skel-thin"></div></div>
+              <div class="card metric-skel"><div class="metric-label">Autonomia</div><div class="metric-value skel-bar"></div><div class="metric-sub skel-bar skel-thin"></div></div>
+              <div class="card metric-skel"><div class="metric-label">Chamadas</div><div class="metric-value skel-bar"></div><div class="metric-sub skel-bar skel-thin"></div></div>
+              <div class="card metric-skel"><div class="metric-label">Taxa de cache</div><div class="metric-value skel-bar"></div><div class="metric-sub skel-bar skel-thin"></div></div>
+            </div>
             <div class="section">
               <h2 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                 <span>Seus agentes <span class="info-tip" data-tip="Cada agente tem seu prompt, ferramentas e canais (web, WhatsApp, embed). Crie quantos quiser.">?</span></span>

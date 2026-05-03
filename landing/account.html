@@ -268,8 +268,28 @@
         }
         renderKey();
         // Load wallet + subscriptions in parallel — both non-blocking.
+        // Wallet load — render an actionable failure card (with retry +
+        // help link) instead of a bare "erro: HTTP 404" string. The
+        // operator hit this once with a stale API key and had no idea
+        // whether the backend was down or their key was bad.
         loadWallet().catch((e) => {
-          document.getElementById('wallet-balance').textContent = 'erro: ' + e.message;
+          const balEl = document.getElementById('wallet-balance');
+          if (!balEl) return;
+          const msg = String(e.message || '');
+          const isAuth = /401|403|api key|unauthorized/i.test(msg);
+          balEl.innerHTML = `
+            <span style="color:var(--danger);font-weight:600;">${isAuth ? 'Sessão expirada' : 'Não consegui carregar o saldo'}</span>
+            <button id="wallet-retry-btn" style="margin-left:8px;background:transparent;border:1px solid currentColor;color:inherit;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">Tentar de novo</button>
+            ${isAuth ? '<a href="/login?return=/account" style="margin-left:6px;color:var(--accent-2);font-size:11px;">re-login</a>' : ''}
+          `;
+          const retryBtn = document.getElementById('wallet-retry-btn');
+          if (retryBtn) retryBtn.onclick = () => {
+            balEl.textContent = 'carregando…';
+            loadWallet().catch((err) => {
+              const safeMsg = String(err.message || '').slice(0, 60).replace(/[<>&"']/g, '');
+              balEl.innerHTML = `<span style="color:var(--danger);font-weight:600;">Ainda falhando — ${safeMsg}</span>`;
+            });
+          };
         });
         loadSubs().catch((e) => {
           document.getElementById('subs-list').innerHTML =
