@@ -210,14 +210,39 @@ export async function createInstance(opts: {
         webhookBase64: false,
       };
     }
-    const res = await evoFetch(opts.serverUrl, '/instance/create', {
-      method: 'POST',
-      apiKey: opts.globalApiKey,
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return { ok: false, error: `createInstance ${res.status}: ${text.slice(0, 240)}` };
+    // Retry with exponential backoff for rate-limited responses (429) and
+    // transient server errors (5xx). Evolution's /instance/create is
+    // particularly sensitive to bursts since multiple new accounts
+    // signing up at once all hit the same shared server. Retry-After
+    // header is honored when present; otherwise default backoff.
+    let res: Response | null = null;
+    let lastBody = '';
+    const MAX_ATTEMPTS = 4;
+    const DEFAULT_DELAYS_MS = [500, 2000, 6000];
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      res = await evoFetch(opts.serverUrl, '/instance/create', {
+        method: 'POST',
+        apiKey: opts.globalApiKey,
+        body: JSON.stringify(body),
+      });
+      if (res.ok) break;
+      const isRetryable = res.status === 429 || res.status >= 500;
+      lastBody = await res.text().catch(() => '');
+      if (!isRetryable || attempt === MAX_ATTEMPTS) {
+        return { ok: false, error: `createInstance ${res.status}: ${lastBody.slice(0, 240)}` };
+      }
+      // Honor Retry-After header (seconds) when present; otherwise use
+      // an exponential backoff schedule.
+      const retryAfter = res.headers.get('retry-after');
+      let delayMs = DEFAULT_DELAYS_MS[attempt - 1] ?? 6000;
+      if (retryAfter) {
+        const secs = parseInt(retryAfter, 10);
+        if (!Number.isNaN(secs) && secs > 0 && secs < 30) delayMs = secs * 1000;
+      }
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    if (!res || !res.ok) {
+      return { ok: false, error: `createInstance gave up: ${lastBody.slice(0, 240)}` };
     }
     const data: any = await res.json().catch(() => ({}));
 

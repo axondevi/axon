@@ -353,7 +353,22 @@ ownerWhatsapp.post('/:id/whatsapp/auto', async (c) => {
     webhookUrl,
   });
   if (!created.ok || !created.apiKey) {
-    return c.json({ error: 'create_failed', message: created.error || 'unknown' }, 502);
+    // 429 from Evolution → server is throttled; client can retry in 30s
+    // OR fall back to "Modo avançado" (BYO Evolution server). Surface
+    // a friendly message so the dashboard doesn't show raw upstream text.
+    const errStr = created.error || '';
+    const is429 = /\b429\b/.test(errStr);
+    return c.json(
+      {
+        error: is429 ? 'evolution_throttled' : 'create_failed',
+        message: is429
+          ? 'Servidor compartilhado WhatsApp temporariamente ocupado. Aguarde 30s e tente de novo, ou use Modo avançado pra conectar seu próprio servidor Evolution.'
+          : (errStr || 'Falha ao criar instância. Tente de novo em 1 minuto.'),
+        retry_after_seconds: is429 ? 30 : 0,
+        upstream_detail: errStr,
+      },
+      is429 ? 429 : 502,
+    );
   }
 
   // 2. Persist the connection. Use per-instance api key (created.apiKey),
