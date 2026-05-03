@@ -45,6 +45,18 @@ function thirtyDaysFromNow(): Date {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 }
 
+// Serializable plan shape — strips the BigInt `price_micro` field that
+// Object.values(PLANS) would otherwise leak into c.json() and trip
+// "cannot serialize BigInt" runtime errors.
+function serializePlans() {
+  return Object.values(PLANS).map((p) => ({
+    id: p.id,
+    name: p.name,
+    price_usd: p.price_usd,
+    included: p.included,
+  }));
+}
+
 function serializeSub(s: typeof agentSubscriptions.$inferSelect) {
   const plan = PLANS[s.plan as Plan['id']] ?? PLANS[DEFAULT_PLAN];
   const projected = computeBillAmountMicro({
@@ -99,7 +111,7 @@ ownerSubscriptionsRoot.get('/subscriptions', async (c) => {
     .where(eq(agentSubscriptions.ownerId, user.id));
   return c.json({
     subscriptions: rows.map(serializeSub),
-    plans: Object.values(PLANS),
+    plans: serializePlans(),
   });
 });
 
@@ -118,11 +130,11 @@ ownerSubscriptions.get('/:id/subscription', async (c) => {
   if (!sub) {
     return c.json({
       subscription: null,
-      plans: Object.values(PLANS),
+      plans: serializePlans(),
       message: 'No subscription yet — POST to this endpoint to activate.',
     });
   }
-  return c.json({ subscription: serializeSub(sub), plans: Object.values(PLANS) });
+  return c.json({ subscription: serializeSub(sub), plans: serializePlans() });
 });
 
 // ─── Create or reactivate ──────────────────────────────────
