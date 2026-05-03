@@ -323,70 +323,12 @@ ownerWhatsapp.post('/:id/whatsapp/auto', async (c) => {
     return c.json({ error: 'wrong_pay_mode', message: 'WhatsApp connections require pay_mode=owner.' }, 400);
   }
 
-  const sharedUrl = (process.env.AXON_EVOLUTION_URL || '').trim().replace(/\/+$/, '');
-  const sharedKey = (process.env.AXON_EVOLUTION_API_KEY || '').trim();
-  if (!sharedUrl || !sharedKey) {
-    return c.json({
-      error: 'auto_provision_unavailable',
-      message: 'Axon Evolution server not configured. Use the manual flow with your own Evolution credentials.',
-    }, 503);
-  }
-
   const body = await c.req.json().catch(() => ({} as any));
   const ownerPhoneRaw = String(body.owner_phone || '').trim();
   const ownerPhone = ownerPhoneRaw ? ownerPhoneRaw.replace(/\D/g, '') : null;
   if (ownerPhone && (ownerPhone.length < 10 || ownerPhone.length > 15)) {
     return c.json({ error: 'bad_request', message: 'owner_phone must be 10–15 digits' }, 400);
   }
-
-  // Generate a unique instance name: axon-<userId-prefix>-<base36ts>.
-  // Keep it under 60 chars (Evolution limit) and DNS-safe (no dots/spaces).
-  const instanceName = `axon-${user.id.slice(0, 8)}-${Date.now().toString(36)}`;
-  const secret = randomBytes(24).toString('hex');
-  const webhookUrl = webhookUrlFor(c, secret);
-
-  // 1. Create instance on shared server (returns per-instance api key + first QR).
-  const created = await createInstance({
-    serverUrl: sharedUrl,
-    globalApiKey: sharedKey,
-    instanceName,
-    webhookUrl,
-  });
-  if (!created.ok || !created.apiKey) {
-    // 429 from Evolution → server is throttled; client can retry in 30s
-    // OR fall back to "Modo avançado" (BYO Evolution server). Surface
-    // a friendly message so the dashboard doesn't show raw upstream text.
-    const errStr = created.error || '';
-    const is429 = /\b429\b/.test(errStr);
-    return c.json(
-      {
-        error: is429 ? 'evolution_throttled' : 'create_failed',
-        message: is429
-          ? 'Servidor compartilhado WhatsApp temporariamente ocupado. Aguarde 30s e tente de novo, ou use Modo avançado pra conectar seu próprio servidor Evolution.'
-          : (errStr || 'Falha ao criar instância. Tente de novo em 1 minuto.'),
-        retry_after_seconds: is429 ? 30 : 0,
-        upstream_detail: errStr,
-      },
-      is429 ? 429 : 502,
-    );
-  }
-
-  // 2. Persist the connection. Use per-instance api key (created.apiKey),
-  // NOT the global key — instance-isolated even on shared server.
-  // Status starts at 'pairing' since the customer still has to scan the QR;
-  // the webhook receiver flips it to 'connected' on first inbound message,
-  // and GET /whatsapp re-probes Evolution if the row hasn't seen traffic.
-  const encrypted = encrypt(created.apiKey);
-  await db.delete(whatsappConnections).where(eq(whatsappConnections.agentId, agentId));
-  await db.insert(whatsappConnections).values({
-    agentId,
-    ownerId: user.id,
-    instanceUrl: sharedUrl,
-    instanceName: created.instanceName!,
-    apiKey: encrypted,
-    webhookSecret: secret,
-    status: 'pairing',
-  });
 
   if (ownerPhone) {
     await db
@@ -395,33 +337,29 @@ ownerWhatsapp.post('/:id/whatsapp/auto', async (c) => {
       .where(eq(agents.id, agentId));
   }
 
-  // 3. If createInstance didn't return a QR (rare), fall back to /instance/connect.
-  let qrBase64 = created.qrBase64;
-  let pairingCode = created.pairingCode;
-  if (!qrBase64 && !pairingCode) {
-    const conn = await connectInstance({
-      instanceUrl: sharedUrl,
-      instanceName: created.instanceName!,
-      apiKey: created.apiKey,
-      phoneNumber: ownerPhone || undefined,
-    });
-    if (conn.ok) {
-      qrBase64 = conn.qrBase64;
-      pairingCode = conn.pairingCode;
-    }
+  const provisioned = await provisionFreshInstance(c, { id: agentId, ownerPhone: ownerPhone || a.ownerPhone }, user.id);
+  if (!provisioned.ok) {
+    return c.json(
+      {
+        error: provisioned.error,
+        message: provisioned.message,
+        retry_after_seconds: provisioned.retryAfterSeconds ?? 0,
+      },
+      provisioned.status as 503 | 502 | 429,
+    );
   }
 
   return c.json({
     ok: true,
     auto_provisioned: true,
     connection: {
-      instance_url: sharedUrl,
-      instance_name: created.instanceName,
+      instance_url: provisioned.sharedUrl,
+      instance_name: provisioned.instanceName,
       status: 'connecting',
-      webhook_url: webhookUrl,
+      webhook_url: webhookUrlFor(c, provisioned.webhookSecret),
       owner_phone: ownerPhone || a.ownerPhone || null,
-      qr_base64: qrBase64,
-      pairing_code: pairingCode,
+      qr_base64: provisioned.qrBase64,
+      pairing_code: provisioned.pairingCode,
     },
   });
 });
@@ -467,73 +405,24 @@ ownerWhatsapp.get('/:id/whatsapp/qr', async (c) => {
   if (!result.ok) {
     // Evolution returns `{count: 0}` (or empty) when the instance exists
     // server-side but is in a stale state — typically because a previous
-    // pairing attempt half-finished, OR the env changed (Feirinha → Axon
-    // dedicated) and the row points to an instance that was never created
-    // on the new server. Recovery: tear down the stale row + re-provision
-    // a fresh instance on whatever the current AXON_EVOLUTION_URL is, in
-    // a single round-trip so the operator's "Refresh QR" click just works.
+    // pairing attempt half-finished, OR the env changed and the row
+    // points to an instance that was never created on the new server.
+    // Recovery: hand off to provisionFreshInstance — same path as /auto,
+    // so cleanup of stale Evolution state stays in one place.
     const looksStale = /count.*0|no qr\/pairing|not found|404/i.test(result.error || '');
     if (looksStale) {
-      // Best-effort cleanup of the dead instance on its old server.
-      await deleteInstance({
-        instanceUrl: conn.instanceUrl,
-        instanceName: conn.instanceName,
-        apiKey,
-      }).catch(() => {});
-      // Drop the stale row and re-provision against the current shared
-      // server. Same auto-provision logic as POST /:id/whatsapp/auto.
-      await db.delete(whatsappConnections).where(eq(whatsappConnections.id, conn.id));
-
-      const sharedUrl = (process.env.AXON_EVOLUTION_URL || '').trim().replace(/\/+$/, '');
-      const sharedKey = (process.env.AXON_EVOLUTION_API_KEY || '').trim();
-      if (!sharedUrl || !sharedKey) {
-        return c.json({ error: 'auto_provision_unavailable', message: 'Servidor Evolution compartilhado não configurado.' }, 503);
-      }
-      const instanceName = `axon-${user.id.slice(0, 8)}-${Date.now().toString(36)}`;
-      const secret = randomBytes(24).toString('hex');
-      const webhookUrl = webhookUrlFor(c, secret);
-      const created = await createInstance({
-        serverUrl: sharedUrl,
-        globalApiKey: sharedKey,
-        instanceName,
-        webhookUrl,
-      });
-      if (!created.ok || !created.apiKey) {
-        return c.json({ error: 'create_failed', message: created.error || 'unknown' }, 502);
-      }
-      const encrypted = encrypt(created.apiKey);
-      await db.insert(whatsappConnections).values({
-        agentId,
-        ownerId: user.id,
-        instanceUrl: sharedUrl,
-        instanceName: created.instanceName!,
-        apiKey: encrypted,
-        webhookSecret: secret,
-        status: 'pairing',
-      });
-      // createInstance sometimes returns the instance metadata without
-      // the QR (Evolution v2 build difference). When that happens, fall
-      // back to /instance/connect to fetch the first QR — same fallback
-      // POST /:id/whatsapp/auto uses.
-      let qrBase64 = created.qrBase64;
-      let pairingCode = created.pairingCode;
-      if (!qrBase64 && !pairingCode) {
-        const conn2 = await connectInstance({
-          instanceUrl: sharedUrl,
-          instanceName: created.instanceName!,
-          apiKey: created.apiKey!,
-          phoneNumber: a.ownerPhone || undefined,
-        });
-        if (conn2.ok) {
-          qrBase64 = conn2.qrBase64;
-          pairingCode = conn2.pairingCode;
-        }
+      const provisioned = await provisionFreshInstance(c, { id: agentId, ownerPhone: a.ownerPhone }, user.id);
+      if (!provisioned.ok) {
+        return c.json(
+          { error: provisioned.error, message: provisioned.message },
+          provisioned.status as 503 | 502 | 429,
+        );
       }
       return c.json({
         status: 'pairing',
         paired: false,
-        qr_base64: qrBase64,
-        pairing_code: pairingCode,
+        qr_base64: provisioned.qrBase64,
+        pairing_code: provisioned.pairingCode,
         recreated: true,
       });
     }
@@ -1966,4 +1855,158 @@ function webhookUrlFor(c: any, secret: string): string {
   const proto = fwdProto || (url.protocol === 'https:' ? 'https' : 'http');
   const host = c.req.header('x-forwarded-host') || url.host;
   return `${proto}://${host}/v1/webhooks/whatsapp/${secret}`;
+}
+
+// Deterministic instance name per agent. Two retries of /auto from the
+// same agent always hit the same Evolution instance, so we never leave
+// orphans behind. Format: `axon-<12-hex-from-agent-uuid>` (≤17 chars,
+// well under Evolution's 60-char ceiling, DNS-safe).
+function instanceNameFor(agentId: string): string {
+  const compact = agentId.replace(/-/g, '').slice(0, 12);
+  return `axon-${compact}`;
+}
+
+/**
+ * Atomic re-provision: tear down any prior Evolution instance + DB row
+ * for this agent, then create a fresh one with a deterministic name.
+ * Used by both POST /:id/whatsapp/auto and the stale-recovery branch
+ * of GET /:id/whatsapp/qr — having one path means a future bug fix
+ * lands in one place, not two.
+ *
+ * Returns the freshly-stored row state plus QR/pairing-code material
+ * the caller hands back to the dashboard. Never throws — surfaces
+ * upstream failures via the `error` field so the route can render
+ * a friendly message + retry guidance.
+ */
+async function provisionFreshInstance(
+  c: any,
+  agent: { id: string; ownerPhone: string | null },
+  ownerId: string,
+): Promise<
+  | {
+      ok: true;
+      sharedUrl: string;
+      instanceName: string;
+      webhookSecret: string;
+      qrBase64?: string;
+      pairingCode?: string;
+    }
+  | { ok: false; error: string; message: string; status: number; retryAfterSeconds?: number }
+> {
+  const sharedUrl = (process.env.AXON_EVOLUTION_URL || '').trim().replace(/\/+$/, '');
+  const sharedKey = (process.env.AXON_EVOLUTION_API_KEY || '').trim();
+  if (!sharedUrl || !sharedKey) {
+    return {
+      ok: false,
+      error: 'auto_provision_unavailable',
+      message: 'Servidor Evolution compartilhado não configurado.',
+      status: 503,
+    };
+  }
+
+  // 1. Tear down any prior Evolution instance for this agent. Best-effort:
+  // if the previous row decrypts cleanly we ask Evolution to delete the
+  // matching instance; otherwise we just drop the DB row. Without this,
+  // every retry leaves a paired-but-unreachable instance on Evolution
+  // (the bug that left the Concessionária mute on 2026-05-03).
+  const [oldConn] = await db
+    .select()
+    .from(whatsappConnections)
+    .where(eq(whatsappConnections.agentId, agent.id))
+    .limit(1);
+  if (oldConn) {
+    try {
+      const oldKey = decrypt(oldConn.apiKey);
+      await deleteInstance({
+        instanceUrl: oldConn.instanceUrl,
+        instanceName: oldConn.instanceName,
+        apiKey: oldKey,
+      }).catch(() => {});
+    } catch {
+      /* old row's api_key is undecryptable (master rotated etc) — skip Evolution cleanup */
+    }
+    await db.delete(whatsappConnections).where(eq(whatsappConnections.id, oldConn.id));
+  }
+
+  // 2. Belt-and-braces: even if step 1 ran, the deterministic name might
+  // already exist on Evolution from a different code path (cron, manual
+  // poke). createInstance returns an error when it does — we delete and
+  // retry once with the global key.
+  const instanceName = instanceNameFor(agent.id);
+  const secret = randomBytes(24).toString('hex');
+  const webhookUrl = webhookUrlFor(c, secret);
+
+  let created = await createInstance({
+    serverUrl: sharedUrl,
+    globalApiKey: sharedKey,
+    instanceName,
+    webhookUrl,
+  });
+  if (!created.ok && /exists|conflict|409/i.test(created.error || '')) {
+    await deleteInstance({
+      instanceUrl: sharedUrl,
+      instanceName,
+      apiKey: sharedKey, // global key works for delete on the shared server
+    }).catch(() => {});
+    created = await createInstance({
+      serverUrl: sharedUrl,
+      globalApiKey: sharedKey,
+      instanceName,
+      webhookUrl,
+    });
+  }
+  if (!created.ok || !created.apiKey) {
+    const errStr = created.error || '';
+    const is429 = /\b429\b/.test(errStr);
+    return {
+      ok: false,
+      error: is429 ? 'evolution_throttled' : 'create_failed',
+      message: is429
+        ? 'Servidor compartilhado WhatsApp temporariamente ocupado. Aguarde 30s e tente de novo.'
+        : (errStr || 'Falha ao criar instância. Tente de novo em 1 minuto.'),
+      status: is429 ? 429 : 502,
+      retryAfterSeconds: is429 ? 30 : undefined,
+    };
+  }
+
+  // 3. Persist DB row only NOW that Evolution confirmed creation. Encrypts
+  // the per-instance api key with MASTER_ENCRYPTION_KEY before storing —
+  // a global-key compromise alone can't impersonate any specific
+  // customer's WhatsApp.
+  await db.insert(whatsappConnections).values({
+    agentId: agent.id,
+    ownerId,
+    instanceUrl: sharedUrl,
+    instanceName: created.instanceName!,
+    apiKey: encrypt(created.apiKey),
+    webhookSecret: secret,
+    status: 'pairing',
+  });
+
+  // 4. createInstance occasionally returns instance metadata without the
+  // QR payload (Evolution v2 build difference). When that happens, fall
+  // back to /instance/connect to fetch the first QR.
+  let qrBase64 = created.qrBase64;
+  let pairingCode = created.pairingCode;
+  if (!qrBase64 && !pairingCode) {
+    const conn = await connectInstance({
+      instanceUrl: sharedUrl,
+      instanceName: created.instanceName!,
+      apiKey: created.apiKey,
+      phoneNumber: agent.ownerPhone || undefined,
+    });
+    if (conn.ok) {
+      qrBase64 = conn.qrBase64;
+      pairingCode = conn.pairingCode;
+    }
+  }
+
+  return {
+    ok: true,
+    sharedUrl,
+    instanceName: created.instanceName!,
+    webhookSecret: secret,
+    qrBase64,
+    pairingCode,
+  };
 }
