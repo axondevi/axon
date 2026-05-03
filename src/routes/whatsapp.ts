@@ -511,11 +511,29 @@ ownerWhatsapp.get('/:id/whatsapp/qr', async (c) => {
         webhookSecret: secret,
         status: 'pairing',
       });
+      // createInstance sometimes returns the instance metadata without
+      // the QR (Evolution v2 build difference). When that happens, fall
+      // back to /instance/connect to fetch the first QR — same fallback
+      // POST /:id/whatsapp/auto uses.
+      let qrBase64 = created.qrBase64;
+      let pairingCode = created.pairingCode;
+      if (!qrBase64 && !pairingCode) {
+        const conn2 = await connectInstance({
+          instanceUrl: sharedUrl,
+          instanceName: created.instanceName!,
+          apiKey: created.apiKey!,
+          phoneNumber: a.ownerPhone || undefined,
+        });
+        if (conn2.ok) {
+          qrBase64 = conn2.qrBase64;
+          pairingCode = conn2.pairingCode;
+        }
+      }
       return c.json({
         status: 'pairing',
         paired: false,
-        qr_base64: created.qrBase64,
-        pairing_code: created.pairingCode,
+        qr_base64: qrBase64,
+        pairing_code: pairingCode,
         recreated: true,
       });
     }
