@@ -15,7 +15,7 @@
 
   const STORAGE_KEY = 'axon.apiKey';
   const BASE_KEY = 'axon.baseUrl';
-  const DEFAULT_BASE = 'https://axon-kedb.onrender.com';
+  const DEFAULT_BASE = 'https://api.nexusinovation.com.br';
 
   class AxonClient {
     constructor(opts = {}) {

@@ -20,7 +20,7 @@
 (function () {
   'use strict';
   const API_BASE = window.location.host.includes('pages.dev') || window.location.protocol === 'file:'
-    ? 'https://axon-kedb.onrender.com'
+    ? 'https://api.nexusinovation.com.br'
     : window.location.origin;
 
   let privyClient = null;

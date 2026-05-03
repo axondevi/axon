@@ -663,7 +663,7 @@ Estacionamento: gratuito por 1h"></textarea>
     <script>
       const STORAGE_KEY = 'axon.apiKey';
       const BASE_KEY = 'axon.baseUrl';
-      const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+      const BASE = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
       const KEY = localStorage.getItem(STORAGE_KEY);
       // Auth gate — page is owner-only. No key → kick to login, return here after.
       if (!KEY) {
@@ -1647,7 +1647,7 @@ Estacionamento: gratuito por 1h"></textarea>
       };
 
       window.showEmbed = function(slug, color) {
-        const apiBase = (localStorage.getItem('axon.baseUrl') || 'https://axon-kedb.onrender.com');
+        const apiBase = (localStorage.getItem('axon.baseUrl') || 'https://api.nexusinovation.com.br');
         const apiUrl = apiBase + '/v1/run/' + slug + '/chat';
         const directUrl = location.origin + '/agent/' + slug;
         const widgetSnippet =
@@ -2704,7 +2704,7 @@ Estacionamento: gratuito por 1h"></textarea>
         const slug = agent.slug || (agent.url || '').split('/agent/').pop();
         const baseHost = window.location.origin;
         const webUrl = baseHost + '/agent/' + slug;
-        const apiUrl = 'https://axon-kedb.onrender.com/v1/run/' + (agent.id || slug);
+        const apiUrl = 'https://api.nexusinovation.com.br/v1/run/' + (agent.id || slug);
         const embedCode = '<script src="' + baseHost + '/embed.js" data-agent="' + slug + '"></' + 'script>';
         const curlCmd = 'curl -X POST ' + apiUrl + ' \\\n  -H "x-api-key: YOUR_AXON_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"messages":[{"role":"user","content":"Ola"}]}\'';
         const waMsg = encodeURIComponent('Quero testar o agente: ' + webUrl);

@@ -160,7 +160,7 @@
       <h1>Operator sign-in</h1>
       <p>Enter the <code>ADMIN_API_KEY</code> to view aggregate business metrics: revenue, profit, per-API margins.</p>
       <div id="error" class="error" style="display: none"></div>
-      <input id="base" placeholder="https://axon-kedb.onrender.com" />
+      <input id="base" placeholder="https://api.nexusinovation.com.br" />
       <input id="admin-key" type="password" placeholder="admin key…" />
       <button id="signin">Open operator dashboard</button>
     </div>
@@ -271,7 +271,7 @@
       const ADMIN_KEY = 'axon.admin';
 
       function base() {
-        return localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        return localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
       }
       function adminKey() { return localStorage.getItem(ADMIN_KEY) || ''; }
 
@@ -312,7 +312,7 @@
         const newBase = document.getElementById('base').value.trim().replace(/\/$/, '');
         const newKey = document.getElementById('admin-key').value.trim();
         if (!newKey) return;
-        localStorage.setItem(BASE_KEY, newBase || 'https://axon-kedb.onrender.com');
+        localStorage.setItem(BASE_KEY, newBase || 'https://api.nexusinovation.com.br');
         localStorage.setItem(ADMIN_KEY, newKey);
         try {
           await load();

@@ -945,7 +945,7 @@
 
       async function api(path, opts = {}) {
         const key = localStorage.getItem(STORAGE_KEY);
-        const base = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const base = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
         const res = await fetch(base + path, {
           ...opts,
           headers: { 'x-api-key': key, 'content-type': 'application/json', ...(opts.headers || {}) },
@@ -1298,7 +1298,7 @@
         }
         if (!confirm(`Confirmar assinatura ${planId.toUpperCase()}? Será debitado da carteira agora.`)) return;
         try {
-          const r = await fetch(`https://axon-kedb.onrender.com/v1/agents/${agentId}/subscription`, {
+          const r = await fetch(`https://api.nexusinovation.com.br/v1/agents/${agentId}/subscription`, {
             method: 'POST',
             headers: { 'x-api-key': localStorage.getItem('axon.apiKey'), 'content-type': 'application/json' },
             body: JSON.stringify({ plan: planId }),
@@ -1317,7 +1317,7 @@
       window.cancelSub = async function(agentId) {
         if (!confirm('Cancelar assinatura? O agente vai parar de responder. Pode reativar depois sem perder dados.')) return;
         try {
-          const r = await fetch(`https://axon-kedb.onrender.com/v1/agents/${agentId}/subscription`, {
+          const r = await fetch(`https://api.nexusinovation.com.br/v1/agents/${agentId}/subscription`, {
             method: 'PATCH',
             headers: { 'x-api-key': localStorage.getItem('axon.apiKey'), 'content-type': 'application/json' },
             body: JSON.stringify({ action: 'cancel' }),
@@ -1918,7 +1918,7 @@
             <h1>Painel Nexus Inovation</h1>
             <p>Cole sua API key pra acessar seus agentes, carteira e histórico.</p>
             ${err ? `<div class="error">${err}</div>` : ''}
-            <input type="text" id="base" placeholder="https://axon-kedb.onrender.com" />
+            <input type="text" id="base" placeholder="https://api.nexusinovation.com.br" />
             <input type="password" id="key" placeholder="ax_live_..." />
             <button class="primary" id="go">Entrar no painel</button>
             <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted); text-align: center;">
@@ -1926,7 +1926,7 @@
             </p>
           </div>
         `;
-        document.getElementById('base').value = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        document.getElementById('base').value = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
         document.getElementById('go').onclick = async () => {
           const base = document.getElementById('base').value.trim();
           const key = document.getElementById('key').value.trim();
@@ -2071,7 +2071,7 @@
         `;
 
         const key = localStorage.getItem(STORAGE_KEY);
-        const base = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const base = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
         const keyShort = key.slice(0, 16) + '…';
         document.getElementById('keyview').textContent = keyShort;
         document.getElementById('logout').onclick = () => {
@@ -2762,7 +2762,7 @@
       // --- search_arxiv: arXiv returns Atom XML, so we parse client-side ---
       async function searchArxivTool(args) {
         const k = localStorage.getItem(STORAGE_KEY);
-        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const b = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
         const t0 = Date.now();
         const params = new URLSearchParams({
           search_query: args.query,
@@ -2841,7 +2841,7 @@
       // the agent reference it as @img:<id> which we expand at render.
       async function generateImageTool(args) {
         const k = localStorage.getItem(STORAGE_KEY);
-        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const b = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
         const t0 = Date.now();
         const textPrompts = [{ text: args.prompt, weight: 1 }];
         if (args.negative_prompt) {
@@ -3485,7 +3485,7 @@
       // so the rest of the agent loop is unchanged.
       async function callGroq(messages, tools, signal, onPartial) {
         const k = localStorage.getItem(STORAGE_KEY);
-        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const b = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
         const res = await fetch(b + '/v1/call/groq/chat', {
           method: 'POST',
           signal,
@@ -3623,7 +3623,7 @@
 
         const { api, endpoint, method, paramStyle, paramMap } = tool._axon;
         const k = localStorage.getItem(STORAGE_KEY);
-        const b = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
+        const b = localStorage.getItem(BASE_KEY) || 'https://api.nexusinovation.com.br';
         const params = paramMap(args);
         let url = `${b}/v1/call/${api}/${endpoint}`;
         const init = { method, headers: { 'Authorization': 'Bearer ' + k } };

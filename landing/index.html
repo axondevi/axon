@@ -188,7 +188,7 @@
             </div>
             <pre><code><span class="c-com">// Pesquisa na web, paga $0.005 em USDC — sem chave, sem cadastro pro SerpAPI</span>
 <span class="c-kw">const</span> res = <span class="c-kw">await</span> <span class="c-fn">fetch</span>(
-  <span class="c-str">'https://axon-kedb.onrender.com/v1/call/serpapi/search?q=best+espresso+in+lisbon'</span>,
+  <span class="c-str">'https://api.nexusinovation.com.br/v1/call/serpapi/search?q=best+espresso+in+lisbon'</span>,
   { headers: { <span class="c-str">'x-api-key'</span>: process.env.<span class="c-var">AXON_KEY</span> } }
 );
 
@@ -605,7 +605,7 @@
     </main>
 
     <script>
-      const SIGNUP_URL = 'https://axon-kedb.onrender.com/v1/signup';
+      const SIGNUP_URL = 'https://api.nexusinovation.com.br/v1/signup';
 
       async function submitSignup(event) {
         event.preventDefault();
@@ -644,7 +644,7 @@
           // Also cache the API key in localStorage for /dashboard convenience
           try {
             localStorage.setItem('axon.apiKey', data.api_key);
-            localStorage.setItem('axon.baseUrl', 'https://axon-kedb.onrender.com');
+            localStorage.setItem('axon.baseUrl', 'https://api.nexusinovation.com.br');
           } catch (_) {}
 
           btn.textContent = 'Done';
@@ -745,7 +745,7 @@
 
     <script>
       (function () {
-        var API_BASE = 'https://axon-kedb.onrender.com';
+        var API_BASE = 'https://api.nexusinovation.com.br';
         var REGISTRY_URL = 'https://github.com/axondevi/axon/blob/main/registry/';
         var grid = document.getElementById('api-cats');
         var eyebrow = document.getElementById('apis-eyebrow');

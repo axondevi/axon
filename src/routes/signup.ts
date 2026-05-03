@@ -226,8 +226,8 @@ app.post('/', ipRateLimit, async (c) => {
       warning: 'Save your API key now. It is shown once and cannot be retrieved later.',
       next_steps: {
         docs: 'https://github.com/axondevi/axon#readme',
-        dashboard: 'https://axon-5zf.pages.dev/dashboard',
-        try_a_call: `curl -H "Authorization: Bearer ${rawKey}" "https://axon-kedb.onrender.com/v1/call/brasilapi/cnpj?cnpj=00000000000191"`,
+        dashboard: 'https://nexusinovation.com.br/dashboard',
+        try_a_call: `curl -H "Authorization: Bearer ${rawKey}" "https://api.nexusinovation.com.br/v1/call/brasilapi/cnpj?cnpj=00000000000191"`,
       },
     },
     201,
