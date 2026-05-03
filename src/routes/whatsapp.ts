@@ -1438,8 +1438,33 @@ async function processBufferedTurn(opts: {
         }
       } catch { /* judge is best-effort; never bubble */ }
     })();
-  } catch {
+  } catch (err) {
+    // Whatever blew up here — runAgent throwing on a provider 5xx, a
+    // memory write failure, a guard-rewrite bug — was previously
+    // swallowed silently AND the fallback "Desculpe, tive um problema
+    // técnico" never made it into agent_messages, so the brain panel
+    // had no idea anything had gone wrong. Now: log the real error
+    // server-side AND persist the user+assistant pair with meta.error
+    // so the operator can click into the panel and see what failed.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('whatsapp.runAgent.failed', {
+      error: errMsg,
+      agent_id: a.id,
+      phone: inbound.phone,
+      session_id: sessionId,
+    });
     reply = '🤖 Desculpe, tive um problema técnico. Tente de novo em alguns segundos.';
+    db.insert(agentMessages).values({
+      agentId: a.id, sessionId, role: 'user',
+      content: mergedText.slice(0, 4000),
+      visitorIp: 'whatsapp',
+    }).catch(() => {});
+    db.insert(agentMessages).values({
+      agentId: a.id, sessionId, role: 'assistant',
+      content: reply,
+      visitorIp: 'whatsapp',
+      meta: { error: errMsg, finish_reason: 'error', provider: 'fallback' } as unknown as Record<string, unknown>,
+    }).catch(() => {});
   }
 
   const apiKey = connApiKey;

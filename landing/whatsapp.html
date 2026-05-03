@@ -221,6 +221,21 @@
         margin-top: 4px; padding: 0 6px;
       }
       .turn.user .turn-meta { text-align: right; }
+      .turn.errored .bubble {
+        border-color: rgba(255,95,87,0.45);
+        background: rgba(255,95,87,0.08);
+      }
+      .error-detail {
+        margin-top: 6px; padding: 8px 10px;
+        background: rgba(255,95,87,0.08);
+        border: 1px solid rgba(255,95,87,0.3);
+        border-radius: 8px;
+        font-size: 12px; color: var(--danger);
+        line-height: 1.4;
+      }
+      .error-detail strong { color: var(--danger); }
+      a.health-pill { text-decoration: none; cursor: pointer; }
+      a.health-pill:hover { filter: brightness(1.2); }
 
       .empty {
         text-align: center; color: var(--text-muted);
@@ -1170,14 +1185,22 @@
         return `
           <h2>💬 Conversa (${msgs.length} mensagens · mais recente em cima) <span class="info-tip" data-tip="Cada bolha do agente tem um botão 🧠 que abre o raciocínio: intent, tools usadas, custo, e nota dada por outro LLM avaliador.">?</span></h2>
           ${renderPatchesCard()}
-          ${msgs.map(m => `
-            <div class="turn ${m.role}">
+          ${msgs.map(m => {
+            const errored = m.role === 'assistant' && m.meta && m.meta.error;
+            return `
+            <div class="turn ${m.role}${errored ? ' errored' : ''}">
               <div class="bubble">${escapeHtml(m.content)}${m.role === 'assistant' ? renderScoreBadge(m.meta) : ''}</div>
+              ${errored ? `
+                <div class="error-detail" title="Erro real do servidor — não-recuperável neste turno. Cliente recebeu fallback genérico.">
+                  ❌ <strong>erro do agente:</strong> ${escapeHtml(String(m.meta.error).slice(0, 240))}
+                  <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">provider: ${escapeHtml(m.meta.provider || 'desconhecido')} · finish: ${escapeHtml(m.meta.finish_reason || '?')}</div>
+                </div>
+              ` : ''}
               <div class="turn-meta">${m.role === 'user' ? 'cliente' : '🤖 agente'} · ${relTime(m.created_at)}${renderEvalAxes(m)}</div>
               ${m.role === 'assistant' && m.meta ? renderBrainToggle(m) : ''}
               ${m.role === 'assistant' && m.meta ? renderBrainPanel(m) : ''}
             </div>
-          `).join('')}
+          `;}).join('')}
         `;
       }
 
@@ -1408,6 +1431,15 @@
 
       function renderHealthPill() {
         const h = state.health;
+        // The business-info-0% case had no clickable affordance — operator
+        // saw the pill, knew their agent was missing context, but had to
+        // hunt for the right page. Now: when business_info_use_rate is 0
+        // OR when no info is filled at all, the pill becomes a real
+        // anchor pointing at /build?edit=<agentId>#business-info, which
+        // scrolls the form straight to the business-info textarea.
+        const editHref = state.selectedAgentId
+          ? `/build?edit=${encodeURIComponent(state.selectedAgentId)}#b-business`
+          : null;
         if (!h || h.avg_score === null || h.avg_score === undefined) {
           // Even before judge has 5+ scored turns, knowledge-use rates
           // can be informative. Show a smaller pill with just those.
@@ -1415,7 +1447,13 @@
             const parts = [];
             if (h.memory_use_rate !== null) parts.push(`memória ${h.memory_use_rate}%`);
             if (h.business_info_use_rate !== null) parts.push(`business info ${h.business_info_use_rate}%`);
-            return `<span class="health-pill mid" title="Saúde de avaliação ainda em coleta — precisa de 5+ turnos avaliados">📚 ${parts.join(' · ')}</span>`;
+            const lowBiz = (h.business_info_use_rate ?? 100) < 20;
+            const tip = lowBiz
+              ? 'Business info pouco usado. Clique para preencher catálogo, endereço, política — agente fica muito mais útil.'
+              : 'Saúde de avaliação ainda em coleta — precisa de 5+ turnos avaliados';
+            const tag = lowBiz && editHref ? 'a' : 'span';
+            const attrs = lowBiz && editHref ? `href="${editHref}"` : '';
+            return `<${tag} class="health-pill mid" ${attrs} title="${escapeHtml(tip)}">📚 ${parts.join(' · ')}${lowBiz ? ' →' : ''}</${tag}>`;
           }
           return '';
         }

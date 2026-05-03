@@ -2799,6 +2799,10 @@ Estacionamento: gratuito por 1h"></textarea>
 
       // ── Auto-load existing agent for editing (?edit=AGENT_ID) ──────
       // Vindo do dashboard pelo botão "⚙ Editar" no card do agente.
+      // Honors location.hash (#b-business etc) by scrolling to the
+      // matching field once the form is populated — used by the
+      // "business info 0%" pill in the brain panel to land the user
+      // straight on the textarea that needs filling.
       function maybeAutoLoadEdit() {
         try {
           var p = new URLSearchParams(window.location.search);
@@ -2808,7 +2812,28 @@ Estacionamento: gratuito por 1h"></textarea>
           var mineBtn = document.querySelector('.tab-bar button[data-tab="mine"]');
           if (mineBtn) mineBtn.click();
           // Open the editor populated with this agent's config
-          setTimeout(function () { editAgent(editId); }, 200);
+          setTimeout(function () {
+            editAgent(editId);
+            var anchor = (location.hash || '').replace('#', '');
+            if (!anchor) return;
+            // Wait for the form fields to render (editAgent is async-ish).
+            // Field IDs in the builder all start with 'b-', so we scroll
+            // and focus once the element materializes.
+            var tries = 0;
+            var poll = setInterval(function () {
+              tries++;
+              var el = document.getElementById(anchor);
+              if (el) {
+                clearInterval(poll);
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof el.focus === 'function') el.focus({ preventScroll: true });
+                el.style.boxShadow = '0 0 0 2px var(--accent)';
+                setTimeout(function () { el.style.boxShadow = ''; }, 1800);
+              } else if (tries > 30) {
+                clearInterval(poll);
+              }
+            }, 200);
+          }, 200);
         } catch (e) {}
       }
 
