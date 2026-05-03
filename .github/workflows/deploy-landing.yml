@@ -27,7 +27,7 @@ jobs:
       contents: read
       deployments: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # wrangler-action@v3 auto-detects the package manager from lockfiles
       # in the repo. We ship bun.lock at the root, so the action tried to
