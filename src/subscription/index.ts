@@ -176,9 +176,13 @@ export async function getSubscription(userId: string) {
 
 /**
  * Daily cron: find subs whose tier_expires_at is in the past. If auto_renew
- * + sufficient balance → renew. Otherwise → drop to 'free'.
+ * + sufficient balance → renew (and email confirmation). Otherwise → drop
+ * to 'free' (and email an explanation + reactivation link). Returns counts
+ * for observability.
  *
- * Returns counts for observability.
+ * Both the renew and downgrade paths fire emails because the previous
+ * silent behavior caused churn — paying customers woke up free with no
+ * notice and no idea what happened.
  */
 export async function processExpiringSubscriptions() {
   const now = new Date();
@@ -191,15 +195,42 @@ export async function processExpiringSubscriptions() {
   let downgraded = 0;
   let failed = 0;
 
+  // Lazy-import email + log so the unit-test path that doesn't ship
+  // these modules still loads the subscription engine.
+  const { sendEmail } = await import('~/lib/email');
+  const { log } = await import('~/lib/logger');
+  const { getBalance } = await import('~/wallet/service');
+  const dashboardUrl = process.env.DASHBOARD_URL ?? 'https://axon-5zf.pages.dev';
+
   for (const u of expired) {
     if (u.tier === 'free') continue;
+    if (!u.email) continue; // anonymous / migrated rows have no addressable email
+    const tierLabel = u.tier.charAt(0).toUpperCase() + u.tier.slice(1);
+    let downgradeReason = 'auto-renew desativado';
+
     if (u.tierAutoRenew && isPaidTier(u.tier)) {
       try {
         await subscribe(u.id, u.tier as Tier, { autoRenew: true });
         renewed++;
+        // Confirmation email — fire-and-forget, never block cron on
+        // SMTP hiccups. Errors are logged for the operator.
+        sendEmail('subscription-renewed', u.email, {
+          name: u.email.split('@')[0],
+          tier_label: tierLabel,
+          amount_usdc: (Number(TIER_PRICES[u.tier as Tier]) / 1_000_000).toFixed(2),
+          period_days: String(PERIOD_DAYS),
+          next_charge_date: new Date(Date.now() + PERIOD_DAYS * 86400_000).toISOString().slice(0, 10),
+          dashboard_url: dashboardUrl,
+        }).catch((err: unknown) => {
+          log.warn('subscription.renewed.email_failed', {
+            user_id: u.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
         continue;
       } catch (err) {
         failed++;
+        downgradeReason = err instanceof Error ? err.message : 'falha na renovação';
         // Fall through to downgrade
       }
     }
@@ -208,7 +239,94 @@ export async function processExpiringSubscriptions() {
       .set({ tier: 'free', tierExpiresAt: null, tierAutoRenew: true })
       .where(eq(users.id, u.id));
     downgraded++;
+    // Downgrade explanation email — same fire-and-forget pattern.
+    let depositAddr = '(sem carteira)';
+    try {
+      const bal = await getBalance(u.id);
+      depositAddr = bal.address || depositAddr;
+    } catch (_) { /* tolerable */ }
+    sendEmail('subscription-downgraded', u.email, {
+      name: u.email.split('@')[0],
+      tier_label: tierLabel,
+      reason: downgradeReason,
+      deposit_address: depositAddr,
+      upgrade_url: `${dashboardUrl}/upgrade`,
+    }).catch((err: unknown) => {
+      log.warn('subscription.downgraded.email_failed', {
+        user_id: u.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   return { processed: expired.length, renewed, downgraded, failed };
+}
+
+/**
+ * Companion cron: find subs expiring in the next N days and email a
+ * heads-up so the owner can confirm balance / cancel auto-renew before
+ * the silent renewal happens. Idempotent within a 48h window per user
+ * (Redis SETNX) so cron retries don't double-email.
+ *
+ * Default DAYS_AHEAD=3 — enough lead time for a deposit to clear on
+ * Base mainnet without spamming weeks early.
+ */
+export async function notifyExpiringSubscriptions(opts: { daysAhead?: number } = {}) {
+  const daysAhead = opts.daysAhead ?? 3;
+  const now = new Date();
+  const cutoff = new Date(now.getTime() + daysAhead * 86400_000);
+  const { gte } = await import('drizzle-orm');
+  const upcoming = await db
+    .select()
+    .from(users)
+    .where(and(
+      isNotNull(users.tierExpiresAt),
+      gte(users.tierExpiresAt, now),
+      lte(users.tierExpiresAt, cutoff),
+    ));
+
+  const { sendEmail } = await import('~/lib/email');
+  const { log } = await import('~/lib/logger');
+  const { getBalance } = await import('~/wallet/service');
+  const { redis } = await import('~/cache/redis');
+  const dashboardUrl = process.env.DASHBOARD_URL ?? 'https://axon-5zf.pages.dev';
+
+  let notified = 0;
+  for (const u of upcoming) {
+    if (u.tier === 'free' || !isPaidTier(u.tier)) continue;
+    if (!u.tierExpiresAt) continue;
+    if (!u.email) continue; // can't notify a user we have no address for
+    // Dedup window: 48h. A user expiring in 3 days won't receive 3
+    // identical reminders if cron runs nightly during that window.
+    const dedup = await redis.set(`sub:notify:${u.id}`, '1', 'EX', 172800, 'NX').catch(() => null);
+    if (dedup !== 'OK') continue;
+    const price = Number(TIER_PRICES[u.tier as Tier]) / 1_000_000;
+    let balUsdc = 0;
+    let depositAddr = '(sem carteira)';
+    try {
+      const bal = await getBalance(u.id);
+      balUsdc = Number(bal.balanceMicro) / 1_000_000;
+      depositAddr = bal.address || depositAddr;
+    } catch (_) { /* tolerable */ }
+    const tierLabel = u.tier.charAt(0).toUpperCase() + u.tier.slice(1);
+    const daysRemaining = Math.max(1, Math.ceil((u.tierExpiresAt.getTime() - now.getTime()) / 86400_000));
+    sendEmail('subscription-expiring-soon', u.email, {
+      name: u.email.split('@')[0],
+      tier_label: tierLabel,
+      amount_usdc: price.toFixed(2),
+      balance_usdc: balUsdc.toFixed(2),
+      expires_at: u.tierExpiresAt.toISOString().slice(0, 10),
+      days_remaining: String(daysRemaining),
+      deposit_address: depositAddr,
+      dashboard_url: dashboardUrl,
+      low_balance: balUsdc < price ? '1' : '',
+    }).catch((err: unknown) => {
+      log.warn('subscription.expiring.email_failed', {
+        user_id: u.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+    notified++;
+  }
+  return { upcoming: upcoming.length, notified };
 }

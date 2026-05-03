@@ -19,6 +19,7 @@ import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
 import { Errors } from '~/lib/errors';
 import { log } from '~/lib/logger';
 import { encrypt, decrypt } from '~/lib/crypto';
+import { utcDayKey } from '~/lib/time';
 import { checkInstance, setWebhook, sendText, sendMedia, sendVoice, connectInstance, createInstance, deleteInstance, fetchMessageMedia, extractInbound, extractCallEvent, rejectCall } from '~/whatsapp/evolution';
 import { recordSentId, isSentByUs } from '~/whatsapp/sent-ids';
 import { runAgent, type ChatMessage } from '~/agents/runtime';
@@ -612,6 +613,45 @@ publicWebhook.post('/:secret', async (c) => {
     return c.json({ ignored: 'cannot_decrypt_key' });
   }
 
+  // ─── Daily budget guard — same logic as agent-run.ts, applied here so
+  // a single spammy WhatsApp contact can't blow past the owner's
+  // configured cap (the field existed but only the HTTP /chat path
+  // honored it, leaving WhatsApp as a free-for-all). When exceeded we
+  // emit one webhook per agent per UTC day and quietly drop the inbound
+  // — the customer doesn't get a robotic "limit reached" reply because
+  // that would be confusing UX for a real WhatsApp conversation; the
+  // owner sees the budget_exhausted webhook + can raise the cap.
+  if (agentRow.dailyBudgetMicro) {
+    const { redis } = await import('~/cache/redis');
+    const dayKey = `agentbudget:${agentRow.id}:${utcDayKey()}`;
+    const spentRaw = await redis.get(dayKey).catch(() => null);
+    const spent = BigInt(spentRaw ?? '0');
+    if (spent >= agentRow.dailyBudgetMicro) {
+      const notifyKey = `agentbudget:notified:${agentRow.id}:${utcDayKey()}`;
+      const wasFirst = await redis.set(notifyKey, '1', 'EX', 86400, 'NX').catch(() => null);
+      if (wasFirst === 'OK') {
+        const { emitWebhook } = await import('~/webhooks/emitter');
+        // emitWebhook is fire-and-forget already; just call it.
+        emitWebhook(agentRow.ownerId, 'agent.budget_exhausted', {
+          agent_id: agentRow.id,
+          agent_slug: agentRow.slug,
+          channel: 'whatsapp',
+          contact_phone: inbound.phone,
+          daily_budget_micro: agentRow.dailyBudgetMicro.toString(),
+          spent_micro: spent.toString(),
+          reset_at: 'utc_midnight',
+        });
+      }
+      log.warn('whatsapp.budget.exceeded', {
+        agent_id: agentRow.id,
+        spent_micro: spent.toString(),
+        cap_micro: agentRow.dailyBudgetMicro.toString(),
+        contact_phone: inbound.phone,
+      });
+      return c.json({ ignored: 'agent_budget_exhausted' });
+    }
+  }
+
   // ─── Media inbound: image / audio → describe / transcribe ───────────
   // The text the agent will see in `inbound.text` gets enriched here:
   //   image → "[CLIENTE ENVIOU FOTO] <description>. Caption: <caption>"
@@ -989,11 +1029,41 @@ async function processBufferedTurn(opts: {
     augmentedSystemPrompt = `${a.systemPrompt}${businessBlock}` +
       (memoryContext ? `\n\n## O que você sabe sobre este contato\n${memoryContext}` : '');
 
-    // Affiliate payout (fire-and-forget). Idempotent — if already paid
-    // or no referrer, this is a single SELECT and returns immediately.
+    // Affiliate payout — fire-and-forget but with a Redis cooldown so a
+    // persistently-failing payout (insufficient funds, transient DB
+    // hiccup) doesn't re-attempt on every single inbound from the same
+    // contact. Without the cooldown, a low-balance owner with a chatty
+    // affiliate-attributed contact generated dozens of "debit_failed"
+    // log lines per minute. Cooldown is 1 hour: long enough to absorb
+    // a top-up, short enough that a recovery after deposit lands fast.
     if (memory && a.affiliateEnabled && a.affiliatePayoutMicro > 0n && memory.referredByUserId && !memory.affiliatePaidAt) {
-      const { payoutAffiliateIfPending } = await import('~/affiliates');
-      void payoutAffiliateIfPending({ agentId: a.id, contactId: memory.id }).catch(() => {});
+      void (async () => {
+        try {
+          const { redis } = await import('~/cache/redis');
+          const cooldownKey = `affiliate:cooldown:${memory.id}`;
+          const fresh = await redis.set(cooldownKey, '1', 'EX', 3600, 'NX');
+          if (fresh !== 'OK') return; // attempted in the last hour, skip
+          const { payoutAffiliateIfPending } = await import('~/affiliates');
+          const res = await payoutAffiliateIfPending({ agentId: a.id, contactId: memory.id });
+          if (!res.paid && res.reason && !/already_paid|no_referrer|affiliate_disabled|zero_payout/.test(res.reason)) {
+            // Real failure (insufficient funds, debit_failed, etc) — log
+            // so the operator can see why payouts aren't landing. Don't
+            // surface to the customer; agent reply already went out.
+            log.warn('affiliate.payout.skipped', {
+              agent_id: a.id,
+              contact_id: memory.id,
+              reason: res.reason,
+              cooldown_until: new Date(Date.now() + 3600_000).toISOString(),
+            });
+          }
+        } catch (err) {
+          log.warn('affiliate.payout.threw', {
+            agent_id: a.id,
+            contact_id: memory.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })();
     }
 
     // ─── Document vault (silent CRM persistence) ───────────────────

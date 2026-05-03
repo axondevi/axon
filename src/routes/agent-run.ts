@@ -34,6 +34,7 @@ import { Errors } from '~/lib/errors';
 import { handleCall } from '~/wrapper/engine';
 import { isToolAllowed } from '~/agents/templates';
 import { emitWebhook } from '~/webhooks/emitter';
+import { utcDayKey } from '~/lib/time';
 
 const app = new Hono();
 
@@ -48,10 +49,8 @@ function clientIp(c: Context): string {
   return String(fwd).split(',')[0].trim();
 }
 
-function utcDayKey(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-}
+// utcDayKey moved to ~/lib/time.ts so the WhatsApp webhook handler
+// shares the exact same bucket boundaries as the HTTP /chat path.
 
 // Allowed pseudo-API for LLM dispatch — agents always call this even if it isn't
 // in allowed_tools (the agent IS the LLM call; the tool whitelist is for what the

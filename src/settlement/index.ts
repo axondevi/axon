@@ -71,8 +71,19 @@ export async function settleForApi(
   return { inserted: inserted.length > 0, owedMicro, requests: reqCount };
 }
 
-/** Settle every active slug that had traffic in the window. */
+/** Settle every active slug that had traffic in the window.
+ *
+ * Per-slug failures are isolated — one bad upstream slug doesn't take
+ * down the whole batch. Each result includes either the aggregate or
+ * an error message, so the operator can see exactly what landed and
+ * what didn't (the previous loop bubbled the first throw and lost the
+ * progress made on prior slugs). settleForApi is idempotent (ON
+ * CONFLICT DO UPDATE skipped for paid rows), so a manual retry after
+ * a partial run only re-touches the slugs that errored.
+ */
 export async function settleAll(period: SettlementPeriod) {
+  const { log } = await import('~/lib/logger');
+  const t0 = Date.now();
   const slugs = await db
     .select({ slug: requests.apiSlug })
     .from(requests)
@@ -85,10 +96,40 @@ export async function settleAll(period: SettlementPeriod) {
     )
     .groupBy(requests.apiSlug);
 
-  const results = [];
+  log.info('settlement.run.start', {
+    period_start: period.start.toISOString(),
+    period_end: period.end.toISOString(),
+    slug_count: slugs.length,
+  });
+
+  const results: Array<{
+    slug: string;
+    inserted?: boolean;
+    owedMicro: bigint;
+    requests?: number;
+    error?: string;
+  }> = [];
+  let successes = 0;
+  let failures = 0;
   for (const { slug } of slugs) {
-    results.push({ slug, ...(await settleForApi(slug, period)) });
+    try {
+      const r = await settleForApi(slug, period);
+      results.push({ slug, ...r });
+      successes++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error('settlement.slug.failed', { slug, error: msg });
+      results.push({ slug, owedMicro: 0n, error: msg });
+      failures++;
+    }
   }
+
+  log.info('settlement.run.done', {
+    duration_ms: Date.now() - t0,
+    slug_count: slugs.length,
+    successes,
+    failures,
+  });
   return results;
 }
 

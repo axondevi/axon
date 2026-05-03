@@ -1,0 +1,70 @@
+# User-tier (free/pro/team) subscription lifecycle.
+#
+# This is the older USER-LEVEL subscription system — distinct from the
+# per-AGENT plan billing in `subscription-billing.yml`. Users with
+# `tier_expires_at` in the past get either:
+#   - renewed (auto-renew on + sufficient balance)
+#   - downgraded to free (auto-renew off OR insufficient balance)
+#
+# Both paths now send an explanation email so the customer isn't
+# surprised by a free tier on Monday morning. The companion notify
+# endpoint runs an hour earlier and reaches out 3 days before expiry.
+#
+# Required secret: ADMIN_API_KEY (shared with other cron workflows).
+
+name: user-subscription-rollover
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # 06:00 BR — heads-up email (3 days before)
+    - cron: '0 10 * * *'  # 07:00 BR — actual renewal/downgrade
+  workflow_dispatch:
+
+concurrency:
+  group: user-subscription-rollover
+  cancel-in-progress: false
+
+jobs:
+  notify-expiring:
+    if: github.event.schedule == '0 9 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Heads-up email (3 days before expiry)
+        run: |
+          for i in 1 2 3; do
+            if curl -fSs --max-time 90 -X POST \
+                 "https://axon-kedb.onrender.com/v1/admin/cron/user-subscription-notify" \
+                 -H "x-admin-key: ${{ secrets.ADMIN_API_KEY }}" \
+                 -H "Content-Type: application/json" \
+                 -d '{"days_ahead": 3}' \
+                 -w "\nHTTP %{http_code}\n" \
+                 -o response.json; then
+              cat response.json
+              exit 0
+            fi
+            echo "attempt $i failed, retrying in 10s"
+            sleep 10
+          done
+          exit 1
+
+  rollover:
+    if: github.event.schedule == '0 10 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Renew or downgrade expired tiers
+        run: |
+          for i in 1 2 3; do
+            if curl -fSs --max-time 90 -X POST \
+                 "https://axon-kedb.onrender.com/v1/admin/cron/user-subscription-rollover" \
+                 -H "x-admin-key: ${{ secrets.ADMIN_API_KEY }}" \
+                 -H "Content-Type: application/json" \
+                 -d '{}' \
+                 -w "\nHTTP %{http_code}\n" \
+                 -o response.json; then
+              cat response.json
+              exit 0
+            fi
+            echo "attempt $i failed, retrying in 10s"
+            sleep 10
+          done
+          exit 1

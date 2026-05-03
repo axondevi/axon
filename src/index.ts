@@ -25,7 +25,7 @@ import operatorRoutes from '~/routes/operator';
 import signupRoutes from '~/routes/signup';
 import authPrivyRoutes from '~/routes/auth-privy';
 import authSupabaseRoutes from '~/routes/auth-supabase';
-import subscriptionRoutes, { publicRoutes as subscriptionPublicRoutes } from '~/routes/subscription';
+import subscriptionRoutes, { publicRoutes as subscriptionPublicRoutes, adminCronRoutes as subscriptionAdminCron } from '~/routes/subscription';
 import agentsRoutes, { publicRoutes as agentsPublicRoutes } from '~/routes/agents';
 import agentRunRoutes from '~/routes/agent-run';
 import { ownerWhatsapp, publicWebhook as whatsappPublicWebhook } from '~/routes/whatsapp';
@@ -166,6 +166,7 @@ app.route('/v1/admin/audit', auditRoutes);
 // authed /v1 router so the api-key middleware doesn't shadow it.
 app.route('/v1/admin', adminCron);
 app.route('/v1/admin', adminSubscriptionsCron);
+app.route('/v1/admin', subscriptionAdminCron);
 
 // ─── Public signup (no auth, IP rate-limited) ─────────
 // MUST be mounted BEFORE the authed /v1 sub-router.

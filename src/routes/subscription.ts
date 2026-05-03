@@ -69,4 +69,32 @@ app.post('/cancel', async (c) => {
   return c.json({ ok: true, ...result });
 });
 
+// Admin-only cron endpoints for the user-tier subscription lifecycle
+// (free / pro / team rollover). The per-agent plan billing lives in
+// routes/subscriptions.ts — this file handles the older user-level
+// monthly tier subscriptions. Mounted under /v1/admin/cron/* in
+// src/index.ts. Both endpoints accept ADMIN_API_KEY via x-admin-key.
+export const adminCronRoutes = new Hono();
+
+adminCronRoutes.post('/cron/user-subscription-rollover', async (c) => {
+  const adminKey = c.req.header('x-admin-key');
+  if (!adminKey || adminKey !== process.env.ADMIN_API_KEY) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const { processExpiringSubscriptions } = await import('~/subscription');
+  const result = await processExpiringSubscriptions();
+  return c.json(result);
+});
+
+adminCronRoutes.post('/cron/user-subscription-notify', async (c) => {
+  const adminKey = c.req.header('x-admin-key');
+  if (!adminKey || adminKey !== process.env.ADMIN_API_KEY) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const body = await c.req.json().catch(() => ({} as { days_ahead?: number }));
+  const { notifyExpiringSubscriptions } = await import('~/subscription');
+  const result = await notifyExpiringSubscriptions({ daysAhead: body.days_ahead });
+  return c.json(result);
+});
+
 export default app;

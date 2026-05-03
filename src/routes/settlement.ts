@@ -60,9 +60,19 @@ app.post('/run', adminAuth, async (c) => {
       results: results.map((r) => ({ ...r, owedMicro: r.owedMicro.toString() })),
     },
   });
+  // Surface partial-failure summary at the top so the operator can spot
+  // an issue without scanning the per-slug array. settleAll never
+  // throws now — it always returns a mix of successes and errors.
+  const successes = results.filter((r) => !r.error).length;
+  const failures = results.filter((r) => r.error).length;
   return c.json({
-    ok: true,
+    ok: failures === 0,
     period,
+    summary: {
+      total: results.length,
+      successes,
+      failures,
+    },
     results: results.map((r) => ({
       ...r,
       owedMicro: r.owedMicro.toString(),
