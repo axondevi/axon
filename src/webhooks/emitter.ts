@@ -140,3 +140,84 @@ async function deliver(
     });
   }
 }
+
+/**
+ * Manual retry for a previously-failed delivery. The original delivery
+ * row is left untouched (audit trail); a new row is inserted with
+ * `attempts = previous + 1` so the operator can see how many times this
+ * payload has been re-attempted. Returns the new delivery's outcome
+ * synchronously so the admin endpoint can surface success/failure.
+ */
+export async function retryDelivery(deliveryId: string): Promise<{
+  ok: boolean;
+  status?: number;
+  error?: string;
+  delivery_id?: string;
+}> {
+  const [orig] = await db.select().from(webhookDeliveries).where(eq(webhookDeliveries.id, deliveryId)).limit(1);
+  if (!orig) return { ok: false, error: 'delivery_not_found' };
+  if (orig.deliveredAt) return { ok: false, error: 'already_delivered' };
+
+  const [sub] = await db.select().from(webhookSubscriptions).where(eq(webhookSubscriptions.id, orig.subscriptionId)).limit(1);
+  if (!sub) return { ok: false, error: 'subscription_deleted' };
+  if (!sub.active) return { ok: false, error: 'subscription_inactive' };
+
+  const safe = checkUrlSafe(sub.url);
+  if (!safe.ok) return { ok: false, error: `url_unsafe: ${safe.reason}` };
+
+  const payload = orig.payload as WebhookPayload<unknown>;
+  const body = JSON.stringify(payload);
+  const sig = createHmac('sha256', sub.secret).update(body, 'utf8').digest('hex');
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let status = 0;
+  let error: string | null = null;
+  try {
+    const res = await fetch(sub.url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'user-agent': USER_AGENT,
+        'x-axon-event': payload.event,
+        'x-axon-delivery-id': payload.id,
+        'x-axon-signature': `sha256=${sig}`,
+        'x-axon-retry': String(orig.attempts + 1),
+      },
+      body,
+      signal: ctrl.signal,
+    });
+    status = res.status;
+    if (status >= 400) error = `HTTP ${status}`;
+  } catch (err) {
+    error = (err as Error).message;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const [inserted] = await db.insert(webhookDeliveries).values({
+    subscriptionId: sub.id,
+    event: payload.event,
+    payload: orig.payload,
+    attempts: orig.attempts + 1,
+    lastStatus: status || null,
+    lastError: error,
+    deliveredAt: error ? null : new Date(),
+  }).returning({ id: webhookDeliveries.id });
+
+  log.info('webhook_retry', {
+    original_delivery_id: deliveryId,
+    new_delivery_id: inserted?.id,
+    subscription_id: sub.id,
+    attempt: orig.attempts + 1,
+    status,
+    error,
+  });
+
+  return {
+    ok: !error,
+    status: status || undefined,
+    error: error ?? undefined,
+    delivery_id: inserted?.id,
+  };
+}

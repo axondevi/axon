@@ -12,7 +12,7 @@
  *                                            answer back via Evolution sendText
  */
 import { Hono } from 'hono';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, ne } from 'drizzle-orm';
 import { randomBytes, createHash } from 'node:crypto';
 import { db } from '~/db';
 import { agents, users, whatsappConnections, agentMessages } from '~/db/schema';
@@ -491,7 +491,11 @@ publicWebhook.post('/:secret', async (c) => {
     .where(eq(whatsappConnections.webhookSecret, secret))
     .limit(1);
   if (!conn) {
-    // Don't 404 — return 200 so a misconfigured webhook doesn't keep retrying
+    // Don't 404 — return 200 so a misconfigured webhook doesn't keep
+    // retrying. Log so the operator can spot a stale webhook URL on
+    // Evolution that no longer matches any DB row (the failure mode
+    // that left the Concessionária mute on 2026-05-03).
+    log.warn('whatsapp.webhook.unknown_secret', { secret_prefix: secret.slice(0, 8) });
     return c.json({ ignored: true });
   }
 
@@ -528,15 +532,24 @@ publicWebhook.post('/:secret', async (c) => {
   // welcome — and a real inbound proves the WhatsApp is actually paired, so
   // we can flip 'pairing' → 'connected' here too.
   if (conn.status === 'disabled') {
+    log.info('whatsapp.webhook.ignored', { reason: 'disabled', conn_id: conn.id, agent_id: conn.agentId });
     return c.json({ ignored: 'disabled' });
   }
 
   // Update freshness ping + promote to 'connected' on first real event so
   // GET /whatsapp can short-circuit the probe path for traffic-bearing rows.
+  // Guard against clobbering an operator-set 'disabled' state — the
+  // status='disabled' check above already short-circuits, but a
+  // concurrent webhook could have set disabled between then and now.
+  // The WHERE keeps disabled disabled and only flips pairing/connecting
+  // → connected; lastEventAt gets bumped either way for freshness.
   db.update(whatsappConnections)
     .set({ lastEventAt: new Date(), status: 'connected' })
-    .where(eq(whatsappConnections.id, conn.id))
-    .catch(() => {});
+    .where(and(eq(whatsappConnections.id, conn.id), ne(whatsappConnections.status, 'disabled')))
+    .catch((err) => log.warn('whatsapp.connection.update_failed', {
+      conn_id: conn.id,
+      error: err instanceof Error ? err.message : String(err),
+    }));
 
   // ─── CALL event: caller dialed the WhatsApp number ───────────────
   // Baileys can't answer calls (no SRTP), so a normal call would just
@@ -558,7 +571,14 @@ publicWebhook.post('/:secret', async (c) => {
 
   // Body already drained as `payload` above for the replay guard; reuse.
   const inbound = extractInbound(payload);
-  if (!inbound) return c.json({ ignored: 'unsupported_event' });
+  if (!inbound) {
+    // Evolution emits all sorts of events (presence, group, status) that
+    // we deliberately don't process. Logged at info so high-volume noise
+    // doesn't drown out warns; useful for debugging "why did Evolution's
+    // hit not turn into a turn?" questions.
+    log.info('whatsapp.webhook.ignored', { reason: 'unsupported_event', conn_id: conn.id, agent_id: conn.agentId });
+    return c.json({ ignored: 'unsupported_event' });
+  }
 
   // ─── Human handoff detection ─────────────────────────────────────
   // fromMe=true on a webhook means the WhatsApp account itself sent the
@@ -570,6 +590,9 @@ publicWebhook.post('/:secret', async (c) => {
   //     paused" mode for 30min so the agent stops talking over them.
   if (inbound.fromMe) {
     if (inbound.messageId && isSentByUs(inbound.messageId)) {
+      // Quietly ignored — these are our own sendText echoes. Logged at
+      // info because volume is high (every reply we send echoes back).
+      log.info('whatsapp.webhook.ignored', { reason: 'echo', conn_id: conn.id, agent_id: conn.agentId });
       return c.json({ ignored: 'echo' });
     }
     // Unknown fromMe → human just answered. Mute the agent for this
@@ -580,18 +603,31 @@ publicWebhook.post('/:secret', async (c) => {
     db.update(contactMemory)
       .set({ humanPausedUntil: pauseUntil, updatedAt: new Date() })
       .where(and(eq(contactMemory.agentId, targetAgentId), eq(contactMemory.phone, inbound.phone)))
-      .catch(() => {});
+      .catch((err) => log.warn('whatsapp.handoff.update_failed', { error: err instanceof Error ? err.message : String(err), agent_id: targetAgentId, phone: inbound.phone }));
+    log.info('whatsapp.handoff.detected', {
+      reason: 'human_handoff',
+      agent_id: conn.agentId,
+      phone: inbound.phone,
+      paused_until: pauseUntil.toISOString(),
+    });
     return c.json({ ignored: 'human_handoff', paused_until: pauseUntil.toISOString() });
   }
 
   // Look up the agent + contact memory once so we can early-out on
   // pause/handoff without doing the expensive media-fetch + LLM work.
   const [agentRow] = await db.select().from(agents).where(eq(agents.id, conn.agentId)).limit(1);
-  if (!agentRow) return c.json({ ignored: 'agent_missing' });
+  if (!agentRow) {
+    // Connection row outlived the agent it pointed at — usually means
+    // the user deleted the agent but the connection cascade FK should
+    // have cleaned this up. Worth investigating if it appears.
+    log.warn('whatsapp.webhook.agent_missing', { conn_id: conn.id, agent_id: conn.agentId });
+    return c.json({ ignored: 'agent_missing' });
+  }
 
   // Owner-set global pause from the dashboard. While paused_at is set,
   // every inbound is dropped — connection stays alive, agent stays mute.
   if (agentRow.pausedAt) {
+    log.info('whatsapp.webhook.ignored', { reason: 'agent_paused', agent_id: agentRow.id, paused_since: agentRow.pausedAt });
     return c.json({ ignored: 'agent_paused' });
   }
 
@@ -602,6 +638,12 @@ publicWebhook.post('/:secret', async (c) => {
     .where(and(eq(contactMemory.agentId, agentRow.id), eq(contactMemory.phone, inbound.phone)))
     .limit(1);
   if (memRow?.humanPausedUntil && memRow.humanPausedUntil.getTime() > Date.now()) {
+    log.info('whatsapp.webhook.ignored', {
+      reason: 'human_handoff_active',
+      agent_id: agentRow.id,
+      phone: inbound.phone,
+      until: memRow.humanPausedUntil.toISOString(),
+    });
     return c.json({ ignored: 'human_handoff_active', until: memRow.humanPausedUntil.toISOString() });
   }
 
@@ -609,7 +651,15 @@ publicWebhook.post('/:secret', async (c) => {
   let connApiKey: string;
   try {
     connApiKey = decrypt(conn.apiKey);
-  } catch {
+  } catch (err) {
+    // MASTER_ENCRYPTION_KEY rotated without backfilling? Re-encrypt
+    // failed migration? Either way the connection is unusable until
+    // the row is recreated. This is a real operational issue.
+    log.error('whatsapp.webhook.cannot_decrypt_key', {
+      conn_id: conn.id,
+      agent_id: conn.agentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return c.json({ ignored: 'cannot_decrypt_key' });
   }
 
@@ -837,7 +887,10 @@ publicWebhook.post('/:secret', async (c) => {
   // bucket so they never get merged with a customer's burst). agentRow
   // was already loaded above for the pause/handoff checks.
   const a = agentRow;
-  if (!a.public) return c.json({ ignored: 'agent_inactive' });
+  if (!a.public) {
+    log.info('whatsapp.webhook.ignored', { reason: 'agent_inactive', agent_id: a.id });
+    return c.json({ ignored: 'agent_inactive' });
+  }
 
   const inboundDigits = inbound.phone.replace(/\D/g, '');
   const ownerDigits = (a.ownerPhone || '').replace(/\D/g, '');
@@ -1131,17 +1184,32 @@ async function processBufferedTurn(opts: {
       const target = pickRoutedAgentId(a.routesTo as RoutesTo, intent);
       if (target) {
         routedId = target;
-        // Fire-and-forget DB update — failure here just means we'll
-        // reclassify next turn, no user-visible impact.
+        // Persist the routing decision so subsequent turns from this
+        // contact go straight to the right specialist without
+        // reclassifying. Fire-and-forget — a write failure means we
+        // reclassify next turn (no user-visible impact) but we still
+        // log so a persistent failure is debuggable.
         db.update(contactMemory)
           .set({ routedAgentId: target, routeIntent: intent, updatedAt: new Date() })
           .where(eq(contactMemory.id, memory.id))
-          .catch(() => {});
+          .catch((err) => log.warn('whatsapp.routing.persist_failed', {
+            error: err instanceof Error ? err.message : String(err),
+            agent_id: a.id,
+            target_agent_id: target,
+            intent,
+          }));
       }
     }
 
     if (routedId) {
-      const routed = await loadRoutedAgent({ agentId: routedId, ownerId: a.ownerId }).catch(() => null);
+      const routed = await loadRoutedAgent({ agentId: routedId, ownerId: a.ownerId }).catch((err) => {
+        log.warn('whatsapp.routing.load_failed', {
+          error: err instanceof Error ? err.message : String(err),
+          target_agent_id: routedId,
+          owner_id: a.ownerId,
+        });
+        return null;
+      });
       if (routed) {
         // The routed agent has its OWN paused_at. If the owner muted the
         // specialist (e.g. clinic receptionist agent paused for the night)
@@ -1464,13 +1532,30 @@ async function processBufferedTurn(opts: {
       .returning({ id: agentMessages.id });
 
     if (memory) {
-      void recordTurn(a.id, inbound.phone).catch(() => {});
+      // Fire-and-forget but with structured logging — without these
+      // logs, a broken Groq key (the LLM that does fact extraction)
+      // would silently leave contact_memory.facts empty forever, and
+      // the brain panel would show "0 fatos extraídos" with no clue
+      // what was wrong.
+      void recordTurn(a.id, inbound.phone).catch((err: unknown) => {
+        log.warn('memory.recordTurn.failed', {
+          agent_id: a.id,
+          phone: inbound.phone,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
       void extractFactsFromTurn({
         agentId: a.id,
         phone: inbound.phone,
         userMessage: mergedText,
         currentMemory: memory,
-      }).catch(() => {});
+      }).catch((err: unknown) => {
+        log.warn('memory.extractFacts.failed', {
+          agent_id: a.id,
+          phone: inbound.phone,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     }
 
     // ─── Fire-and-forget judge layer ──────────────────────────────

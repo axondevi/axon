@@ -32,6 +32,7 @@ import { ownerWhatsapp, publicWebhook as whatsappPublicWebhook } from '~/routes/
 import { ownerContacts } from '~/routes/contacts';
 import { ownerAppointments, ownerAppointmentsRoot, adminCron } from '~/routes/appointments';
 import { ownerSubscriptions, ownerSubscriptionsRoot, adminSubscriptionsCron } from '~/routes/subscriptions';
+import adminWebhooksRoutes from '~/routes/admin-webhooks';
 import { nftMetaRoutes } from '~/routes/nft-metadata';
 import { checkoutRoutes } from '~/routes/checkout';
 import { previewRoutes } from '~/routes/preview';
@@ -167,6 +168,7 @@ app.route('/v1/admin/audit', auditRoutes);
 app.route('/v1/admin', adminCron);
 app.route('/v1/admin', adminSubscriptionsCron);
 app.route('/v1/admin', subscriptionAdminCron);
+app.route('/v1/admin/webhooks', adminWebhooksRoutes);
 
 // ─── Public signup (no auth, IP rate-limited) ─────────
 // MUST be mounted BEFORE the authed /v1 sub-router.
