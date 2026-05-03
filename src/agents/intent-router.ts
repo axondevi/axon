@@ -108,19 +108,47 @@ export function pickRoutedAgentId(routes: RoutesTo | null | undefined, intent: R
 /**
  * Load an agent by id, validating it belongs to the same owner as the
  * caller (cheap defense against a misconfigured routes_to pointing at
- * someone else's agent — would leak between accounts otherwise).
+ * someone else's agent — would leak between accounts otherwise) AND
+ * that the agent is in a routable state (not paused, not deleted, owner
+ * not deleted). Returns null on any miss; logs the reason so a broken
+ * routes_to config is debuggable from the operator's logs instead of
+ * silently degrading to fallback.
  */
 export async function loadRoutedAgent(opts: {
   agentId: string;
   ownerId: string;
 }): Promise<typeof agents.$inferSelect | null> {
+  const { log } = await import('~/lib/logger');
   const [a] = await db
     .select()
     .from(agents)
     .where(eq(agents.id, opts.agentId))
     .limit(1);
-  if (!a) return null;
-  if (a.ownerId !== opts.ownerId) return null;     // cross-owner — refuse
-  if (!a.public) return null;                       // disabled agent
+  if (!a) {
+    log.warn('routing.target_missing', { target_agent_id: opts.agentId, owner_id: opts.ownerId });
+    return null;
+  }
+  if (a.ownerId !== opts.ownerId) {
+    log.warn('routing.cross_owner_refused', { target_agent_id: opts.agentId, target_owner: a.ownerId, caller_owner: opts.ownerId });
+    return null;
+  }
+  if (!a.public) {
+    log.warn('routing.target_disabled', { target_agent_id: opts.agentId });
+    return null;
+  }
+  if (a.pausedAt) {
+    log.warn('routing.target_paused', { target_agent_id: opts.agentId, paused_since: a.pausedAt });
+    return null;
+  }
+  // Confirm the owner account itself is still active. If the operator
+  // deleted their account, agents cascade-delete via FK, so a missing
+  // user usually means the agent already vanished too — but soft-delete
+  // (deleted_at) is also possible and that's where we'd leak otherwise.
+  const { users } = await import('~/db/schema');
+  const [owner] = await db.select().from(users).where(eq(users.id, opts.ownerId)).limit(1);
+  if (!owner || owner.deletedAt) {
+    log.warn('routing.owner_deleted', { target_agent_id: opts.agentId, owner_id: opts.ownerId });
+    return null;
+  }
   return a;
 }

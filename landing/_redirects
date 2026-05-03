@@ -13,12 +13,12 @@
 # /agent-preview/:slug → preview UI ("test drive" before connecting WhatsApp).
 /agent-preview/:slug    /agent-preview?slug=:slug    200
 
-# Vertical niche pages — single template (niche.html) renders all 3 verticals
-# from one config. URLs stay pretty (clinica/restaurante/loja) for SEO,
-# rewrite is internal (200) so the bar shows the friendly path.
-/clinica          /niche?tipo=clinica          200
-/restaurante      /niche?tipo=restaurante      200
-/loja             /niche?tipo=loja             200
+# Vertical niche pages — pre-rendered as standalone files (clinica.html,
+# restaurante.html, loja.html) so SEO crawlers, social link previews,
+# and slow-JS clients all get the full content on first paint. CF Pages
+# auto-strips the .html extension so /clinica → clinica.html happens
+# without an explicit rule. Source of truth for content lives in
+# scripts/generate-niche-pages.py — re-run after editing.
 
 # /personas was standalone but duplicated the "🎭 Personas" tab in /build.
 # Send users there with the tab pre-selected via hash; build.html JS reads

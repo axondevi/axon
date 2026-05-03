@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Atendente virtual pra sua loja online · Nexus Inovation</title>
+<meta name="description" content="Calcula frete por CEP, valida CNPJ, compara preço. Reduz abandono de carrinho. R$199/mês." />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Atendente virtual pra sua loja online · Nexus Inovation" />
+<meta property="og:description" content="Calcula frete por CEP, valida CNPJ, compara preço. Reduz abandono de carrinho. R$199/mês." />
+<meta property="og:image" content="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&amp;fit=crop&amp;w=800&amp;h=480&amp;q=80" />
+<meta property="og:url" content="https://axon-5zf.pages.dev/loja" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="canonical" href="https://axon-5zf.pages.dev/loja" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  :root { --niche: #22c55e; --niche-shadow: rgba(34, 197, 94, 0.35); }
+  .niche-hero { padding: 80px 0 60px; background: linear-gradient(180deg, color-mix(in srgb, var(--niche) 8%, transparent), transparent); text-align: center; }
+  .niche-hero h1 { font-size: clamp(32px, 6vw, 56px); margin: 16px 0; line-height: 1.1; }
+  .niche-hero h1 .accent { color: var(--niche); }
+  .niche-hero .subhead { font-size: clamp(16px, 2.4vw, 20px); color: var(--text-dim); max-width: 680px; margin: 0 auto 32px; }
+  .niche-hero-photo { display: block; margin: 0 auto 24px; width: 100%; max-width: 380px; aspect-ratio: 16/10; object-fit: cover; border-radius: 16px; box-shadow: 0 24px 48px rgba(0,0,0,0.45); }
+  .niche-cta { display: inline-flex; align-items: center; gap: 10px; background: var(--niche); color: #fff; padding: 16px 32px; border-radius: 10px; font-weight: 700; font-size: 16px; text-decoration: none; min-height: 44px; box-shadow: 0 8px 24px var(--niche-shadow); transition: transform 0.15s; }
+  .niche-cta:hover { transform: translateY(-2px); }
+  .niche-cta-sub { color: var(--text-dim); font-size: 13px; margin-top: 12px; }
+  .niche-trust { display: flex; gap: 24px; justify-content: center; margin-top: 40px; flex-wrap: wrap; color: var(--text-dim); font-size: 13px; }
+  .niche-trust span { display: inline-flex; align-items: center; gap: 6px; }
+  .niche-features { padding: 60px 0; }
+  .niche-features h2 { text-align: center; font-size: clamp(24px, 4vw, 36px); margin-bottom: 48px; }
+  .niche-features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  .niche-feature { padding: 28px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); transition: transform 0.15s, border-color 0.15s; }
+  .niche-feature:hover { transform: translateY(-2px); border-color: var(--niche); }
+  .niche-feature .ico { width: 100%; height: 140px; background-size: cover; background-position: center; border-radius: 8px; margin-bottom: 16px; background-color: var(--bg-elev); }
+  .niche-feature h3 { font-size: 18px; margin-bottom: 8px; color: var(--niche); }
+  .niche-feature p { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+  .niche-how { background: var(--bg-elev); padding: 60px 0; }
+  .niche-how h2 { text-align: center; font-size: clamp(24px, 4vw, 36px); margin-bottom: 48px; }
+  .niche-steps { max-width: 760px; margin: 0 auto; display: grid; gap: 20px; }
+  .niche-step { display: grid; grid-template-columns: 50px 1fr; gap: 20px; align-items: start; padding: 20px; border-left: 3px solid var(--niche); background: var(--bg-card); border-radius: 0 10px 10px 0; }
+  .niche-step .num { background: var(--niche); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+  .niche-step h4 { font-size: 16px; margin-bottom: 6px; }
+  .niche-step p { color: var(--text-dim); font-size: 14px; line-height: 1.55; }
+  .niche-pricing { padding: 60px 0; text-align: center; }
+  .niche-pricing h2 { font-size: clamp(24px, 4vw, 36px); margin-bottom: 16px; }
+  .niche-pricing .price { font-size: 56px; font-weight: 800; color: var(--niche); }
+  .niche-pricing .price small { font-size: 16px; color: var(--text-dim); font-weight: 400; }
+  .niche-pricing ul { list-style: none; padding: 0; max-width: 480px; margin: 32px auto; text-align: left; display: grid; gap: 10px; }
+  .niche-pricing li { padding: 8px 0; color: var(--text); display: flex; align-items: center; gap: 10px; }
+  .niche-pricing li::before { content: "✓"; color: var(--niche); font-weight: 700; flex-shrink: 0; }
+  .niche-faq { padding: 60px 0 100px; max-width: 720px; margin: 0 auto; }
+  .niche-faq h2 { font-size: clamp(24px, 4vw, 36px); margin-bottom: 32px; text-align: center; }
+  .niche-faq details { border-bottom: 1px solid var(--border); padding: 18px 0; cursor: pointer; }
+  .niche-faq summary { font-weight: 600; font-size: 16px; list-style: none; }
+  .niche-faq summary::-webkit-details-marker { display: none; }
+  .niche-faq summary::after { content: "+"; float: right; color: var(--niche); font-size: 22px; line-height: 1; }
+  .niche-faq details[open] summary::after { content: "−"; }
+  .niche-faq details > p { margin-top: 12px; color: var(--text-dim); font-size: 14px; line-height: 1.7; }
+  .niche-other { padding: 40px 0 60px; text-align: center; }
+  .niche-other-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .niche-other a { padding: 10px 18px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); text-decoration: none; font-size: 14px; transition: border-color 0.15s, color 0.15s; }
+  .niche-other a:hover { border-color: var(--niche); color: var(--text); }
+  @media (max-width: 600px) {
+    .niche-hero { padding: 50px 0 40px; }
+    .niche-features, .niche-how, .niche-pricing, .niche-faq { padding: 40px 0; }
+    .niche-step { grid-template-columns: 40px 1fr; gap: 14px; padding: 16px; }
+    .niche-cta { width: 100%; justify-content: center; padding: 16px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="container nav-inner">
+    <a href="/" class="brand"><span class="logo-dot"></span> Nexus Inovation</a>
+    <nav class="nav-links">
+      <a href="/clinica">Clínica</a>
+      <a href="/restaurante">Restaurante</a>
+      <a href="/loja">Loja</a>
+      <a href="/build">Criar agente</a>
+      <a href="/upgrade">Planos</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="niche-hero">
+    <div class="container">
+      <img class="niche-hero-photo" src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&amp;fit=crop&amp;w=800&amp;h=480&amp;q=80" alt="" loading="eager" />
+      <h1>Sua loja online atendendo<br /><span class="accent">no WhatsApp e no site 24h</span></h1>
+      <p class="subhead">Calcula frete por CEP, valida CNPJ pra mostrar credibilidade, compara preço com concorrente, responde política de troca. Sem cliente abandonando carrinho por falta de resposta.</p>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+        <a class="niche-cta" href="/agent/demo-ecommerce-br" style="background:#22c55e;box-shadow:0 8px 24px rgba(34,197,94,0.35);">
+          Testar grátis (sem cadastro)
+        </a>
+        <a class="niche-cta" href="/build?template=ecommerce-br">
+          Criar a minha agora
+        </a>
+      </div>
+      <div class="niche-cta-sub">5 minutos · sem cartão de crédito · cancela quando quiser</div>
+      <div class="niche-trust"><span>✓ Funciona em Shopify, Nuvemshop, Loja Integrada</span><span>✓ Cálculo de frete por CEP</span><span>✓ Valida CNPJ na hora</span></div>
+    </div>
+  </section>
+
+  <section class="niche-features">
+    <div class="container">
+      <h2>O que seu atendente sabe fazer</h2>
+      <div class="niche-features-grid"><div class="niche-feature">
+            <div class="ico" style="background-image:url('https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=400&h=240&q=80')"></div>
+            <h3>Calcula frete por CEP</h3>
+            <p>Cliente manda CEP, ele responde valor + prazo de entrega na hora. Reduz abandono de carrinho — pessoa não precisa esperar até preencher checkout pra saber o frete.</p>
+        </div><div class="niche-feature">
+            <div class="ico" style="background-image:url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&h=240&q=80')"></div>
+            <h3>Valida CNPJ na hora</h3>
+            <p>&quot;Vocês são empresa séria?&quot; — ele consulta CNPJ, mostra dados públicos da empresa, situação cadastral. Trust automático sem você pedir.</p>
+        </div><div class="niche-feature">
+            <div class="ico" style="background-image:url('https://images.unsplash.com/photo-1488229297570-58520851e868?auto=format&fit=crop&w=400&h=240&q=80')"></div>
+            <h3>Compara com concorrente</h3>
+            <p>Cliente acha barato em outro site? Ele consulta o link do concorrente e mostra o que vocês têm de diferente (frete grátis, garantia, troca, prazo).</p>
+        </div><div class="niche-feature">
+            <div class="ico" style="background-image:url('https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=400&h=240&q=80')"></div>
+            <h3>Política de troca/devolução</h3>
+            <p>Você cadastra a política uma vez, ele responde sempre que perguntarem. Sem você ter que repetir o mesmo texto 50 vezes.</p>
+        </div><div class="niche-feature">
+            <div class="ico" style="background-image:url('https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=400&h=240&q=80')"></div>
+            <h3>Converte moeda</h3>
+            <p>Cliente vê produto em dólar/euro? Ele converte pra real automaticamente. Útil pra dropshipping ou cross-border.</p>
+        </div><div class="niche-feature">
+            <div class="ico" style="background-image:url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&h=240&q=80')"></div>
+            <h3>Captura leads</h3>
+            <p>Quando alguém pergunta produto que vocês não têm, ele anota e te avisa. Você sabe exatamente o que falta no catálogo.</p>
+        </div></div>
+    </div>
+  </section>
+
+  <section class="niche-how">
+    <div class="container">
+      <h2>Como funciona</h2>
+      <div class="niche-steps"><div class="niche-step">
+            <div class="num">1</div>
+            <div><h4>Crie conta grátis</h4><p>Cadastra com email. R$5 de crédito grátis pra testar.</p></div>
+        </div><div class="niche-step">
+            <div class="num">2</div>
+            <div><h4>Escolha o template &quot;E-commerce&quot;</h4><p>Template já vem com tom amigável BR + ferramentas de frete, CNPJ, comparação.</p></div>
+        </div><div class="niche-step">
+            <div class="num">3</div>
+            <div><h4>Cadastre os dados da loja</h4><p>Nome, CNPJ, política de troca, prazos, garantias. Cole link da loja se quiser que ele consulte produtos.</p></div>
+        </div><div class="niche-step">
+            <div class="num">4</div>
+            <div><h4>Plugue no site OU WhatsApp</h4><p>Cole o código embed no seu Shopify/Nuvemshop/WooCommerce — vira widget de chat. OU conecta no WhatsApp da loja.</p></div>
+        </div><div class="niche-step">
+            <div class="num">5</div>
+            <div><h4>Acompanhe vendas e leads</h4><p>Dashboard mostra cada conversa, frete consultado, pedidos abandonados, perguntas sobre produtos que não tem.</p></div>
+        </div></div>
+    </div>
+  </section>
+
+  <section class="niche-pricing">
+    <div class="container">
+      <h2>Quanto custa</h2>
+      <div class="price">R$ 199<small>/mês</small></div>
+      <ul><li>Atendimento ilimitado WhatsApp + site</li><li>Cálculo de frete em tempo real (CEP)</li><li>Validação de CNPJ automática</li><li>Embed pra qualquer plataforma</li><li>Histórico completo + leads</li><li>Cancele quando quiser, sem multa</li></ul>
+      <a class="niche-cta" href="/build?template=ecommerce-br">Criar a minha agora</a>
+    </div>
+  </section>
+
+  <section class="niche-faq">
+    <h2>Perguntas frequentes</h2>
+    <details><summary>Funciona com Shopify, Nuvemshop, Loja Integrada, WooCommerce?</summary><p>Sim. O embed é universal — funciona em qualquer plataforma que aceita HTML/script. Em poucos minutos você cola e tá rodando.</p></details><details><summary>Ele realmente reduz abandono de carrinho?</summary><p>Estudos mostram que 67% dos abandonos vêm de &quot;frete inesperado&quot; e &quot;dúvidas não respondidas&quot;. Resolver isso ANTES do checkout aumenta conversão 15-30%. Esse é exatamente o problema que esse atendente resolve.</p></details><details><summary>E o cálculo de frete? É integrado com Correios/transportadora?</summary><p>Por padrão, ele calcula baseado no CEP + sua taxa configurada. Pra integração nativa com Correios/Jadlog/Loggi, é roadmap pra v2.</p></details><details><summary>Dá pra integrar com meu catálogo de produtos?</summary><p>Sim, via link da loja (ele faz scrape de produtos quando cliente pergunta). Pra integração mais profunda (estoque em tempo real), precisa configurar via API — leva 1 hora se você for dev, ou pedimos pra te ajudar.</p></details><details><summary>Funciona em mais de um idioma?</summary><p>Sim. Padrão é PT-BR, mas pode adicionar inglês ou espanhol — ajusta o prompt pra responder no idioma do cliente automaticamente.</p></details><details><summary>E os dados dos clientes? LGPD?</summary><p>Conformidade total. Conversas armazenadas pra você acessar, exportável a qualquer momento, deletável quando o cliente pedir.</p></details>
+  </section>
+
+  <section class="niche-other">
+    <div class="container">
+      <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 14px;">Outras verticais</p>
+      <div class="niche-other-row"><a href="/clinica">Recepcionista…</a><a href="/restaurante">Atendente…</a></div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer-mini">
+  <div class="container" style="padding: 24px 0; text-align: center; color: var(--text-muted); font-size: 13px;">
+    Atendente virtual pra lojas online brasileiras. · <a href="/" style="color: var(--text-dim);">Início</a> · <a href="/build" style="color: var(--text-dim);">Criar agente</a>
+  </div>
+</footer>
+
+</body>
+</html>

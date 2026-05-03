@@ -107,14 +107,22 @@
       async function bootstrap() {
         setReady(false);
         // Wait for Supabase JS CDN. Without this, the form submit handler
-        // would silently no-op when supabase is null.
+        // would silently no-op when supabase is null. Old code waited 5s
+        // and gave up with a static "recarregue" message — on slow 3G
+        // that's a dead-end signup. Now: 8s wait, then a real Recarregar
+        // button so the visitor can retry without typing the URL again.
         let waited = 0;
-        while (!window.supabase && waited < 5000) {
+        while (!window.supabase && waited < 8000) {
           await new Promise((r) => setTimeout(r, 100));
           waited += 100;
         }
         if (!window.supabase) {
-          showAlert('error', 'Não consegui carregar o cliente Supabase. Recarregue a página.');
+          const el = document.getElementById('alert');
+          el.className = 'alert error';
+          el.innerHTML = 'Conexão lenta carregando autenticação. ' +
+            '<button type="button" id="reload-btn" style="margin-left:8px;padding:4px 10px;border-radius:4px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;font-weight:600;">Tentar de novo</button>';
+          el.hidden = false;
+          document.getElementById('reload-btn').onclick = () => location.reload();
           return;
         }
         try {
@@ -127,7 +135,14 @@
           sbClient = window.supabase.createClient(cfg.project_url, cfg.anon_key);
           setReady(true);
         } catch (e) {
-          showAlert('error', 'Falha ao carregar config: ' + e.message);
+          // Network blip on /config — same recovery affordance, retry
+          // re-triggers the whole bootstrap chain.
+          const el = document.getElementById('alert');
+          el.className = 'alert error';
+          el.innerHTML = 'Falha ao carregar config (' + (e.message || 'rede') + '). ' +
+            '<button type="button" id="reload-btn-2" style="margin-left:8px;padding:4px 10px;border-radius:4px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;font-weight:600;">Tentar de novo</button>';
+          el.hidden = false;
+          document.getElementById('reload-btn-2').onclick = () => location.reload();
         }
       }
 
