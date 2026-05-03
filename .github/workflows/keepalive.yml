@@ -25,26 +25,47 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
+      # Render free-tier cold-start can exceed 60s when the Docker image
+      # is large. We retry up to 3× with 150s per attempt — first call
+      # triggers wakeup, subsequent calls hit a warm instance.
       - name: Ping Axon Evolution gateway (dedicated)
-        # 60s timeout absorbs the cold-start latency on the first hit
-        # after a long idle. -f makes curl exit non-zero on 4xx/5xx so
-        # the job goes red if the service is genuinely down.
         run: |
-          curl -sSf --max-time 60 https://axon-evolution.onrender.com/ \
-            -o /dev/null -w "axon-evolution: HTTP %{http_code} time=%{time_total}s\n"
+          for i in 1 2 3; do
+            if curl -sSf --max-time 150 https://axon-evolution.onrender.com/ \
+                 -o /dev/null -w "axon-evolution attempt $i: HTTP %{http_code} time=%{time_total}s\n"; then
+              exit 0
+            fi
+            echo "attempt $i failed — sleeping 5s before retry"
+            sleep 5
+          done
+          exit 1
 
+      # Kept around for connections paired BEFORE the dedicated
+      # axon-evolution server was set up — those instance_url values
+      # in whatsapp_connections still point here. Once all customers
+      # are migrated this step can drop.
       - name: Ping Feirinha Evolution gateway (legacy)
-        # Kept around for connections paired BEFORE the dedicated
-        # axon-evolution server was set up — those instance_url values
-        # in whatsapp_connections still point here. Once all customers
-        # are migrated this step can drop.
         run: |
-          curl -sSf --max-time 60 https://evolution-api-feirinha.onrender.com/ \
-            -o /dev/null -w "evolution-feirinha: HTTP %{http_code} time=%{time_total}s\n"
+          for i in 1 2 3; do
+            if curl -sSf --max-time 150 https://evolution-api-feirinha.onrender.com/ \
+                 -o /dev/null -w "evolution-feirinha attempt $i: HTTP %{http_code} time=%{time_total}s\n"; then
+              exit 0
+            fi
+            echo "attempt $i failed — sleeping 5s before retry"
+            sleep 5
+          done
+          exit 1
 
       - name: Ping Axon backend
         run: |
-          curl -sSf --max-time 60 https://axon-kedb.onrender.com/health/ready \
-            -o /dev/null -w "axon: HTTP %{http_code} time=%{time_total}s\n"
+          for i in 1 2 3; do
+            if curl -sSf --max-time 150 https://axon-kedb.onrender.com/health/ready \
+                 -o /dev/null -w "axon attempt $i: HTTP %{http_code} time=%{time_total}s\n"; then
+              exit 0
+            fi
+            echo "attempt $i failed — sleeping 5s before retry"
+            sleep 5
+          done
+          exit 1
