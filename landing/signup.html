@@ -82,6 +82,16 @@
     <script>
       const API_BASE = 'https://axon-kedb.onrender.com';
       let supabase = null;
+      let supabaseReady = false;
+
+      function setReady(ready) {
+        supabaseReady = ready;
+        const btn = document.getElementById('submit-btn');
+        if (btn) {
+          btn.disabled = !ready;
+          btn.style.opacity = ready ? '' : '0.5';
+        }
+      }
 
       function showAlert(kind, msg) {
         const el = document.getElementById('alert');
@@ -91,18 +101,38 @@
       }
 
       async function bootstrap() {
-        const r = await fetch(API_BASE + '/v1/auth/supabase/config');
-        const cfg = await r.json();
-        if (!cfg.configured) {
-          showAlert('error', 'Login Supabase não configurado pelo operador. Cadastre via /v1/signup direto.');
+        setReady(false);
+        // Wait for Supabase JS CDN. Without this, the form submit handler
+        // would silently no-op when supabase is null.
+        let waited = 0;
+        while (!window.supabase && waited < 5000) {
+          await new Promise((r) => setTimeout(r, 100));
+          waited += 100;
+        }
+        if (!window.supabase) {
+          showAlert('error', 'Não consegui carregar o cliente Supabase. Recarregue a página.');
           return;
         }
-        supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+        try {
+          const r = await fetch(API_BASE + '/v1/auth/supabase/config');
+          const cfg = await r.json();
+          if (!cfg.configured) {
+            showAlert('error', 'Cadastro Supabase não configurado pelo operador.');
+            return;
+          }
+          supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+          setReady(true);
+        } catch (e) {
+          showAlert('error', 'Falha ao carregar config: ' + e.message);
+        }
       }
 
       document.getElementById('signup-form').addEventListener('submit', async (ev) => {
         ev.preventDefault();
-        if (!supabase) return;
+        if (!supabaseReady || !supabase) {
+          showAlert('error', 'Auth ainda carregando — aguarde 1 segundo e tente de novo.');
+          return;
+        }
         const email = document.getElementById('email').value.trim().toLowerCase();
         const password = document.getElementById('password').value;
         const btn = document.getElementById('submit-btn');
@@ -134,7 +164,20 @@
           showAlert('success', 'Conta criada e logada!');
           setTimeout(() => { location.href = '/dashboard'; }, 600);
         } catch (e) {
-          showAlert('error', e.message || String(e));
+          // Common Supabase errors:
+          //   "User already registered"   → email exists, redirect to login
+          //   "Email not confirmed"       → first-time path, ask to check inbox
+          //   "Email rate limit exceeded" → built-in SMTP throttle
+          //   "Signup is disabled"        → admin disabled email auth
+          let msg = e.message || String(e);
+          if (/already registered|already exists/i.test(msg)) {
+            msg = 'E-mail já cadastrado. Use "Já tem conta? Entrar" abaixo.';
+          } else if (/rate limit/i.test(msg)) {
+            msg = 'Muitas tentativas. Aguarde 1 minuto e tente de novo.';
+          } else if (/Signup is disabled/i.test(msg)) {
+            msg = 'Cadastro desativado pelo operador. Contate suporte.';
+          }
+          showAlert('error', msg);
           btn.disabled = false; btn.textContent = 'Criar conta grátis';
         }
       });
