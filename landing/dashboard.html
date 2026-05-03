@@ -926,6 +926,13 @@
   <body>
     <div id="app"></div>
 
+    <!-- Subscribe modal — populated by openSubscribeModal() -->
+    <div id="sub-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div id="sub-modal-body"></div>
+      </div>
+    </div>
+
     <script>
       const STORAGE_KEY = 'axon.apiKey';
       const BASE_KEY = 'axon.baseUrl';
@@ -1087,6 +1094,7 @@
               <span class="stat-loading">carregando estatísticas…</span>
             </div>
             <div class="agent-actions">
+              <button class="agent-btn" id="sub-btn-${escapeAttr(a.id)}" onclick="openSubscribeModal('${escapeAttr(a.id)}', '${escapeAttr(a.name)}')" title="Plano e assinatura desse agente" style="background:linear-gradient(135deg,rgba(124,92,255,0.15),rgba(25,213,198,0.1));border-color:rgba(124,92,255,0.5);color:var(--accent);font-weight:600;">💳 Assinar</button>
               <a class="agent-btn" href="/agent-preview/${escapeAttr(a.slug)}" target="_blank" title="Pré-visualizar e testar agente antes de conectar WhatsApp" style="border-color:rgba(124,92,255,0.4);color:var(--accent);">🧪 Testar</a>
               <a class="agent-btn" href="/whatsapp" title="Ver memória, contatos e conversas">🧠 Cérebro</a>
               <a class="agent-btn" href="/contacts" title="Base de contatos: ficha estruturada, documentos categorizados, histórico" style="border-color:rgba(25,213,198,0.4);color:var(--accent-2);">👥 Contatos</a>
@@ -1101,11 +1109,40 @@
       }
 
       async function hydrateAgentCard(a) {
-        // Load whatsapp connection + contacts count in parallel
-        const [conn, contacts] = await Promise.all([
+        // Load whatsapp connection + contacts count + subscription state in parallel
+        const [conn, contacts, subResp] = await Promise.all([
           api(`/v1/agents/${a.id}/whatsapp`).catch(() => ({ connected: false })),
           api(`/v1/agents/${a.id}/contacts?limit=200`).catch(() => ({ contacts: [] })),
+          api(`/v1/agents/${a.id}/subscription`).catch(() => ({ subscription: null })),
         ]);
+
+        // Update subscribe button label based on subscription state
+        const subBtn = document.getElementById(`sub-btn-${a.id}`);
+        if (subBtn) {
+          const sub = subResp.subscription;
+          if (!sub) {
+            subBtn.textContent = '💳 Assinar';
+            subBtn.title = 'Sem assinatura ativa — clique pra escolher plano';
+          } else if (sub.status === 'active') {
+            subBtn.textContent = `✅ ${sub.plan_name} ($${sub.plan_price_usd})`;
+            subBtn.title = `Assinatura ativa — renova em ${sub.days_until_renewal}d`;
+            subBtn.style.background = 'rgba(25,213,198,0.12)';
+            subBtn.style.borderColor = 'rgba(25,213,198,0.5)';
+            subBtn.style.color = 'var(--accent-2)';
+          } else if (sub.status === 'grace') {
+            subBtn.textContent = `⚠️ Atrasado`;
+            subBtn.title = `Saldo insuficiente — agente pausa em ${Math.max(0, Math.ceil((new Date(sub.grace_until).getTime() - Date.now()) / 86400000))}d`;
+            subBtn.style.background = 'rgba(255,214,10,0.15)';
+            subBtn.style.borderColor = 'rgba(255,214,10,0.5)';
+            subBtn.style.color = 'var(--warn)';
+          } else if (sub.status === 'cancelled') {
+            subBtn.textContent = `🔄 Reativar`;
+            subBtn.title = 'Cancelado — clique pra reativar';
+            subBtn.style.background = 'rgba(255,95,87,0.1)';
+            subBtn.style.borderColor = 'rgba(255,95,87,0.4)';
+            subBtn.style.color = 'var(--danger)';
+          }
+        }
 
         // Update channels pill — WhatsApp status visible immediately
         const channelsEl = document.getElementById(`channels-${a.id}`);
@@ -1142,6 +1179,162 @@
           `;
         }
       }
+
+      // ─── Subscribe modal — per-agent monthly plan in USDC ────────────────
+      // Loads current subscription state + wallet balance + plan options,
+      // shows Starter vs Pro with current usage projection, handles the
+      // POST to activate (debits wallet first month immediately) or
+      // PATCH to change plan / cancel.
+      window.openSubscribeModal = async function(agentId, agentName) {
+        const modal = document.getElementById('sub-modal');
+        const body = document.getElementById('sub-modal-body');
+        body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-dim);">Carregando…</div>';
+        modal.style.display = 'flex';
+
+        try {
+          const [subResp, balResp] = await Promise.all([
+            api(`/v1/agents/${agentId}/subscription`),
+            api('/v1/wallet/balance'),
+          ]);
+          const sub = subResp.subscription;
+          const plans = subResp.plans || [];
+          // Backend returns balance_usdc as a fixed-point string ("0.50").
+          const balance = Number(balResp.available_usdc || balResp.balance_usdc || 0);
+          renderSubModal({ agentId, agentName, sub, plans, balance });
+        } catch (e) {
+          body.innerHTML = `<div style="padding:24px;color:var(--danger);">Erro: ${e.message}</div>`;
+        }
+      };
+
+      function renderSubModal({ agentId, agentName, sub, plans, balance }) {
+        const body = document.getElementById('sub-modal-body');
+        const balanceColor = balance < 40 ? 'var(--warn)' : 'var(--accent-2)';
+
+        const planCard = (p) => {
+          const canAfford = balance >= p.price_usd;
+          const isCurrent = sub && sub.plan === p.id && sub.status === 'active';
+          return `
+            <div style="background:var(--bg-elev);border:1px solid ${isCurrent ? 'var(--accent)' : 'var(--border)'};border-radius:10px;padding:20px;flex:1;${isCurrent ? 'box-shadow:0 0 0 1px rgba(124,92,255,0.3);' : ''}">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+                <div>
+                  <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">${p.name}</div>
+                  <div style="font-size:28px;font-weight:800;margin-top:4px;">$${p.price_usd}<span style="font-size:13px;color:var(--text-muted);font-weight:500;">/mês</span></div>
+                </div>
+                ${isCurrent ? '<span style="background:rgba(124,92,255,0.2);color:var(--accent);font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;">ATUAL</span>' : ''}
+              </div>
+              <ul style="list-style:none;padding:0;margin:14px 0;font-size:13px;color:var(--text-dim);">
+                <li style="padding:3px 0;">✓ <strong style="color:var(--text);">${p.included.turns.toLocaleString('pt-BR')}</strong> turnos/mês</li>
+                <li style="padding:3px 0;">✓ <strong style="color:var(--text);">${p.included.vision.toLocaleString('pt-BR')}</strong> fotos/PDFs lidos</li>
+                <li style="padding:3px 0;">✓ <strong style="color:var(--text);">${p.included.pdf.toLocaleString('pt-BR')}</strong> PDFs gerados</li>
+                <li style="padding:3px 0;">✓ <strong style="color:var(--text);">${p.included.reminders.toLocaleString('pt-BR')}</strong> lembretes</li>
+                <li style="padding:3px 0;">✓ <strong style="color:var(--text);">${p.included.storage_gb} GB</strong> storage</li>
+              </ul>
+              <button
+                class="agent-btn"
+                style="width:100%;padding:11px;font-weight:600;${
+                  isCurrent ? 'background:transparent;border:1px solid var(--border);color:var(--text-dim);' :
+                  canAfford ? 'background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#0a0a0b;border:none;' :
+                  'background:rgba(255,214,10,0.1);border:1px solid rgba(255,214,10,0.4);color:var(--warn);'
+                }"
+                ${isCurrent ? 'disabled' : ''}
+                onclick="confirmSubscribe('${agentId}', '${p.id}', ${canAfford})">
+                ${isCurrent ? 'Plano atual' : canAfford ? `Assinar — $${p.price_usd}` : `Saldo insuficiente`}
+              </button>
+            </div>
+          `;
+        };
+
+        body.innerHTML = `
+          <div style="padding:28px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:18px;">
+              <div>
+                <h2 style="margin:0 0 4px;font-size:20px;">Assinatura — ${escapeHtml(agentName)}</h2>
+                <p style="margin:0;color:var(--text-dim);font-size:13px;">Plano mensal por agente, debitado automaticamente da sua carteira USDC.</p>
+              </div>
+              <button onclick="closeSubModal()" style="background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;padding:0 4px;">×</button>
+            </div>
+
+            <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:13px;color:var(--text-dim);">Saldo na carteira</span>
+              <span style="font-size:18px;font-weight:700;color:${balanceColor};font-family:'JetBrains Mono',monospace;">$${balance.toFixed(2)} USDC</span>
+            </div>
+
+            ${sub ? `
+              <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:18px;">
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Status atual</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <strong style="font-size:14px;">${sub.plan_name}</strong>
+                  <span style="font-size:12px;color:${sub.status === 'active' ? 'var(--accent-2)' : sub.status === 'grace' ? 'var(--warn)' : 'var(--danger)'};">
+                    ${sub.status === 'active' ? '🟢 ativo' : sub.status === 'grace' ? '🟡 grace' : '⚪ cancelado'}
+                  </span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-family:'JetBrains Mono',monospace;">
+                  Renova em ${sub.days_until_renewal}d · Próximo débito ~$${sub.projected_next_bill_usd.toFixed(2)}
+                </div>
+                ${sub.status === 'active' ? `
+                  <button class="agent-btn" style="margin-top:10px;width:100%;background:transparent;border:1px solid rgba(255,95,87,0.4);color:var(--danger);font-size:12px;padding:8px;" onclick="cancelSub('${agentId}')">Cancelar assinatura</button>
+                ` : ''}
+              </div>
+            ` : ''}
+
+            <div style="display:flex;gap:14px;flex-wrap:wrap;">
+              ${plans.map(planCard).join('')}
+            </div>
+
+            ${balance < 40 ? `
+              <div style="margin-top:18px;padding:14px;background:rgba(255,214,10,0.1);border:1px solid rgba(255,214,10,0.4);border-radius:8px;font-size:13px;color:var(--text);">
+                ⚠️ Você precisa de pelo menos <strong>$40 USDC</strong> pra ativar o plano Starter.
+                <a href="/account#topup" style="color:var(--accent-2);text-decoration:underline;margin-left:6px;">Adicionar saldo →</a>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      window.confirmSubscribe = async function(agentId, planId, canAfford) {
+        if (!canAfford) {
+          location.href = '/account#topup';
+          return;
+        }
+        if (!confirm(`Confirmar assinatura ${planId.toUpperCase()}? Será debitado da carteira agora.`)) return;
+        try {
+          const r = await fetch(`https://axon-kedb.onrender.com/v1/agents/${agentId}/subscription`, {
+            method: 'POST',
+            headers: { 'x-api-key': localStorage.getItem('axon.apiKey'), 'content-type': 'application/json' },
+            body: JSON.stringify({ plan: planId }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.message || data.error || `HTTP ${r.status}`);
+          window.AxonUI && AxonUI.toast(`Assinatura ${planId} ativada!`, { type: 'success' });
+          closeSubModal();
+          // Reload to refresh agent cards.
+          location.reload();
+        } catch (e) {
+          window.AxonUI && AxonUI.toast('Falha: ' + e.message, { type: 'error', durationMs: 6000 });
+        }
+      };
+
+      window.cancelSub = async function(agentId) {
+        if (!confirm('Cancelar assinatura? O agente vai parar de responder. Pode reativar depois sem perder dados.')) return;
+        try {
+          const r = await fetch(`https://axon-kedb.onrender.com/v1/agents/${agentId}/subscription`, {
+            method: 'PATCH',
+            headers: { 'x-api-key': localStorage.getItem('axon.apiKey'), 'content-type': 'application/json' },
+            body: JSON.stringify({ action: 'cancel' }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.message || data.error || `HTTP ${r.status}`);
+          window.AxonUI && AxonUI.toast('Assinatura cancelada.', { type: 'success' });
+          closeSubModal();
+          location.reload();
+        } catch (e) {
+          window.AxonUI && AxonUI.toast('Falha: ' + e.message, { type: 'error' });
+        }
+      };
+
+      window.closeSubModal = function() {
+        document.getElementById('sub-modal').style.display = 'none';
+      };
 
       // ─── WhatsApp connect/disconnect modal ────────────────────────────────
       // State holder: pollHandle is the setInterval id used to detect when

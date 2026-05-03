@@ -4,490 +4,259 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Planos · Nexus Inovation</title>
-    <meta name="description" content="Faça upgrade do seu plano Nexus Inovation — pague em USDC da sua carteira existente. Mais rate limits e menos taxa por chamada." />
+    <meta name="description" content="Planos por agente — assinatura mensal em USDC. Starter $40 ou Pro $100. Inclui WhatsApp, voz, vision, PDF, lembretes." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="/_ui-kit.css" />
-    <script src="/_ui-kit.js" defer></script>
     <style>
-      .up-wrap { padding: 56px 0 100px; max-width: 1100px; }
-      .up-wrap h1 { font-size: 40px; letter-spacing: -0.02em; margin: 0 0 12px; }
-      .up-wrap .lede { color: var(--text-dim); font-size: 17px; line-height: 1.6; margin: 0 0 16px; }
-      .up-wrap .pitch { color: var(--text); font-size: 14px; line-height: 1.7; margin: 0 0 36px; }
-      .up-wrap .pitch strong { color: var(--accent-2); }
-      .current-state {
-        display: flex; gap: 14px; align-items: center;
-        background: var(--bg-elev); border: 1px solid var(--border);
-        border-radius: 8px; padding: 14px 18px; margin: 0 0 32px;
-        font-size: 14px;
+      :root {
+        --bg: #0a0a0b; --bg-card: #16161a; --bg-elev: #111114;
+        --border: #25252b; --text: #eeeef0; --text-dim: #9a9aa4; --text-muted: #6a6a76;
+        --accent: #7c5cff; --accent-2: #19d5c6; --warn: #ffd60a;
       }
-      .current-state .label { color: var(--text-muted); margin-right: 4px; }
-      .current-state strong { color: var(--text); }
-      .current-state .divider { color: var(--text-muted); margin: 0 8px; }
+      .up-wrap { padding: 56px 0 100px; max-width: 1100px; margin: 0 auto; }
+      .up-wrap h1 { font-size: 40px; letter-spacing: -0.02em; margin: 0 0 12px; }
+      .up-wrap .lede { color: var(--text-dim); font-size: 17px; line-height: 1.6; margin: 0 0 32px; }
 
       .plans-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
       }
-      @media (max-width: 980px) { .plans-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-      @media (max-width: 560px) { .plans-grid { grid-template-columns: minmax(0, 1fr); } }
+      @media (max-width: 720px) { .plans-grid { grid-template-columns: 1fr; } }
 
       .plan-card {
         background: var(--bg-elev); border: 1px solid var(--border);
-        border-radius: 12px; padding: 24px; display: flex; flex-direction: column;
+        border-radius: 14px; padding: 32px;
         position: relative;
-        transition: border-color 120ms ease, transform 120ms ease;
+        display: flex; flex-direction: column;
       }
-      .plan-card:hover { border-color: rgba(124,92,255,0.4); transform: translateY(-2px); }
-      .plan-card.is-current { border-color: var(--accent); }
+      .plan-card.is-popular {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(124,92,255,0.3);
+      }
       .plan-card.is-popular::before {
-        content: 'POPULAR';
-        position: absolute; top: -10px; left: 16px;
+        content: 'POPULAR'; position: absolute; top: -10px; left: 24px;
         background: linear-gradient(135deg, var(--accent), var(--accent-2));
-        color: #0a0a0b;
-        padding: 3px 10px; border-radius: 4px;
+        color: #0a0a0b; padding: 4px 12px; border-radius: 4px;
         font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
       }
-      .plan-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 8px; }
-      .plan-name.tier-pro { color: var(--accent); }
-      .plan-name.tier-team { color: #f59e0b; }
-      .plan-name.tier-enterprise { background: linear-gradient(135deg, #8b5cf6, #ec4899); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-      .plan-price { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
-      .plan-price .per { font-size: 13px; color: var(--text-muted); font-weight: 500; }
-      .plan-blurb { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 18px; min-height: 42px; }
-      .plan-features { list-style: none; padding: 0; margin: 0 0 22px; flex: 1; }
-      .plan-features li {
-        font-size: 13px; color: var(--text-dim);
-        padding: 6px 0; display: flex; align-items: flex-start; gap: 8px;
+      .plan-name { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 12px; }
+      .plan-price { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+      .plan-price .per { font-size: 14px; color: var(--text-muted); font-weight: 500; margin-left: 6px; }
+      .plan-blurb { color: var(--text-dim); font-size: 14px; line-height: 1.6; margin: 8px 0 24px; }
+      .plan-features {
+        list-style: none; padding: 0; margin: 0 0 24px; flex: 1;
       }
-      .plan-features li::before { content: '✓'; color: var(--accent-2); flex: 0 0 auto; font-weight: 700; }
-      .plan-features li.muted { color: var(--text-muted); }
-      .plan-features li.muted::before { content: '·'; color: var(--text-muted); font-weight: 400; }
+      .plan-features li {
+        font-size: 14px; color: var(--text);
+        padding: 8px 0; display: flex; align-items: center; gap: 10px;
+      }
+      .plan-features li::before {
+        content: '✓'; color: var(--accent-2);
+        font-weight: 700; flex-shrink: 0;
+      }
+      .plan-features .quota {
+        color: var(--text-dim); font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+      }
       .plan-cta {
         display: block; text-align: center;
-        padding: 11px 16px; border-radius: 6px;
-        font-size: 14px; font-weight: 600; cursor: pointer;
-        background: transparent; color: var(--text); border: 1px solid var(--border);
+        padding: 14px 20px; border-radius: 8px;
+        font-size: 15px; font-weight: 600;
         text-decoration: none;
         transition: all 120ms ease;
       }
-      .plan-cta:hover:not(:disabled) { background: var(--bg-card); border-color: var(--accent); }
-      .plan-cta.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0a0a0b; border-color: transparent; }
-      .plan-cta.primary:hover:not(:disabled) { filter: brightness(1.1); }
-      .plan-cta:disabled { opacity: 0.55; cursor: not-allowed; }
-      .plan-cta.is-current { background: rgba(124,92,255,0.15); color: var(--accent); border-color: var(--accent); }
+      .plan-cta.primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #0a0a0b; border: none;
+      }
+      .plan-cta.primary:hover { filter: brightness(1.1); }
+      .plan-cta.secondary {
+        background: transparent; color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .plan-cta.secondary:hover { border-color: var(--accent); }
 
-      .faq { margin: 64px 0 0; max-width: 760px; }
+      .overage-section {
+        margin-top: 48px; padding: 28px;
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      .overage-section h2 { margin: 0 0 8px; font-size: 22px; }
+      .overage-section p { margin: 0 0 20px; color: var(--text-dim); font-size: 14px; }
+      .overage-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+      }
+      .overage-item {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 8px; padding: 14px; text-align: center;
+      }
+      .overage-item .price {
+        font-size: 18px; font-weight: 700;
+        color: var(--accent-2); margin-bottom: 2px;
+      }
+      .overage-item .label {
+        font-size: 12px; color: var(--text-muted);
+      }
+
+      .faq { margin: 48px 0 0; }
       .faq h2 { font-size: 22px; font-weight: 700; margin: 0 0 18px; }
       .faq details {
         background: var(--bg-elev); border: 1px solid var(--border);
         border-radius: 8px; padding: 14px 18px; margin: 0 0 10px;
       }
-      .faq summary { cursor: pointer; font-weight: 600; font-size: 15px; color: var(--text); }
-      .faq summary::-webkit-details-marker { color: var(--text-muted); }
+      .faq summary { cursor: pointer; font-weight: 600; font-size: 15px; }
       .faq p { color: var(--text-dim); font-size: 14px; line-height: 1.6; margin: 10px 0 0; }
-      .faq a { color: var(--accent-2); }
 
-      .login-prompt {
-        background: var(--bg-elev); border: 1px solid var(--border);
-        border-radius: 10px; padding: 28px;
-        text-align: center; margin: 24px 0;
+      header { display:flex; justify-content:space-between; align-items:center; padding:14px 24px; border-bottom:1px solid var(--border); background:var(--bg); }
+      header .brand { display:flex; gap:10px; align-items:center; font-weight:800; font-size:18px; color:var(--text); text-decoration:none; }
+      header .brand .logo-dot { width:10px; height:10px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); }
+      header nav { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+      header nav a { color:var(--text-dim); text-decoration:none; font-size:13px; padding:6px 10px; }
+      header nav a:hover { color:var(--text); }
+      header nav a.active { color:var(--accent-2); }
+
+      @media (max-width: 600px) {
+        .up-wrap { padding: 32px 16px 60px; }
+        .up-wrap h1 { font-size: 28px; }
+        .plan-card { padding: 24px; }
+        .plan-price { font-size: 36px; }
       }
-      .login-prompt p { color: var(--text-dim); margin: 0 0 16px; }
-      .login-prompt a { color: var(--accent-2); }
-      .toast-mini {
-        position: fixed; bottom: 24px; right: 24px;
-        background: rgba(20,20,28,0.96); border: 1px solid var(--border);
-        color: var(--text); padding: 12px 18px; border-radius: 6px;
-        font-size: 14px; opacity: 0; transition: opacity 200ms ease;
-        z-index: 100; max-width: 380px;
-      }
-      .toast-mini.show { opacity: 1; }
-      @media (max-width: 500px) {
-        .up-wrap { padding: 32px 0 60px; }
-        .up-wrap h1 { font-size: 26px; }
-        .up-wrap .lede { font-size: 14px; }
-        .up-wrap .pitch { font-size: 13px; }
-        .plan-card { padding: 18px 16px; }
-        .plan-name { font-size: 12px; }
-        .plan-price { font-size: 28px; }
-        .plan-cta { padding: 12px 16px; min-height: 44px; font-size: 13px; }
-        .faq summary { padding: 12px 0; font-size: 14px; min-height: 44px; }
-        .faq details { padding: 12px 14px; }
-        .toast-mini { bottom: 16px; right: 12px; left: 12px; max-width: none; width: auto; }
-        .login-prompt { padding: 20px 14px; }
-        .current-state { flex-direction: column; align-items: stretch; padding: 14px; gap: 8px; }
-      }
-      .toast-mini.success { border-left: 3px solid #4ade80; }
-      .toast-mini.error { border-left: 3px solid #f87171; }
     </style>
   </head>
   <body>
     <header>
-      <div class="container">
-        <a href="/" class="brand"><span class="logo-dot"></span> Nexus Inovation</a>
-        <nav>
-          <a href="/explore" data-pt="Explorar" data-en="Explore">Explorar</a>
-          <a href="/build" data-pt="Criar agente" data-en="Build agent">Criar agente</a>
-          <a href="/dashboard" data-pt="Painel" data-en="Dashboard">Painel</a>
-          <a href="/upgrade" aria-current="page" data-pt="Planos" data-en="Plans">Planos</a>
-          <a href="/learn/" data-pt="Tutoriais" data-en="Tutorials">Tutoriais</a>
-          <a href="/stats" data-pt="Estatísticas" data-en="Stats">Estatísticas</a>
-          <button id="lang-toggle" class="lang-toggle" type="button" aria-label="Trocar idioma" style="margin-left:8px;">
-            <span data-active="pt">🇧🇷 PT</span>
-            <span data-active="en">🇺🇸 EN</span>
-          </button>
-        </nav>
-      </div>
+      <a href="/" class="brand"><span class="logo-dot"></span> Nexus Inovation</a>
+      <nav>
+        <a href="/dashboard">Painel</a>
+        <a href="/whatsapp">Brain</a>
+        <a href="/contacts">Contatos</a>
+        <a href="/upgrade" class="active">Planos</a>
+        <a href="/account">Conta</a>
+        <a href="/learn">Aprender</a>
+      </nav>
     </header>
 
-    <main class="container up-wrap">
-      <h1 data-pt="Como o Nexus Inovation cobra" data-en="How Nexus Inovation charges">Como o Nexus Inovation cobra</h1>
-      <p class="lede" data-pt="Você paga só pelas APIs que usar — centavos por chamada, em USDC. O plano abaixo é opcional e dá desconto na taxa de gateway." data-en="You only pay for the APIs you use — pennies per call, in USDC. The plans below are optional and discount the gateway fee.">Você paga só pelas APIs que usar — centavos por chamada, em USDC. O plano abaixo é opcional e dá desconto na taxa de gateway.</p>
+    <div class="up-wrap">
+      <h1>Planos por agente</h1>
+      <p class="lede">
+        Assinatura mensal em USDC. Cada agente tem seu próprio plano —
+        ative só os agentes que estiverem em produção.
+        Sem fidelidade, cancele quando quiser.
+      </p>
 
-      <!-- Two distinct usage paths so the visitor can see themselves -->
-      <div class="usage-paths" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0 32px;">
-        <div style="background:linear-gradient(135deg,rgba(124,92,255,0.08),transparent);border:1px solid rgba(124,92,255,0.30);border-radius:12px;padding:20px;">
-          <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:8px;" data-pt="Caminho 1 · com agente" data-en="Path 1 · with agent">Caminho 1 · com agente</div>
-          <h3 style="margin:0 0 10px;font-size:18px;letter-spacing:-0.01em;" data-pt="Tem negócio? Cria um atendente IA." data-en="Got a business? Build an AI assistant.">Tem negócio? Cria um atendente IA.</h3>
-          <p style="margin:0 0 14px;color:var(--text-dim);font-size:13px;line-height:1.55;" data-pt="Cria agente em 5 minutos, conecta no WhatsApp, atende 24h. Você paga só pelas APIs que ele consome (média ~R$0,03 por conversa). Plano abaixo desconta essa taxa." data-en="Build the agent in 5 minutes, plug it into WhatsApp, attend 24/7. You only pay for the APIs it consumes (~R$0.03 per conversation on average). The plan below discounts that fee.">Cria agente em 5 minutos, conecta no WhatsApp, atende 24h. Você paga só pelas APIs que ele consome (média ~R$0,03 por conversa). Plano abaixo desconta essa taxa.</p>
-          <a href="/build" style="color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;" data-pt="Criar agente →" data-en="Build agent →">Criar agente →</a>
-        </div>
-        <div style="background:linear-gradient(135deg,rgba(25,213,198,0.06),transparent);border:1px solid rgba(25,213,198,0.30);border-radius:12px;padding:20px;">
-          <div style="font-size:11px;color:var(--accent-2);text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:8px;" data-pt="Caminho 2 · sem agente" data-en="Path 2 · no agent">Caminho 2 · sem agente</div>
-          <h3 style="margin:0 0 10px;font-size:18px;letter-spacing:-0.01em;" data-pt="É dev? Chama as APIs direto." data-en="Dev? Call the APIs directly.">É dev? Chama as APIs direto.</h3>
-          <p style="margin:0 0 14px;color:var(--text-dim);font-size:13px;line-height:1.55;" data-pt="40+ APIs num único endpoint. Paga em USDC via x402 (HTTP 402 nativo) — sem cadastro de cartão, sem fatura mensal, sem chave por API. Centavos por chamada." data-en="40+ APIs through a single endpoint. Pay in USDC via x402 (native HTTP 402) — no credit card, no monthly invoice, no per-API key. Pennies per call.">40+ APIs num único endpoint. Paga em USDC via x402 (HTTP 402 nativo) — sem cadastro de cartão, sem fatura mensal, sem chave por API. Centavos por chamada.</p>
-          <a href="/#apis" style="color:var(--accent-2);font-size:13px;font-weight:600;text-decoration:none;" data-pt="Ver APIs disponíveis →" data-en="See available APIs →">Ver APIs disponíveis →</a>
-        </div>
-      </div>
-      <style>
-        @media (max-width:640px){.usage-paths{grid-template-columns:1fr !important;}}
-      </style>
-
-      <p class="pitch" data-pt="Os planos abaixo se aplicam aos dois caminhos: descontam a taxa por chamada e destravam capacidade (mais clientes simultâneos, mais agentes, suporte). Cancele a hora que quiser." data-en="The plans below apply to both paths: they discount the per-call fee and unlock capacity (more concurrent customers, more agents, support). Cancel anytime.">Os planos abaixo se aplicam aos dois caminhos: <strong>descontam a taxa por chamada</strong> e destravam capacidade. Cancele a hora que quiser.</p>
-
-      <!-- How the payment actually works — kills confusion about x402, on-chain
-           latency, etc. People worry "every call goes on-chain?" — answer is no. -->
-      <details style="margin:24px 0 32px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:16px 20px;">
-        <summary style="cursor:pointer;font-weight:700;font-size:15px;list-style:none;display:flex;align-items:center;gap:8px;" data-pt="🔧 Como funciona o pagamento (sem mistério)" data-en="🔧 How payment actually works (no mystery)">🔧 Como funciona o pagamento (sem mistério)</summary>
-        <div style="margin-top:14px;color:var(--text-dim);font-size:13px;line-height:1.6;">
-          <p data-pt="Você deposita USDC UMA VEZ na sua carteira Nexus Inovation (rede Base, ~12s). Depois disso, cada chamada de API debita centavos do seu saldo INSTANTANEAMENTE — sem assinar transação, sem esperar bloco, sem fee on-chain. É um sistema de saldo pré-pago, igual ao crédito de celular." data-en="You deposit USDC ONCE into your Nexus Inovation wallet (Base network, ~12s). After that, each API call debits pennies from your balance INSTANTLY — no signed transaction, no block confirmation, no on-chain fee. It's a prepaid balance system, just like phone credit.">
-            Você deposita USDC <strong>uma vez</strong> na sua carteira Nexus Inovation (rede Base, ~12s). Depois disso, cada chamada de API debita centavos do seu saldo <strong>instantaneamente</strong> — sem assinar transação, sem esperar bloco, sem fee on-chain. É um sistema de saldo pré-pago, igual ao crédito de celular.
-          </p>
-          <p style="margin-top:10px;" data-pt="O x402 (HTTP 402) só entra em cena se você for dev e quiser chamar APIs sem cadastro: header de pagamento na request, debita direto da sua wallet on-chain. Mas pro dono de agente, é tudo off-chain — agentes ficam tão rápidos quanto qualquer SaaS." data-en="x402 (HTTP 402) only kicks in if you're a dev calling APIs without an account: payment header on the request, debits directly from your on-chain wallet. But for agent owners, it's all off-chain — agents stay as fast as any SaaS.">
-            O <strong>x402</strong> (HTTP 402) só entra em cena se você for dev e quiser chamar APIs sem cadastro: header de pagamento na request, debita direto da sua wallet on-chain. Mas <strong>pro dono de agente, é tudo off-chain</strong> — agentes ficam tão rápidos quanto qualquer SaaS.
-          </p>
-          <p style="margin-top:10px;" data-pt="Reconciliação on-chain só ao sacar: você pede pra retirar saldo, Nexus Inovation transfere USDC de volta pra sua carteira pessoal. Tudo entre depósito e saque é off-chain, instantâneo." data-en="On-chain reconciliation only happens at withdrawal: you request to cash out, Nexus Inovation transfers USDC back to your personal wallet. Everything between deposit and withdrawal is off-chain, instant.">
-            <strong>Reconciliação on-chain só ao sacar</strong>: você pede pra retirar saldo, Nexus Inovation transfere USDC de volta pra sua carteira pessoal. Tudo entre depósito e saque é off-chain, instantâneo.
-          </p>
-        </div>
-      </details>
-
-      <div id="state-row" class="current-state" style="display:none">
-        <span><span class="label">Plano atual:</span> <strong id="cur-tier">—</strong></span>
-        <span class="divider">·</span>
-        <span id="cur-expiry">—</span>
-        <span class="divider">·</span>
-        <span><span class="label">Saldo:</span> <strong id="cur-balance">—</strong> USDC</span>
-      </div>
-
-      <div id="login-block" class="login-prompt" style="display:none">
-        <p>Você precisa estar logado pra assinar.</p>
-        <p><a href="/dashboard">Entrar no painel</a> · ou <a href="/#signup">criar conta grátis</a></p>
-      </div>
-
-      <!-- Tabela comparativa rápida — o que muda na prática -->
-      <div class="comparison-card" style="margin-bottom:32px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
-        <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
-          <h2 style="margin:0;font-size:18px;">Comparativo rápido</h2>
-          <p style="margin:4px 0 0;color:var(--text-dim);font-size:13px;">O que cada plano <strong>realmente</strong> destrava pro seu agente.</p>
-        </div>
-        <div style="overflow-x:auto;">
-          <table class="comp-table" style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead>
-              <tr>
-                <th style="text-align:left;padding:14px 16px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);">Capacidade</th>
-                <th style="padding:14px 12px;text-align:center;font-weight:600;color:var(--text-dim);border-bottom:1px solid var(--border);">Free</th>
-                <th style="padding:14px 12px;text-align:center;font-weight:600;color:var(--accent);border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);">Pro</th>
-                <th style="padding:14px 12px;text-align:center;font-weight:600;color:#ff8c42;border-bottom:1px solid var(--border);">Team</th>
-                <th style="padding:14px 12px;text-align:center;font-weight:600;color:#a855f7;border-bottom:1px solid var(--border);">Enterprise</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Clientes simultâneos no WhatsApp <span class="info-tip" data-tip="Cada cliente em conversa ativa pode estar gerando ~10 chamadas/min (LLM + memória + ferramentas).">?</span></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">~1</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);"><strong>~60</strong></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);"><strong>~300</strong></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">3000+</td>
-              </tr>
-              <tr>
-                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Conversas/dia (estimativa) <span class="info-tip" data-tip="Calculado em msgs por dia, considerando ~5 turnos por conversa típica.">?</span></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">~30</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);"><strong>~2.000</strong></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);"><strong>~10.000</strong></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);ilimitado">ilimitado</td>
-              </tr>
-              <tr>
-                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Taxa por chamada <span class="info-tip" data-tip="Quanto Nexus Inovation adiciona por cima do custo da API. Quanto menor, mais lucro pra você.">?</span></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">100% (padrão)</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);"><strong>−25%</strong></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);"><strong>−50%</strong></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);−75%+</td>
-              </tr>
-              <tr>
-                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Templates premium <span class="info-tip" data-tip="Recepcionista clínica, atendente restaurante, etc — agentes verticais prontos.">?</span></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">Básicos</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);">Todos</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">Todos + customizado</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);Customizados</td>
-              </tr>
-              <tr>
-                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Alertas por email <span class="info-tip" data-tip="Avisos automáticos de saldo baixo, erros, conversas com problema.">?</span></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-muted);">—</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);">✓</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
-              </tr>
-              <tr>
-                <td style="padding:12px 16px;border-bottom:1px solid var(--border);">Painel operador (admin) <span class="info-tip" data-tip="Métricas agregadas: profit, custos, top APIs.">?</span></td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-muted);">—</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);background:rgba(124,92,255,0.04);color:var(--text-muted);">—</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
-                <td style="padding:12px;text-align:center;border-bottom:1px solid var(--border);">✓</td>
-              </tr>
-              <tr>
-                <td style="padding:12px 16px;">Suporte</td>
-                <td style="padding:12px;text-align:center;color:var(--text-muted);">Email lento</td>
-                <td style="padding:12px;text-align:center;background:rgba(124,92,255,0.04);">Email rápido</td>
-                <td style="padding:12px;text-align:center;">Suporte prioritário</td>
-                <td style="padding:12px;text-align:center;">SLA garantido</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <h2 style="font-size:18px;margin:32px 0 12px;">Casos de uso reais</h2>
-      <div class="use-cases" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:32px;">
-        <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:16px;">
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Free</div>
-          <h3 style="margin:0 0 8px;font-size:15px;">Testando a ideia</h3>
-          <p style="font-size:13px;color:var(--text-dim);margin:0;">Você cria 1 agente, conecta no WhatsApp pessoal, valida que funciona com amigos. ~30 conversas/dia.</p>
-        </div>
-        <div style="background:rgba(124,92,255,0.05);border:1px solid rgba(124,92,255,0.25);border-radius:10px;padding:16px;">
-          <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Pro · $20/mês</div>
-          <h3 style="margin:0 0 8px;font-size:15px;">Pequeno negócio rodando</h3>
-          <p style="font-size:13px;color:var(--text-dim);margin:0;">1-2 agentes ativos no WhatsApp da empresa. ~2.000 conversas/mês. Você economiza ~$30/mês na taxa só pela margem reduzida.</p>
-        </div>
-        <div style="background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:16px;">
-          <div style="font-size:11px;color:#ff8c42;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Team · $100/mês</div>
-          <h3 style="margin:0 0 8px;font-size:15px;">Múltiplos clientes / franquia</h3>
-          <p style="font-size:13px;color:var(--text-dim);margin:0;">5-10 agentes pra clientes diferentes. ~10.000 conversas/mês. Acesso a métricas de gestão e suporte prioritário.</p>
-        </div>
-      </div>
-
-      <h2 style="font-size:18px;margin:32px 0 12px;">Planos detalhados</h2>
-      <div class="plans-grid" id="plans">
+      <div class="plans-grid">
         <div class="plan-card">
-          <div class="plan-name">free</div>
-          <div class="plan-price">$0 <span class="per">/ pra sempre</span></div>
-          <p class="plan-blurb">Pra testar e validar a ideia.</p>
+          <div class="plan-name">Starter</div>
+          <div class="plan-price">$40<span class="per">/mês por agente</span></div>
+          <div class="plan-blurb">
+            Pra clínica, salão, comércio pequeno e profissional liberal.
+            Cobre 90% dos casos sem overage.
+          </div>
           <ul class="plan-features">
-            <li>10 chamadas / min</li>
-            <li>Pague por chamada (taxa padrão)</li>
-            <li>Acesso a todas as 40 APIs</li>
-            <li class="muted">Templates básicos</li>
-            <li class="muted">Sem SLA</li>
+            <li><span><strong>5.000</strong> turnos WhatsApp <span class="quota">(~166/dia)</span></span></li>
+            <li><span><strong>500</strong> fotos/PDFs lidos <span class="quota">(via Vision)</span></span></li>
+            <li><span><strong>200</strong> PDFs gerados <span class="quota">(comprovantes, fichas)</span></span></li>
+            <li><span><strong>1.000</strong> lembretes automáticos D-1</span></li>
+            <li><span><strong>1 GB</strong> storage de documentos</span></li>
+            <li><span>Voz bidirecional Cartesia + Deepgram</span></li>
+            <li><span>Brain panel + judge LLM + arc</span></li>
+            <li><span>CRM silencioso + ficha estruturada</span></li>
           </ul>
-          <button class="plan-cta" disabled>Plano padrão</button>
+          <a href="/dashboard" class="plan-cta primary">Assinar Starter →</a>
         </div>
 
         <div class="plan-card is-popular">
-          <div class="plan-name tier-pro">pro</div>
-          <div class="plan-price">$20 <span class="per">/ 30 dias</span></div>
-          <p class="plan-blurb">Pra quem já tem agente no ar.</p>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price">$100<span class="per">/mês por agente</span></div>
+          <div class="plan-blurb">
+            Pra e-commerce ativo, multi-atendentes, clínica grande, alta volumetria.
+          </div>
           <ul class="plan-features">
-            <li><strong>600</strong> chamadas / min (60×)</li>
-            <li><strong>−25%</strong> taxa em todas chamadas</li>
-            <li>Templates premium destravados</li>
-            <li>Alertas por email</li>
-            <li>Renovação automática (cancele a hora que quiser)</li>
+            <li><span><strong>25.000</strong> turnos WhatsApp <span class="quota">(~830/dia)</span></span></li>
+            <li><span><strong>5.000</strong> fotos/PDFs lidos</span></li>
+            <li><span><strong>1.000</strong> PDFs gerados</span></li>
+            <li><span><strong>5.000</strong> lembretes automáticos</span></li>
+            <li><span><strong>5 GB</strong> storage de documentos</span></li>
+            <li><span>Tudo do Starter</span></li>
+            <li><span>Multi-agente roteamento (intent → especialista)</span></li>
+            <li><span>Suporte prioritário</span></li>
           </ul>
-          <button class="plan-cta primary" data-tier="pro">Assinar — $20</button>
+          <a href="/dashboard" class="plan-cta primary">Assinar Pro →</a>
         </div>
+      </div>
 
-        <div class="plan-card">
-          <div class="plan-name tier-team">team</div>
-          <div class="plan-price">$100 <span class="per">/ 30 dias</span></div>
-          <p class="plan-blurb">Pra agências e franquias.</p>
-          <ul class="plan-features">
-            <li><strong>3.000</strong> chamadas / min (300×)</li>
-            <li><strong>−50%</strong> taxa em todas chamadas</li>
-            <li>Regras de orçamento customizadas</li>
-            <li>Painel admin com métricas</li>
-            <li>Suporte prioritário</li>
-          </ul>
-          <button class="plan-cta" data-tier="team">Assinar — $100</button>
-        </div>
-
-        <div class="plan-card">
-          <div class="plan-name tier-enterprise">enterprise</div>
-          <div class="plan-price">Customizado <span class="per">/ negociado</span></div>
-          <p class="plan-blurb">Pra alto volume / SLA.</p>
-          <ul class="plan-features">
-            <li><strong>30.000+</strong> chamadas / min</li>
-            <li><strong>−75%+</strong> taxa, preço negociado</li>
-            <li>Upstreams dedicados + SLA</li>
-            <li>Deploy privado (opcional)</li>
-            <li>Cobrança trimestral</li>
-          </ul>
-          <a class="plan-cta" href="mailto:shopkaolin.com@gmail.com?subject=Nexus Inovation%20enterprise">Falar com a gente →</a>
+      <div class="overage-section">
+        <h2>Acima do incluído</h2>
+        <p>Caso seu agente passe do limite mensal, cobramos por uso adicional. Sem surpresa: você vê o consumo em tempo real no painel <code>/account</code>.</p>
+        <div class="overage-grid">
+          <div class="overage-item">
+            <div class="price">$0,01</div>
+            <div class="label">por turno extra</div>
+          </div>
+          <div class="overage-item">
+            <div class="price">$0,10</div>
+            <div class="label">por foto/PDF lido</div>
+          </div>
+          <div class="overage-item">
+            <div class="price">$0,05</div>
+            <div class="label">por PDF gerado</div>
+          </div>
+          <div class="overage-item">
+            <div class="price">$0,01</div>
+            <div class="label">por lembrete</div>
+          </div>
         </div>
       </div>
 
       <div class="faq">
         <h2>Perguntas frequentes</h2>
         <details>
-          <summary>Como funciona a assinatura em USDC?</summary>
-          <p>Quando você assina, o preço do plano é debitado uma vez da sua carteira Nexus Inovation. Seu plano ativa por 30 dias. Renovação automática (ligada por padrão) cobra a mesma carteira no dia 30 — se tiver saldo, continua; se não tiver, volta pra grátis e enviamos email avisando.</p>
+          <summary>Como pago a assinatura?</summary>
+          <p>
+            Sua conta tem uma carteira USDC na rede Base (criada automaticamente).
+            Você deposita USDC nela (direto ou via Pix → on-ramp).
+            Todo mês debitamos automaticamente o valor do plano + qualquer overage.
+          </p>
+        </details>
+        <details>
+          <summary>O que acontece se faltar saldo?</summary>
+          <p>
+            Você tem <strong>5 dias de grace period</strong>. Durante esse tempo,
+            seu agente continua funcionando normalmente e você recebe email de aviso.
+            Após 5 dias sem reabastecer, o agente é pausado automaticamente
+            (não responde mais no WhatsApp). Pode reativar a qualquer momento adicionando saldo.
+          </p>
         </details>
         <details>
           <summary>Posso cancelar quando quiser?</summary>
-          <p>Sim — a hora que quiser. Cancelar só desativa a renovação automática. Você mantém o plano pago (rate limits, taxas reduzidas, todos benefícios) até o fim do período já pago, depois volta pra grátis. Não tem reembolso parcial — o período já foi pré-pago.</p>
+          <p>
+            Sim, sem fidelidade. Cancele em <code>/account</code>. O agente
+            é pausado imediatamente. O período já pago não é reembolsado mas
+            você pode reativar dentro do prazo sem perder histórico/contatos.
+          </p>
         </details>
         <details>
-          <summary>E se meu saldo USDC estiver baixo?</summary>
-          <p>Se você tentar assinar com menos que o preço do plano, a chamada retorna erro de saldo insuficiente. <a href="/buy-usdc">Compre USDC</a> primeiro. Se a renovação automática disparar sem saldo, o plano volta pra grátis e enviamos email — você adiciona USDC e re-assina.</p>
+          <summary>Posso mudar de plano no meio do mês?</summary>
+          <p>
+            Sim. Mudança de plano (Starter → Pro ou vice-versa) entra em vigor
+            na próxima renovação. Não há proporcional no meio do ciclo.
+          </p>
         </details>
         <details>
-          <summary>O desconto de taxa vale pra APIs grátis também?</summary>
-          <p>Sim. Mesmo em APIs grátis (Open-Meteo, Wikipedia, BrasilAPI, etc) aplicamos uma pequena taxa Nexus Inovation pra cobrir infraestrutura. Usuários Pro/Team têm essa taxa descontada em 25% / 50% em todo o catálogo.</p>
-        </details>
-        <details>
-          <summary>Por que USDC e não cartão de crédito?</summary>
-          <p>Nexus Inovation usa USDC porque: zero taxa de processamento, liquidação instantânea, sem chargeback, sem conversão pra real. Reusar a mesma carteira pra assinatura E chamadas mantém o modelo simples — seu USDC paga TUDO, sem segunda relação de cobrança.</p>
-        </details>
-        <details>
-          <summary>Posso trocar de Pro pra Team no meio do mês?</summary>
-          <p>Sim. Assinar Team enquanto está no Pro estende a partir do vencimento atual em vez de resetar — você não perde dias pagos. Downgrades só viram no próximo período.</p>
-        </details>
-        <details>
-          <summary>Quantos agentes posso criar em cada plano?</summary>
-          <p>Sem limite hard. Mas a quantidade prática depende do tráfego: Free aguenta 1 agente leve. Pro: 1-3 agentes ativos. Team: 5-10 agentes em paralelo. Enterprise: ilimitado.</p>
+          <summary>O que conta como "turno"?</summary>
+          <p>
+            Cada resposta do agente no WhatsApp = 1 turno. Mensagem que o cliente
+            envia em sequência (3 bolhas em 5s) é tratada como 1 turno só
+            (debounce de 3s).
+          </p>
         </details>
       </div>
-    </main>
-
-    <div id="toast" class="toast-mini"></div>
-
-    <script>
-      const STORAGE_KEY = 'axon.apiKey';
-      const BASE_KEY = 'axon.baseUrl';
-      const BASE = localStorage.getItem(BASE_KEY) || 'https://axon-kedb.onrender.com';
-      const KEY = localStorage.getItem(STORAGE_KEY);
-      if (!KEY) {
-        location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
-      }
-
-      function showToast(msg, kind) {
-        const t = document.getElementById('toast');
-        t.textContent = msg;
-        t.className = 'toast-mini ' + (kind || '') + ' show';
-        setTimeout(() => { t.classList.remove('show'); }, 3000);
-      }
-
-      async function api(path, opts) {
-        const res = await fetch(BASE + path, {
-          ...opts,
-          headers: {
-            'Authorization': 'Bearer ' + KEY,
-            'Content-Type': 'application/json',
-            ...(opts && opts.headers),
-          },
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const err = new Error((data.error && data.error.message) || data.message || `HTTP ${res.status}`);
-          err.status = res.status; err.data = data;
-          throw err;
-        }
-        return data;
-      }
-
-      async function init() {
-        if (!KEY) {
-          document.getElementById('login-block').style.display = '';
-          // Disable subscribe buttons
-          document.querySelectorAll('[data-tier]').forEach(b => { b.disabled = true; b.textContent = 'Entre primeiro'; });
-          return;
-        }
-        try {
-          const [sub, bal] = await Promise.all([
-            api('/v1/subscription'),
-            api('/v1/wallet/balance'),
-          ]);
-          const row = document.getElementById('state-row');
-          document.getElementById('cur-tier').textContent = (sub.tier_effective || 'free').toUpperCase();
-          if (sub.tier_active !== 'free' && sub.expires_at) {
-            const exp = new Date(sub.expires_at).toLocaleDateString();
-            document.getElementById('cur-expiry').innerHTML = sub.tier_effective === 'free'
-              ? `<span style="color:#f87171">Expired ${exp}</span>`
-              : `Renova <strong>${exp}</strong> · renovação automática <strong>${sub.auto_renew ? 'ligada' : 'desligada'}</strong>`;
-          } else {
-            document.getElementById('cur-expiry').textContent = 'No active paid plan';
-          }
-          document.getElementById('cur-balance').textContent = bal.balance_usdc;
-          row.style.display = '';
-
-          // Mark current tier card
-          document.querySelectorAll('.plan-card').forEach((card) => {
-            const btn = card.querySelector('[data-tier]');
-            if (!btn) return;
-            const tier = btn.dataset.tier;
-            if (tier === sub.tier_effective && sub.tier_effective !== 'free') {
-              card.classList.add('is-current');
-              btn.classList.add('is-current');
-              btn.textContent = `Renew — $${tier === 'pro' ? '20' : '100'}`;
-            }
-          });
-        } catch (e) {
-          showToast('Could not load subscription state — ' + e.message, 'error');
-        }
-
-        document.querySelectorAll('[data-tier]').forEach((btn) => {
-          btn.addEventListener('click', async () => {
-            const tier = btn.dataset.tier;
-            const price = tier === 'pro' ? 20 : 100;
-            if (!confirm(`Assinar plano ${tier.toUpperCase()} por $${price} USDC por 30 dias?`)) return;
-            const original = btn.textContent;
-            btn.disabled = true; btn.textContent = 'Processing…';
-            try {
-              const r = await api('/v1/subscription/subscribe', {
-                method: 'POST',
-                body: JSON.stringify({ tier, auto_renew: true }),
-              });
-              showToast(`Assinado plano ${tier.toUpperCase()} até ${new Date(r.expires_at).toLocaleDateString('pt-BR')}`, 'success');
-              setTimeout(() => { window.location.reload(); }, 1500);
-            } catch (e) {
-              const m = e.status === 402 || /insufficient/i.test(e.message)
-                ? 'Insufficient balance. Top up at /buy-usdc first.'
-                : 'Falha na assinatura: ' + e.message;
-              showToast(m, 'error');
-              btn.disabled = false; btn.textContent = original;
-            }
-          });
-        });
-      }
-
-      init();
-    </script>
-
-    <link rel="stylesheet" href="/_i18n.css" />
-    <script src="/_i18n.js" defer></script>
+    </div>
   </body>
 </html>

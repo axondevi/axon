@@ -146,6 +146,40 @@
         </div>
       </div>
 
+      <div class="panel" id="topup">
+        <div class="panel-header">
+          Carteira USDC
+          <span class="meta" id="wallet-balance" style="color:var(--text-muted);font-weight:400;font-size:12px;">carregando…</span>
+        </div>
+        <div class="panel-body">
+          <div class="alert warn" style="margin-bottom:14px;">
+            💸 Sua carteira USDC paga as assinaturas mensais dos agentes. Mantenha saldo suficiente pra renovação automática.
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Endereço de depósito</span>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span class="field-value" id="wallet-addr" style="font-size:11px;">—</span>
+              <button class="btn-mini" id="copy-addr-btn" title="Copiar endereço">📋</button>
+            </div>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Rede</span>
+            <span class="field-value">Base (Ethereum L2)</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">Token</span>
+            <span class="field-value">USDC (USD Coin)</span>
+          </div>
+
+          <div style="margin-top:16px;padding:14px;background:var(--bg-elev);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-dim);">
+            <strong style="color:var(--text);">Como adicionar saldo:</strong><br>
+            <strong>1. USDC direto:</strong> manda USDC na rede Base pro endereço acima. Crédito automático em 1-2 min após confirmação on-chain.<br>
+            <strong>2. Pix → USDC:</strong> envie Pix de R$X pra <code>kaolinn20@gmail.com</code>, manda comprovante pelo WhatsApp. Convertemos manualmente em ~1h.
+          </div>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-header">
           Assinaturas dos agentes
@@ -230,11 +264,32 @@
           }
         }
         renderKey();
-        // Load subscriptions in parallel — non-blocking.
+        // Load wallet + subscriptions in parallel — both non-blocking.
+        loadWallet().catch((e) => {
+          document.getElementById('wallet-balance').textContent = 'erro: ' + e.message;
+        });
         loadSubs().catch((e) => {
           document.getElementById('subs-list').innerHTML =
             `<div class="alert error">Falha ao carregar assinaturas: ${e.message}</div>`;
         });
+      }
+
+      async function loadWallet() {
+        const r = await fetch(API_BASE + '/v1/wallet/balance', {
+          headers: { 'x-api-key': currentKey, 'content-type': 'application/json' },
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const bal = Number(data.available_usdc || data.balance_usdc || 0);
+        const balEl = document.getElementById('wallet-balance');
+        balEl.textContent = `$${bal.toFixed(2)} USDC disponível`;
+        balEl.style.color = bal < 40 ? 'var(--warn)' : 'var(--accent-2)';
+        balEl.style.fontWeight = '600';
+        document.getElementById('wallet-addr').textContent = data.address;
+        document.getElementById('copy-addr-btn').onclick = async () => {
+          await navigator.clipboard.writeText(data.address);
+          showAlert('success', 'Endereço copiado.');
+        };
       }
 
       async function loadSubs() {
