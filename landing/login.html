@@ -146,7 +146,10 @@
       const STORAGE_KEY = 'axon.apiKey';      // matches dashboard.html / build.html
       const STORAGE_KEY_LEGACY = 'axon_api_key'; // matches whatsapp.html / contacts.html
 
-      let supabase = null;
+      // Renamed from `supabase` — Firefox throws "redeclaration of
+      // non-configurable global property" because the CDN script
+      // already defined window.supabase.
+      let sbClient = null;
       let supabaseReady = false;
 
       // Disable any button that requires Supabase until init finishes,
@@ -195,7 +198,7 @@
             document.getElementById('config-warn').hidden = false;
             return;
           }
-          supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+          sbClient = window.supabase.createClient(cfg.project_url, cfg.anon_key);
           setReady(true);
         } catch (e) {
           showAlert('error', 'Não consegui carregar config de auth: ' + e.message);
@@ -203,7 +206,7 @@
         }
 
         // 2. If we already have a Supabase session, exchange for API key & redirect
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await sbClient.auth.getSession();
         if (session?.access_token) {
           await exchangeAndRedirect(session.access_token);
         }
@@ -238,13 +241,13 @@
       document.getElementById('login-form').addEventListener('submit', async (ev) => {
         ev.preventDefault();
         clearAlert();
-        if (!supabase) return;
+        if (!sbClient) return;
         const email = document.getElementById('email').value.trim().toLowerCase();
         const password = document.getElementById('password').value;
         const btn = document.getElementById('submit-btn');
         btn.disabled = true; btn.textContent = 'Entrando…';
         try {
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
           if (error) throw error;
           await exchangeAndRedirect(data.session.access_token);
         } catch (e) {
@@ -255,7 +258,7 @@
 
       document.getElementById('magic-btn').addEventListener('click', async () => {
         clearAlert();
-        if (!supabaseReady || !supabase) {
+        if (!supabaseReady || !sbClient) {
           showAlert('error', 'Auth ainda carregando — aguarde 1 segundo e tente de novo.');
           return;
         }
@@ -265,7 +268,7 @@
         const orig = btn.textContent;
         btn.disabled = true; btn.textContent = 'Enviando…';
         try {
-          const { error } = await supabase.auth.signInWithOtp({
+          const { error } = await sbClient.auth.signInWithOtp({
             email,
             options: { emailRedirectTo: location.origin + '/login' },
           });
@@ -282,11 +285,11 @@
       document.getElementById('reset-link').addEventListener('click', async (ev) => {
         ev.preventDefault();
         clearAlert();
-        if (!supabase) return;
+        if (!sbClient) return;
         const email = document.getElementById('email').value.trim().toLowerCase();
         if (!email) { showAlert('error', 'Digite seu e-mail acima primeiro.'); return; }
         try {
-          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          const { error } = await sbClient.auth.resetPasswordForEmail(email, {
             redirectTo: location.origin + '/login',
           });
           if (error) throw error;

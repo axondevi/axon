@@ -81,7 +81,11 @@
 
     <script>
       const API_BASE = 'https://axon-kedb.onrender.com';
-      let supabase = null;
+      // Renamed from `supabase` to avoid colliding with the global
+      // window.supabase that the CDN script defines as non-configurable
+      // (Firefox / strict envs throw "redeclaration of non-configurable
+      // global property"). Chrome silently accepted, Firefox doesn't.
+      let sbClient = null;
       let supabaseReady = false;
 
       function setReady(ready) {
@@ -120,7 +124,7 @@
             showAlert('error', 'Cadastro Supabase não configurado pelo operador.');
             return;
           }
-          supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+          sbClient = window.supabase.createClient(cfg.project_url, cfg.anon_key);
           setReady(true);
         } catch (e) {
           showAlert('error', 'Falha ao carregar config: ' + e.message);
@@ -129,7 +133,7 @@
 
       document.getElementById('signup-form').addEventListener('submit', async (ev) => {
         ev.preventDefault();
-        if (!supabaseReady || !supabase) {
+        if (!supabaseReady || !sbClient) {
           showAlert('error', 'Auth ainda carregando — aguarde 1 segundo e tente de novo.');
           return;
         }
@@ -138,7 +142,7 @@
         const btn = document.getElementById('submit-btn');
         btn.disabled = true; btn.textContent = 'Criando…';
         try {
-          const { data, error } = await supabase.auth.signUp({
+          const { data, error } = await sbClient.auth.signUp({
             email,
             password,
             options: { emailRedirectTo: location.origin + '/login' },

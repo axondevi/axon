@@ -211,7 +211,10 @@
       const STORAGE_KEY = 'axon.apiKey';
       const STORAGE_KEY_LEGACY = 'axon_api_key';
 
-      let supabase = null;
+      // Renamed from `supabase` — Firefox throws "redeclaration of
+      // non-configurable global property" because the CDN script
+      // already defined window.supabase.
+      let sbClient = null;
       let revealed = false;
       let currentKey = '';
 
@@ -240,8 +243,8 @@
           showAlert('error', 'Supabase não configurado pelo operador.');
           return;
         }
-        supabase = window.supabase.createClient(cfg.project_url, cfg.anon_key);
-        const { data: { session } } = await supabase.auth.getSession();
+        sbClient = window.supabase.createClient(cfg.project_url, cfg.anon_key);
+        const { data: { session } } = await sbClient.auth.getSession();
         if (!session) { location.href = '/login'; return; }
 
         document.getElementById('email-display').textContent = session.user.email || '—';
@@ -371,7 +374,7 @@
 
       document.getElementById('rotate-btn').addEventListener('click', async () => {
         if (!confirm('Regenerar a API key invalida a chave atual em 5 minutos. Atualize seus scripts depois. Continuar?')) return;
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await sbClient.auth.getSession();
         if (!session) { location.href = '/login'; return; }
         const r = await fetch(API_BASE + '/v1/auth/supabase/rotate', {
           method: 'POST',
@@ -395,7 +398,7 @@
       });
 
       window.logout = async () => {
-        if (supabase) await supabase.auth.signOut();
+        if (sbClient) await sbClient.auth.signOut();
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(STORAGE_KEY_LEGACY);
         location.href = '/login';
