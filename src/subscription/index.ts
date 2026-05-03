@@ -34,8 +34,15 @@ export const TIER_MARKUP_DISCOUNT_PCT: Record<Tier, number> = {
 };
 
 // Per-tier rate-limit ceiling, mirrored in src/middleware/rate-limit.ts
+//
+// Bumped free tier from 10 → 60 in 2026-05 because the modern dashboard
+// loads N+5 endpoints in parallel on render (wallet + agents +
+// per-agent whatsapp/contacts/subscription/health). With even 2 agents
+// the free tier was hitting 10/min on a single page load. 60/min
+// (1/sec average) is generous enough for hand-driving the UI but keeps
+// the abuse ceiling well below paid tier capacity.
 export const TIER_RATE_LIMITS: Record<Tier, number> = {
-  free: 10,
+  free: 60,
   pro: 600,
   team: 3000,
   enterprise: 30000,
