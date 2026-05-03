@@ -775,6 +775,13 @@ Estacionamento: gratuito por 1h"></textarea>
         if (!res.ok) {
           const err = new Error((data.error && data.error.message) || data.message || `HTTP ${res.status}`);
           err.status = res.status; err.data = data;
+          // Auto-recover from stale api_key by bouncing through /login
+          // (silently re-exchanges Supabase session and returns here).
+          if (res.status === 401 && window.AxonUI && AxonUI.handleAuthError(err)) {
+            // Throw a never-resolving promise so callers don't render
+            // an error flash before the navigation kicks in.
+            return new Promise(() => {});
+          }
           throw err;
         }
         return data;

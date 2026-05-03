@@ -60,5 +60,27 @@
     return '$' + n.toFixed(2);
   }
 
-  window.AxonUI = { toast, formatCost };
+  /**
+   * If `err` looks like a stale/missing api_key, drop the cached key and
+   * bounce through /login (which silently re-exchanges any active
+   * Supabase session and redirects back via ?return=). Returns true
+   * when it redirected — the caller should `return` immediately so it
+   * doesn't try to render error UI right before the navigation.
+   *
+   * Works with both legacy storage keys (`axon.apiKey`, `axon_api_key`)
+   * since different pages standardized on different names.
+   */
+  function handleAuthError(err) {
+    const msg = (err && (err.message || err.error)) || String(err || '');
+    if (!/api key|unauthorized|401/i.test(msg)) return false;
+    try {
+      localStorage.removeItem('axon.apiKey');
+      localStorage.removeItem('axon_api_key');
+    } catch (_) { /* private mode */ }
+    const back = location.pathname + location.search;
+    location.href = '/login?return=' + encodeURIComponent(back);
+    return true;
+  }
+
+  window.AxonUI = { toast, formatCost, handleAuthError };
 })();

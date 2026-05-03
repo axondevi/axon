@@ -252,10 +252,10 @@
           },
         });
         if (!r.ok) {
-          if (r.status === 401) {
-            localStorage.removeItem(STORAGE_KEY);
-            state.apiKey = '';
-            render();
+          // Stale/missing key → bounce through /login so the Supabase
+          // session re-exchanges silently and we land back here.
+          if (r.status === 401 && window.AxonUI && AxonUI.handleAuthError(new Error('unauthorized'))) {
+            return new Promise(() => {});
           }
           const body = await r.json().catch(() => ({}));
           const parts = [String(r.status)];

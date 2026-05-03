@@ -2265,14 +2265,7 @@
           // ---- Agent chat ----
           initAgentChat();
         } catch (e) {
-          // Stale/rotated api_key → bounce through /login. Login.html
-          // re-exchanges the Supabase session silently and redirects
-          // back to ?return=, so a logged-in user sees no friction.
-          if (/api key/i.test(e.message || '')) {
-            localStorage.removeItem(STORAGE_KEY);
-            location.href = '/login?return=' + encodeURIComponent(location.pathname + location.search);
-            return;
-          }
+          if (window.AxonUI && AxonUI.handleAuthError(e)) return;
           root.innerHTML = `<div class="container"><div class="error">${e.message}</div></div>`;
         }
       }

@@ -549,10 +549,11 @@
           },
         });
         if (!r.ok) {
-          if (r.status === 401) {
-            localStorage.removeItem(STORAGE_KEY);
-            state.apiKey = '';
-            render();
+          // Stale/missing key → bounce through /login so the Supabase
+          // session re-exchanges silently and we land back here. Hold
+          // the promise open so callers don't render an error flash.
+          if (r.status === 401 && window.AxonUI && AxonUI.handleAuthError(new Error('unauthorized'))) {
+            return new Promise(() => {});
           }
           // Read the JSON body so callers can branch on `error` codes
           // (wrong_pay_mode, auto_provision_unavailable, etc) and show
