@@ -879,6 +879,29 @@ export async function runAgent(opts: {
   const greetingHint =
     hourBR < 12 ? 'bom dia' : hourBR < 18 ? 'boa tarde' : 'boa noite';
 
+  // Universal quality rule — applies to every agent regardless of
+  // template. Born from a real failure: 3 conversations with the live
+  // Concessionária ended with 0 tool calls and pure deflection ("qual
+  // modelo?" / "como posso ajudar?"). The fix isn't another template
+  // tweak — it's a non-negotiable house rule that every reply must
+  // either move the deal forward with real data OR ask one sharp
+  // question that unlocks a tool call next turn. Kept tight (Llama
+  // tunes out long preambles) and ordered AFTER the persona so the
+  // template's domain knowledge wins on conflict.
+  const qualityRule = tools.length
+    ? `## Regra de qualidade (não-negociável)
+Cada resposta sua deve conter UMA dessas duas coisas — nunca nenhuma:
+  (a) dado real puxado de tool (FIPE, CEP, mercadolivre, weather, search…),
+  (b) UMA pergunta sharp que destrava tool no próximo turno.
+
+Se a resposta não tem (a) nem (b), reformula antes de mandar.
+"Como posso ajudar?" / "Qual sua dúvida?" / "Em que posso te auxiliar?" são PROIBIDAS — elas não destravam nada.
+
+Se o cliente é vago ("quanto custa", "tem barato"), NÃO devolve outra pergunta vaga. Faz UMA pergunta sharp + JÁ chama a tool com chute razoável: "Qual modelo? FIPE na hora" / "Te puxo opções até R$X" / etc.
+
+Se você JÁ tem business_info (endereço, horário, catálogo, política), USA antes de perguntar. Repetir pergunta que tá no business_info = bot ruim.`
+    : '';
+
   const fullSystemPrompt = [
     systemPrompt,
     '',
@@ -887,6 +910,8 @@ export async function runAgent(opts: {
     '',
     tools.length ? '## Tools available' : '',
     toolList,
+    '',
+    qualityRule,
     '',
     `Current date: ${isoDate} (${weekdayBR}, ${hourBR}h${minBR} no Brasil — saudação adequada agora: "${greetingHint}").`,
   ]
