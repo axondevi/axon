@@ -288,6 +288,8 @@ adminCron.post('/cron/appointment-reminders', async (c) => {
       void import('~/lib/metrics').then(({ bumpCounter }) => {
         bumpCounter('axon_appointment_reminder_sent_total', { tag: 'd-1' });
       });
+      // Subscription usage — counts toward included reminders quota.
+      void import('~/payment/usage').then((m) => m.trackReminder(apt.agentId)).catch(() => {});
     } else {
       failed++;
       details.push({ id: apt.id, outcome: 'send-fail', error: (r as { error?: string }).error });

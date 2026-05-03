@@ -612,6 +612,73 @@ export const appointments = pgTable(
 );
 export type Appointment = typeof appointments.$inferSelect;
 
+// ─── Agent subscriptions (per-agent monthly billing in USDC) ──
+// One row per active agent. Plans: 'starter' ($40/mo) and 'pro' ($100/mo).
+// Each plan ships with included monthly quotas (turns, vision describes,
+// pdf generations, reminders); usage above the included tier is billed
+// per-unit at overage rates and added to the next monthly debit.
+//
+// Lifecycle:
+//   active   → normal operation, agent runs, counters tick
+//   grace    → wallet didn't cover the renewal debit; 5-day window where
+//              agent KEEPS RUNNING but owner sees a "deposite USDC" prompt.
+//              After 5 days, cron flips status to 'cancelled' AND sets
+//              agents.paused_at = NOW() so the WhatsApp webhook stops
+//              dispatching to the LLM.
+//   cancelled→ owner cancelled OR grace expired. Agent is paused, can be
+//              reactivated by owner via /v1/agents/:id/subscription POST.
+export const agentSubscriptions = pgTable(
+  'agent_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    /** 'starter' | 'pro'. Defaults set in src/payment/plans.ts. */
+    plan: text('plan').notNull().default('starter'),
+    /** 'active' | 'grace' | 'cancelled'. */
+    status: text('status').notNull().default('active'),
+
+    /** Period boundaries for the current paid month. Cron compares
+     *  current_period_end to NOW() to decide what to bill next. */
+    currentPeriodStart: timestamp('current_period_start', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+
+    /** Set when cron tries to bill but wallet is short. Drives the 5-day
+     *  countdown (graceUntil = lastBillFailedAt + 5 days). */
+    lastBillFailedAt: timestamp('last_bill_failed_at', { withTimezone: true }),
+    graceUntil: timestamp('grace_until', { withTimezone: true }),
+
+    /** Most recent successful debit. */
+    lastBilledAt: timestamp('last_billed_at', { withTimezone: true }),
+    /** Amount of last debit in USDC micro-units (6 decimals). */
+    lastBillMicro: bigint('last_bill_micro', { mode: 'bigint' }).notNull().default(0n),
+
+    /** Per-period usage counters — reset to 0 on successful billing.
+     *  These drive the overage calculation. */
+    usedTurns: integer('used_turns').notNull().default(0),
+    usedVision: integer('used_vision').notNull().default(0),
+    usedPdf: integer('used_pdf').notNull().default(0),
+    usedReminders: integer('used_reminders').notNull().default(0),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    agentUnique: uniqueIndex('agent_subscriptions_agent_idx').on(t.agentId),
+    ownerIdx: index('agent_subscriptions_owner_idx').on(t.ownerId),
+    statusIdx: index('agent_subscriptions_status_idx').on(t.status),
+    periodEndIdx: index('agent_subscriptions_period_end_idx').on(t.currentPeriodEnd),
+  }),
+);
+export type AgentSubscription = typeof agentSubscriptions.$inferSelect;
+
 // ─── Pix Payments (MercadoPago integration) ───────────────────
 // Tracks pending → approved/expired/cancelled lifecycle of Pix charges.
 // When status flips to 'approved', credit() in wallet/service.ts writes

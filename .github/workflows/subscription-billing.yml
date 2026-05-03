@@ -1,0 +1,44 @@
+# Daily per-agent subscription billing — runs at 10:00 UTC (07:00 BR /
+# GMT-3), invokes the backend cron endpoint that:
+#   1. Bills any subscription whose period_end has passed (status active
+#      or grace).
+#   2. On insufficient wallet balance, transitions to 'grace' for 5 days.
+#   3. After grace expires, sets status='cancelled' AND pauses the agent
+#      (sets agents.paused_at) so WhatsApp stops processing turns.
+#
+# The endpoint is idempotent — re-running same day won't double-bill
+# because lastBilledAt + new currentPeriodEnd move forward atomically.
+#
+# Manual trigger via workflow_dispatch is supported for ad-hoc runs.
+# Required secret: ADMIN_API_KEY (already on Render and shared with the
+# appointment-reminders workflow).
+
+name: subscription-billing
+
+on:
+  schedule:
+    # 10:00 UTC = 07:00 America/Sao_Paulo. Cron uses UTC.
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: subscription-billing
+  cancel-in-progress: false
+
+jobs:
+  charge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger backend cron endpoint
+        run: |
+          echo "POST https://axon-kedb.onrender.com/v1/admin/cron/subscription-billing"
+          curl -fsS -X POST \
+            "https://axon-kedb.onrender.com/v1/admin/cron/subscription-billing" \
+            -H "x-admin-key: ${{ secrets.ADMIN_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' | tee response.json
+          python -c "
+          import json
+          d = json.load(open('response.json'))
+          print(f\"due={d.get('due_count')} billed={d.get('billed')} grace_started={d.get('grace_started')} cancelled={d.get('cancelled')} errors={d.get('errors')}\")
+          "

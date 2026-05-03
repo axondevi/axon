@@ -31,6 +31,7 @@ import agentRunRoutes from '~/routes/agent-run';
 import { ownerWhatsapp, publicWebhook as whatsappPublicWebhook } from '~/routes/whatsapp';
 import { ownerContacts } from '~/routes/contacts';
 import { ownerAppointments, ownerAppointmentsRoot, adminCron } from '~/routes/appointments';
+import { ownerSubscriptions, ownerSubscriptionsRoot, adminSubscriptionsCron } from '~/routes/subscriptions';
 import { nftMetaRoutes } from '~/routes/nft-metadata';
 import { checkoutRoutes } from '~/routes/checkout';
 import { previewRoutes } from '~/routes/preview';
@@ -164,6 +165,7 @@ app.route('/v1/admin/audit', auditRoutes);
 // secret with the GitHub Action that calls it daily. Mounted BEFORE the
 // authed /v1 router so the api-key middleware doesn't shadow it.
 app.route('/v1/admin', adminCron);
+app.route('/v1/admin', adminSubscriptionsCron);
 
 // ─── Public signup (no auth, IP rate-limited) ─────────
 // MUST be mounted BEFORE the authed /v1 sub-router.
@@ -209,6 +211,8 @@ v1.route('/agents', ownerWhatsapp);  // adds /v1/agents/:id/whatsapp under same 
 v1.route('/agents', ownerContacts);  // adds /v1/agents/:id/contacts/* under same auth
 v1.route('/agents', ownerAppointments);     // /v1/agents/:id/{appointments,contacts/:phone/appointments}
 v1.route('/', ownerAppointmentsRoot);       // /v1/appointments/:id PATCH/DELETE
+v1.route('/agents', ownerSubscriptions);    // /v1/agents/:id/subscription
+v1.route('/', ownerSubscriptionsRoot);      // /v1/subscriptions (list per owner)
 v1.route('/checkout', checkoutRoutes);  // POST /v1/checkout/pix + status polling
 v1.route('/webhook-subscriptions', webhookSubsRoutes);
 v1.route('/affiliate', affiliateRoutes);  // earnings + agent list for referrers

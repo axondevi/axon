@@ -666,6 +666,9 @@ publicWebhook.post('/:secret', async (c) => {
       });
       if (media.ok && media.bytes && media.mimeType) {
         const { describeImage } = await import('~/llm/vision');
+        // Subscription usage counter — vision describes count toward
+        // the per-month included quota (overage billed at $0.10 each).
+        void import('~/payment/usage').then((m) => m.trackVision(conn.agentId)).catch(() => {});
         const desc = await describeImage({
           imageBytes: media.bytes,
           mimeType: media.mimeType,
@@ -773,6 +776,8 @@ publicWebhook.post('/:secret', async (c) => {
         let extracted = '';
         if (isPdf) {
           const { describePdf } = await import('~/llm/vision');
+          // PDF inbound also counts as vision (same Gemini multimodal call).
+          void import('~/payment/usage').then((m) => m.trackVision(conn.agentId)).catch(() => {});
           const r = await describePdf({
             pdfBytes: media.bytes,
             contextHint: inbound.text || undefined,
@@ -1257,6 +1262,15 @@ async function processBufferedTurn(opts: {
     images = result.images || [];
     pixPayments = result.pixPayments || [];
     pdfs = result.pdfs || [];
+
+    // Subscription usage: each runAgent success counts as one billable
+    // turn. PDFs are tracked separately because they have their own
+    // overage rate (different from raw turns). Fire-and-forget — never
+    // blocks the WhatsApp reply.
+    void import('~/payment/usage').then((m) => {
+      m.trackTurn(a.id);
+      if (pdfs.length > 0) m.trackUsage(a.id, 'pdf', pdfs.length);
+    }).catch(() => {});
 
     // ─── Output guardrail: catch capability hallucinations ─────────
     // Even with explicit "NÃO prometa X" rules in the system prompt,

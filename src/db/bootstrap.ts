@@ -311,6 +311,33 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "appointments_contact_idx" ON "appointments"("contact_memory_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "appointments_scheduled_idx" ON "appointments"("scheduled_for")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "appointments_status_idx" ON "appointments"("status")`);
+
+  // 0028: agent_subscriptions — per-agent monthly USDC billing.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "agent_subscriptions" (
+      "id"                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "agent_id"                 uuid NOT NULL REFERENCES "agents"("id") ON DELETE CASCADE,
+      "owner_id"                 uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "plan"                     text NOT NULL DEFAULT 'starter',
+      "status"                   text NOT NULL DEFAULT 'active',
+      "current_period_start"     timestamptz NOT NULL DEFAULT NOW(),
+      "current_period_end"       timestamptz NOT NULL,
+      "last_bill_failed_at"      timestamptz,
+      "grace_until"              timestamptz,
+      "last_billed_at"           timestamptz,
+      "last_bill_micro"          bigint NOT NULL DEFAULT 0,
+      "used_turns"               integer NOT NULL DEFAULT 0,
+      "used_vision"              integer NOT NULL DEFAULT 0,
+      "used_pdf"                 integer NOT NULL DEFAULT 0,
+      "used_reminders"           integer NOT NULL DEFAULT 0,
+      "created_at"               timestamp NOT NULL DEFAULT NOW(),
+      "updated_at"               timestamp NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "agent_subscriptions_agent_idx" ON "agent_subscriptions"("agent_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_subscriptions_owner_idx" ON "agent_subscriptions"("owner_id")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_subscriptions_status_idx" ON "agent_subscriptions"("status")`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_subscriptions_period_end_idx" ON "agent_subscriptions"("current_period_end")`);
 }
 
 export async function ensureSystemRows() {

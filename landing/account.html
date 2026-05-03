@@ -147,6 +147,18 @@
       </div>
 
       <div class="panel">
+        <div class="panel-header">
+          Assinaturas dos agentes
+          <span class="meta" id="subs-count" style="color:var(--text-muted);font-weight:400;font-size:12px;">carregando…</span>
+        </div>
+        <div class="panel-body">
+          <div id="subs-list">
+            <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">Carregando…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
         <div class="panel-header">Sessão</div>
         <div class="panel-body">
           <div class="field-row">
@@ -218,6 +230,77 @@
           }
         }
         renderKey();
+        // Load subscriptions in parallel — non-blocking.
+        loadSubs().catch((e) => {
+          document.getElementById('subs-list').innerHTML =
+            `<div class="alert error">Falha ao carregar assinaturas: ${e.message}</div>`;
+        });
+      }
+
+      async function loadSubs() {
+        const r = await fetch(API_BASE + '/v1/subscriptions', {
+          headers: { 'x-api-key': currentKey, 'content-type': 'application/json' },
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const subs = data.subscriptions || [];
+        const plans = data.plans || [];
+
+        document.getElementById('subs-count').textContent =
+          `${subs.length} agente${subs.length === 1 ? '' : 's'} ativo${subs.length === 1 ? '' : 's'}`;
+
+        if (subs.length === 0) {
+          document.getElementById('subs-list').innerHTML = `
+            <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">
+              Nenhum agente em assinatura. Os planos:<br>
+              ${plans.map((p) => `<strong style="color:var(--text);">${p.name}</strong>: $${p.price_usd}/mês (inclui ${p.included.turns} turnos, ${p.included.vision} fotos, ${p.included.pdf} PDFs)`).join(' · ')}
+              <br><br>Pra ativar: vai em <a href="/dashboard" style="color:var(--accent-2);">Painel</a>, escolhe um agente e clica "Assinar".
+            </div>`;
+          return;
+        }
+
+        const statusBadge = (s) => {
+          const colors = { active: '#19d5c6', grace: '#ffd60a', cancelled: '#ff5f57' };
+          const labels = { active: '🟢 ativo', grace: '🟡 atrasado', cancelled: '⚪ cancelado' };
+          return `<span style="color:${colors[s] || '#9a9aa4'};font-size:12px;">${labels[s] || s}</span>`;
+        };
+        const usageBar = (used, included) => {
+          const pct = Math.min(100, (used / Math.max(1, included)) * 100);
+          const over = used > included;
+          const color = over ? '#ff5f57' : pct > 80 ? '#ffd60a' : '#19d5c6';
+          return `
+            <div style="font-size:11px;color:var(--text-muted);">${used.toLocaleString('pt-BR')} / ${included.toLocaleString('pt-BR')}${over ? ' (overage)' : ''}</div>
+            <div style="height:4px;background:var(--bg-elev);border-radius:2px;margin-top:3px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${color};"></div>
+            </div>`;
+        };
+
+        const html = subs.map((s) => `
+          <div style="padding:14px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div>
+                <strong style="font-size:13px;">${s.plan_name}</strong>
+                <span style="margin-left:8px;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${s.agent_id.slice(0, 8)}…</span>
+              </div>
+              <div>
+                ${statusBadge(s.status)}
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+              Renovação em <strong>${s.days_until_renewal} dia${s.days_until_renewal === 1 ? '' : 's'}</strong> ·
+              Próximo débito estimado: <strong style="color:var(--text);">$${s.projected_next_bill_usd.toFixed(2)}</strong>
+              ${s.grace_until ? ` · <span style="color:#ffd60a;">⚠️ Grace até ${new Date(s.grace_until).toLocaleDateString('pt-BR')}</span>` : ''}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+              <div><div style="font-size:11px;color:var(--text-dim);margin-bottom:2px;">Turnos</div>${usageBar(s.usage.turns, s.included.turns)}</div>
+              <div><div style="font-size:11px;color:var(--text-dim);margin-bottom:2px;">Fotos/PDFs lidos</div>${usageBar(s.usage.vision, s.included.vision)}</div>
+              <div><div style="font-size:11px;color:var(--text-dim);margin-bottom:2px;">PDFs gerados</div>${usageBar(s.usage.pdf, s.included.pdf)}</div>
+              <div><div style="font-size:11px;color:var(--text-dim);margin-bottom:2px;">Lembretes</div>${usageBar(s.usage.reminders, s.included.reminders)}</div>
+            </div>
+          </div>
+        `).join('');
+
+        document.getElementById('subs-list').innerHTML = html;
       }
 
       document.getElementById('reveal-btn').addEventListener('click', () => {
