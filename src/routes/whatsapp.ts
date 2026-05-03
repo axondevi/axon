@@ -465,6 +465,60 @@ ownerWhatsapp.get('/:id/whatsapp/qr', async (c) => {
     phoneNumber: a.ownerPhone || undefined,
   });
   if (!result.ok) {
+    // Evolution returns `{count: 0}` (or empty) when the instance exists
+    // server-side but is in a stale state — typically because a previous
+    // pairing attempt half-finished, OR the env changed (Feirinha → Axon
+    // dedicated) and the row points to an instance that was never created
+    // on the new server. Recovery: tear down the stale row + re-provision
+    // a fresh instance on whatever the current AXON_EVOLUTION_URL is, in
+    // a single round-trip so the operator's "Refresh QR" click just works.
+    const looksStale = /count.*0|no qr\/pairing|not found|404/i.test(result.error || '');
+    if (looksStale) {
+      // Best-effort cleanup of the dead instance on its old server.
+      await deleteInstance({
+        instanceUrl: conn.instanceUrl,
+        instanceName: conn.instanceName,
+        apiKey,
+      }).catch(() => {});
+      // Drop the stale row and re-provision against the current shared
+      // server. Same auto-provision logic as POST /:id/whatsapp/auto.
+      await db.delete(whatsappConnections).where(eq(whatsappConnections.id, conn.id));
+
+      const sharedUrl = (process.env.AXON_EVOLUTION_URL || '').trim().replace(/\/+$/, '');
+      const sharedKey = (process.env.AXON_EVOLUTION_API_KEY || '').trim();
+      if (!sharedUrl || !sharedKey) {
+        return c.json({ error: 'auto_provision_unavailable', message: 'Servidor Evolution compartilhado não configurado.' }, 503);
+      }
+      const instanceName = `axon-${user.id.slice(0, 8)}-${Date.now().toString(36)}`;
+      const secret = randomBytes(24).toString('hex');
+      const webhookUrl = webhookUrlFor(c, secret);
+      const created = await createInstance({
+        serverUrl: sharedUrl,
+        globalApiKey: sharedKey,
+        instanceName,
+        webhookUrl,
+      });
+      if (!created.ok || !created.apiKey) {
+        return c.json({ error: 'create_failed', message: created.error || 'unknown' }, 502);
+      }
+      const encrypted = encrypt(created.apiKey);
+      await db.insert(whatsappConnections).values({
+        agentId,
+        ownerId: user.id,
+        instanceUrl: sharedUrl,
+        instanceName: created.instanceName!,
+        apiKey: encrypted,
+        webhookSecret: secret,
+        status: 'pairing',
+      });
+      return c.json({
+        status: 'pairing',
+        paired: false,
+        qr_base64: created.qrBase64,
+        pairing_code: created.pairingCode,
+        recreated: true,
+      });
+    }
     return c.json({ error: 'pairing_fetch_failed', message: result.error }, 502);
   }
   return c.json({
