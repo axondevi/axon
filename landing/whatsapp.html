@@ -487,32 +487,82 @@
         50% { opacity: 1; }
       }
 
-      /* Mobile ─────────────────────────────── */
+      /* Mobile: master-detail pattern ─────────────────────────
+         Stacked panes are too cramped on phones (220px contacts +
+         split detail = nothing readable). New behavior: ONE pane at
+         a time. List of contacts fills the screen; tap a contact to
+         swap to the detail view; "← Contatos" button returns. */
+      .mobile-back-btn {
+        display: none; /* desktop hides */
+        background: var(--bg-elev);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .mobile-back-btn:active { background: var(--bg-card); }
+
       @media (max-width: 800px) {
-        main { grid-template-columns: 1fr; grid-template-rows: 220px 1fr; height: calc(100vh - 130px); }
-        .contacts-pane { max-height: 220px; border-right: none; border-bottom: 1px solid var(--border); }
-        .conn-bar { flex-wrap: wrap; gap: 8px; padding: 8px 14px; }
-        .detail-pane { grid-template-rows: minmax(0, 0.5fr) minmax(0, 0.5fr); overflow: hidden; }
-        .memory-card { max-height: 35vh; padding: 14px 16px; }
-        .chat-pane { padding: 14px 16px; }
-        header { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
-        .header-actions { width: 100%; justify-content: space-between; }
-        .agent-select { flex: 1; min-height: 40px; min-width: 0; }
-        .key-chip { font-size: 10px; padding: 6px 9px; min-height: 36px; display: inline-flex; align-items: center; }
-        .nav-link { padding: 8px 10px; min-height: 40px; display: inline-flex; align-items: center; }
-        .turn { max-width: 88%; }
-        .bubble { font-size: 13px; padding: 9px 12px; }
-        .contacts-header { padding: 10px 14px; font-size: 11px; }
-        .contact-item { padding: 12px 14px; }
-        .contact-name { font-size: 13px; }
-        .contact-phone { font-size: 10px; }
+        /* One column, full-height per pane. JS toggles `data-mobile-view`
+           on <main> so we know which pane to show. */
+        main {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr;
+          height: calc(100dvh - 110px);
+        }
+        .contacts-pane { border-right: none; max-height: none; height: 100%; overflow-y: auto; }
+        .detail-pane { display: none; }
+        main[data-mobile-view="detail"] .contacts-pane { display: none; }
+        main[data-mobile-view="detail"] .detail-pane {
+          display: grid;
+          grid-template-rows: auto auto 1fr;
+          height: 100%;
+          overflow: hidden;
+        }
+        .mobile-back-btn { display: inline-flex; align-items: center; gap: 6px; margin: 10px 14px 0; min-height: 38px; }
+
+        /* Memory collapsed by default on mobile — too tall, eats chat. */
+        .memory-card { max-height: 38vh; padding: 12px 14px; overflow-y: auto; }
+        .memory-card.collapsed { max-height: 44px; padding: 10px 14px; }
+        .chat-pane { padding: 12px 14px; min-height: 0; }
+
+        /* Header: tighter, scrollable */
+        header { padding: 10px 12px; flex-wrap: wrap; gap: 8px; }
+        .header-actions { width: 100%; justify-content: space-between; gap: 6px; }
+        .agent-select { flex: 1; min-height: 40px; min-width: 0; font-size: 13px; }
+        .key-chip { font-size: 10px; padding: 6px 8px; min-height: 36px; display: inline-flex; align-items: center; }
+        .nav-link { padding: 8px 10px; min-height: 40px; display: inline-flex; align-items: center; font-size: 13px; }
+
+        /* Connection bar: stacks vertically when narrow */
+        .conn-bar { flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 14px; font-size: 12px; }
+        .conn-bar > * { width: auto; }
+
+        /* Bubble + content */
+        .turn { max-width: 92%; }
+        .bubble { font-size: 13px; padding: 9px 12px; line-height: 1.4; }
+        .turn-meta { font-size: 10px; }
+
+        /* Contact list rows: bigger tap targets */
+        .contacts-header { padding: 12px 14px; font-size: 11px; }
+        .contact-item { padding: 14px 14px; min-height: 60px; }
+        .contact-name { font-size: 14px; }
+        .contact-phone { font-size: 11px; }
         .badge { padding: 3px 7px; font-size: 10px; }
         .mem-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
         .facts-table td { font-size: 12px; padding: 5px 6px; }
+
+        /* Brain panel inside chat: smaller, more compact */
+        .brain-section { padding: 10px 12px; }
+        .brain-row { font-size: 11px; }
       }
       @media (max-width: 480px) {
         .mem-grid { grid-template-columns: 1fr; }
-        .conn-bar > span { font-size: 12px; }
+        .header-actions { font-size: 12px; }
+        .nav-link { padding: 7px 8px; font-size: 12px; }
       }
     </style>
   </head>
@@ -704,7 +754,7 @@
             </span>
           </div>
 
-          <main>
+          <main data-mobile-view="${state.selectedPhone ? 'detail' : 'list'}">
             <div class="contacts-pane">
               <div class="contacts-header">${state.contacts.length} contatos <span class="info-tip" data-tip="Lista de pessoas que conversaram com seu agente. Cada uma tem memória própria (nome, fatos, histórico).">?</span></div>
               ${state.contacts.length === 0 ? (!conn ? `
@@ -736,6 +786,9 @@
             </div>
 
             <div class="detail-pane">
+              <button class="mobile-back-btn" onclick="closeContactOnMobile()" aria-label="Voltar para lista de contatos">
+                ← Contatos
+              </button>
               <div class="memory-card ${state.memoryCollapsed ? 'collapsed' : ''}">${renderMemory()}</div>
               <div class="chat-pane">${renderChat()}</div>
             </div>
@@ -1627,6 +1680,17 @@
           const chat = document.querySelector('.chat-pane');
           if (chat) chat.scrollTop = 0;
         });
+      };
+
+      // Mobile: deselect contact to return to the list view. CSS hides
+      // the contacts pane when data-mobile-view="detail" is set on
+      // <main>, and shows it when="list". Setting selectedPhone to
+      // null flips the attribute via the renderApp() template literal.
+      window.closeContactOnMobile = () => {
+        state.selectedPhone = null;
+        state.memory = null;
+        state.messages = [];
+        render();
       };
 
       // ─── Data ─────────────────────────────────
