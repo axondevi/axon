@@ -482,33 +482,92 @@ Estacionamento: gratuito por 1h"></textarea>
           </div>
 
           <div class="field" id="catalog-field-wrap">
-            <label>Catálogo / Inventário <span class="info-tip" data-tip="Sobe um CSV ou JSON com sua lista de produtos/imóveis/carros. O agente usa como fonte da verdade — nunca inventa item que não está aqui. Colunas reconhecidas: name (obrigatório), price, region, description, image_url. Outras viram metadata.">?</span></label>
-            <div id="b-catalog-area" style="border:1.5px dashed var(--border);border-radius:10px;padding:18px;text-align:center;background:var(--bg-elev);transition:border-color 0.15s,background 0.15s;">
-              <div id="b-catalog-empty">
-                <div style="font-size:32px;opacity:0.5;margin-bottom:8px;">📋</div>
-                <div style="font-size:14px;color:var(--text);margin-bottom:6px;font-weight:600;">Nenhum catálogo carregado</div>
-                <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Arraste um CSV ou JSON aqui, ou:</div>
-                <input type="file" id="b-catalog-file" accept=".csv,.json,text/csv,application/json" style="display:none;" />
-                <button type="button" id="b-catalog-pick-btn" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">📁 Escolher arquivo</button>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:10px;">Máx 1MB · até 1000 itens</div>
-              </div>
-              <div id="b-catalog-loaded" style="display:none;text-align:left;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                  <div>
-                    <div style="font-size:14px;font-weight:600;color:var(--text);"><span id="b-catalog-count">0</span> itens carregados</div>
-                    <div style="font-size:11px;color:var(--text-dim);" id="b-catalog-fields"></div>
-                  </div>
-                  <div style="display:flex;gap:6px;">
-                    <button type="button" id="b-catalog-replace-btn" style="background:transparent;color:var(--text-dim);border:1px solid var(--border);padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer;">🔄 Trocar</button>
-                    <button type="button" id="b-catalog-clear-btn" style="background:transparent;color:var(--danger);border:1px solid var(--danger);padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer;">🗑 Apagar</button>
-                  </div>
+            <label>Catálogo / Inventário <span class="info-tip" data-tip="Lista de produtos/imóveis/carros que o agente sabe que tem em estoque. Usa como fonte da verdade — nunca inventa item que não esteja aqui. Pode editar direto, colar do Excel, ou subir CSV/JSON.">?</span></label>
+
+            <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-elev);overflow:hidden;">
+
+              <!-- Header com contagem + abas -->
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card);">
+                <div style="font-size:13px;color:var(--text);">
+                  📋 <strong><span id="b-catalog-count">0</span></strong> itens
+                  <span id="b-catalog-fields" style="color:var(--text-muted);font-size:11px;margin-left:8px;"></span>
                 </div>
-                <div id="b-catalog-preview" style="font-size:11px;color:var(--text-dim);background:var(--bg-card);border-radius:6px;padding:8px 10px;font-family:'JetBrains Mono',monospace;max-height:120px;overflow-y:auto;"></div>
+                <div style="display:flex;gap:6px;">
+                  <a href="#" id="b-catalog-template-btn" style="font-size:11px;color:var(--accent-2);text-decoration:none;padding:5px 8px;">📥 Baixar template</a>
+                  <button type="button" id="b-catalog-clear-btn" style="background:transparent;color:var(--danger);border:1px solid rgba(255,95,87,0.4);padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;">🗑 Apagar tudo</button>
+                </div>
               </div>
-              <div id="b-catalog-status" style="display:none;font-size:12px;margin-top:10px;padding:8px 12px;border-radius:6px;"></div>
+
+              <!-- Tabs -->
+              <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);">
+                <button type="button" class="b-cat-tab active" data-cat-tab="editor" style="flex:1;background:transparent;border:none;color:var(--text);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid var(--accent);font-weight:600;">📝 Editor visual</button>
+                <button type="button" class="b-cat-tab" data-cat-tab="paste" style="flex:1;background:transparent;border:none;color:var(--text-dim);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;">📋 Colar do Excel</button>
+                <button type="button" class="b-cat-tab" data-cat-tab="upload" style="flex:1;background:transparent;border:none;color:var(--text-dim);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;">📁 Subir arquivo</button>
+              </div>
+
+              <!-- Tab 1: Editor visual (table) -->
+              <div id="b-cat-pane-editor" class="b-cat-pane" style="padding:14px;">
+                <div style="overflow-x:auto;">
+                  <table id="b-catalog-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                      <tr style="border-bottom:1px solid var(--border);">
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Nome*</th>
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Preço (R$)</th>
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Bairro/Região</th>
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Descrição</th>
+                        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Foto (URL)</th>
+                        <th style="width:24px;"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="b-catalog-tbody">
+                      <!-- rows injected via JS -->
+                    </tbody>
+                  </table>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                  <button type="button" id="b-catalog-add-row" style="background:var(--bg-card);color:var(--text);border:1px solid var(--border);padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;">➕ Adicionar item</button>
+                  <button type="button" id="b-catalog-save-editor" style="background:var(--accent);color:white;border:none;padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;margin-left:auto;">💾 Salvar catálogo</button>
+                </div>
+              </div>
+
+              <!-- Tab 2: Paste from Excel -->
+              <div id="b-cat-pane-paste" class="b-cat-pane" style="padding:14px;display:none;">
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">
+                  Abra sua planilha (Excel/Google Sheets), seleciona da linha do cabeçalho até a última linha, copia (<kbd style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-family:inherit;font-size:11px;border:1px solid var(--border);">Ctrl+C</kbd>) e cola aqui:
+                </div>
+                <textarea id="b-catalog-paste-area" rows="8" placeholder="Cole aqui (a primeira linha precisa ter os nomes das colunas):
+
+nome	preço	bairro	descrição
+Apto 2 quartos	1200	Tatuapé	Reformado, vaga
+Casa 3 quartos	2500	Mooca	Quintal grande
+..." style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:12px;resize:vertical;"></textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+                  <span style="font-size:11px;color:var(--text-muted);flex:1;">Detecta tab/vírgula/ponto-e-vírgula automaticamente.</span>
+                  <button type="button" id="b-catalog-paste-save" style="background:var(--accent);color:white;border:none;padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">📥 Importar colado</button>
+                </div>
+              </div>
+
+              <!-- Tab 3: File upload (existing flow) -->
+              <div id="b-cat-pane-upload" class="b-cat-pane" style="padding:14px;display:none;">
+                <div id="b-catalog-area" style="border:1.5px dashed var(--border);border-radius:8px;padding:24px;text-align:center;transition:border-color 0.15s,background 0.15s;">
+                  <div style="font-size:32px;opacity:0.5;margin-bottom:8px;">📁</div>
+                  <div style="font-size:13px;color:var(--text);margin-bottom:4px;font-weight:600;">Arraste um arquivo CSV ou JSON aqui</div>
+                  <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;">ou clique no botão</div>
+                  <input type="file" id="b-catalog-file" accept=".csv,.json,.tsv,.txt,text/csv,application/json" style="display:none;" />
+                  <button type="button" id="b-catalog-pick-btn" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">Escolher arquivo</button>
+                  <div style="font-size:10px;color:var(--text-muted);margin-top:10px;">Máx 1MB · até 1000 itens</div>
+                </div>
+              </div>
+
+              <!-- Status pill (shared by all tabs) -->
+              <div id="b-catalog-status" style="display:none;font-size:12px;margin:0 14px 12px;padding:8px 12px;border-radius:6px;"></div>
+
             </div>
-            <div class="hint">
-              Funciona pra qualquer negócio: <strong>imobiliária</strong> (imóveis com preço, bairro, fotos), <strong>concessionária</strong> (carros + FIPE + km), <strong>pet shop</strong> (produtos + estoque), etc. O agente usa o catálogo via tool <code>search_catalog</code> e nunca inventa item que não esteja aqui.
+            <div class="hint" style="margin-top:8px;">
+              <strong>📝 Editor visual</strong>: adiciona/edita item por item.
+              <strong>📋 Colar</strong>: copia do Excel/Sheets, cola aqui.
+              <strong>📁 Arquivo</strong>: sobe CSV/JSON.<br>
+              O agente usa o catálogo via tool <code>search_catalog</code> e <strong>nunca inventa</strong> item que não esteja aqui.
             </div>
           </div>
 
@@ -2284,7 +2343,9 @@ Estacionamento: gratuito por 1h"></textarea>
         if (id) {
           loadCatalogState(id);
         } else {
-          renderCatalogState({ item_count: 0 });
+          catalogItems = [];
+          renderCatalogHeader({ item_count: 0 });
+          renderCatalogTable();
         }
         renderPersonaBadge();
         document.getElementById('b-color').value = formState.primary_color;
@@ -2952,44 +3013,86 @@ Estacionamento: gratuito por 1h"></textarea>
         } catch (e) {}
       }
 
-      // ── Catalog upload widget ───────────────────────────────────────
-      // Tied to /v1/agents/:id/catalog/{upload,GET,DELETE}. Reads
-      // server state on edit, lets owner upload a fresh CSV/JSON, or
-      // wipe it. Drag-drop is bound on the wrapper; click pickers fall
-      // through to the hidden <input type=file>.
+      // ── Catalog widget ──────────────────────────────────────────────
+      // Three input modes (tabs): visual table editor, paste-from-
+      // spreadsheet, file upload. All three POST to /catalog/upload —
+      // the editor sends { items: [...] } directly, paste sends raw
+      // text, file sends multipart. Server normalizes everything.
+
+      // Local mirror of the catalog so the table editor can mutate
+      // freely without round-tripping the server on every keystroke.
+      // Saved on demand via the "Salvar catálogo" button.
+      let catalogItems = [];
+
       async function loadCatalogState(agentId) {
         try {
           const r = await api(`/v1/agents/${agentId}/catalog`);
-          renderCatalogState(r);
+          catalogItems = Array.isArray(r.items) ? r.items.map(normalizeItem) : [];
+          renderCatalogHeader({ item_count: r.item_count });
+          renderCatalogTable();
         } catch (e) {
-          renderCatalogState({ item_count: 0 });
+          catalogItems = [];
+          renderCatalogHeader({ item_count: 0 });
+          renderCatalogTable();
         }
       }
 
-      function renderCatalogState(state) {
-        const empty = document.getElementById('b-catalog-empty');
-        const loaded = document.getElementById('b-catalog-loaded');
-        const status = document.getElementById('b-catalog-status');
-        if (status) status.style.display = 'none';
-        if (!state || !state.item_count) {
-          if (empty) empty.style.display = '';
-          if (loaded) loaded.style.display = 'none';
+      function normalizeItem(raw) {
+        return {
+          id: raw.id || ('item-' + Math.random().toString(36).slice(2, 9)),
+          name: raw.name || '',
+          price: raw.price ?? '',
+          region: raw.region || '',
+          description: raw.description || '',
+          image_url: raw.image_url || '',
+        };
+      }
+
+      function renderCatalogHeader(state) {
+        const countEl = document.getElementById('b-catalog-count');
+        if (countEl) countEl.textContent = state?.item_count ?? catalogItems.length;
+        const fieldsEl = document.getElementById('b-catalog-fields');
+        if (fieldsEl) fieldsEl.textContent = catalogItems.length ? '· nome, preço, região, descrição, foto' : '';
+      }
+
+      function renderCatalogTable() {
+        const tbody = document.getElementById('b-catalog-tbody');
+        if (!tbody) return;
+        if (catalogItems.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-muted);font-size:12px;">Nenhum item ainda. Clique <strong>Adicionar item</strong> abaixo, ou cole/suba na outra aba.</td></tr>`;
           return;
         }
-        if (empty) empty.style.display = 'none';
-        if (loaded) {
-          loaded.style.display = '';
-          document.getElementById('b-catalog-count').textContent = state.item_count;
-          const fields = state.field_map ? Object.entries(state.field_map).map(([k,v]) => `${k}=${v}`).join(' · ') : '';
-          document.getElementById('b-catalog-fields').textContent = fields;
-          const items = state.items || state.preview || [];
-          document.getElementById('b-catalog-preview').innerHTML = items.slice(0, 5).map((it) => {
-            const parts = [`<strong>${escapeHtml(it.name || '?')}</strong>`];
-            if (it.price !== undefined) parts.push(`R$${Number(it.price).toFixed(2)}`);
-            if (it.region) parts.push(escapeHtml(it.region));
-            return parts.join(' · ');
-          }).join('<br/>');
-        }
+        tbody.innerHTML = catalogItems.map((it, i) => `
+          <tr style="border-bottom:1px solid var(--border);" data-row="${i}">
+            <td style="padding:4px;"><input type="text" data-field="name" value="${escapeAttr(it.name)}" placeholder="ex: Apto 2 quartos" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;" /></td>
+            <td style="padding:4px;"><input type="text" data-field="price" value="${escapeAttr(it.price)}" placeholder="1200" style="width:90px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;" /></td>
+            <td style="padding:4px;"><input type="text" data-field="region" value="${escapeAttr(it.region)}" placeholder="Tatuapé" style="width:120px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;" /></td>
+            <td style="padding:4px;"><input type="text" data-field="description" value="${escapeAttr(it.description)}" placeholder="reformado, vaga..." style="width:100%;min-width:160px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;" /></td>
+            <td style="padding:4px;"><input type="text" data-field="image_url" value="${escapeAttr(it.image_url)}" placeholder="https://..." style="width:140px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:11px;font-family:inherit;" /></td>
+            <td style="padding:4px;text-align:center;"><button type="button" data-remove="${i}" title="Remover" style="background:transparent;color:var(--danger);border:none;font-size:16px;cursor:pointer;padding:4px 6px;">×</button></td>
+          </tr>
+        `).join('');
+        // Wire input listeners (event delegation on tbody for rest)
+        tbody.querySelectorAll('input').forEach((input) => {
+          input.addEventListener('change', (e) => {
+            const tr = e.target.closest('tr');
+            const idx = Number(tr.dataset.row);
+            const field = e.target.dataset.field;
+            if (catalogItems[idx]) catalogItems[idx][field] = e.target.value;
+          });
+        });
+        tbody.querySelectorAll('button[data-remove]').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            const idx = Number(e.target.dataset.remove);
+            catalogItems.splice(idx, 1);
+            renderCatalogHeader({});
+            renderCatalogTable();
+          });
+        });
+      }
+
+      function escapeAttr(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
       }
 
       function showCatalogStatus(msg, kind) {
@@ -3030,11 +3133,7 @@ Estacionamento: gratuito por 1h"></textarea>
             showCatalogStatus(`<strong>Não consegui processar:</strong> ${escapeHtml(data.message || 'erro desconhecido')}${warns ? '<br/>' + warns : ''}`, 'err');
             return;
           }
-          renderCatalogState({
-            item_count: data.item_count,
-            items: data.preview,
-            field_map: data.field_map,
-          });
+          renderCatalogHeader({ item_count: data.item_count });
           const warns = (data.warnings || []).filter(w => w).map(w => `• ${escapeHtml(w)}`).join('<br/>');
           showCatalogStatus(`✅ <strong>${data.item_count} itens carregados.</strong> Mapeamento: ${Object.entries(data.field_map || {}).map(([k,v]) => `${k}=${v}`).join(' · ')}${warns ? '<br/><span style="color:#ffd60a">' + warns + '</span>' : ''}`, 'ok');
         } catch (e) {
@@ -3046,51 +3145,200 @@ Estacionamento: gratuito por 1h"></textarea>
         return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
       }
 
+      // Save the in-memory catalog (table editor) to the server.
+      async function saveEditorCatalog() {
+        if (!editingAgentId) {
+          showCatalogStatus('Salve o agente primeiro (sem catálogo) — depois volte aqui pra preencher os itens.', 'warn');
+          return;
+        }
+        const cleaned = catalogItems
+          .filter((it) => it.name && String(it.name).trim())
+          .map((it) => {
+            const out = { name: String(it.name).trim() };
+            if (it.price !== '' && it.price != null) out.price = it.price;
+            if (it.region) out.region = String(it.region).trim();
+            if (it.description) out.description = String(it.description).trim();
+            if (it.image_url) out.image_url = String(it.image_url).trim();
+            return out;
+          });
+        if (cleaned.length === 0) {
+          showCatalogStatus('Nenhum item com nome preenchido. Adicione pelo menos um.', 'warn');
+          return;
+        }
+        showCatalogStatus(`⏳ Salvando ${cleaned.length} item(ns)…`, 'ok');
+        try {
+          const r = await fetch(BASE + '/v1/agents/' + editingAgentId + '/catalog/upload', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: cleaned }),
+          });
+          const data = await r.json();
+          if (!r.ok) {
+            showCatalogStatus(`<strong>Falha:</strong> ${escapeHtml(data.message || 'erro')}`, 'err');
+            return;
+          }
+          renderCatalogHeader({ item_count: data.item_count });
+          showCatalogStatus(`✅ <strong>${data.item_count} itens salvos</strong> e disponíveis pro agente.`, 'ok');
+        } catch (e) {
+          showCatalogStatus(`Falha de rede: ${escapeHtml(e.message || String(e))}`, 'err');
+        }
+      }
+
+      // Save raw pasted text (TSV/CSV from Excel/Sheets).
+      async function savePastedCatalog() {
+        if (!editingAgentId) {
+          showCatalogStatus('Salve o agente primeiro (sem catálogo) — depois volte e cole.', 'warn');
+          return;
+        }
+        const content = document.getElementById('b-catalog-paste-area').value;
+        if (!content.trim()) {
+          showCatalogStatus('Cole o conteúdo da planilha antes.', 'warn');
+          return;
+        }
+        showCatalogStatus(`⏳ Importando…`, 'ok');
+        try {
+          const r = await fetch(BASE + '/v1/agents/' + editingAgentId + '/catalog/upload', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, format: 'csv' }),
+          });
+          const data = await r.json();
+          if (!r.ok) {
+            const warns = (data.warnings || []).map((w) => `• ${escapeHtml(w)}`).join('<br/>');
+            showCatalogStatus(`<strong>${escapeHtml(data.message || 'erro')}</strong>${warns ? '<br/>' + warns : ''}`, 'err');
+            return;
+          }
+          // Refresh editor state with what landed
+          await loadCatalogState(editingAgentId);
+          // Switch to editor tab so user sees what got imported
+          switchCatalogTab('editor');
+          const warns = (data.warnings || []).filter((w) => w).map((w) => `• ${escapeHtml(w)}`).join('<br/>');
+          showCatalogStatus(`✅ <strong>${data.item_count} itens importados</strong> · campos: ${Object.entries(data.field_map || {}).map(([k,v]) => `${k}=${v}`).join(' · ')}${warns ? '<br/><span style="color:#ffd60a">' + warns + '</span>' : ''}`, 'ok');
+        } catch (e) {
+          showCatalogStatus(`Falha de rede: ${escapeHtml(e.message || String(e))}`, 'err');
+        }
+      }
+
+      function switchCatalogTab(name) {
+        document.querySelectorAll('.b-cat-tab').forEach((btn) => {
+          const active = btn.dataset.catTab === name;
+          btn.style.color = active ? 'var(--text)' : 'var(--text-dim)';
+          btn.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+          btn.style.fontWeight = active ? '600' : '400';
+        });
+        document.querySelectorAll('.b-cat-pane').forEach((p) => {
+          p.style.display = (p.id === 'b-cat-pane-' + name) ? '' : 'none';
+        });
+      }
+
+      function downloadCatalogTemplate() {
+        const csv = 'name,price,region,description,image_url\n' +
+          'Apto 2 quartos Tatuapé,1200,Tatuapé,Reformado, vaga, perto do metrô,\n' +
+          'Casa 3 quartos Mooca,2500,Mooca,Quintal grande, 2 vagas,\n' +
+          'Studio Vila Madalena,1800,Vila Madalena,Mobiliado, próximo do bar,\n';
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'catalogo-template.csv';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }
+
       (function bindCatalogWidget() {
+        // Tab switching
+        document.querySelectorAll('.b-cat-tab').forEach((btn) => {
+          btn.addEventListener('click', () => switchCatalogTab(btn.dataset.catTab));
+        });
+
+        // Editor tab
+        const addBtn = document.getElementById('b-catalog-add-row');
+        if (addBtn) addBtn.addEventListener('click', () => {
+          catalogItems.push(normalizeItem({}));
+          renderCatalogHeader({});
+          renderCatalogTable();
+          // Focus new row's name input
+          requestAnimationFrame(() => {
+            const inputs = document.querySelectorAll('#b-catalog-tbody input[data-field="name"]');
+            if (inputs.length) inputs[inputs.length - 1].focus();
+          });
+        });
+        const saveEditorBtn = document.getElementById('b-catalog-save-editor');
+        if (saveEditorBtn) saveEditorBtn.addEventListener('click', saveEditorCatalog);
+
+        // Paste tab
+        const pasteSaveBtn = document.getElementById('b-catalog-paste-save');
+        if (pasteSaveBtn) pasteSaveBtn.addEventListener('click', savePastedCatalog);
+
+        // Upload tab (drag-drop + file picker)
         const area = document.getElementById('b-catalog-area');
         const fileInput = document.getElementById('b-catalog-file');
         const pickBtn = document.getElementById('b-catalog-pick-btn');
-        const replaceBtn = document.getElementById('b-catalog-replace-btn');
-        const clearBtn = document.getElementById('b-catalog-clear-btn');
-        if (!area || !fileInput) return;
-        const trigger = () => fileInput.click();
-        if (pickBtn) pickBtn.addEventListener('click', trigger);
-        if (replaceBtn) replaceBtn.addEventListener('click', trigger);
-        fileInput.addEventListener('change', (e) => {
+        if (pickBtn && fileInput) pickBtn.addEventListener('click', () => fileInput.click());
+        if (fileInput) fileInput.addEventListener('change', (e) => {
           const file = e.target.files && e.target.files[0];
-          if (file) uploadCatalogFile(file);
-          e.target.value = ''; // allow re-uploading same filename
+          if (file) {
+            uploadCatalogFile(file).then(() => {
+              if (editingAgentId) loadCatalogState(editingAgentId);
+              switchCatalogTab('editor');
+            });
+          }
+          e.target.value = '';
         });
-        // Drag-drop on the entire area
-        ['dragenter', 'dragover'].forEach((ev) => {
-          area.addEventListener(ev, (e) => {
-            e.preventDefault();
-            area.style.borderColor = 'var(--accent)';
-            area.style.background = 'rgba(124,92,255,0.05)';
+        if (area) {
+          ['dragenter', 'dragover'].forEach((ev) => {
+            area.addEventListener(ev, (e) => {
+              e.preventDefault();
+              area.style.borderColor = 'var(--accent)';
+              area.style.background = 'rgba(124,92,255,0.05)';
+            });
           });
-        });
-        ['dragleave', 'drop'].forEach((ev) => {
-          area.addEventListener(ev, (e) => {
-            e.preventDefault();
-            area.style.borderColor = '';
-            area.style.background = '';
+          ['dragleave', 'drop'].forEach((ev) => {
+            area.addEventListener(ev, (e) => {
+              e.preventDefault();
+              area.style.borderColor = '';
+              area.style.background = '';
+            });
           });
+          area.addEventListener('drop', (e) => {
+            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (file) {
+              uploadCatalogFile(file).then(() => {
+                if (editingAgentId) loadCatalogState(editingAgentId);
+                switchCatalogTab('editor');
+              });
+            }
+          });
+        }
+
+        // Header buttons
+        const templateBtn = document.getElementById('b-catalog-template-btn');
+        if (templateBtn) templateBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          downloadCatalogTemplate();
         });
-        area.addEventListener('drop', (e) => {
-          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-          if (file) uploadCatalogFile(file);
-        });
+        const clearBtn = document.getElementById('b-catalog-clear-btn');
         if (clearBtn) clearBtn.addEventListener('click', async () => {
-          if (!editingAgentId) return;
-          if (!confirm('Apagar catálogo? O agente vai voltar a depender só do business_info.')) return;
+          if (!editingAgentId) {
+            catalogItems = [];
+            renderCatalogHeader({ item_count: 0 });
+            renderCatalogTable();
+            return;
+          }
+          if (!confirm('Apagar todo o catálogo? Não dá pra desfazer.')) return;
           try {
             await api('/v1/agents/' + editingAgentId + '/catalog', { method: 'DELETE' });
-            renderCatalogState({ item_count: 0 });
+            catalogItems = [];
+            renderCatalogHeader({ item_count: 0 });
+            renderCatalogTable();
             showCatalogStatus('Catálogo apagado.', 'ok');
           } catch (e) {
             showCatalogStatus(`Falha ao apagar: ${escapeHtml(e.message || String(e))}`, 'err');
           }
         });
+
+        // Initial render (empty state)
+        renderCatalogHeader({});
+        renderCatalogTable();
       })();
 
       // ── Init ─────────────────────────────────────────────────────────

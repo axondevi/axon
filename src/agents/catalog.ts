@@ -125,11 +125,31 @@ function normalizeRow(
 }
 
 /**
- * Minimal RFC-4180-ish CSV parser. Handles quoted fields with embedded
- * commas + escaped quotes (""). Avoids pulling in a 30kb dependency
- * for a one-shot upload path.
+ * Minimal RFC-4180-ish CSV/TSV parser. Auto-detects the delimiter
+ * (comma vs tab vs semicolon) by sniffing the first line — Excel
+ * exports vary by region (tab on copy-paste, semicolon in pt-BR
+ * Excel, comma in plain CSV). Handles quoted fields with embedded
+ * delimiters + escaped quotes (""). Inline so we don't pay a 30kb
+ * dependency for a one-shot upload path.
  */
-function parseCsv(text: string): Record<string, string>[] {
+function detectDelimiter(text: string): string {
+  // Sample the first line. Whichever candidate appears most wins,
+  // with tab biased highest because spreadsheet copy-paste is tab-
+  // separated and end users will almost always paste from Excel/
+  // Sheets rather than hand-craft a comma list.
+  const firstLine = text.split('\n')[0] || '';
+  const counts = {
+    '\t': (firstLine.match(/\t/g) || []).length,
+    ';':  (firstLine.match(/;/g) || []).length,
+    ',':  (firstLine.match(/,/g) || []).length,
+  };
+  if (counts['\t'] > 0) return '\t';
+  if (counts[';'] > counts[',']) return ';';
+  return ',';
+}
+
+function parseCsv(text: string, delim?: string): Record<string, string>[] {
+  const sep = delim || detectDelimiter(text);
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
@@ -145,7 +165,7 @@ function parseCsv(text: string): Record<string, string>[] {
       }
     } else {
       if (c === '"' && cell === '') { inQuote = true; }
-      else if (c === ',') { row.push(cell); cell = ''; }
+      else if (c === sep) { row.push(cell); cell = ''; }
       else if (c === '\r') { /* skip */ }
       else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
       else { cell += c; }

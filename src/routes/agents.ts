@@ -954,12 +954,20 @@ app.post('/:id/catalog/upload', async (c) => {
     .limit(1);
   if (!a) throw Errors.notFound('Agent');
 
-  // Accept either: { content: string, format: 'csv' | 'json' } or a
-  // multipart upload. Multipart is the friendlier path from a browser
-  // file input; the JSON path is for SDK / curl usage.
+  // Three input paths supported, ordered by typical end-user friendliness:
+  //   1. JSON body { items: [...] } — pre-parsed from the inline table
+  //      editor (no parsing, just validation + save). Friendliest path
+  //      because operator never touches a spreadsheet.
+  //   2. JSON body { content: string, format: 'csv'|'json' } — paste
+  //      from Excel/Sheets dumped into a textarea. parseCatalog auto-
+  //      detects tab vs comma vs semicolon delimiter.
+  //   3. multipart/form-data with file — the original CSV/JSON file
+  //      upload, kept for SDK / curl usage and bulk imports.
+  const ctype = c.req.header('content-type') || '';
+  let directItems: unknown[] | null = null;
   let content = '';
   let format = 'csv';
-  const ctype = c.req.header('content-type') || '';
+
   if (ctype.includes('multipart/form-data')) {
     const form = await c.req.formData();
     const file = form.get('file');
@@ -968,13 +976,56 @@ app.post('/:id/catalog/upload', async (c) => {
       format = file.name.toLowerCase().endsWith('.json') ? 'json' : 'csv';
     }
   } else {
-    const body = await c.req.json().catch(() => ({} as { content?: string; format?: string }));
-    content = String(body.content || '');
-    format = String(body.format || 'csv');
+    const body = await c.req.json().catch(() => ({} as { items?: unknown[]; content?: string; format?: string }));
+    if (Array.isArray(body.items)) {
+      directItems = body.items;
+    } else {
+      content = String(body.content || '');
+      format = String(body.format || 'csv');
+    }
   }
 
+  // Path 1: pre-parsed items — light validation only, no parser run.
+  if (directItems) {
+    if (directItems.length === 0) {
+      return c.json({ error: 'bad_request', message: 'array de itens vazio' }, 400);
+    }
+    if (directItems.length > 1000) {
+      return c.json({ error: 'bad_request', message: 'máximo 1000 itens — divida em mais agentes' }, 413);
+    }
+    // Drop rows without name (the only required field). Coerce + trim.
+    const cleaned = directItems
+      .filter((it): it is Record<string, unknown> => !!it && typeof it === 'object')
+      .map((it) => {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(it)) {
+          if (v === null || v === undefined || v === '') continue;
+          out[k] = typeof v === 'string' ? v.trim() : v;
+        }
+        return out;
+      })
+      .filter((it) => it.name && String(it.name).trim());
+    if (cleaned.length === 0) {
+      return c.json({ error: 'bad_request', message: 'nenhum item com nome preenchido' }, 400);
+    }
+    await db
+      .update(agents)
+      .set({ catalog: cleaned as unknown as Record<string, unknown>, updatedAt: new Date() })
+      .where(eq(agents.id, a.id));
+    return c.json({
+      ok: true,
+      item_count: cleaned.length,
+      preview: cleaned.slice(0, 5),
+      warnings: directItems.length > cleaned.length
+        ? [`${directItems.length - cleaned.length} linha(s) ignorada(s) por falta de nome.`]
+        : [],
+      field_map: { name: 'name', price: 'price', region: 'region', description: 'description', image_url: 'image_url' },
+    });
+  }
+
+  // Paths 2 + 3: parse free-form content
   if (!content.trim()) {
-    return c.json({ error: 'bad_request', message: 'content vazio — envie CSV ou JSON' }, 400);
+    return c.json({ error: 'bad_request', message: 'content vazio — envie CSV, JSON, ou cole de uma planilha' }, 400);
   }
   if (content.length > 1_000_000) {
     return c.json({ error: 'bad_request', message: 'arquivo muito grande (>1MB) — divida em mais agentes' }, 413);
