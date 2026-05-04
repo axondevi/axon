@@ -1268,10 +1268,11 @@ async function processBufferedTurn(opts: {
     'crypto_price',
     'convert_currency',
   ];
-  // search_catalog is universal — costs nothing, only useful when the
-  // agent has a catalog uploaded. Always-on so the LLM knows it's
-  // available without the operator having to explicitly enable.
-  const universalTools = ['search_catalog'];
+  // search_catalog + send_listing_photo are universal — both cost
+  // nothing on their own (catalog is in-memory, photo is just a URL
+  // forwarded to Evolution). Always-on so the LLM can chain them
+  // without the operator having to explicitly enable either.
+  const universalTools = ['search_catalog', 'send_listing_photo'];
   const effectiveTools = isOwner
     ? Array.from(new Set([...baseTools, ...ownerExtraTools, ...universalTools]))
     : Array.from(new Set([...baseTools, ...universalTools]));
@@ -1714,17 +1715,20 @@ async function processBufferedTurn(opts: {
   }
 
   // ─── Send any generated images first (out-of-band from text reply) ─
+  // Two flavors: base64 from generate_image (Stability), public URL from
+  // send_listing_photo (catalog). Evolution sendMedia accepts either.
   for (const img of images) {
+    const fromUrl = !!img.url && !img.base64;
     await sendOurMedia({
       instanceUrl: conn.instanceUrl,
       instanceName: conn.instanceName,
       apiKey,
       number: inbound.phone,
-      base64Data: img.base64,
+      ...(fromUrl ? { media: img.url } : { base64Data: img.base64 }),
       mediatype: 'image',
       mimetype: img.mimetype || 'image/png',
-      fileName: 'gerada.png',
-      caption: img.prompt ? img.prompt.slice(0, 700) : '',
+      fileName: fromUrl ? 'foto.jpg' : 'gerada.png',
+      caption: (img.caption || img.prompt || '').slice(0, 700),
       delayMs: 800,
     });
     await new Promise((r) => setTimeout(r, 400));

@@ -216,6 +216,19 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     },
     // No buildRequest — intercepted in the runtime special-case below.
   },
+  send_listing_photo: {
+    description:
+      'Send a real photo of a catalog item (property, car, product) to the customer via WhatsApp. Use this when the customer asks for "fotos", "imagens", "foto da casa", "manda a foto" — or when showing items where you want the photo to land. ALWAYS call search_catalog first to get the actual image_url from the inventory. Maximum 3 photos per turn (avoids spam). Returns ok:true when queued. NEVER write "[FOTOS]" or "*FOTO*" placeholders in your reply — call this tool to deliver real photos.',
+    parameters: {
+      type: 'object',
+      properties: {
+        image_url: { type: 'string', description: 'The public image_url returned by search_catalog for the item. Must start with http(s)://' },
+        caption: { type: 'string', description: 'Optional short caption (≤200 chars) shown below the photo — usually the listing name + price.' },
+      },
+      required: ['image_url'],
+    },
+    // No buildRequest — intercepted in the runtime special-case below.
+  },
   generate_pix: {
     description:
       'Generate a Brazilian Pix payment for the customer to pay in-chat. Returns the QR code and copy-paste string. The QR is delivered automatically via WhatsApp; you only need to confirm to the customer. Use ONLY when the customer explicitly wants to pay (asked "como pago?", "quero comprar", etc).',
@@ -748,12 +761,14 @@ interface RunAgentResult {
    *  cache lookup, LLM calls, and tool calls. */
   latency_ms?: number;
   /**
-   * Base64-encoded images produced by tool calls (currently only generate_image
-   * via Stability). Caller (e.g. the WhatsApp webhook) is responsible for
-   * delivering these to the end user — they are NOT inlined into `content`,
-   * which the LLM still sees as plain text.
+   * Images produced by tool calls. Two source flavors:
+   *   - generate_image (Stability): base64 + mimetype
+   *   - send_listing_photo (catalog): public URL from the catalog item
+   * Caller (e.g. the WhatsApp webhook) is responsible for delivering these
+   * to the end user — they are NOT inlined into `content`, which the LLM
+   * still sees as plain text.
    */
-  images?: Array<{ base64: string; mimetype: string; prompt?: string }>;
+  images?: Array<{ base64?: string; url?: string; mimetype: string; prompt?: string; caption?: string }>;
   /**
    * Pix payments produced by `generate_pix` tool calls. Same out-of-band
    * delivery pattern as images — the WhatsApp webhook sends the QR PNG via
@@ -992,6 +1007,10 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
    (i) chama \`search_catalog\` com a query do cliente (mesmo se já chamou em turno anterior — pega os itens fresh),
    (ii) chama \`generate_pdf\` passando: \`title\` curto ("Imóveis selecionados", "Veículos disponíveis", "Catálogo Pet"), \`body\` resumindo (1 frase com quantidade + faixa de preço), e \`sections\` com UM bloco por item (heading = nome do item, content = preço + região + descrição curta + link se houver). Limita a 8 itens — PDF maior cansa.
    NUNCA gere PDF de catálogo sem ter chamado \`search_catalog\` antes — você inventaria os itens. Se o catálogo voltar vazio, fala "ainda não temos itens cadastrados aqui, mas anota seu interesse e te aviso assim que entrar" em vez de gerar PDF vazio.
+5. **Foto de item do catálogo = encadeamento obrigatório.** Quando o cliente pede "manda foto", "tem foto?", "me mostra a casa", "quero ver imagens", você FAZ DOIS PASSOS no MESMO turno:
+   (i) chama \`search_catalog\` com a query (ex: "casa Martin de Sá") pra pegar o \`image_url\` real do item,
+   (ii) chama \`send_listing_photo\` UMA VEZ por foto (max 3) passando o \`image_url\` retornado e um \`caption\` curto (nome + preço).
+   PROIBIDO escrever "*FOTOS*", "[FOTO DA FACHADA]", "vou enviar as fotos" sem chamar a tool. Sem image_url no item? Diz honesto: "esse não tem foto cadastrada, mas a descrição é X" em vez de fingir que vai enviar.
 
 ## Formato de saída no WhatsApp (obrigatório)
 - **Bolhas curtas, separadas por \`||\`.** Resposta natural no zap = 2-3 bolhas de 1-2 frases cada. NUNCA mande um parágrafo de 5 linhas — fica robótico e o cliente bate o olho e some.
@@ -1198,6 +1217,47 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
           history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: errMsg }) });
           toolCallsExecuted.push({ name: 'search_catalog', args, ok: false, cost_usdc: '0', error: errMsg, ms: Date.now() - tcStart });
         }
+        continue;
+      }
+
+      // ─── Special-case: send_listing_photo ────────────────────────
+      // Queues a real photo (URL from catalog) for out-of-band delivery
+      // by the channel handler. Caps at 3 photos per turn so the LLM
+      // can't spam an entire catalog. URL must be public http(s).
+      if (tc.function.name === 'send_listing_photo') {
+        const tcStart = Date.now();
+        const url = String(args.image_url || '').trim();
+        const caption = String(args.caption || '').slice(0, 200);
+        const errReply = (msg: string) => {
+          history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: msg }) });
+          toolCallsExecuted.push({ name: 'send_listing_photo', args, ok: false, cost_usdc: '0', error: msg, ms: Date.now() - tcStart });
+        };
+        if (!/^https?:\/\//i.test(url)) {
+          errReply('image_url must start with http(s)://. Get the URL from search_catalog first.');
+          continue;
+        }
+        const alreadyQueued = generatedImages.filter((i) => i.url).length;
+        if (alreadyQueued >= 3) {
+          errReply('Limite de 3 fotos por turno atingido. Pergunte ao cliente se quer ver mais antes de enviar outras.');
+          continue;
+        }
+        // Lazy-extract mime from URL extension; falls back to image/jpeg
+        // (most catalog photos are JPEG and Evolution renders fine without
+        // exact mime).
+        const mimeFromExt = url.match(/\.(png|jpe?g|webp|gif)(?:\?|#|$)/i);
+        const mimetype = mimeFromExt
+          ? `image/${mimeFromExt[1].toLowerCase().replace('jpg', 'jpeg')}`
+          : 'image/jpeg';
+        generatedImages.push({ url, mimetype, caption });
+        history.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify({ ok: true, queued: true, note: 'Foto será enviada automaticamente. Continue a conversa normal — NÃO escreva [FOTO] ou *FOTO*; ela já vai pelo canal de mídia.' }),
+        });
+        toolCallsExecuted.push({
+          name: 'send_listing_photo', args, ok: true, cost_usdc: '0',
+          ms: Date.now() - tcStart, response_excerpt: `queued ${url.slice(0, 80)}`, status: 200,
+        });
         continue;
       }
 
