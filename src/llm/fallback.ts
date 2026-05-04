@@ -59,6 +59,14 @@ interface ProviderConfig {
    *  example, often returns empty `acao` when many tools are exposed —
    *  flag false and the cascade will skip it for tool-using turns. */
   supportsTools: boolean;
+  /** True if the provider accepts BOTH frequency_penalty and
+   *  presence_penalty in the same request. Cohere rejects the combo
+   *  with HTTP 400 ("invalid request: frequency_penalty with
+   *  presence_penalty is not supported for this model"), which made
+   *  the whole cascade fail when Groq + Gemini were both rate-limited
+   *  → user saw "Desculpe, problema técnico" repeatedly. When false,
+   *  we strip both penalties from the request. */
+  supportsRepetitionPenalties: boolean;
 }
 
 /**
@@ -76,6 +84,7 @@ const PROVIDERS: ProviderConfig[] = [
     keySlug: 'groq',
     model: 'llama-3.3-70b-versatile',
     supportsTools: true,
+    supportsRepetitionPenalties: true,
   },
   {
     name: 'gemini',
@@ -83,6 +92,9 @@ const PROVIDERS: ProviderConfig[] = [
     keySlug: 'gemini',
     model: 'gemini-2.5-flash',
     supportsTools: true,
+    // Gemini's OAI-compat layer accepts the params but silently ignores
+    // them. Sending is harmless. Keeping true so we don't have to gate.
+    supportsRepetitionPenalties: true,
   },
   {
     name: 'cohere',
@@ -93,6 +105,10 @@ const PROVIDERS: ProviderConfig[] = [
     // already narrows the catalog, but Cohere still mis-emits `acao: ""`
     // sometimes. Keep it as text-fallback only.
     supportsTools: false,
+    // Cohere's compat layer returns 400 if BOTH penalties are present.
+    // Strip them entirely for Cohere requests so the fallback path
+    // doesn't 400-cascade when Groq + Gemini are both rate-limited.
+    supportsRepetitionPenalties: false,
   },
 ];
 
@@ -180,12 +196,14 @@ export async function chatCompletionWithFallback(req: LLMRequest): Promise<LLMRe
       temperature: req.temperature ?? 0.7,
     };
     // Anti-repetition penalties — only attach when the caller asked
-    // for them so deterministic gateway calls (low temp, no penalties)
-    // still behave the way they always did. Both penalties are part
-    // of the OpenAI-compatible spec; Groq, Gemini (via OAI compat), and
-    // Cohere all accept them, and silently ignore unknown providers.
-    if (req.frequency_penalty !== undefined) body.frequency_penalty = req.frequency_penalty;
-    if (req.presence_penalty !== undefined) body.presence_penalty = req.presence_penalty;
+    // for them AND the provider accepts both together. Cohere returns
+    // 400 if both are sent, so we strip them entirely for Cohere; the
+    // fallback path then succeeds with plain temperature instead of
+    // tripping "All providers exhausted" on every Groq/Gemini blip.
+    if (provider.supportsRepetitionPenalties) {
+      if (req.frequency_penalty !== undefined) body.frequency_penalty = req.frequency_penalty;
+      if (req.presence_penalty !== undefined) body.presence_penalty = req.presence_penalty;
+    }
     // Only attach tools if BOTH the request wants them AND the provider
     // supports them. This handles the text-only fallback path where Cohere
     // gets the request without tools to keep it from emitting empty action.
