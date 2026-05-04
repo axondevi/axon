@@ -316,6 +316,8 @@
     </header>
 
     <main class="container build-wrap">
+      <div id="onboarding-welcome-slot"></div>
+      <div id="onboarding-steps-slot"></div>
       <div class="build-hero">
         <div>
           <h1 data-pt="Construa seu agente de IA" data-en="Build your AI agent">Construa seu agente de IA</h1>
@@ -2698,7 +2700,19 @@ Casa 3 quartos	2500	Mooca	Quintal grande
           closeBuilder();
           loadMyAgents();
           document.querySelector('.tab-bar button[data-tab="mine"]').click();
-          if (createdAgent) showTestAgoraModal(createdAgent);
+          // In onboarding mode, skip the post-create marketing modal and
+          // hand the user straight to step 2 (WhatsApp pairing) — they
+          // came here from /build?welcome=1 specifically to ship the
+          // first agent fast. Persist the agent id so /whatsapp can
+          // pre-select it.
+          if (createdAgent) {
+            const onboarding = new URLSearchParams(location.search).get('welcome') === '1';
+            if (onboarding) {
+              location.href = '/whatsapp?welcome=1&agent=' + encodeURIComponent(createdAgent.id);
+              return;
+            }
+            showTestAgoraModal(createdAgent);
+          }
         } catch (e) {
           // Save failure (backend rejection, slug already taken, etc) —
           // surface to inline error box AND a toast so the operator
@@ -3358,6 +3372,24 @@ Casa 3 quartos	2500	Mooca	Quintal grande
       document.addEventListener('axon:langchanged', function () {
         if (window.AxonI18n) window.AxonI18n.apply();
       });
+
+      // ─── Onboarding overlay ──────────────────────────────────────
+      // Fires on the first paint when the user lands here from the
+      // welcome email or the dashboard's first-time CTA. We don't
+      // need to know the actual agent count — `?welcome=1` is the
+      // contract. Step 1 = "Criar agente". Banner is one-shot per
+      // browser via dismissKey.
+      (function showBuildOnboarding() {
+        const params = new URLSearchParams(location.search);
+        if (params.get('welcome') !== '1') return;
+        if (!window.AxonUI) return;
+        if (AxonUI.renderSteps) AxonUI.renderSteps('onboarding-steps-slot', 1);
+        if (AxonUI.welcomeBanner) AxonUI.welcomeBanner('onboarding-welcome-slot', {
+          title: '👋 Vamos criar seu primeiro agente',
+          message: 'Pega um template (clínica, restaurante, loja, pet shop…), ajusta o nome, e em ~60 segundos seu bot tá pronto pra conectar no zap.',
+          dismissKey: 'axon.welcome.build',
+        });
+      })();
     </script>
 
     <link rel="stylesheet" href="/_i18n.css" />

@@ -567,6 +567,11 @@
     </style>
   </head>
   <body>
+    <!-- Onboarding overlay — fixed at top so the always-rerendering #app
+         doesn't clobber it. Only painted when ?welcome=1 is present. -->
+    <div id="onboarding-overlay" style="position:fixed;top:0;left:0;right:0;z-index:1200;padding:14px 18px 0;pointer-events:none;display:none;">
+      <div id="onboarding-overlay-inner" style="max-width:760px;margin:0 auto;pointer-events:auto;"></div>
+    </div>
     <div id="app"></div>
 
     <script>
@@ -883,6 +888,20 @@
       // Aborts after 90s if not paired (user can retry).
       let connectWizardState = { step: 'form', pollTimer: null, agentId: null };
 
+      // When the user came from the onboarding flow (?welcome=1), close the
+      // pairing modal and bounce to /dashboard?welcome=done — that page
+      // shows the success banner + step 3 ("testar no zap"). Outside the
+      // onboarding flow, the existing 'paired' modal screen stays put so
+      // returning operators see the success state in context.
+      function maybeFinishOnboarding() {
+        const params = new URLSearchParams(location.search);
+        if (params.get('welcome') !== '1') return;
+        // Brief delay so the user sees the green success state in the
+        // modal before we yank them away — feels less jarring than an
+        // instant redirect.
+        setTimeout(() => { location.href = '/dashboard?welcome=done'; }, 1200);
+      }
+
       window.showConnectModal = () => {
         if (!state.selectedAgentId) {
           alert('Selecione um agente no menu acima antes de conectar.');
@@ -1145,6 +1164,7 @@
             connectWizardState.step = 'pairing';
           }
           renderConnectStep();
+          if (connectWizardState.step === 'paired') maybeFinishOnboarding();
         } catch (err) {
           // Reset to form so user can fix and retry.
           connectWizardState.step = 'form';
@@ -1219,6 +1239,7 @@
               connectWizardState.pollTimer = null;
               connectWizardState.step = 'paired';
               renderConnectStep();
+              maybeFinishOnboarding();
             }
           } catch (_) { /* network blip — keep polling */ }
         }, intervalMs);
@@ -1723,7 +1744,13 @@
           }
           return;
         }
-        if (!state.selectedAgentId || !state.agents.find(a => a.id === state.selectedAgentId)) {
+        // Honor ?agent=<id> from the onboarding redirect coming out of
+        // /build, so the user lands directly on their freshly created
+        // agent rather than the first in the list (could be a sibling).
+        const wantId = new URLSearchParams(location.search).get('agent');
+        if (wantId && state.agents.find(a => a.id === wantId)) {
+          state.selectedAgentId = wantId;
+        } else if (!state.selectedAgentId || !state.agents.find(a => a.id === state.selectedAgentId)) {
           state.selectedAgentId = state.agents[0].id;
         }
         await loadAgentData();
@@ -1818,6 +1845,38 @@
         if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h atrás`;
         return d.toLocaleDateString('pt-BR');
       }
+
+      // ─── Onboarding overlay (paints once, persists across re-renders
+      //     because it lives outside #app) ─────────────────────────
+      (function paintOnboardingOverlay() {
+        const params = new URLSearchParams(location.search);
+        if (params.get('welcome') !== '1') return;
+        const overlay = document.getElementById('onboarding-overlay');
+        const inner = document.getElementById('onboarding-overlay-inner');
+        if (!overlay || !inner) return;
+        const tryPaint = () => {
+          if (!window.AxonUI || !AxonUI.renderSteps || !AxonUI.welcomeBanner) {
+            return setTimeout(tryPaint, 60); // _ui-kit.js still deferring
+          }
+          overlay.style.display = 'block';
+          // Banner first, then steps below it.
+          inner.innerHTML = '<div id="ob-banner-slot"></div><div id="ob-steps-slot"></div>';
+          AxonUI.welcomeBanner('ob-banner-slot', {
+            title: '📱 Conecte ao WhatsApp',
+            message: 'Escaneie o QR ou use o código de pareamento. Assim que cair, te levo de volta pro painel.',
+            dismissKey: 'axon.welcome.whatsapp',
+          });
+          AxonUI.renderSteps('ob-steps-slot', 2);
+          // Push the rest of the page down so the overlay doesn't cover
+          // the header. Using padding on body avoids messing with #app's
+          // own scroll containers.
+          requestAnimationFrame(() => {
+            const h = overlay.getBoundingClientRect().height;
+            document.body.style.paddingTop = h + 'px';
+          });
+        };
+        tryPaint();
+      })();
 
       // ─── Boot ─────────────────────────────────
       (async () => {

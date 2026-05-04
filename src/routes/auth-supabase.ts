@@ -103,7 +103,7 @@ async function verifySupabaseToken(accessToken: string): Promise<SupabaseUser | 
 async function provisionUser(opts: {
   email: string;
   supabaseUserId: string;
-}): Promise<{ ok: true; userId: string; rawKey: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; userId: string; rawKey: string; depositAddress: string } | { ok: false; error: string }> {
   // Generate the user id up-front so the wallet provider can derive a
   // deterministic address from it (matches signup.ts pattern).
   const userId = randomUUID();
@@ -156,7 +156,7 @@ async function provisionUser(opts: {
       amountMicro: toMicro(SIGNUP_BONUS_USDC),
       meta: { reason: 'supabase_signup_bonus', email: opts.email },
     });
-    return { ok: true, userId: user.id, rawKey };
+    return { ok: true, userId: user.id, rawKey, depositAddress: deposit.address };
   } catch (err: any) {
     log.warn('auth.supabase.create_failed', {
       email: opts.email,
@@ -271,6 +271,29 @@ app.post('/exchange', async (c) => {
   if (!created.ok) {
     return c.json({ error: created.error, message: 'Failed to create account.' }, 503);
   }
+
+  // Welcome email — fire-and-forget so a slow Resend call never blocks login.
+  // Mirrors the legacy /v1/signup path so users who arrive via Supabase auth
+  // (the real signup flow today) get the same onboarding nudge.
+  void (async () => {
+    try {
+      const { sendEmail } = await import('~/email/client');
+      const { welcomeEmail } = await import('~/email/templates');
+      const t = welcomeEmail({
+        email,
+        apiKey: created.rawKey,
+        bonusUsdc: String(SIGNUP_BONUS_USDC),
+        depositAddress: created.depositAddress,
+      });
+      await sendEmail({ to: email, subject: t.subject, html: t.html, text: t.text, tag: 'welcome' });
+    } catch (err) {
+      log.warn('auth.supabase.welcome_email_failed', {
+        user_id: created.userId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  })();
+
   return c.json({ ok: true, api_key: created.rawKey, user_id: created.userId, rotated: false, created: true });
 });
 

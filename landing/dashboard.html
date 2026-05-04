@@ -1006,6 +1006,34 @@
         const wrap = document.getElementById('next-action-hero');
         if (!wrap) return;
 
+        // ─── Onboarding header (step indicator + optional welcome) ───
+        // Three states map to three steps in the indicator:
+        //   no agents       → step 1 (Criar agente)
+        //   has agent, no WA → step 2 (Conectar WhatsApp)
+        //   WA connected     → step 3 (Testar — done)
+        // We pre-compute the WA state for the first agent here so the
+        // existing branches below don't double-fetch.
+        let waConnected = false;
+        if (agents && agents.length > 0) {
+          const first = agents[0];
+          const conn = await api(`/v1/agents/${first.id}/whatsapp`).catch(() => ({ connected: false }));
+          waConnected = !!(conn && conn.connected);
+        }
+        const step = (!agents || agents.length === 0) ? 1 : (waConnected ? 3 : 2);
+        if (window.AxonUI && AxonUI.renderSteps && step < 3) {
+          AxonUI.renderSteps('onboarding-steps-slot', step);
+        }
+        // Post-pairing celebration banner (one-time).
+        const params = new URLSearchParams(location.search);
+        if (params.get('welcome') === 'done' && step === 3 && window.AxonUI && AxonUI.welcomeBanner) {
+          AxonUI.welcomeBanner('onboarding-welcome-slot', {
+            title: '🎉 Tudo pronto!',
+            message: 'Seu agente está conectado ao WhatsApp e atendendo. Manda uma mensagem pelo zap pra ver na prática.',
+            cta: { label: 'Ver conversas', href: '/contacts' },
+            dismissKey: 'axon.welcome.dashboard.done',
+          });
+        }
+
         // 1 — No agents yet
         if (!agents || agents.length === 0) {
           wrap.innerHTML = `
@@ -1022,9 +1050,8 @@
         // From here, all branches reference the first agent.
         const a = agents[0];
 
-        // 2 — Has agent but no WhatsApp connection
-        const conn = await api(`/v1/agents/${a.id}/whatsapp`).catch(() => ({ connected: false }));
-        if (!conn || !conn.connected) {
+        // 2 — Has agent but no WhatsApp connection (uses cached waConnected from above)
+        if (!waConnected) {
           wrap.innerHTML = `
             <div class="next-action">
               <div>
@@ -2033,6 +2060,8 @@
           </header>
           <div class="container">
             <h1 data-pt="Painel" data-en="Dashboard">Painel</h1>
+            <div id="onboarding-welcome-slot"></div>
+            <div id="onboarding-steps-slot"></div>
             <div id="next-action-hero"></div>
             <div id="deposit-hero-wrap"></div>
             <div class="grid" id="metrics">

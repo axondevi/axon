@@ -13,7 +13,7 @@
  *  - Plaintext fallback for clients that block HTML
  */
 
-const FRONTEND = process.env.FRONTEND_BASE_URL || 'https://axon-5zf.pages.dev';
+const FRONTEND = process.env.FRONTEND_BASE_URL || 'https://nexusinovation.com.br';
 
 /** Standard wrapper to keep all templates visually consistent. */
 function wrap(opts: { preheader: string; bodyHtml: string }): string {
@@ -87,6 +87,7 @@ export function welcomeEmail(opts: {
 }): { subject: string; html: string; text: string } {
   const subject = '🎉 Bem-vindo ao Axon — sua wallet já está ativa';
   const dashUrl = `${FRONTEND}/dashboard`;
+  const buildUrl = `${FRONTEND}/build?welcome=1`;
 
   const bodyHtml = `
     <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#eeeef0;">Pronto, ${escapeHtml(opts.email.split('@')[0])}!</h1>
@@ -103,7 +104,10 @@ export function welcomeEmail(opts: {
     <p style="margin:0 0 6px;color:#9a9aa4;font-size:13px;">⚠️ Guarde com você — esta é a única vez que mostramos a chave completa.</p>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0;">
       <tr><td>
-        <a href="${dashUrl}" style="display:inline-block;background:#7c5cff;color:#fff;padding:12px 24px;border-radius:8px;font-weight:600;text-decoration:none;font-size:14px;">Abrir painel →</a>
+        <a href="${buildUrl}" style="display:inline-block;background:#7c5cff;color:#fff;padding:12px 24px;border-radius:8px;font-weight:600;text-decoration:none;font-size:14px;">Criar meu primeiro agente →</a>
+      </td></tr>
+      <tr><td style="padding-top:8px;">
+        <a href="${dashUrl}" style="display:inline-block;color:#9a9aa4;font-size:12px;text-decoration:underline;">ou abrir o painel direto</a>
       </td></tr>
     </table>
     <h2 style="margin:28px 0 10px;font-size:15px;font-weight:600;color:#eeeef0;">Próximos passos</h2>
@@ -125,6 +129,7 @@ export function welcomeEmail(opts: {
     `API Key: ${opts.apiKey}`,
     '⚠️ Esta é a única vez que mostramos a chave completa — guarde-a!',
     '',
+    `Criar meu primeiro agente: ${buildUrl}`,
     `Painel: ${dashUrl}`,
     '',
     'Próximos passos:',

@@ -298,3 +298,122 @@
   }
 }
 
+/* ─── Onboarding step indicator ──────────────────────────────────── */
+.axon-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: var(--bg-card, #16161a);
+  border: 1px solid var(--border, #25252b);
+  border-radius: 10px;
+}
+.axon-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--text-dim, #9a9aa4);
+  transition: all 0.15s;
+}
+.axon-step.todo { opacity: 0.5; }
+.axon-step.active {
+  background: rgba(124, 92, 255, 0.12);
+  color: var(--text, #eeeef0);
+  font-weight: 600;
+}
+.axon-step.done {
+  color: #19d5c6;
+  cursor: pointer;
+}
+.axon-step.done:hover { background: rgba(25, 213, 198, 0.08); }
+.axon-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--bg-elev, #111114);
+  border: 1px solid var(--border, #25252b);
+  flex-shrink: 0;
+}
+.axon-step.active .axon-step-num {
+  background: #7c5cff;
+  color: #fff;
+  border-color: #7c5cff;
+}
+.axon-step.done .axon-step-num {
+  background: #19d5c6;
+  color: #0a0a0b;
+  border-color: #19d5c6;
+}
+.axon-step-sep {
+  flex: 1;
+  min-width: 12px;
+  height: 1px;
+  background: var(--border, #25252b);
+}
+
+/* ─── Welcome banner ─────────────────────────────────────────────── */
+.axon-welcome-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.14), rgba(25, 213, 198, 0.08));
+  border: 1px solid rgba(124, 92, 255, 0.35);
+  border-radius: 10px;
+  color: var(--text, #eeeef0);
+}
+.axon-welcome-text { flex: 1; min-width: 0; }
+.axon-welcome-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.axon-welcome-msg {
+  font-size: 13px;
+  color: var(--text-dim, #9a9aa4);
+  line-height: 1.5;
+}
+.axon-welcome-cta {
+  display: inline-block;
+  background: #7c5cff;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.axon-welcome-cta:hover { background: #6a4eef; }
+.axon-welcome-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim, #9a9aa4);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.axon-welcome-close:hover { color: var(--text, #eeeef0); background: rgba(255, 255, 255, 0.05); }
+
+@media (max-width: 600px) {
+  .axon-welcome-banner { flex-wrap: wrap; }
+  .axon-welcome-cta { width: 100%; text-align: center; }
+}
+

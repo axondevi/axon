@@ -82,5 +82,106 @@
     return true;
   }
 
-  window.AxonUI = { toast, formatCost, handleAuthError };
+  /**
+   * Onboarding helpers — step indicator (1→2→3) and welcome banner.
+   *
+   * The three steps are fixed across the product:
+   *   1. Criar agente            (lives on /build)
+   *   2. Conectar WhatsApp       (lives on /whatsapp)
+   *   3. Testar no zap           (back to /dashboard)
+   *
+   * `renderSteps(target, current)` injects a horizontal pill row.
+   * `current` is 1|2|3 (the step the user is ON). Earlier steps render
+   * as "done"; later steps as "todo". Same target can be re-rendered.
+   *
+   * `welcomeBanner(target, opts)` injects a dismissible headline.
+   *  - opts.title, opts.message: strings (PT-BR)
+   *  - opts.cta: { label, href } — optional inline action button
+   *  - opts.dismissKey: localStorage key — once dismissed, never shown again
+   */
+  const STEP_DEFS = [
+    { n: 1, label: 'Criar agente', href: '/build' },
+    { n: 2, label: 'Conectar WhatsApp', href: '/whatsapp' },
+    { n: 3, label: 'Testar no zap', href: '/dashboard' },
+  ];
+
+  function renderSteps(target, current) {
+    const host = typeof target === 'string' ? document.getElementById(target) : target;
+    if (!host) return;
+    host.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'axon-steps';
+    wrap.setAttribute('data-step', String(current));
+    STEP_DEFS.forEach((s, i) => {
+      const status = s.n < current ? 'done' : s.n === current ? 'active' : 'todo';
+      const node = document.createElement(s.n < current ? 'a' : 'div');
+      node.className = 'axon-step ' + status;
+      if (s.n < current) node.href = s.href;
+      const num = document.createElement('span');
+      num.className = 'axon-step-num';
+      num.textContent = s.n < current ? '✓' : String(s.n);
+      const lbl = document.createElement('span');
+      lbl.className = 'axon-step-label';
+      lbl.textContent = s.label;
+      node.appendChild(num);
+      node.appendChild(lbl);
+      wrap.appendChild(node);
+      if (i < STEP_DEFS.length - 1) {
+        const sep = document.createElement('span');
+        sep.className = 'axon-step-sep';
+        wrap.appendChild(sep);
+      }
+    });
+    host.appendChild(wrap);
+  }
+
+  function welcomeBanner(target, opts) {
+    opts = opts || {};
+    const host = typeof target === 'string' ? document.getElementById(target) : target;
+    if (!host) return;
+    if (opts.dismissKey) {
+      try {
+        if (localStorage.getItem(opts.dismissKey) === '1') return;
+      } catch (_) { /* private mode */ }
+    }
+    const el = document.createElement('div');
+    el.className = 'axon-welcome-banner';
+    const txt = document.createElement('div');
+    txt.className = 'axon-welcome-text';
+    if (opts.title) {
+      const t = document.createElement('div');
+      t.className = 'axon-welcome-title';
+      t.textContent = opts.title;
+      txt.appendChild(t);
+    }
+    if (opts.message) {
+      const m = document.createElement('div');
+      m.className = 'axon-welcome-msg';
+      m.textContent = opts.message;
+      txt.appendChild(m);
+    }
+    el.appendChild(txt);
+    if (opts.cta && opts.cta.href && opts.cta.label) {
+      const a = document.createElement('a');
+      a.className = 'axon-welcome-cta';
+      a.href = opts.cta.href;
+      a.textContent = opts.cta.label;
+      el.appendChild(a);
+    }
+    const close = document.createElement('button');
+    close.className = 'axon-welcome-close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Fechar');
+    close.textContent = '×';
+    close.addEventListener('click', () => {
+      el.remove();
+      if (opts.dismissKey) {
+        try { localStorage.setItem(opts.dismissKey, '1'); } catch (_) { /* private mode */ }
+      }
+    });
+    el.appendChild(close);
+    host.prepend(el);
+  }
+
+  window.AxonUI = { toast, formatCost, handleAuthError, renderSteps, welcomeBanner };
 })();
