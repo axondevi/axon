@@ -553,6 +553,26 @@ function nameFromTitle(title: string | undefined): string | undefined {
  * product/listing names, prices, brief descriptions. Keeps under ~12k chars
  * for cheap Gemini calls.
  */
+/** Decide if an `<img src>` is a real listing photo vs UI chrome
+ *  (logos, sprite icons, base64 placeholders, tracking pixels). The
+ *  LLM gets confused by hundreds of tiny URLs, so we filter aggressively
+ *  before injecting into the prompt. */
+function isListingImageUrl(url: string): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  if (lower.startsWith('data:')) return false;
+  if (!/^https?:\/\//i.test(url)) return false;
+  // Common chrome / non-photo patterns
+  if (/(logo|sprite|icon|favicon|whatsapp|instagram|facebook|youtube|tiktok|placeholder|loading|spinner|tracking|pixel\.gif)/i.test(lower)) {
+    return false;
+  }
+  // Path under common asset folders that don't host listing photos
+  if (/\/(icons?|svg|sprites?|tracking|analytics)\//i.test(lower)) return false;
+  // Allowed extensions — skip GIF (usually animations / loaders)
+  if (!/\.(jpe?g|png|webp)(?:\?|#|$)/i.test(lower)) return false;
+  return true;
+}
+
 function htmlToVisibleText(html: string): string {
   let s = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
@@ -560,8 +580,25 @@ function htmlToVisibleText(html: string): string {
     .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
     .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ');
-  // Preserve href on anchors briefly so the LLM can reference image links
-  // — but really keep the text payload small.
+  // Preserve <img src> as inline markers so the LLM can correlate
+  // photos with the listing they sit next to in the DOM. We try the
+  // common attributes that lazy-loaders use (data-src, data-lazy)
+  // before src, since modern sites set src= to a placeholder. Cap at
+  // 60 markers so we don't blow the prompt budget on icon-heavy pages.
+  let imgCount = 0;
+  s = s.replace(
+    /<img\b[^>]*?(?:data-src|data-lazy(?:-src)?|data-original|src)=["']([^"']+)["'][^>]*>/gi,
+    (_full, src: string) => {
+      if (imgCount >= 60) return ' ';
+      // Resolve relative URLs would need baseUrl; we accept absolute only
+      // here and let the LLM include them verbatim. Relative ones get
+      // dropped — the post-LLM normalizer in llmExtract resolves with
+      // pageUrl just like JSON-LD images.
+      if (!isListingImageUrl(src)) return ' ';
+      imgCount++;
+      return ` [IMG: ${src}] `;
+    },
+  );
   s = s.replace(/<[^>]+>/g, ' ');
   s = s
     .replace(/&nbsp;/g, ' ')
@@ -572,7 +609,7 @@ function htmlToVisibleText(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/\s+/g, ' ')
     .trim();
-  return s.slice(0, 12_000);
+  return s.slice(0, 14_000);
 }
 
 async function llmExtract(
@@ -600,7 +637,8 @@ async function llmExtract(
     '- Máximo 30 itens. Se houver mais, pegue os 30 primeiros.',
     '- price: extraia o valor numérico. "R$ 1.234,56" → 1234.56. "1.500/mês" → 1500. Sem moeda no JSON.',
     '- type: detecte se é venda ou aluguel. Pistas de ALUGUEL: "alugar", "aluguel", "locação", "/mês", "mensal", preço entre R$300 e R$10.000 sem ser produto. Pistas de VENDA: "à venda", "venda", "comprar", preço acima de R$50.000. Se não der pra saber, use null.',
-    '- Não invente. Se um campo não está claro, use null. Não chute o tipo — só preencha se o texto deixar claro.',
+    '- image_url: o texto contém marcadores `[IMG: <url>]` em volta dos itens — esses são as URLs reais das fotos do site. Para cada item, escolha a URL [IMG:] que está MAIS PRÓXIMA do nome dele no texto. Use a URL EXATA, sem mudar. Se não houver [IMG:] perto, use null. NÃO invente URL.',
+    '- Não invente nada. Se um campo não está claro, use null.',
     '',
     'Texto da página:',
     '"""',
