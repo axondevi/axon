@@ -612,6 +612,63 @@ function htmlToVisibleText(html: string): string {
   return s.slice(0, 14_000);
 }
 
+/**
+ * Call Gemini with automatic model fallback when the primary model is
+ * rate-limited (429) or temporarily unavailable (503). The free tier has
+ * separate quotas per model, so if flash-lite is exhausted we still have
+ * flash and flash-8b to try. Keeps the import working through quota
+ * pressure that's common on shared keys.
+ */
+async function callGeminiJson(
+  apiKey: string,
+  prompt: string,
+  maxOutputTokens: number,
+  timeoutMs: number,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const primary = process.env.GEMINI_EXTRACT_MODEL || 'gemini-2.5-flash-lite';
+  // Models in order of preference. First the configured primary, then
+  // siblings with separate per-day quotas.
+  const chain = Array.from(new Set([primary, 'gemini-2.5-flash-lite', 'gemini-2.5-flash']));
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens,
+      responseMimeType: 'application/json',
+    },
+  });
+  let lastErr = '';
+  for (const model of chain) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(
+        `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ctrl.signal },
+      );
+      if (res.ok) {
+        const data = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return { ok: true, text };
+      }
+      const errText = (await res.text()).slice(0, 200);
+      lastErr = `${model} → ${res.status}: ${errText}`;
+      // 429 (quota) and 503 (overload) are worth retrying with another
+      // model. 4xx other than 429 is a request problem — bail.
+      if (res.status !== 429 && res.status !== 503) {
+        return { ok: false, error: lastErr };
+      }
+    } catch (err) {
+      lastErr = `${model} → ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return { ok: false, error: lastErr || 'all gemini models failed' };
+}
+
 async function llmExtract(
   visibleText: string,
   pageUrl: string,
@@ -622,9 +679,6 @@ async function llmExtract(
   if (!apiKey) {
     return { items: [], warnings: ['GEMINI_API_KEY ausente — fallback indisponível'] };
   }
-  // Flash Lite has a separate quota from regular Flash (per memory note)
-  // and is cheap enough to burn on a one-off catalog import.
-  const model = process.env.GEMINI_EXTRACT_MODEL || 'gemini-2.5-flash-lite';
 
   const prompt = [
     'Você é um extrator de catálogo. Recebe o texto de UMA página de um site (imobiliária, loja, concessionária, restaurante, etc) e retorna os itens (imóveis, produtos, carros, pratos, serviços) listados ali.',
@@ -646,36 +700,13 @@ async function llmExtract(
     '"""',
   ].join('\n');
 
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 4096,
-      responseMimeType: 'application/json',
-    },
-  };
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30_000);
+  const call = await callGeminiJson(apiKey, prompt, 4096, 30_000);
+  if (!call.ok) {
+    warnings.push(`Gemini: ${call.error.slice(0, 200)}`);
+    return { items: [], warnings };
+  }
   try {
-    const res = await fetch(
-      `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-      },
-    );
-    if (!res.ok) {
-      const t = await res.text();
-      warnings.push(`Gemini ${res.status}: ${t.slice(0, 160)}`);
-      return { items: [], warnings };
-    }
-    const data = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = call.text;
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
@@ -747,10 +778,8 @@ async function llmExtract(
     return { items, warnings };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    warnings.push(`Falha Gemini: ${msg}`);
+    warnings.push(`Falha parse: ${msg}`);
     return { items: [], warnings };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -861,7 +890,6 @@ async function llmExtractDetailPage(
 ): Promise<CatalogItem | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
-  const model = process.env.GEMINI_EXTRACT_MODEL || 'gemini-2.5-flash-lite';
   const prompt = [
     'Você está lendo a PÁGINA DE DETALHES de UM ÚNICO item (um imóvel, carro, produto, serviço) no site. Extraia toda a informação relevante.',
     `URL: ${pageUrl}`,
@@ -884,31 +912,17 @@ async function llmExtractDetailPage(
     '"""',
   ].join('\n');
 
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 2048,
-      responseMimeType: 'application/json',
-    },
-  };
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20_000);
+  const call = await callGeminiJson(apiKey, prompt, 2048, 20_000);
+  if (!call.ok) return null;
+  const text = call.text;
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); }
+  catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) { try { parsed = JSON.parse(m[0]); } catch { return null; } }
+    else return null;
+  }
   try {
-    const res = await fetch(
-      `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal },
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    let parsed: unknown;
-    try { parsed = JSON.parse(text); }
-    catch {
-      const m = text.match(/\{[\s\S]*\}/);
-      if (m) { try { parsed = JSON.parse(m[0]); } catch { return null; } }
-      else return null;
-    }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
     const r = parsed as Record<string, unknown>;
     const name = strFromAny(r.name);
@@ -945,8 +959,6 @@ async function llmExtractDetailPage(
     return item;
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
