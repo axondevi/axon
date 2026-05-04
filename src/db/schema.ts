@@ -267,6 +267,16 @@ export const agents = pgTable(
     // the system_prompt at runtime so changes take effect immediately
     // without re-deploying the prompt.
     businessInfo: text('business_info'),
+    // Catalog: structured inventory the agent uses as source of truth
+    // for "what we have". Avoids the hallucination loop where the LLM
+    // invents 3 properties to fill silence ("Casa em Apucirana R$950"
+    // out of thin air). Owner uploads CSV/JSON via POST
+    // /v1/agents/:id/catalog/upload — system parses + stores here.
+    // Each item is a free-form record with a few "well-known" keys
+    // (name, price, region, description, image_url) that the prompt
+    // injection + search_catalog tool look for; everything else is
+    // metadata available via the tool.
+    catalog: jsonb('catalog'),
     // Per-agent voice override + global voice toggle. When voiceEnabled
     // is false, the runtime never calls TTS regardless of persona/audio
     // mirroring. When voiceIdOverride is set, it wins over the persona's

@@ -937,6 +937,105 @@ app.post('/:id/patches/apply', async (c) => {
   return c.json({ ok: true, applied: true, system_prompt_length: newPrompt.length });
 });
 
+// ─── Catalog management ─────────────────────────────────────
+// Owner uploads a CSV or JSON of inventory items. The parser detects
+// well-known fields (name, price, region, etc) by alias and stores
+// the normalized array in agents.catalog (jsonb). Agent runtime
+// injects a preview into the system prompt and exposes search_catalog
+// as a tool for dynamic lookups. Source of truth so the LLM doesn't
+// invent properties / products to fill silence.
+app.post('/:id/catalog/upload', async (c) => {
+  const user = c.get('user') as { id: string };
+  const idOrSlug = c.req.param('id');
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(idOrSlug, user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+
+  // Accept either: { content: string, format: 'csv' | 'json' } or a
+  // multipart upload. Multipart is the friendlier path from a browser
+  // file input; the JSON path is for SDK / curl usage.
+  let content = '';
+  let format = 'csv';
+  const ctype = c.req.header('content-type') || '';
+  if (ctype.includes('multipart/form-data')) {
+    const form = await c.req.formData();
+    const file = form.get('file');
+    if (file && typeof file !== 'string') {
+      content = await file.text();
+      format = file.name.toLowerCase().endsWith('.json') ? 'json' : 'csv';
+    }
+  } else {
+    const body = await c.req.json().catch(() => ({} as { content?: string; format?: string }));
+    content = String(body.content || '');
+    format = String(body.format || 'csv');
+  }
+
+  if (!content.trim()) {
+    return c.json({ error: 'bad_request', message: 'content vazio — envie CSV ou JSON' }, 400);
+  }
+  if (content.length > 1_000_000) {
+    return c.json({ error: 'bad_request', message: 'arquivo muito grande (>1MB) — divida em mais agentes' }, 413);
+  }
+
+  const { parseCatalog } = await import('~/agents/catalog');
+  const result = parseCatalog(content, format);
+
+  if (result.items.length === 0) {
+    return c.json({
+      error: 'parse_failed',
+      message: 'Nenhum item válido no arquivo. Veja warnings.',
+      warnings: result.warnings,
+      field_map: result.fieldMap,
+    }, 400);
+  }
+
+  await db
+    .update(agents)
+    .set({ catalog: result.items as unknown as Record<string, unknown>, updatedAt: new Date() })
+    .where(eq(agents.id, a.id));
+
+  return c.json({
+    ok: true,
+    item_count: result.items.length,
+    field_map: result.fieldMap,
+    warnings: result.warnings,
+    preview: result.items.slice(0, 5),
+  });
+});
+
+// Read current catalog (preview / debug)
+app.get('/:id/catalog', async (c) => {
+  const user = c.get('user') as { id: string };
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(c.req.param('id'), user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+  const items = Array.isArray(a.catalog) ? a.catalog : [];
+  return c.json({
+    item_count: items.length,
+    items: items.slice(0, 50),
+    truncated: items.length > 50,
+  });
+});
+
+// Wipe catalog (owner can reset before re-uploading)
+app.delete('/:id/catalog', async (c) => {
+  const user = c.get('user') as { id: string };
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(c.req.param('id'), user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+  await db.update(agents).set({ catalog: null, updatedAt: new Date() }).where(eq(agents.id, a.id));
+  return c.json({ ok: true });
+});
+
 /** Turn a judge issue into a short imperative correction line. */
 function issueToPatchText(issue: string): string {
   const trimmed = issue.trim().replace(/\s+/g, ' ');

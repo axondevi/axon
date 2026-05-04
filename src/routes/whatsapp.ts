@@ -1079,7 +1079,17 @@ async function processBufferedTurn(opts: {
       ? `\n\n## Informações do negócio (use estas como verdade ao responder o cliente)\n${a.businessInfo.trim()}`
       : '';
 
-    augmentedSystemPrompt = `${a.systemPrompt}${businessBlock}` +
+    // Catalog injection — preview of inventory the owner uploaded.
+    // The agent treats this as the source of truth for "what we have"
+    // (vs. the LLM hallucinating items). search_catalog tool gives
+    // dynamic access to the rest when the inline preview isn't enough.
+    let catalogBlock = '';
+    if (Array.isArray(a.catalog) && a.catalog.length > 0) {
+      const { renderCatalogContext } = await import('~/agents/catalog');
+      catalogBlock = '\n\n' + renderCatalogContext(a.catalog as any[]);
+    }
+
+    augmentedSystemPrompt = `${a.systemPrompt}${businessBlock}${catalogBlock}` +
       (memoryContext ? `\n\n## O que você sabe sobre este contato\n${memoryContext}` : '');
 
     // Affiliate payout — fire-and-forget but with a Redis cooldown so a
@@ -1227,7 +1237,13 @@ async function processBufferedTurn(opts: {
         const routedBusiness = ((routed as any).businessInfo && (routed as any).businessInfo.trim())
           ? `\n\n## Informações do negócio (use estas como verdade ao responder o cliente)\n${(routed as any).businessInfo.trim()}`
           : '';
-        augmentedSystemPrompt = `${routed.systemPrompt}${routedBusiness}` +
+        let routedCatalog = '';
+        const routedCat = (routed as any).catalog;
+        if (Array.isArray(routedCat) && routedCat.length > 0) {
+          const { renderCatalogContext } = await import('~/agents/catalog');
+          routedCatalog = '\n\n' + renderCatalogContext(routedCat);
+        }
+        augmentedSystemPrompt = `${routed.systemPrompt}${routedBusiness}${routedCatalog}` +
           (memoryContext ? `\n\n## O que você sabe sobre este contato\n${memoryContext}` : '');
       }
     }

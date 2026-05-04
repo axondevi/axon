@@ -130,6 +130,12 @@ export async function ensureCriticalSchema() {
   // SELECT * paths reference it, so DDL goes here.
   await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "business_info" text`);
 
+  // 0016 (bootstrap): catalog — JSONB array of inventory items the
+  // agent uses as source of truth instead of inventing properties /
+  // products to fill silence. Lives on the agent row to avoid a join
+  // on every hot-path SELECT.
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "catalog" jsonb`);
+
   // 0016: requests.agent_id was added in migration 0004 without a foreign
   // key. Add ON DELETE SET NULL so deleting an agent leaves request history
   // intact for accounting/analytics. We DO NOT use CASCADE — operator may
