@@ -1377,6 +1377,37 @@ async function processBufferedTurn(opts: {
     pixPayments = result.pixPayments || [];
     pdfs = result.pdfs || [];
 
+    // ─── Strip leaked tool-call markup ─────────────────────────────
+    // Some providers (Cohere, occasionally Gemini) emit tool calls as
+    // text — `<function=ibge_city>{"id":"3550308"}</function>` or
+    // `{"name":"lookup_cep","arguments":{"cep":"01001-000"}}` inline
+    // — instead of using the structured tool_calls API channel. The
+    // raw markup leaks into the customer's WhatsApp reply if we don't
+    // scrub it. Removes any of:
+    //   <function=NAME>...</function>
+    //   <function_call>...</function_call>
+    //   ```tool_call ... ```
+    //   bare {"name":"...", "arguments":{...}} JSON object as a turn
+    if (typeof reply === 'string' && reply.includes('<function')) {
+      reply = reply.replace(/<function(?:_call)?[^>]*>[\s\S]*?<\/function(?:_call)?>/gi, '').trim();
+    }
+    if (typeof reply === 'string' && reply.includes('```tool_call')) {
+      reply = reply.replace(/```tool_call[\s\S]*?```/gi, '').trim();
+    }
+    if (typeof reply === 'string') {
+      reply = reply.replace(/^\s*\{"name"\s*:\s*"[a-z_]+"\s*,\s*"arguments"\s*:[\s\S]*?\}\s*$/gim, '').trim();
+    }
+    // If stripping left an empty reply, fall back to a soft prompt so
+    // the customer doesn't see a blank message bubble.
+    if (typeof reply === 'string' && reply.trim().length === 0) {
+      reply = 'Hmm, deixa eu reformular. Pode me dar mais um detalhe?';
+      log.warn('whatsapp.reply.stripped_to_empty', {
+        agent_id: a.id,
+        phone: inbound.phone,
+        original_had_function_tag: true,
+      });
+    }
+
     // Subscription usage: each runAgent success counts as one billable
     // turn. PDFs are tracked separately because they have their own
     // overage rate (different from raw turns). Fire-and-forget — never
@@ -1485,6 +1516,8 @@ async function processBufferedTurn(opts: {
         ms: t.ms,
         cost_usdc: t.cost_usdc,
         ...(t.error ? { error: t.error } : {}),
+        ...(t.response_excerpt ? { response_excerpt: t.response_excerpt } : {}),
+        ...(t.status ? { status: t.status } : {}),
       })),
       iterations: result.iterations,
       finish_reason: result.finish_reason,

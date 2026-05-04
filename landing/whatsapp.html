@@ -1330,20 +1330,45 @@
 
         // ─── 3. SECTION: Raciocínio ────────────────────────────────
         // What the agent DECIDED to do — tools called, iterations, finish.
+        // Per-tool block shows args + response excerpt + a "wasted?"
+        // flag so the operator can spot agents calling tools that
+        // didn't end up in the reply (= money burned on nothing).
+        const replyText = (m.content || '').toLowerCase();
         const toolsBlock = tools.length
           ? `<div class="brain-row" style="align-items:flex-start;">
               <span class="brain-label">Tools</span>
               <div style="flex:1;">
-                ${tools.map(t => `
-                  <div style="margin:2px 0;">
-                    <span class="${t.ok ? 'brain-tool-ok' : 'brain-tool-err'}">${t.ok ? '✓' : '✗'}</span>
-                    <strong style="color:var(--text);">${escapeHtml(t.name)}</strong>
-                    <span style="color:var(--text-muted);">(${escapeHtml(JSON.stringify(t.args || {}).slice(0, 80))})</span>
-                    ${t.ms ? `<span style="color:var(--text-muted);"> · ${t.ms}ms</span>` : ''}
-                    ${t.cost_usdc && parseFloat(t.cost_usdc) > 0 ? `<span style="color:var(--text-muted);"> · $${t.cost_usdc}</span>` : ''}
-                    ${t.error ? `<div style="color:var(--danger);font-size:11px;margin-left:18px;">↳ ${escapeHtml(t.error)}</div>` : ''}
-                  </div>
-                `).join('')}
+                ${tools.map(t => {
+                  const argsJson = JSON.stringify(t.args || {});
+                  const argValues = Object.values(t.args || {}).map(v => String(v).toLowerCase());
+                  // Heuristic: if no arg value appears in the reply, the
+                  // tool was likely called blindly (or the LLM didn't
+                  // weave the result in). Useful to catch "lookup_cep
+                  // called with hallucinated 01001-000" type waste.
+                  const wasted = t.ok && argValues.length > 0 &&
+                    !argValues.some(v => v.length > 2 && replyText.includes(v));
+                  const wastedTag = wasted
+                    ? '<span title="Tool foi chamada mas o resultado não apareceu na resposta — pode ter sido chamada blind/desperdício" style="color:var(--warn,#ffd60a);font-size:10px;font-weight:600;margin-left:6px;">⚠ não-usado</span>'
+                    : '';
+                  const excerpt = t.response_excerpt
+                    ? `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);background:rgba(255,255,255,0.03);border-left:2px solid var(--border);padding:4px 8px;margin:4px 0 4px 18px;border-radius:0 4px 4px 0;max-width:520px;overflow-wrap:break-word;">↳ ${escapeHtml(t.response_excerpt)}${t.response_excerpt.length >= 280 ? '…' : ''}</div>`
+                    : '';
+                  return `
+                    <div style="margin:6px 0;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.05);">
+                      <div>
+                        <span class="${t.ok ? 'brain-tool-ok' : 'brain-tool-err'}">${t.ok ? '✓' : '✗'}</span>
+                        <strong style="color:var(--text);">${escapeHtml(t.name)}</strong>
+                        ${t.status ? `<span style="font-size:10px;color:var(--text-muted);">[${t.status}]</span>` : ''}
+                        ${t.ms ? `<span style="color:var(--text-muted);font-size:11px;"> · ${t.ms}ms</span>` : ''}
+                        ${t.cost_usdc && parseFloat(t.cost_usdc) > 0 ? `<span style="color:var(--text-muted);font-size:11px;"> · $${t.cost_usdc}</span>` : ''}
+                        ${wastedTag}
+                      </div>
+                      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-left:18px;margin-top:2px;">args: ${escapeHtml(argsJson.slice(0, 200))}${argsJson.length > 200 ? '…' : ''}</div>
+                      ${excerpt}
+                      ${t.error ? `<div style="color:var(--danger);font-size:11px;margin-left:18px;margin-top:2px;">✗ ${escapeHtml(t.error)}</div>` : ''}
+                    </div>
+                  `;
+                }).join('')}
               </div>
             </div>`
           : `<div class="brain-row">

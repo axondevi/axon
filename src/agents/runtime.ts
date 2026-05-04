@@ -711,6 +711,12 @@ interface RunAgentResult {
     error?: string;
     /** Wall-clock duration of the upstream call in ms (best effort). */
     ms?: number;
+    /** First 280 chars of the upstream response — surfaced in the brain
+     *  panel so the operator can see what the tool actually returned
+     *  without diving into raw history. */
+    response_excerpt?: string;
+    /** HTTP status from the upstream call. */
+    status?: number;
   }>;
   iterations: number;
   finish_reason: 'stop' | 'max_iterations' | 'error';
@@ -899,7 +905,12 @@ Se a resposta não tem (a) nem (b), reformula antes de mandar.
 
 Se o cliente é vago ("quanto custa", "tem barato"), NÃO devolve outra pergunta vaga. Faz UMA pergunta sharp + JÁ chama a tool com chute razoável: "Qual modelo? FIPE na hora" / "Te puxo opções até R$X" / etc.
 
-Se você JÁ tem business_info (endereço, horário, catálogo, política), USA antes de perguntar. Repetir pergunta que tá no business_info = bot ruim.`
+Se você JÁ tem business_info (endereço, horário, catálogo, política), USA antes de perguntar. Repetir pergunta que tá no business_info = bot ruim.
+
+## Regras de tool-use (NUNCA viole)
+1. **NUNCA invente dado pra preencher tool.** Se a tool precisa de CEP, CNPJ, modelo de carro, link, e o cliente NÃO disse — VOCÊ PERGUNTA antes. Não chama lookup_cep com "01001-000" só pra ter algo. Não chama lookup_fipe com "Civic" se cliente só falou "carro". Cada chamada custa dinheiro do dono — desperdício é proibido.
+2. **NUNCA escreva o markup da tool no texto.** Markup tipo \`<function=name>{...}</function>\` ou \`{"name": "...", "arguments": {...}}\` é INTERNO — sai pelo canal de tool_calls do LLM, NÃO no campo content. Se você se pegar querendo escrever isso no texto, RECOMECE a resposta sem o markup.
+3. **Tool falhou ou retornou vazio?** Diz pro cliente honesto ("não achei o CEP, confirma os 8 dígitos?") em vez de inventar a resposta como se tivesse dado.`
     : '';
 
   const fullSystemPrompt = [
@@ -1238,12 +1249,20 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
           }
         }
 
+        // Response excerpt for the brain panel — first 280 chars of
+        // whatever the upstream returned, so the operator can see at
+        // a glance "tool was called with X, returned Y" without
+        // digging into raw history. Truncated to keep agent_messages
+        // meta from bloating.
+        const responseExcerpt = String(truncated || '').slice(0, 280);
         toolCallsExecuted.push({
           name: tc.function.name,
           args,
           ok: upstreamRes.ok,
           cost_usdc: cost.toFixed(6),
           ms: Date.now() - tcStart,
+          response_excerpt: responseExcerpt,
+          status: upstreamRes.status,
         });
         history.push({ role: 'tool', tool_call_id: tc.id, content: truncated });
       } catch (err: any) {
