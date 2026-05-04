@@ -595,11 +595,12 @@ async function llmExtract(
     '',
     'Regras:',
     '- Retorne APENAS um JSON array, sem markdown, sem explicação.',
-    '- Cada item tem: name (obrigatório), price (número em BRL ou null), region (string ou null), description (string curta, max 200 chars, ou null), image_url (string ou null).',
+    '- Cada item tem: name (obrigatório), price (número em BRL ou null), region (string ou null), description (string curta, max 200 chars, ou null), image_url (string ou null), type ("venda" | "aluguel" | null).',
     '- Se a página NÃO listar itens (ex: é um blog, contato, sobre), retorne [].',
     '- Máximo 30 itens. Se houver mais, pegue os 30 primeiros.',
     '- price: extraia o valor numérico. "R$ 1.234,56" → 1234.56. "1.500/mês" → 1500. Sem moeda no JSON.',
-    '- Não invente. Se um campo não está claro, use null.',
+    '- type: detecte se é venda ou aluguel. Pistas de ALUGUEL: "alugar", "aluguel", "locação", "/mês", "mensal", preço entre R$300 e R$10.000 sem ser produto. Pistas de VENDA: "à venda", "venda", "comprar", preço acima de R$50.000. Se não der pra saber, use null.',
+    '- Não invente. Se um campo não está claro, use null. Não chute o tipo — só preencha se o texto deixar claro.',
     '',
     'Texto da página:',
     '"""',
@@ -676,6 +677,8 @@ async function llmExtract(
       if (region) item.region = region;
       const description = strFromAny(r.description);
       if (description) item.description = description;
+      const typeRaw = strFromAny(r.type);
+      if (typeRaw === 'venda' || typeRaw === 'aluguel') item.type = typeRaw;
       let image = strFromAny(r.image_url);
       if (image && !/^https?:\/\//i.test(image)) {
         try {

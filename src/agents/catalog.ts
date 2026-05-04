@@ -28,6 +28,10 @@ export interface CatalogItem {
   region?: string;
   description?: string;
   image_url?: string;
+  /** Transaction kind for real-estate / multi-mode catalogs.
+   *  'venda' = for sale, 'aluguel' = for rent. Optional — most
+   *  pure-product catalogs (e-commerce, restaurants) won't set it. */
+  type?: 'venda' | 'aluguel';
   meta?: Record<string, string>;
 }
 
@@ -259,29 +263,57 @@ export function renderCatalogContext(items: CatalogItem[], previewLimit = 12): s
   const total = items.length;
   const regions = new Set(items.map((i) => i.region).filter(Boolean));
   const priceList = items.map((i) => i.price).filter((p): p is number => typeof p === 'number');
-  const priceLine = priceList.length
-    ? `Faixa de preço: R$ ${Math.min(...priceList).toFixed(2)} – R$ ${Math.max(...priceList).toFixed(2)}.`
-    : '';
+
+  // Split price ranges by transaction type when present — without this
+  // a real-estate catalog mixes 4-digit aluguel and 6-digit venda into a
+  // single useless range like "R$1.6k – R$4.5M" that lets the agent
+  // hallucinate a "rental for R$ 6.500" when the only items in that
+  // range are sales.
+  const venda = items.filter((i) => i.type === 'venda' && typeof i.price === 'number');
+  const aluguel = items.filter((i) => i.type === 'aluguel' && typeof i.price === 'number');
+  const untyped = items.filter((i) => !i.type && typeof i.price === 'number');
+  const priceLines: string[] = [];
+  if (venda.length) {
+    const ps = venda.map((i) => i.price!);
+    priceLines.push(`Venda (${venda.length} itens): R$ ${Math.min(...ps).toLocaleString('pt-BR')} – R$ ${Math.max(...ps).toLocaleString('pt-BR')}.`);
+  }
+  if (aluguel.length) {
+    const ps = aluguel.map((i) => i.price!);
+    priceLines.push(`Aluguel (${aluguel.length} itens): R$ ${Math.min(...ps).toLocaleString('pt-BR')} – R$ ${Math.max(...ps).toLocaleString('pt-BR')}.`);
+  }
+  if (!venda.length && !aluguel.length && untyped.length) {
+    priceLines.push(`Faixa: R$ ${Math.min(...priceList).toLocaleString('pt-BR')} – R$ ${Math.max(...priceList).toLocaleString('pt-BR')}.`);
+  }
+
   const regionLine = regions.size
-    ? `Regiões cobertas: ${[...regions].slice(0, 8).join(', ')}${regions.size > 8 ? ` (+${regions.size - 8})` : ''}.`
+    ? `Regiões: ${[...regions].slice(0, 8).join(', ')}${regions.size > 8 ? ` (+${regions.size - 8})` : ''}.`
     : '';
 
   const preview = items.slice(0, previewLimit).map((i) => {
     const parts = [`• ${i.name}`];
-    if (i.price !== undefined) parts.push(`R$${i.price.toFixed(2)}`);
+    if (i.type) parts.push(i.type.toUpperCase());
+    if (i.price !== undefined) parts.push(`R$ ${i.price.toLocaleString('pt-BR')}`);
     if (i.region) parts.push(i.region);
     if (i.description) parts.push(`— ${i.description.slice(0, 80)}`);
     return parts.join(' · ');
   });
 
   return [
-    `## Catálogo (fonte de verdade — ${total} itens disponíveis)`,
-    'NUNCA invente item fora do catálogo. Se o cliente pediu algo que NÃO está aqui, fala honesto: "não tenho isso em estoque hoje, mas tenho [alternativa do catálogo]".',
-    priceLine,
+    `## Catálogo de produtos/imóveis (FONTE DA VERDADE — ${total} itens disponíveis)`,
+    '',
+    '🚫 REGRA INVIOLÁVEL DE CATÁLOGO:',
+    '1. **NUNCA INVENTE ITEM**, NUNCA invente preço, nunca invente bairro/região, nunca invente código. Só fala do que está nesta lista ou no resultado de search_catalog.',
+    '2. Se o cliente pediu **VENDA mas só tem ALUGUEL** (ou vice-versa), seja honesto: "Hoje tenho [tipo que tem], não tenho [tipo que ele pediu] disponível." NÃO empurra o que não cabe.',
+    '3. Se o cliente pediu **faixa de preço** que não bate com NENHUM item, seja honesto: "Na sua faixa de R$ X eu não tenho hoje, o mais próximo é R$ Y."',
+    '4. Antes de listar, **chame search_catalog(query)** com o filtro do cliente (ex: "casa aluguel até 2000"). Se voltar vazio, recuse — não preencha com itens fora do filtro.',
+    '5. PROIBIDO arredondar/aproximar preço. R$ 8.000 NÃO vira "R$ 6.500". R$ 1.670 NÃO vira "R$ 1.500".',
+    '',
+    ...priceLines,
     regionLine,
+    '',
     total > previewLimit
-      ? `\nAmostra (${previewLimit} de ${total} itens — use search_catalog pra filtrar mais):`
-      : `\nItens disponíveis:`,
+      ? `Amostra (${previewLimit} de ${total} — use search_catalog pra filtrar):`
+      : `Itens disponíveis:`,
     ...preview,
     total > previewLimit ? `\n... e mais ${total - previewLimit} itens. Use search_catalog(query) pra puxar matches específicos.` : '',
   ].filter(Boolean).join('\n');
