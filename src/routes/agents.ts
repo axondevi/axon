@@ -1057,6 +1057,65 @@ app.post('/:id/catalog/upload', async (c) => {
   });
 });
 
+// Import catalog from a website URL — owner pastes their site, we
+// fetch + extract via JSON-LD then Gemini fallback. By default returns
+// only a preview (so the owner can review before committing); pass
+// {save:true} to overwrite the agent's catalog atomically.
+app.post('/:id/catalog/import-url', async (c) => {
+  const user = c.get('user') as { id: string };
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(c.req.param('id'), user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    url?: string;
+    save?: boolean;
+  };
+  const url = String(body.url || '').trim();
+  if (!url) {
+    return c.json({ error: 'bad_request', message: 'campo "url" obrigatório' }, 400);
+  }
+
+  const { importCatalogFromUrl } = await import('~/agents/site-importer');
+  const result = await importCatalogFromUrl(url);
+
+  if (!result.ok || result.items.length === 0) {
+    return c.json(
+      {
+        error: 'import_failed',
+        message: result.error || 'Não consegui extrair itens dessa URL.',
+        warnings: result.warnings,
+        page_title: result.page_title,
+        source: result.source,
+      },
+      400,
+    );
+  }
+
+  if (body.save) {
+    await db
+      .update(agents)
+      .set({
+        catalog: result.items as unknown as Record<string, unknown>,
+        updatedAt: new Date(),
+      })
+      .where(eq(agents.id, a.id));
+  }
+
+  return c.json({
+    ok: true,
+    saved: !!body.save,
+    item_count: result.items.length,
+    items: result.items,
+    source: result.source,
+    page_title: result.page_title,
+    warnings: result.warnings,
+  });
+});
+
 // Read current catalog (preview / debug)
 app.get('/:id/catalog', async (c) => {
   const user = c.get('user') as { id: string };

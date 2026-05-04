@@ -501,14 +501,31 @@ Estacionamento: gratuito por 1h"></textarea>
               </div>
 
               <!-- Tabs -->
-              <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);">
-                <button type="button" class="b-cat-tab active" data-cat-tab="editor" style="flex:1;background:transparent;border:none;color:var(--text);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid var(--accent);font-weight:600;">📝 Editor visual</button>
-                <button type="button" class="b-cat-tab" data-cat-tab="paste" style="flex:1;background:transparent;border:none;color:var(--text-dim);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;">📋 Colar do Excel</button>
-                <button type="button" class="b-cat-tab" data-cat-tab="upload" style="flex:1;background:transparent;border:none;color:var(--text-dim);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;">📁 Subir arquivo</button>
+              <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg);overflow-x:auto;">
+                <button type="button" class="b-cat-tab active" data-cat-tab="site" style="flex:1;min-width:130px;background:transparent;border:none;color:var(--text);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid var(--accent);font-weight:600;">🌐 Importar do site</button>
+                <button type="button" class="b-cat-tab" data-cat-tab="editor" style="flex:1;min-width:120px;background:transparent;border:none;color:var(--text-dim);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;">📝 Editor visual</button>
+                <button type="button" class="b-cat-tab" data-cat-tab="paste" style="flex:1;min-width:120px;background:transparent;border:none;color:var(--text-dim);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;">📋 Colar do Excel</button>
+                <button type="button" class="b-cat-tab" data-cat-tab="upload" style="flex:1;min-width:120px;background:transparent;border:none;color:var(--text-dim);padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;">📁 Subir arquivo</button>
+              </div>
+
+              <!-- Tab 0: Importar do site (URL) -->
+              <div id="b-cat-pane-site" class="b-cat-pane" style="padding:14px;">
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+                  ✨ <strong>O jeito mais rápido:</strong> cola o link do seu site e a IA extrai tudo automaticamente. Funciona melhor com a página de listagem (ex: <code>/imoveis</code>, <code>/produtos</code>).
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;">
+                  <input type="url" id="b-catalog-site-url" placeholder="https://minhaimobiliaria.com.br/imoveis" style="flex:1;min-width:240px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:13px;" />
+                  <button type="button" id="b-catalog-site-extract" style="background:var(--accent);color:white;border:none;padding:10px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap;">✨ Extrair catálogo</button>
+                </div>
+                <div id="b-catalog-site-progress" style="display:none;margin-top:12px;padding:10px 14px;background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.3);border-radius:6px;font-size:12px;color:var(--text);"></div>
+                <div id="b-catalog-site-preview" style="display:none;margin-top:12px;"></div>
+                <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">
+                  Limite: até 30 itens por extração · 10s timeout · Sites com Cloudflare/anti-bot podem falhar (use as outras abas).
+                </div>
               </div>
 
               <!-- Tab 1: Editor visual (table) -->
-              <div id="b-cat-pane-editor" class="b-cat-pane" style="padding:14px;">
+              <div id="b-cat-pane-editor" class="b-cat-pane" style="padding:14px;display:none;">
                 <div style="overflow-x:auto;">
                   <table id="b-catalog-table" style="width:100%;border-collapse:collapse;font-size:12px;">
                     <thead>
@@ -566,9 +583,10 @@ Casa 3 quartos	2500	Mooca	Quintal grande
 
             </div>
             <div class="hint" style="margin-top:8px;">
-              <strong>📝 Editor visual</strong>: adiciona/edita item por item.
-              <strong>📋 Colar</strong>: copia do Excel/Sheets, cola aqui.
-              <strong>📁 Arquivo</strong>: sobe CSV/JSON.<br>
+              <strong>🌐 Site</strong>: cola a URL e a IA extrai (mais rápido).
+              <strong>📝 Editor</strong>: item por item.
+              <strong>📋 Colar</strong>: do Excel/Sheets.
+              <strong>📁 Arquivo</strong>: CSV/JSON.<br>
               O agente usa o catálogo via tool <code>search_catalog</code> e <strong>nunca inventa</strong> item que não esteja aqui.
             </div>
           </div>
@@ -3233,6 +3251,157 @@ Casa 3 quartos	2500	Mooca	Quintal grande
         }
       }
 
+      // Site import: cola URL → backend extrai (JSON-LD ou Gemini) → mostra preview → user salva.
+      // Two-step on purpose: avoid clobbering an existing catalog by accident.
+      let pendingSiteItems = null;
+
+      async function importCatalogFromSite() {
+        const urlInput = document.getElementById('b-catalog-site-url');
+        const progressEl = document.getElementById('b-catalog-site-progress');
+        const previewEl = document.getElementById('b-catalog-site-preview');
+        const btn = document.getElementById('b-catalog-site-extract');
+        const url = (urlInput && urlInput.value || '').trim();
+        if (!url) { showSiteProgress('Cola a URL primeiro.', 'err'); return; }
+        if (!editingAgentId) { showSiteProgress('Salva o agente antes (campo Nome/Slug acima).', 'err'); return; }
+
+        previewEl.style.display = 'none';
+        previewEl.innerHTML = '';
+        pendingSiteItems = null;
+        btn.disabled = true; btn.textContent = '⏳ Lendo site…';
+        showSiteProgress('Acessando o site e procurando produtos/imóveis…', 'info');
+
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (KEY) headers['Authorization'] = 'Bearer ' + KEY;
+          const r = await fetch(BASE + '/v1/agents/' + editingAgentId + '/catalog/import-url', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ url, save: false }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            const hint = data.message || 'Falha ao extrair.';
+            const warns = (data.warnings || []).join(' · ');
+            showSiteProgress(escapeHtml(hint) + (warns ? '<br/><span style="opacity:0.7">' + escapeHtml(warns) + '</span>' : ''), 'err');
+            return;
+          }
+          const items = Array.isArray(data.items) ? data.items : [];
+          if (items.length === 0) {
+            showSiteProgress('Nenhum item encontrado.', 'err');
+            return;
+          }
+          pendingSiteItems = items;
+          const sourceLabel = data.source === 'jsonld' ? 'dados estruturados (rápido + exato)'
+            : data.source === 'llm' ? 'IA lendo o texto da página'
+            : data.source === 'mixed' ? 'estruturados + IA'
+            : data.source;
+          showSiteProgress(
+            '✅ Achei <strong>' + items.length + ' itens</strong> via ' + escapeHtml(sourceLabel) +
+            (data.page_title ? ' · <span style="opacity:0.7">' + escapeHtml(data.page_title) + '</span>' : ''),
+            'ok'
+          );
+          renderSitePreview(items);
+        } catch (e) {
+          showSiteProgress('Falha de rede: ' + escapeHtml(e.message || String(e)), 'err');
+        } finally {
+          btn.disabled = false; btn.textContent = '✨ Extrair catálogo';
+        }
+      }
+
+      function showSiteProgress(html, kind) {
+        const el = document.getElementById('b-catalog-site-progress');
+        if (!el) return;
+        el.style.display = '';
+        const colors = {
+          info: { bg: 'rgba(124,92,255,0.08)', border: 'rgba(124,92,255,0.3)' },
+          ok:   { bg: 'rgba(46,204,113,0.10)', border: 'rgba(46,204,113,0.4)' },
+          err:  { bg: 'rgba(255,95,87,0.10)',  border: 'rgba(255,95,87,0.4)' },
+        };
+        const c = colors[kind] || colors.info;
+        el.style.background = c.bg;
+        el.style.borderColor = c.border;
+        el.innerHTML = html;
+      }
+
+      function renderSitePreview(items) {
+        const el = document.getElementById('b-catalog-site-preview');
+        if (!el) return;
+        const rows = items.slice(0, 10).map((it) => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px 8px;font-weight:500;">${escapeHtml(it.name || '')}</td>
+            <td style="padding:6px 8px;color:var(--text-dim);">${it.price !== undefined && it.price !== null ? 'R$ ' + Number(it.price).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</td>
+            <td style="padding:6px 8px;color:var(--text-dim);">${escapeHtml(it.region || '—')}</td>
+            <td style="padding:6px 8px;color:var(--text-muted);font-size:11px;">${escapeHtml((it.description || '').slice(0, 80))}${it.description && it.description.length > 80 ? '…' : ''}</td>
+          </tr>
+        `).join('');
+        const more = items.length > 10 ? `<div style="text-align:center;padding:8px;color:var(--text-muted);font-size:11px;">… e mais ${items.length - 10} itens</div>` : '';
+        el.innerHTML = `
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);">
+            <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card);font-size:12px;color:var(--text);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span>📋 <strong>${items.length} itens</strong> prontos pra importar</span>
+              <div style="display:flex;gap:6px;">
+                <button type="button" id="b-site-edit" style="background:var(--bg-elev);color:var(--text);border:1px solid var(--border);padding:6px 12px;border-radius:5px;font-size:11px;cursor:pointer;">✏️ Revisar antes</button>
+                <button type="button" id="b-site-save" style="background:var(--accent);color:white;border:none;padding:6px 14px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">💾 Salvar tudo</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto;max-height:300px;overflow-y:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead style="position:sticky;top:0;background:var(--bg-card);">
+                  <tr><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Nome</th><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Preço</th><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Região</th><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Descrição</th></tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+              ${more}
+            </div>
+          </div>
+        `;
+        el.style.display = '';
+        document.getElementById('b-site-save').addEventListener('click', saveSiteImport);
+        document.getElementById('b-site-edit').addEventListener('click', () => {
+          // Move the extracted items into the editor tab so the owner
+          // can tweak before saving — common for LLM-extracted content
+          // where prices/descriptions sometimes need cleanup.
+          if (!pendingSiteItems) return;
+          catalogItems = pendingSiteItems.map(normalizeItem);
+          renderCatalogHeader({});
+          renderCatalogTable();
+          switchCatalogTab('editor');
+          showCatalogStatus('Itens carregados no editor — revise e clique em 💾 Salvar catálogo.', 'ok');
+        });
+      }
+
+      async function saveSiteImport() {
+        if (!pendingSiteItems || !pendingSiteItems.length || !editingAgentId) return;
+        const btn = document.getElementById('b-site-save');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Salvando…'; }
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (KEY) headers['Authorization'] = 'Bearer ' + KEY;
+          const r = await fetch(BASE + '/v1/agents/' + editingAgentId + '/catalog/upload', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ items: pendingSiteItems }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            showSiteProgress('Falha ao salvar: ' + escapeHtml(data.message || r.statusText), 'err');
+            if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar tudo'; }
+            return;
+          }
+          showSiteProgress('✅ <strong>' + data.item_count + ' itens salvos!</strong> O agente já está usando o catálogo.', 'ok');
+          pendingSiteItems = null;
+          loadCatalogState(editingAgentId);
+          // Hide preview after save to make state crystal-clear
+          setTimeout(() => {
+            const previewEl = document.getElementById('b-catalog-site-preview');
+            if (previewEl) { previewEl.style.display = 'none'; previewEl.innerHTML = ''; }
+          }, 2500);
+        } catch (e) {
+          showSiteProgress('Falha de rede ao salvar: ' + escapeHtml(e.message || String(e)), 'err');
+          if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar tudo'; }
+        }
+      }
+
       function switchCatalogTab(name) {
         document.querySelectorAll('.b-cat-tab').forEach((btn) => {
           const active = btn.dataset.catTab === name;
@@ -3278,6 +3447,14 @@ Casa 3 quartos	2500	Mooca	Quintal grande
         });
         const saveEditorBtn = document.getElementById('b-catalog-save-editor');
         if (saveEditorBtn) saveEditorBtn.addEventListener('click', saveEditorCatalog);
+
+        // Site import tab
+        const siteBtn = document.getElementById('b-catalog-site-extract');
+        const siteUrl = document.getElementById('b-catalog-site-url');
+        if (siteBtn) siteBtn.addEventListener('click', () => importCatalogFromSite());
+        if (siteUrl) siteUrl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); importCatalogFromSite(); }
+        });
 
         // Paste tab
         const pasteSaveBtn = document.getElementById('b-catalog-paste-save');
