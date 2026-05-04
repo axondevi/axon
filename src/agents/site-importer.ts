@@ -524,6 +524,30 @@ function extractTitle(html: string): string | undefined {
 }
 
 /**
+ * Best-effort business name from a raw page title. Strips common SEO
+ * suffixes ("| Site Name", " - Categoria") and prefers the segment
+ * with a known business word ("Imobiliária", "Loja", etc) when
+ * present. Falls back to the first segment.
+ */
+function nameFromTitle(title: string | undefined): string | undefined {
+  if (!title) return undefined;
+  const cleaned = title.replace(/\s+/g, ' ').trim();
+  // Split on common separators used by CMS title templates.
+  const segments = cleaned.split(/\s+[|·–—:>]\s+|\s+-\s+/g).map((s) => s.trim()).filter(Boolean);
+  if (segments.length === 0) return undefined;
+  const BUSINESS_WORDS =
+    /\b(imobiliária|imobiliaria|imóveis|imoveis|loja|store|concessionária|concessionaria|auto|veículos|veiculos|carros|restaurante|clínica|clinica|consultório|consultorio|salão|salao|estética|estetica|advocacia|escritório|escritorio|empresa|hotel|pousada|pizzaria|padaria|farmácia|farmacia|petshop|pet shop|academia|escola|colégio|colegio)\b/i;
+  // Prefer the segment that mentions a business word — usually it's the
+  // brand part, not the page topic.
+  const branded = segments.find((s) => BUSINESS_WORDS.test(s));
+  let pick = branded || segments[0];
+  // Strip leading "Bem-vindo a", "Página inicial -", noise prefixes.
+  pick = pick.replace(/^(bem[-\s]?vindo[s]?\s+a[oà]?\s+|home\s*[-:]\s*|página\s+inicial\s*[-:]\s*)/i, '').trim();
+  // 60 chars is a sane brand length; longer = probably a sentence.
+  return pick.length > 60 ? undefined : pick;
+}
+
+/**
  * Strip scripts/styles/comments/svg, collapse whitespace, drop nav/footer
  * heuristically. We want what a customer would actually read on the page:
  * product/listing names, prices, brief descriptions. Keeps under ~12k chars
@@ -768,6 +792,14 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
   let business = jsonldBusiness;
   business = mergeBusiness(business, extractMetaBusiness(html, url));
   business = extractContactsFromHtml(html, business);
+  // Last-resort name fallback from <title> tag — many small business
+  // sites (WordPress, Wix templates) skip JSON-LD Organization but
+  // their page title is "Imobiliária X" / "Loja Y" / etc. Without
+  // this, the rename pill never appears for those owners.
+  if (!business.name) {
+    const fromTitle = nameFromTitle(pageTitle);
+    if (fromTitle) business.name = fromTitle;
+  }
   const businessInfoText = formatBusinessInfo(business, pageTitle);
 
   if (jsonldItems.length >= 3) {
