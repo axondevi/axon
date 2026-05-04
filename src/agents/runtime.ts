@@ -778,6 +778,29 @@ const MAX_TOOL_RESULT_CHARS = 6000;
 const TYPICAL_LLM_TURN_COST_MICRO = 1500n;  // ~$0.0015
 
 /**
+ * Per-turn LLM debit — every non-cached agent reply takes this much
+ * from the owner's wallet. Tools are billed separately on top. Default
+ * is 1500 micro ($0.0015), overridable via env LLM_TURN_COST_MICRO so
+ * the operator can dial it up/down without a redeploy.
+ *
+ * Why per-turn billing exists: subscription is cheap monthly + good
+ * % markup on APIs. Without per-turn, conversation traffic is free
+ * to the platform — owner's wallet only depletes when an actual
+ * upstream tool fires. With per-turn, every reply contributes, so
+ * the math closes even on a chatty agent that doesn't call tools.
+ */
+function getLlmTurnCostMicro(): bigint {
+  const raw = process.env.LLM_TURN_COST_MICRO;
+  if (!raw) return TYPICAL_LLM_TURN_COST_MICRO;
+  try {
+    const n = BigInt(raw);
+    return n >= 0n ? n : TYPICAL_LLM_TURN_COST_MICRO;
+  } catch {
+    return TYPICAL_LLM_TURN_COST_MICRO;
+  }
+}
+
+/**
  * Run the agent loop server-side. Caller has already loaded the agent +
  * checked auth/budget/tier — this function focuses purely on the LLM
  * conversation + tool execution.
@@ -967,6 +990,44 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
     if (tcs.length === 0) {
       const content = String(msg.content ?? '');
 
+      // ─── Per-turn LLM debit ────────────────────────────────────
+      // Charge the owner's wallet for the conversation itself, not
+      // just the tools that fired during it. This is the platform's
+      // base cost recovery — without it, a chatty visitor agent that
+      // doesn't call tools never depletes the owner's wallet, and
+      // the math doesn't close. Skipped on cache hits (handled at
+      // the early-return path above).
+      const llmTurnCost = getLlmTurnCostMicro();
+      if (llmTurnCost > 0n && ownerId && content.length > 0) {
+        try {
+          const { debit } = await import('~/wallet/service');
+          await debit({
+            userId: ownerId,
+            amountMicro: llmTurnCost,
+            type: 'debit',
+            meta: {
+              purpose: 'agent_turn',
+              agent_id: agentId,
+              provider: lastProvider,
+              iterations: iter + 1,
+              tool_calls: toolCallsExecuted.length,
+            },
+          });
+          totalCostMicro += llmTurnCost;
+        } catch (err) {
+          // Insufficient funds shouldn't block the reply — the customer
+          // already got an answer. Log so the operator sees it; the
+          // owner will hit balance-low alerts via the wallet flow.
+          const { log } = await import('~/lib/logger');
+          log.warn('agent.turn_debit.failed', {
+            agent_id: agentId,
+            owner_id: ownerId,
+            cost_micro: llmTurnCost.toString(),
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       // ─── Store in cache for future deduplication ───────────────
       // Fire-and-forget: don't block the response on cache write.
       // Skip if no agentId, no cache enabled, no question to key on, or contextual convo.
@@ -978,7 +1039,7 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
         !looksContextual &&
         content.length > 10
       ) {
-        const turnCost = totalCostMicro + TYPICAL_LLM_TURN_COST_MICRO;
+        const turnCost = totalCostMicro;
         // void = explicit fire-and-forget
         void storeInCache(agentId, lastUser.content, content, turnCost).catch(() => {});
       }
