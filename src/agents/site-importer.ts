@@ -27,6 +27,19 @@ const USER_AGENT =
   'Mozilla/5.0 (compatible; AxonCatalogBot/1.0; +https://nexusinovation.com.br)';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
+export interface BusinessInfo {
+  name?: string;
+  description?: string;
+  phone?: string;
+  whatsapp?: string;
+  email?: string;
+  address?: string;
+  hours?: string;
+  website?: string;
+  social?: string[];
+  areas?: string[];
+}
+
 export interface ImportResult {
   ok: boolean;
   items: CatalogItem[];
@@ -35,6 +48,10 @@ export interface ImportResult {
   error?: string;
   /** Page title — surfaced so the operator can confirm we got the right site. */
   page_title?: string;
+  /** Structured business profile (for UI preview). */
+  business?: BusinessInfo;
+  /** PT-BR formatted text block, ready to drop into agents.business_info. */
+  business_info_text?: string;
 }
 
 function shortHash(s: string): string {
@@ -217,16 +234,267 @@ function jsonLdToItem(
   return item;
 }
 
-function extractJsonLd(html: string, baseUrl: string): CatalogItem[] {
+// schema.org types that represent the business itself (not a listing).
+// RealEstateAgent + AutomotiveBusiness are the most common for our
+// target verticals; LocalBusiness is the broad fallback.
+const BUSINESS_TYPES = new Set([
+  'Organization',
+  'LocalBusiness',
+  'Corporation',
+  'RealEstateAgent',
+  'AutomotiveBusiness',
+  'AutoDealer',
+  'AutoRepair',
+  'Store',
+  'Restaurant',
+  'FoodEstablishment',
+  'MedicalBusiness',
+  'MedicalOrganization',
+  'Dentist',
+  'BeautySalon',
+  'HairSalon',
+  'HealthAndBeautyBusiness',
+  'ProfessionalService',
+  'LegalService',
+  'FinancialService',
+  'TravelAgency',
+  'LodgingBusiness',
+  'EducationalOrganization',
+  'School',
+]);
+
+function addressFromAny(addr: unknown): string | undefined {
+  if (!addr) return undefined;
+  if (typeof addr === 'string') return strFromAny(addr);
+  if (typeof addr !== 'object') return undefined;
+  const a = addr as Record<string, unknown>;
+  const parts = [
+    strFromAny(a.streetAddress),
+    strFromAny(a.addressLocality),
+    strFromAny(a.addressRegion),
+    strFromAny(a.postalCode),
+  ].filter(Boolean);
+  return parts.length ? parts.join(', ') : undefined;
+}
+
+function hoursFromAny(raw: unknown): string | undefined {
+  // openingHours can be: string, string[], or array of OpeningHoursSpecification objects.
+  if (!raw) return undefined;
+  if (typeof raw === 'string') return strFromAny(raw);
+  if (Array.isArray(raw)) {
+    const lines = raw
+      .map((v) => {
+        if (typeof v === 'string') return v.trim();
+        if (v && typeof v === 'object') {
+          const o = v as Record<string, unknown>;
+          const days = Array.isArray(o.dayOfWeek)
+            ? o.dayOfWeek.map(String).map((d) => d.split('/').pop()).join(', ')
+            : strFromAny(o.dayOfWeek)?.split('/').pop();
+          const open = strFromAny(o.opens);
+          const close = strFromAny(o.closes);
+          if (days && open && close) return `${days}: ${open}–${close}`;
+        }
+        return '';
+      })
+      .filter(Boolean);
+    return lines.length ? lines.join(' · ').slice(0, 300) : undefined;
+  }
+  return undefined;
+}
+
+function jsonLdToBusiness(raw: Record<string, unknown>): BusinessInfo | null {
+  const t = raw['@type'];
+  const types = Array.isArray(t) ? t : t ? [t] : [];
+  if (!types.some((x) => BUSINESS_TYPES.has(String(x)))) return null;
+
+  const info: BusinessInfo = {};
+  const name = strFromAny(raw.name) || strFromAny((raw as { legalName?: unknown }).legalName);
+  if (name) info.name = name;
+
+  const description = strFromAny(raw.description, 800);
+  if (description) info.description = description;
+
+  const phone = strFromAny(raw.telephone) || strFromAny((raw as { phone?: unknown }).phone);
+  if (phone) info.phone = phone;
+
+  const email = strFromAny(raw.email);
+  if (email) info.email = email;
+
+  const address = addressFromAny(raw.address);
+  if (address) info.address = address;
+
+  const hours = hoursFromAny(raw.openingHours) || hoursFromAny((raw as { openingHoursSpecification?: unknown }).openingHoursSpecification);
+  if (hours) info.hours = hours;
+
+  const website = strFromAny(raw.url);
+  if (website) info.website = website;
+
+  // areaServed: string | array | Place {name}
+  const areaRaw = raw.areaServed;
+  const areas: string[] = [];
+  const pushArea = (v: unknown) => {
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (s) areas.push(s);
+    } else if (v && typeof v === 'object') {
+      const n = strFromAny((v as Record<string, unknown>).name);
+      if (n) areas.push(n);
+    }
+  };
+  if (Array.isArray(areaRaw)) areaRaw.forEach(pushArea);
+  else if (areaRaw) pushArea(areaRaw);
+  if (areas.length) info.areas = areas.slice(0, 8);
+
+  // sameAs is the schema.org convention for social profiles
+  const sameAs = (raw as { sameAs?: unknown }).sameAs;
+  if (Array.isArray(sameAs)) {
+    const social = sameAs
+      .map((s) => strFromAny(s))
+      .filter((s): s is string => !!s && /^https?:\/\//i.test(s))
+      .slice(0, 6);
+    if (social.length) info.social = social;
+  } else if (typeof sameAs === 'string' && /^https?:\/\//i.test(sameAs)) {
+    info.social = [sameAs];
+  }
+
+  return Object.keys(info).length ? info : null;
+}
+
+/** Merge — keep first non-empty value for each field. */
+function mergeBusiness(into: BusinessInfo, from: BusinessInfo): BusinessInfo {
+  const out: BusinessInfo = { ...into };
+  for (const k of Object.keys(from) as (keyof BusinessInfo)[]) {
+    if (out[k] === undefined || (Array.isArray(out[k]) && (out[k] as unknown[]).length === 0)) {
+      // @ts-expect-error widened union write
+      out[k] = from[k];
+    }
+  }
+  return out;
+}
+
+function extractMetaBusiness(html: string, baseUrl: string): BusinessInfo {
+  // Backup pass: og:* and standard <meta> tags. Useful when the site
+  // has no JSON-LD Organization block but ships basic OpenGraph for
+  // social previews — virtually every modern site does.
+  const info: BusinessInfo = {};
+  const meta = (key: string): string | undefined => {
+    const re = new RegExp(
+      `<meta[^>]+(?:property|name)=["']${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*content=["']([^"']+)["']`,
+      'i',
+    );
+    const m = html.match(re);
+    if (m) return m[1].trim();
+    // Reverse attribute order
+    const re2 = new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`,
+      'i',
+    );
+    const m2 = html.match(re2);
+    return m2 ? m2[1].trim() : undefined;
+  };
+  const name = meta('og:site_name') || meta('application-name');
+  if (name) info.name = name;
+  const description = meta('og:description') || meta('description');
+  if (description) info.description = description.slice(0, 800);
+  // og: doesn't standardize phone but some sites use business:contact_data:phone_number
+  const phone = meta('business:contact_data:phone_number') || meta('og:phone_number');
+  if (phone) info.phone = phone;
+  const email = meta('business:contact_data:email');
+  if (email) info.email = email;
+  // Compose address from business:contact_data:* if present
+  const street = meta('business:contact_data:street_address');
+  const city = meta('business:contact_data:locality');
+  const region = meta('business:contact_data:region');
+  const addrParts = [street, city, region].filter(Boolean);
+  if (addrParts.length) info.address = addrParts.join(', ');
+  // og:url as canonical website
+  const url = meta('og:url');
+  if (url) {
+    try {
+      info.website = new URL(url, baseUrl).toString();
+    } catch {
+      /* ignore */
+    }
+  }
+  return info;
+}
+
+const SOCIAL_PATTERNS: Array<{ re: RegExp; label: string }> = [
+  { re: /(?:wa\.me|api\.whatsapp\.com\/send|whatsapp\.com\/[+\d])[^"'\s<>]*/gi, label: 'whatsapp' },
+  { re: /https?:\/\/(?:www\.)?instagram\.com\/[^"'\s<>?#]+/gi, label: 'instagram' },
+  { re: /https?:\/\/(?:www\.)?facebook\.com\/[^"'\s<>?#]+/gi, label: 'facebook' },
+];
+
+function extractContactsFromHtml(html: string, info: BusinessInfo): BusinessInfo {
+  // Phone fallback: scan first 30k of HTML for BR phone patterns. Conservative
+  // regex — only matches with explicit (DDD) or +55 prefixes to avoid grabbing
+  // arbitrary numbers like prices or zipcodes.
+  const out: BusinessInfo = { ...info };
+  const head = html.slice(0, 30_000);
+  if (!out.phone) {
+    const m = head.match(/(?:\+?55\s?)?\(?\d{2}\)?\s?9?\s?\d{4}[-\s]?\d{4}/);
+    if (m) out.phone = m[0].trim();
+  }
+  if (!out.email) {
+    // Prefer mailto: links — they're explicit. Skip generic noreply addresses.
+    const m = head.match(/mailto:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/);
+    if (m && !/no[-_]?reply/i.test(m[1])) out.email = m[1];
+  }
+  // Social: dedup by host+path
+  if (!out.social || out.social.length === 0) {
+    const found = new Set<string>();
+    for (const { re } of SOCIAL_PATTERNS) {
+      let mm: RegExpExecArray | null;
+      const localRe = new RegExp(re.source, re.flags);
+      while ((mm = localRe.exec(html)) !== null && found.size < 6) {
+        const url = mm[0].replace(/['"<>]+$/, '');
+        // Strip common share URLs (intent, tracker)
+        if (/sharer|intent\/tweet|share=true/i.test(url)) continue;
+        found.add(url);
+      }
+    }
+    // wa.me numbers — promote to dedicated whatsapp field
+    for (const url of found) {
+      if (/wa\.me|api\.whatsapp/i.test(url) && !out.whatsapp) {
+        out.whatsapp = url;
+      }
+    }
+    const social = [...found].filter((u) => !/wa\.me|api\.whatsapp/i.test(u));
+    if (social.length) out.social = social;
+  }
+  return out;
+}
+
+export function formatBusinessInfo(info: BusinessInfo, fallbackTitle?: string): string {
+  // Compose a PT-BR text block that fits agents.businessInfo. Order
+  // mirrors how a customer-facing rep would introduce the business.
+  const lines: string[] = [];
+  const name = info.name || fallbackTitle;
+  if (name) lines.push(`Nome: ${name}`);
+  if (info.description) lines.push(`Sobre: ${info.description}`);
+  if (info.address) lines.push(`Endereço: ${info.address}`);
+  if (info.areas && info.areas.length) lines.push(`Atende: ${info.areas.join(', ')}`);
+  if (info.hours) lines.push(`Horário: ${info.hours}`);
+  if (info.phone) lines.push(`Telefone: ${info.phone}`);
+  if (info.whatsapp) lines.push(`WhatsApp: ${info.whatsapp}`);
+  if (info.email) lines.push(`E-mail: ${info.email}`);
+  if (info.website) lines.push(`Site: ${info.website}`);
+  if (info.social && info.social.length) lines.push(`Redes: ${info.social.join(' · ')}`);
+  return lines.join('\n').slice(0, 4000);
+}
+
+function extractFromJsonLd(html: string, baseUrl: string): {
+  items: CatalogItem[];
+  business: BusinessInfo;
+} {
   const items: CatalogItem[] = [];
-  const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   const seen = new Set<string>();
+  let business: BusinessInfo = {};
+  const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
     let json: unknown;
     try {
-      // Some sites embed multiple JSON objects separated by commas — wrap
-      // in array if the literal opens with { and contains }, { (rare).
       json = JSON.parse(m[1].trim());
     } catch {
       continue;
@@ -238,12 +506,16 @@ function extractJsonLd(html: string, baseUrl: string): CatalogItem[] {
         if (!seen.has(key)) {
           seen.add(key);
           items.push(item);
-          if (items.length >= MAX_ITEMS) return items;
+          if (items.length >= MAX_ITEMS) break;
         }
+        continue;
       }
+      const biz = jsonLdToBusiness(obj);
+      if (biz) business = mergeBusiness(business, biz);
     }
+    if (items.length >= MAX_ITEMS) break;
   }
-  return items;
+  return { items, business };
 }
 
 function extractTitle(html: string): string | undefined {
@@ -489,16 +761,29 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
 
   const warnings: string[] = [];
 
-  // Pass 1: structured data
-  const jsonldItems = extractJsonLd(html, url);
+  // Pass 1: structured data — collects items AND business profile in
+  // one HTML walk. Business info is best-effort; we always try to fill
+  // it from meta + heuristics even if items came back empty.
+  const { items: jsonldItems, business: jsonldBusiness } = extractFromJsonLd(html, url);
+  let business = jsonldBusiness;
+  business = mergeBusiness(business, extractMetaBusiness(html, url));
+  business = extractContactsFromHtml(html, business);
+  const businessInfoText = formatBusinessInfo(business, pageTitle);
+
   if (jsonldItems.length >= 3) {
-    log.info('site-importer.jsonld_hit', { url, items: jsonldItems.length });
+    log.info('site-importer.jsonld_hit', {
+      url,
+      items: jsonldItems.length,
+      business_fields: Object.keys(business).length,
+    });
     return {
       ok: true,
       items: jsonldItems.slice(0, MAX_ITEMS),
       source: 'jsonld',
       warnings,
       page_title: pageTitle,
+      business,
+      business_info_text: businessInfoText || undefined,
     };
   }
 
@@ -513,6 +798,8 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
       error:
         'Página muito vazia — provavelmente carrega via JavaScript que o importador não executa. Tente uma URL específica de listagem.',
       page_title: pageTitle,
+      business,
+      business_info_text: businessInfoText || undefined,
     };
   }
   const llm = await llmExtract(visibleText, url, pageTitle);
@@ -531,6 +818,8 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
   }
 
   if (merged.length === 0) {
+    // Even with no items, hand back business info if we found any —
+    // owner can still benefit from auto-filled name/phone/address.
     return {
       ok: false,
       items: [],
@@ -539,6 +828,8 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
       error:
         'Não consegui extrair itens. Tente colar a URL da página de listagem (ex: /imoveis, /carros, /produtos) em vez da home.',
       page_title: pageTitle,
+      business,
+      business_info_text: businessInfoText || undefined,
     };
   }
 
@@ -547,6 +838,7 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
     jsonld: jsonldItems.length,
     llm: llm.items.length,
     final: merged.length,
+    business_fields: Object.keys(business).length,
   });
   return {
     ok: true,
@@ -554,5 +846,7 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
     source: jsonldItems.length && llm.items.length ? 'mixed' : jsonldItems.length ? 'jsonld' : 'llm',
     warnings,
     page_title: pageTitle,
+    business,
+    business_info_text: businessInfoText || undefined,
   };
 }

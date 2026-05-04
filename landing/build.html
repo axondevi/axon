@@ -3254,6 +3254,8 @@ Casa 3 quartos	2500	Mooca	Quintal grande
       // Site import: cola URL → backend extrai (JSON-LD ou Gemini) → mostra preview → user salva.
       // Two-step on purpose: avoid clobbering an existing catalog by accident.
       let pendingSiteItems = null;
+      let pendingSiteBusiness = null;     // raw structured fields (for preview card)
+      let pendingSiteBusinessText = null; // PT-BR formatted text (for textarea)
 
       async function importCatalogFromSite() {
         const urlInput = document.getElementById('b-catalog-site-url');
@@ -3267,8 +3269,10 @@ Casa 3 quartos	2500	Mooca	Quintal grande
         previewEl.style.display = 'none';
         previewEl.innerHTML = '';
         pendingSiteItems = null;
+        pendingSiteBusiness = null;
+        pendingSiteBusinessText = null;
         btn.disabled = true; btn.textContent = '⏳ Lendo site…';
-        showSiteProgress('Acessando o site e procurando produtos/imóveis…', 'info');
+        showSiteProgress('Acessando o site e procurando produtos/imóveis + dados da empresa…', 'info');
 
         try {
           const headers = { 'Content-Type': 'application/json' };
@@ -3291,12 +3295,16 @@ Casa 3 quartos	2500	Mooca	Quintal grande
             return;
           }
           pendingSiteItems = items;
+          pendingSiteBusiness = data.business || null;
+          pendingSiteBusinessText = data.business_info_text || null;
           const sourceLabel = data.source === 'jsonld' ? 'dados estruturados (rápido + exato)'
             : data.source === 'llm' ? 'IA lendo o texto da página'
             : data.source === 'mixed' ? 'estruturados + IA'
             : data.source;
+          const bizCount = data.business ? Object.keys(data.business).filter((k) => data.business[k] && (!Array.isArray(data.business[k]) || data.business[k].length)).length : 0;
+          const bizPart = bizCount ? ' + <strong>' + bizCount + ' dado(s) da empresa</strong>' : '';
           showSiteProgress(
-            '✅ Achei <strong>' + items.length + ' itens</strong> via ' + escapeHtml(sourceLabel) +
+            '✅ Achei <strong>' + items.length + ' itens</strong>' + bizPart + ' via ' + escapeHtml(sourceLabel) +
             (data.page_title ? ' · <span style="opacity:0.7">' + escapeHtml(data.page_title) + '</span>' : ''),
             'ok'
           );
@@ -3323,6 +3331,41 @@ Casa 3 quartos	2500	Mooca	Quintal grande
         el.innerHTML = html;
       }
 
+      function renderBusinessCard(biz) {
+        // Show only the populated fields — empty fields would just look like
+        // we failed to detect them when the site simply didn't expose them.
+        if (!biz || typeof biz !== 'object') return '';
+        const rows = [];
+        const push = (label, value, opts) => {
+          if (!value) return;
+          const v = Array.isArray(value) ? value.join(' · ') : String(value);
+          rows.push(`<div style="padding:5px 0;display:flex;gap:8px;font-size:12px;"><span style="color:var(--text-muted);min-width:90px;">${label}</span><span style="color:var(--text);${opts && opts.mono ? 'font-family:JetBrains Mono,monospace;' : ''}">${escapeHtml(v)}</span></div>`);
+        };
+        push('🏢 Nome', biz.name);
+        push('📝 Sobre', (biz.description || '').slice(0, 200) + (biz.description && biz.description.length > 200 ? '…' : ''));
+        push('📍 Endereço', biz.address);
+        push('🗺 Atende', biz.areas);
+        push('🕒 Horário', biz.hours);
+        push('📞 Telefone', biz.phone, { mono: true });
+        push('💬 WhatsApp', biz.whatsapp, { mono: true });
+        push('✉️ E-mail', biz.email, { mono: true });
+        push('🌐 Site', biz.website, { mono: true });
+        if (biz.social && biz.social.length) push('📲 Redes', biz.social.length + ' link(s)');
+        if (rows.length === 0) return '';
+        return `
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);margin-bottom:10px;">
+            <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(46,204,113,0.06);font-size:12px;color:var(--text);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span>🏢 <strong>${rows.length} dado(s) da empresa</strong> detectados — vão pro campo "Informações importantes"</span>
+              <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;color:var(--text-dim);">
+                <input type="checkbox" id="b-site-include-biz" checked style="margin:0;cursor:pointer;" />
+                Incluir no salvamento
+              </label>
+            </div>
+            <div style="padding:10px 14px;">${rows.join('')}</div>
+          </div>
+        `;
+      }
+
       function renderSitePreview(items) {
         const el = document.getElementById('b-catalog-site-preview');
         if (!el) return;
@@ -3335,7 +3378,14 @@ Casa 3 quartos	2500	Mooca	Quintal grande
           </tr>
         `).join('');
         const more = items.length > 10 ? `<div style="text-align:center;padding:8px;color:var(--text-muted);font-size:11px;">… e mais ${items.length - 10} itens</div>` : '';
+        const businessCard = renderBusinessCard(pendingSiteBusiness);
+        const existingBiz = (document.getElementById('b-business')?.value || '').trim();
+        const bizWarn = (businessCard && existingBiz)
+          ? '<div style="margin-bottom:8px;padding:8px 12px;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.3);border-radius:6px;font-size:11px;color:var(--text);">⚠️ Já existe info no campo "Informações importantes" — vai ser <strong>substituída</strong> se você marcar a checkbox acima.</div>'
+          : '';
         el.innerHTML = `
+          ${businessCard}
+          ${bizWarn}
           <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);">
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card);font-size:12px;color:var(--text);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <span>📋 <strong>${items.length} itens</strong> prontos pra importar</span>
@@ -3365,18 +3415,30 @@ Casa 3 quartos	2500	Mooca	Quintal grande
           catalogItems = pendingSiteItems.map(normalizeItem);
           renderCatalogHeader({});
           renderCatalogTable();
+          // Also drop business info into the textarea so the owner can
+          // clean it up alongside the items.
+          const includeBizEl = document.getElementById('b-site-include-biz');
+          if (pendingSiteBusinessText && (!includeBizEl || includeBizEl.checked)) {
+            const ta = document.getElementById('b-business');
+            if (ta) ta.value = pendingSiteBusinessText;
+            if (typeof formState !== 'undefined') formState.business_info = pendingSiteBusinessText;
+          }
           switchCatalogTab('editor');
-          showCatalogStatus('Itens carregados no editor — revise e clique em 💾 Salvar catálogo.', 'ok');
+          showCatalogStatus('Itens + info da empresa carregados no editor — revise e clique em 💾 Salvar catálogo. Não esqueça de salvar o agente também!', 'ok');
         });
       }
 
       async function saveSiteImport() {
         if (!pendingSiteItems || !pendingSiteItems.length || !editingAgentId) return;
         const btn = document.getElementById('b-site-save');
+        const includeBizEl = document.getElementById('b-site-include-biz');
+        const wantBiz = pendingSiteBusinessText && (!includeBizEl || includeBizEl.checked);
         if (btn) { btn.disabled = true; btn.textContent = '⏳ Salvando…'; }
         try {
           const headers = { 'Content-Type': 'application/json' };
           if (KEY) headers['Authorization'] = 'Bearer ' + KEY;
+          // Save catalog items first — this is the primary outcome the
+          // user expects from clicking the button.
           const r = await fetch(BASE + '/v1/agents/' + editingAgentId + '/catalog/upload', {
             method: 'POST',
             headers,
@@ -3384,12 +3446,34 @@ Casa 3 quartos	2500	Mooca	Quintal grande
           });
           const data = await r.json().catch(() => ({}));
           if (!r.ok) {
-            showSiteProgress('Falha ao salvar: ' + escapeHtml(data.message || r.statusText), 'err');
+            showSiteProgress('Falha ao salvar catálogo: ' + escapeHtml(data.message || r.statusText), 'err');
             if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar tudo'; }
             return;
           }
-          showSiteProgress('✅ <strong>' + data.item_count + ' itens salvos!</strong> O agente já está usando o catálogo.', 'ok');
+          // Then PATCH the agent with the business info text if the user
+          // opted in. Failure here is non-fatal — items already saved.
+          let bizSaved = false;
+          if (wantBiz) {
+            try {
+              const r2 = await fetch(BASE + '/v1/agents/' + editingAgentId, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({ business_info: pendingSiteBusinessText }),
+              });
+              if (r2.ok) {
+                bizSaved = true;
+                // Reflect in the live form so the textarea shows what was saved.
+                const ta = document.getElementById('b-business');
+                if (ta) ta.value = pendingSiteBusinessText;
+                if (typeof formState !== 'undefined') formState.business_info = pendingSiteBusinessText;
+              }
+            } catch (_) { /* non-fatal */ }
+          }
+          const bizMsg = wantBiz ? (bizSaved ? ' + dados da empresa' : ' (dados da empresa falharam, salva manual)') : '';
+          showSiteProgress('✅ <strong>' + data.item_count + ' itens salvos' + bizMsg + '!</strong> O agente já está usando.', 'ok');
           pendingSiteItems = null;
+          pendingSiteBusiness = null;
+          pendingSiteBusinessText = null;
           loadCatalogState(editingAgentId);
           // Hide preview after save to make state crystal-clear
           setTimeout(() => {

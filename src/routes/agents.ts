@@ -1073,6 +1073,7 @@ app.post('/:id/catalog/import-url', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     url?: string;
     save?: boolean;
+    save_business?: boolean;
   };
   const url = String(body.url || '').trim();
   if (!url) {
@@ -1082,6 +1083,8 @@ app.post('/:id/catalog/import-url', async (c) => {
   const { importCatalogFromUrl } = await import('~/agents/site-importer');
   const result = await importCatalogFromUrl(url);
 
+  // Even on item-extraction failure, return business info if we got any
+  // — owner still benefits from an auto-filled profile.
   if (!result.ok || result.items.length === 0) {
     return c.json(
       {
@@ -1090,18 +1093,31 @@ app.post('/:id/catalog/import-url', async (c) => {
         warnings: result.warnings,
         page_title: result.page_title,
         source: result.source,
+        business: result.business,
+        business_info_text: result.business_info_text,
       },
       400,
     );
   }
 
   if (body.save) {
+    // Atomic write — catalog + business_info together when both
+    // present. If owner already has business_info, only overwrite
+    // when explicitly requested via save_business=true (default true
+    // for backwards-compat with the simpler {save:true} flow but the
+    // UI is smart enough to ask first).
+    const update: { catalog: unknown; updatedAt: Date; businessInfo?: string } = {
+      catalog: result.items as unknown as Record<string, unknown>,
+      updatedAt: new Date(),
+    };
+    const wantBiz = body.save_business !== false;
+    if (wantBiz && result.business_info_text) {
+      update.businessInfo = result.business_info_text.slice(0, 4000);
+    }
     await db
       .update(agents)
-      .set({
-        catalog: result.items as unknown as Record<string, unknown>,
-        updatedAt: new Date(),
-      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set(update as any)
       .where(eq(agents.id, a.id));
   }
 
@@ -1113,6 +1129,8 @@ app.post('/:id/catalog/import-url', async (c) => {
     source: result.source,
     page_title: result.page_title,
     warnings: result.warnings,
+    business: result.business,
+    business_info_text: result.business_info_text,
   });
 });
 
