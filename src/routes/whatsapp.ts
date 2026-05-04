@@ -1861,7 +1861,7 @@ export function splitReply(text: string): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
-  // Explicit separator path
+  // Explicit separator path — agent voluntarily split with `||`
   if (trimmed.includes('||')) {
     const parts = trimmed
       .split(/\|\|+/)
@@ -1870,15 +1870,35 @@ export function splitReply(text: string): string[] {
     return parts.slice(0, 4);
   }
 
-  // Auto-split long replies
-  if (trimmed.length > 180) {
-    // Match sentences ending in . ! ? followed by space or end
-    const sentences = trimmed.match(/[^.!?]+[.!?]+(?:\s+|$)/g);
+  // Auto-split long replies into natural bubbles. Previous behavior
+  // was split-into-two on the midpoint sentence; that left replies of
+  // 400+ chars as two 200-char walls, which the user flagged as
+  // "muito longa, não é separada". Now: greedy pack ~120 chars per
+  // bubble, snapping at sentence boundaries so we never break mid-
+  // thought. Cap at 4 bubbles total — anything longer suggests a
+  // rambling LLM response that should be tuned at the prompt instead.
+  const TARGET_BUBBLE_CHARS = 120;
+  const MAX_BUBBLES = 4;
+
+  if (trimmed.length > 160) {
+    const sentences = trimmed.match(/[^.!?\n]+[.!?\n]+(?:\s+|$)|[^.!?\n]+$/g);
     if (sentences && sentences.length >= 2) {
-      const mid = Math.ceil(sentences.length / 2);
-      const a = sentences.slice(0, mid).join('').trim();
-      const b = sentences.slice(mid).join('').trim();
-      return [a, b].filter(Boolean);
+      const bubbles: string[] = [];
+      let current = '';
+      for (const s of sentences) {
+        const next = (current + s).trim();
+        if (current && next.length > TARGET_BUBBLE_CHARS) {
+          bubbles.push(current.trim());
+          current = s;
+        } else {
+          current = next;
+        }
+        if (bubbles.length >= MAX_BUBBLES - 1) break;
+      }
+      if (current.trim()) bubbles.push(current.trim());
+      // Only return the multi-bubble version if it actually helped —
+      // single-sentence walls fall back to the original text.
+      if (bubbles.length >= 2) return bubbles.slice(0, MAX_BUBBLES);
     }
   }
 
