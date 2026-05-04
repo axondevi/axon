@@ -27,7 +27,17 @@ export interface CatalogItem {
   price?: number;
   region?: string;
   description?: string;
+  /** First/cover photo. Kept separate from `images` for backwards-
+   *  compat with the original single-image schema. Always equals
+   *  images[0] when both exist. */
   image_url?: string;
+  /** Full photo gallery for the item (up to ~6 from detail pages).
+   *  Agent can pick which to send via send_listing_photo. */
+  images?: string[];
+  /** Detail page URL — what we deep-crawled to get the rich data.
+   *  Useful for "saber mais" links and for the search_catalog tool
+   *  to share the listing page itself. */
+  url?: string;
   /** Transaction kind for real-estate / multi-mode catalogs.
    *  'venda' = for sale, 'aluguel' = for rent. Optional — most
    *  pure-product catalogs (e-commerce, restaurants) won't set it. */

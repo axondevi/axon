@@ -632,7 +632,7 @@ async function llmExtract(
     '',
     'Regras:',
     '- Retorne APENAS um JSON array, sem markdown, sem explicação.',
-    '- Cada item tem: name (obrigatório), price (número em BRL ou null), region (string ou null), description (string curta, max 200 chars, ou null), image_url (string ou null), type ("venda" | "aluguel" | null).',
+    '- Cada item tem: name (obrigatório), price (número em BRL ou null), region (string ou null), description (string curta, max 200 chars, ou null), image_url (string ou null), images (array de strings com TODAS as URLs de foto desse item, ou []), url (link para página de detalhes do item, ou null), type ("venda" | "aluguel" | null).',
     '- Se a página NÃO listar itens (ex: é um blog, contato, sobre), retorne [].',
     '- Máximo 30 itens. Se houver mais, pegue os 30 primeiros.',
     '- price: extraia o valor numérico. "R$ 1.234,56" → 1234.56. "1.500/mês" → 1500. Sem moeda no JSON.',
@@ -717,15 +717,31 @@ async function llmExtract(
       if (description) item.description = description;
       const typeRaw = strFromAny(r.type);
       if (typeRaw === 'venda' || typeRaw === 'aluguel') item.type = typeRaw;
-      let image = strFromAny(r.image_url);
-      if (image && !/^https?:\/\//i.test(image)) {
-        try {
-          image = new URL(image, pageUrl).toString();
-        } catch {
-          image = undefined;
+      const resolveUrl = (raw: unknown): string | undefined => {
+        const s = strFromAny(raw);
+        if (!s) return undefined;
+        if (/^https?:\/\//i.test(s)) return s;
+        try { return new URL(s, pageUrl).toString(); } catch { return undefined; }
+      };
+      const image = resolveUrl(r.image_url);
+      if (image) item.image_url = image;
+      // Optional images array (deep-crawl detail pages return many).
+      const imagesRaw = (r as { images?: unknown }).images;
+      if (Array.isArray(imagesRaw)) {
+        const list = imagesRaw
+          .map(resolveUrl)
+          .filter((u): u is string => !!u && isListingImageUrl(u))
+          .slice(0, 6);
+        // Dedup + ensure cover photo (image_url) is first when present.
+        const dedup = Array.from(new Set(list));
+        if (item.image_url && !dedup.includes(item.image_url)) dedup.unshift(item.image_url);
+        if (dedup.length) {
+          item.images = dedup;
+          if (!item.image_url) item.image_url = dedup[0];
         }
       }
-      if (image) item.image_url = image;
+      const itemUrl = resolveUrl((r as { url?: unknown }).url);
+      if (itemUrl) item.url = itemUrl;
       items.push(item);
     }
     return { items, warnings };
@@ -736,6 +752,233 @@ async function llmExtract(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Find candidate detail-page URLs from a listing/index page. Heuristics:
+ *   - same origin only (don't crawl outbound links)
+ *   - URL path matches typical listing patterns (/imovel/, /produto/, /carro/, /id=)
+ *   - Skip pagination, filters, login/cart routes, mailto/tel/anchors
+ *   - Skip image and asset URLs
+ */
+function extractListingUrls(html: string, baseUrl: string, max = 20): string[] {
+  const base = new URL(baseUrl);
+  const out = new Set<string>();
+  // Common detail-page path tokens across verticals.
+  const LISTING_TOKENS =
+    /\/(imove(l|is)|imobiliari[ao]|propert(y|ies)|listing|anuncio|anuncios|produto|produtos|product|products|carro|carros|veiculo|veiculos|vehicle|vehicles|auto|moto|casa|apartamento|item|catalog|loja|loja-virtual|comprar|alugar|aluguel|venda|seminovos|usados|estoque)(\/|\?|-|_|=)/i;
+  // Numeric id-style fallback (e.g. /detail/12345, /imovel/12345.html)
+  const ID_TOKEN = /\/[a-z0-9-]*(\d{3,})(?:\.html?|\.php)?(?:\?|#|$)/i;
+  const SKIP =
+    /\/(login|cart|carrinho|checkout|cadastro|register|wp-(admin|login|content)|cdn-cgi|search|busca|filtro|page|pagina|tag|categoria|category|blog|sobre|contato|faq|sitemap|robots|favicon|atendimento|politica|termos)(\/|\?|$)/i;
+
+  const re = /<a\b[^>]+href=["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const href = m[1].trim();
+    if (!href || href.startsWith('#') || /^(mailto|tel|javascript):/i.test(href)) continue;
+    if (/\.(jpe?g|png|webp|gif|svg|css|js|pdf|zip|xml|json|ico|woff2?)(?:\?|#|$)/i.test(href)) continue;
+    let u: URL;
+    try { u = new URL(href, baseUrl); } catch { continue; }
+    if (u.origin !== base.origin) continue;
+    if (SKIP.test(u.pathname)) continue;
+    // Don't pull the page back to itself (would re-crawl what we already have)
+    if (u.href.replace(/[#?].*$/, '') === baseUrl.replace(/[#?].*$/, '')) continue;
+    if (LISTING_TOKENS.test(u.pathname) || ID_TOKEN.test(u.pathname)) {
+      // Strip URL fragments — same page in WhatsApp owner's view
+      u.hash = '';
+      out.add(u.toString());
+      if (out.size >= max) break;
+    }
+  }
+  return Array.from(out);
+}
+
+/** Fetch HTML with byte cap + timeout. Refactored from importCatalogFromUrl
+ *  so deep-crawl can reuse the exact same hardening (SSRF guard already
+ *  ran on the parent URL; detail URLs are same-origin so we trust them). */
+async function fetchHtmlBounded(
+  url: string,
+  timeoutMs: number,
+  maxBytes: number,
+): Promise<{ ok: true; html: string; title?: string } | { ok: false; error: string }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'user-agent': USER_AGENT,
+        accept: 'text/html,application/xhtml+xml',
+        'accept-language': 'pt-BR,pt;q=0.9,en;q=0.5',
+      },
+      signal: ctrl.signal,
+      redirect: 'follow',
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    const ctype = res.headers.get('content-type') || '';
+    if (!/html|xml/i.test(ctype)) return { ok: false, error: `not HTML (${ctype})` };
+    const reader = res.body?.getReader();
+    let html: string;
+    if (!reader) {
+      html = await res.text();
+    } else {
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      while (total < maxBytes) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        total += value.byteLength;
+      }
+      try { await reader.cancel(); } catch { /* ignore */ }
+      const buf = new Uint8Array(Math.min(total, maxBytes));
+      let off = 0;
+      for (const ch of chunks) {
+        const take = Math.min(ch.byteLength, buf.length - off);
+        buf.set(ch.subarray(0, take), off);
+        off += take;
+        if (off >= buf.length) break;
+      }
+      html = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+    }
+    return { ok: true, html, title: extractTitle(html) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * LLM extraction tuned for a single-listing detail page (one item, lots
+ * of detail). Different from llmExtract which expects a list page. Used
+ * by deepCrawl to enrich each item with full info + photo gallery.
+ */
+async function llmExtractDetailPage(
+  visibleText: string,
+  pageUrl: string,
+  pageTitle?: string,
+): Promise<CatalogItem | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  const model = process.env.GEMINI_EXTRACT_MODEL || 'gemini-2.5-flash-lite';
+  const prompt = [
+    'Você está lendo a PÁGINA DE DETALHES de UM ÚNICO item (um imóvel, carro, produto, serviço) no site. Extraia toda a informação relevante.',
+    `URL: ${pageUrl}`,
+    `Título: ${pageTitle || '(sem título)'}`,
+    '',
+    'Retorne APENAS um objeto JSON único (não array), com:',
+    '- name: nome/título do item (ex: "Casa 3 quartos no Itaim", "Honda Civic 2020").',
+    '- price: número em BRL (ou null se não tiver). "R$ 1.234,56" → 1234.56.',
+    '- type: "venda" | "aluguel" | null (detecte por palavras como "à venda", "aluguel", "/mês").',
+    '- region: bairro, cidade ou área de cobertura.',
+    '- description: descrição completa, até 600 chars (m², quartos, banheiros, vagas, amenidades, condição, etc).',
+    '- image_url: a foto de capa (a primeira do gallery).',
+    '- images: array com TODAS as URLs de fotos do item (cap 6). Use marcadores [IMG: <url>] que aparecem no texto. Use URLs EXATAS, não invente.',
+    '',
+    'Se a página NÃO é detalhe de um item (é blog, contato, listagem), retorne null.',
+    '',
+    'Texto da página:',
+    '"""',
+    visibleText,
+    '"""',
+  ].join('\n');
+
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 2048,
+      responseMimeType: 'application/json',
+    },
+  };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20_000);
+  try {
+    const res = await fetch(
+      `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let parsed: unknown;
+    try { parsed = JSON.parse(text); }
+    catch {
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch { return null; } }
+      else return null;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const r = parsed as Record<string, unknown>;
+    const name = strFromAny(r.name);
+    if (!name) return null;
+    const item: CatalogItem = { id: shortHash(name + ':' + pageUrl), name, url: pageUrl };
+    const price = priceFromAny(r.price);
+    if (price !== undefined) item.price = price;
+    const region = strFromAny(r.region);
+    if (region) item.region = region;
+    const description = strFromAny(r.description, 800);
+    if (description) item.description = description;
+    const typeRaw = strFromAny(r.type);
+    if (typeRaw === 'venda' || typeRaw === 'aluguel') item.type = typeRaw;
+    const resolve = (v: unknown): string | undefined => {
+      const s = strFromAny(v);
+      if (!s) return undefined;
+      if (/^https?:\/\//i.test(s)) return s;
+      try { return new URL(s, pageUrl).toString(); } catch { return undefined; }
+    };
+    const cover = resolve(r.image_url);
+    if (cover) item.image_url = cover;
+    if (Array.isArray(r.images)) {
+      const list = (r.images as unknown[])
+        .map(resolve)
+        .filter((u): u is string => !!u && isListingImageUrl(u))
+        .slice(0, 6);
+      const dedup = Array.from(new Set(list));
+      if (cover && !dedup.includes(cover)) dedup.unshift(cover);
+      if (dedup.length) {
+        item.images = dedup;
+        if (!item.image_url) item.image_url = dedup[0];
+      }
+    }
+    return item;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Run detail-page extractions in parallel chunks. Concurrency 5 keeps
+ * under most sites' soft rate-limits + Gemini's per-second cap, while
+ * still finishing 20 items in ~12s. Returns whatever extracted
+ * successfully — partial results are useful.
+ */
+async function deepCrawlDetailPages(
+  urls: string[],
+  concurrency = 5,
+): Promise<{ items: CatalogItem[]; failed: number }> {
+  const results: CatalogItem[] = [];
+  let failed = 0;
+  for (let i = 0; i < urls.length; i += concurrency) {
+    const batch = urls.slice(i, i + concurrency);
+    const batchResults = await Promise.all(
+      batch.map(async (u) => {
+        const fetched = await fetchHtmlBounded(u, 8_000, 600_000);
+        if (!fetched.ok) return null;
+        const text = htmlToVisibleText(fetched.html);
+        if (text.length < 100) return null;
+        return llmExtractDetailPage(text, u, fetched.title);
+      }),
+    );
+    for (const r of batchResults) {
+      if (r) results.push(r);
+      else failed++;
+    }
+  }
+  return { items: results, failed };
 }
 
 export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult> {
@@ -906,10 +1149,65 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
     };
   }
 
+  // ─── Deep crawl pass — fetch each item's detail page in parallel
+  // for richer data: full description (m², quartos, amenidades), photo
+  // gallery (vs single cover photo), exact transaction type, structured
+  // attributes the home/list page didn't surface. Capped at 20 items
+  // to fit in a single sync request (~12s with concurrency 5).
+  const detailUrls = extractListingUrls(html, url, 20);
+  let deepCount = 0;
+  if (detailUrls.length > 0) {
+    const t0 = Date.now();
+    const deep = await deepCrawlDetailPages(detailUrls, 5);
+    deepCount = deep.items.length;
+    log.info('site-importer.deep_crawl', {
+      attempted: detailUrls.length,
+      success: deep.items.length,
+      failed: deep.failed,
+      ms: Date.now() - t0,
+    });
+    if (deep.failed > 0) {
+      warnings.push(`Deep crawl: ${deep.failed} de ${detailUrls.length} páginas de detalhe falharam (timeout ou anti-bot).`);
+    }
+    // Merge strategy: deep-crawled items REPLACE list-page versions when
+    // their names overlap. Detail items are richer (full desc + gallery)
+    // so we always prefer them. Names that only appear on the list page
+    // stay as-is (best-effort partial coverage).
+    const byName = new Map<string, CatalogItem>();
+    for (const it of merged) byName.set(it.name.toLowerCase().slice(0, 50), it);
+    for (const it of deep.items) {
+      const key = it.name.toLowerCase().slice(0, 50);
+      const existing = byName.get(key);
+      if (existing) {
+        // Merge: keep best price/region from either, prefer detail's
+        // description + images + url + type.
+        byName.set(key, {
+          ...existing,
+          ...it,
+          price: it.price ?? existing.price,
+          region: it.region || existing.region,
+          // image_url: existing might already point at the cover photo
+          // from the list page; if detail has a gallery, use its first.
+          image_url: it.image_url || existing.image_url,
+          images: it.images && it.images.length ? it.images : existing.images,
+          type: it.type || existing.type,
+        });
+      } else {
+        // Detail item with name we didn't see on the list page — keep it.
+        byName.set(key, it);
+      }
+    }
+    // Re-cap at MAX_ITEMS in case we accumulated more.
+    const finalList = Array.from(byName.values()).slice(0, MAX_ITEMS);
+    merged.length = 0;
+    merged.push(...finalList);
+  }
+
   log.info('site-importer.success', {
     url,
     jsonld: jsonldItems.length,
     llm: llm.items.length,
+    deep: deepCount,
     final: merged.length,
     business_fields: Object.keys(business).length,
   });
