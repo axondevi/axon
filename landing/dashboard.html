@@ -401,25 +401,37 @@
         .deposit-hero .qr-img { width: 120px !important; height: 120px !important; }
         h1 { font-size: 22px; }
         h2 { font-size: 16px; }
+        /* Stack metrics vertically below 380px (handled separately).
+           Above 380px keep 2-col but bump padding so values don't crash. */
         .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
         .card { padding: 16px; }
-        .metric-value { font-size: 24px; }
+        .metric-value { font-size: 24px; word-break: break-all; }
         .metric-label { font-size: 11px; }
         .metric-sub { font-size: 11px; }
-        header { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
-        header nav { width: 100%; overflow-x: auto; flex-wrap: nowrap !important; padding-bottom: 4px; }
-        header nav a { white-space: nowrap; padding: 8px 10px !important; min-height: 36px; display: inline-flex; align-items: center; }
-        header > div:last-child { width: 100%; justify-content: space-between; }
-        .key-chip { font-size: 11px; padding: 6px 9px; }
+        /* Header: brand on its own line, nav scrolls horizontally
+           with momentum. Native iOS feel + no wall-of-chips wrap. */
+        header { padding: 10px 14px; flex-wrap: wrap; gap: 10px; }
+        .brand { font-size: 15px; }
+        header nav { width: 100%; overflow-x: auto; flex-wrap: nowrap !important; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+        header nav a { white-space: nowrap; padding: 8px 10px !important; min-height: 38px; display: inline-flex; align-items: center; font-size: 13px; }
+        header > div:last-child { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+        .key-chip { font-size: 11px; padding: 6px 9px; min-height: 32px; }
         .deposit-info .addr { flex-wrap: wrap; }
         .deposit-info code { font-size: 11px; word-break: break-all; }
-        .copy-btn { padding: 8px 14px; min-height: 36px; }
+        .copy-btn { padding: 8px 14px; min-height: 38px; }
+        /* Transactions table: scroll horizontally, pad rows for taps */
         table { font-size: 12px; }
-        th, td { padding: 8px 6px !important; }
-        .tx-row .mono { font-size: 11px; }
+        th, td { padding: 10px 8px !important; }
+        .tx-row .mono { font-size: 11px; word-break: break-all; }
+        /* Agent cards full-width with bigger touch targets */
+        .agent-row { flex-direction: column; align-items: stretch; gap: 12px; }
+        .agent-actions { flex-wrap: wrap; }
+        .agent-btn { flex: 1; min-width: 80px; min-height: 40px; }
       }
       @media (max-width: 380px) {
         .grid { grid-template-columns: 1fr; }
+        .container { padding: 16px 12px; }
+        .agent-actions { gap: 6px; }
       }
       .deposit-info .warning {
         font-size: 12px; color: #ff7a6f;
