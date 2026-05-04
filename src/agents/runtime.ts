@@ -859,12 +859,51 @@ export async function runAgent(opts: {
   ) {
     const cached = await checkCache(agentId, lastUser.content).catch(() => null);
     if (cached?.hit) {
+      // Cache hits ARE billed — they're pure margin for the operator
+      // (no upstream LLM cost, customer gets a real reply). Charged at
+      // the same rate as a regular turn by default; tune via env
+      // LLM_CACHE_HIT_COST_MICRO to discount cache turns separately
+      // if you want to advertise "cache custa menos" later.
+      const cacheCost = (() => {
+        const raw = process.env.LLM_CACHE_HIT_COST_MICRO;
+        if (raw) {
+          try { const n = BigInt(raw); if (n >= 0n) return n; } catch { /* fall through */ }
+        }
+        return getLlmTurnCostMicro();
+      })();
+      let actualBilledMicro = 0n;
+      if (cacheCost > 0n && ownerId) {
+        try {
+          const { debit } = await import('~/wallet/service');
+          await debit({
+            userId: ownerId,
+            amountMicro: cacheCost,
+            type: 'debit',
+            meta: {
+              purpose: 'agent_turn',
+              agent_id: agentId,
+              cache_hit: true,
+              cache_similarity: cached.similarity,
+            },
+          });
+          actualBilledMicro = cacheCost;
+        } catch (err) {
+          const { log } = await import('~/lib/logger');
+          log.warn('agent.turn_debit.failed', {
+            agent_id: agentId,
+            owner_id: ownerId,
+            cost_micro: cacheCost.toString(),
+            cache_hit: true,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
       return {
         content: cached.response,
         tool_calls_executed: [],
         iterations: 0,
         finish_reason: 'stop',
-        total_cost_usdc: '0.000000',
+        total_cost_usdc: (Number(actualBilledMicro) / 1_000_000).toFixed(6),
         cached: true,
         cache_similarity: cached.similarity,
         latency_ms: Date.now() - t0,
