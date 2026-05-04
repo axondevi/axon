@@ -1075,8 +1075,13 @@ async function processBufferedTurn(opts: {
     // injected RIGHT AFTER the role prompt so the LLM treats it as
     // ground truth when answering "qual o endereço?", "quanto custa?",
     // etc — instead of saying "não tenho essa informação".
+    // Business info injection. The "OVERRIDE" framing matters: the LLM
+    // sees its own past assistant turns in the conversation history and
+    // tends to perpetuate any name/address it said before — even if that
+    // was hallucinated before business_info got filled in. This block
+    // explicitly tells the model: trust this over your past messages.
     const businessBlock = (a.businessInfo && a.businessInfo.trim())
-      ? `\n\n## Informações do negócio (use estas como verdade ao responder o cliente)\n${a.businessInfo.trim()}`
+      ? `\n\n## ⚠️ DADOS REAIS DA EMPRESA (FONTE DA VERDADE)\nEstas informações são a verdade absoluta sobre o negócio. Se em mensagens passadas você disse outro nome, endereço ou telefone — IGNORA o que disse antes e usa SOMENTE estes dados agora. NUNCA invente nome de empresa, endereço, telefone ou horário fora desta lista.\n\n${a.businessInfo.trim()}`
       : '';
 
     // Catalog injection — preview of inventory the owner uploaded.
