@@ -3352,6 +3352,26 @@ Casa 3 quartos	2500	Mooca	Quintal grande
         push('🌐 Site', biz.website, { mono: true });
         if (biz.social && biz.social.length) push('📲 Redes', biz.social.length + ' link(s)');
         if (rows.length === 0) return '';
+
+        // If we extracted a business name and it differs from the
+        // agent's current name, offer to rename in-place. Default ON
+        // because most owners want the agent to identify as the real
+        // company (the auto-named "Imobiliária Concierge" template is
+        // a placeholder).
+        const currentName = (document.getElementById('b-name')?.value || '').trim();
+        const proposedName = (biz.name || '').trim().slice(0, 80);
+        const renameBlock = proposedName && proposedName.toLowerCase() !== currentName.toLowerCase()
+          ? `
+            <div style="padding:8px 14px;border-top:1px solid var(--border);background:rgba(124,92,255,0.06);font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <input type="checkbox" id="b-site-rename" checked style="margin:0;cursor:pointer;" />
+              <label for="b-site-rename" style="cursor:pointer;flex:1;">
+                Renomear agente: <span style="color:var(--text-dim);text-decoration:line-through;">${escapeHtml(currentName)}</span>
+                → <strong style="color:var(--accent-2);">${escapeHtml(proposedName)}</strong>
+              </label>
+            </div>
+          `
+          : '';
+
         return `
           <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);margin-bottom:10px;">
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(46,204,113,0.06);font-size:12px;color:var(--text);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -3362,6 +3382,7 @@ Casa 3 quartos	2500	Mooca	Quintal grande
               </label>
             </div>
             <div style="padding:10px 14px;">${rows.join('')}</div>
+            ${renameBlock}
           </div>
         `;
       }
@@ -3423,6 +3444,15 @@ Casa 3 quartos	2500	Mooca	Quintal grande
             if (ta) ta.value = pendingSiteBusinessText;
             if (typeof formState !== 'undefined') formState.business_info = pendingSiteBusinessText;
           }
+          // And reflect the proposed name in the name input if the
+          // rename checkbox was checked — so "Salvar agente" picks it up.
+          const renameEl2 = document.getElementById('b-site-rename');
+          if (renameEl2 && renameEl2.checked && pendingSiteBusiness && pendingSiteBusiness.name) {
+            const nameInput = document.getElementById('b-name');
+            const newName = String(pendingSiteBusiness.name).trim().slice(0, 80);
+            if (nameInput) nameInput.value = newName;
+            if (typeof formState !== 'undefined') formState.name = newName;
+          }
           switchCatalogTab('editor');
           showCatalogStatus('Itens + info da empresa carregados no editor — revise e clique em 💾 Salvar catálogo. Não esqueça de salvar o agente também!', 'ok');
         });
@@ -3450,27 +3480,44 @@ Casa 3 quartos	2500	Mooca	Quintal grande
             if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar tudo'; }
             return;
           }
-          // Then PATCH the agent with the business info text if the user
-          // opted in. Failure here is non-fatal — items already saved.
+          // Then PATCH the agent with business_info + (optionally) the
+          // new agent name. Failure here is non-fatal — items already saved.
           let bizSaved = false;
-          if (wantBiz) {
+          let renameSaved = false;
+          const renameEl = document.getElementById('b-site-rename');
+          const wantRename = renameEl && renameEl.checked && pendingSiteBusiness && pendingSiteBusiness.name;
+          const newName = wantRename ? String(pendingSiteBusiness.name).trim().slice(0, 80) : null;
+          const patchBody = {};
+          if (wantBiz) patchBody.business_info = pendingSiteBusinessText;
+          if (newName) patchBody.name = newName;
+          if (Object.keys(patchBody).length) {
             try {
               const r2 = await fetch(BASE + '/v1/agents/' + editingAgentId, {
                 method: 'PATCH',
                 headers,
-                body: JSON.stringify({ business_info: pendingSiteBusinessText }),
+                body: JSON.stringify(patchBody),
               });
               if (r2.ok) {
-                bizSaved = true;
-                // Reflect in the live form so the textarea shows what was saved.
-                const ta = document.getElementById('b-business');
-                if (ta) ta.value = pendingSiteBusinessText;
-                if (typeof formState !== 'undefined') formState.business_info = pendingSiteBusinessText;
+                if (wantBiz) {
+                  bizSaved = true;
+                  // Reflect in the live form so the textarea shows what was saved.
+                  const ta = document.getElementById('b-business');
+                  if (ta) ta.value = pendingSiteBusinessText;
+                  if (typeof formState !== 'undefined') formState.business_info = pendingSiteBusinessText;
+                }
+                if (newName) {
+                  renameSaved = true;
+                  const nameInput = document.getElementById('b-name');
+                  if (nameInput) nameInput.value = newName;
+                  if (typeof formState !== 'undefined') formState.name = newName;
+                }
               }
             } catch (_) { /* non-fatal */ }
           }
-          const bizMsg = wantBiz ? (bizSaved ? ' + dados da empresa' : ' (dados da empresa falharam, salva manual)') : '';
-          showSiteProgress('✅ <strong>' + data.item_count + ' itens salvos' + bizMsg + '!</strong> O agente já está usando.', 'ok');
+          const parts = [data.item_count + ' itens'];
+          if (wantBiz) parts.push(bizSaved ? 'dados da empresa' : 'dados FALHARAM');
+          if (wantRename) parts.push(renameSaved ? 'nome do agente: ' + escapeHtml(newName) : 'rename FALHOU');
+          showSiteProgress('✅ <strong>' + parts.join(' + ') + ' salvos!</strong> O agente já está usando.', 'ok');
           pendingSiteItems = null;
           pendingSiteBusiness = null;
           pendingSiteBusinessText = null;
