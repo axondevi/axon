@@ -1263,9 +1263,13 @@ async function processBufferedTurn(opts: {
     'crypto_price',
     'convert_currency',
   ];
+  // search_catalog is universal — costs nothing, only useful when the
+  // agent has a catalog uploaded. Always-on so the LLM knows it's
+  // available without the operator having to explicitly enable.
+  const universalTools = ['search_catalog'];
   const effectiveTools = isOwner
-    ? Array.from(new Set([...baseTools, ...ownerExtraTools]))
-    : baseTools;
+    ? Array.from(new Set([...baseTools, ...ownerExtraTools, ...universalTools]))
+    : Array.from(new Set([...baseTools, ...universalTools]));
 
   // ─── Capability guards ────────────────────────────────────────
   // Stop the agent from claiming it'll do things the toolkit doesn't
@@ -1373,6 +1377,11 @@ async function processBufferedTurn(opts: {
   (c as any).set('axon:contact_phone', inbound.phone);
   (c as any).set('axon:contact_memory_id', memory?.id ?? null);
   (c as any).set('axon:contact_name', memory?.displayName ?? inbound.pushName ?? null);
+  // Catalog goes via context (not args) so search_catalog tool can
+  // dynamically filter without re-loading the agent row mid-run.
+  // runtimeAgent here is either the entry agent or the routed one;
+  // both paths attached their own catalog above when present.
+  (c as any).set('axon:catalog', Array.isArray((runtimeAgent as any).catalog) ? (runtimeAgent as any).catalog : []);
 
   let reply: string;
   let images: NonNullable<Awaited<ReturnType<typeof runAgent>>['images']> = [];

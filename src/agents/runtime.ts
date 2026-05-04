@@ -203,6 +203,19 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
       },
     }),
   },
+  search_catalog: {
+    description:
+      'Search the agent owner\'s uploaded inventory catalog (cars, properties, products, anything the operator cataloged). Returns matching items as the source of truth — use BEFORE suggesting any item to the customer, never invent inventory. Returns up to 10 items ranked by relevance. Search across name, region, description, and any custom metadata fields. Returns empty array if no catalog uploaded or no matches.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Free-form search — model, region, price range words, anything the customer mentioned. E.g. "tatuapé 2 quartos", "Onix usado", "ração filhote".' },
+        limit: { type: 'integer', description: 'Max items (default 10).' },
+      },
+      required: ['query'],
+    },
+    // No buildRequest — intercepted in the runtime special-case below.
+  },
   generate_pix: {
     description:
       'Generate a Brazilian Pix payment for the customer to pay in-chat. Returns the QR code and copy-paste string. The QR is delivered automatically via WhatsApp; you only need to confirm to the customer. Use ONLY when the customer explicitly wants to pay (asked "como pago?", "quero comprar", etc).',
@@ -1144,6 +1157,44 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
       // come from `c.set('axon:contact_*')` set by the channel handler
       // (whatsapp.ts) before calling runAgent. The daily reminder cron
       // sweeps appointments table independently.
+      // ─── Special-case: search_catalog ─────────────────────────────
+      // No upstream API call — pulls from the agent's own JSONB
+      // catalog field (loaded once at the channel handler). Free
+      // and instant; serves as the "real inventory" lookup so the
+      // LLM doesn't invent items.
+      if (tc.function.name === 'search_catalog') {
+        const tcStart = Date.now();
+        try {
+          const items = (c.get('axon:catalog' as never) as unknown[]) || [];
+          const query = String(args.query || '').trim();
+          const limit = Math.min(Number(args.limit) || 10, 25);
+          if (!Array.isArray(items) || items.length === 0) {
+            const result = JSON.stringify({ items: [], note: 'Catálogo vazio. Avise o cliente honestamente que ainda não há inventário cadastrado.' });
+            history.push({ role: 'tool', tool_call_id: tc.id, content: result });
+            toolCallsExecuted.push({ name: 'search_catalog', args, ok: true, cost_usdc: '0', ms: Date.now() - tcStart, response_excerpt: result.slice(0, 280), status: 200 });
+            continue;
+          }
+          const { searchCatalog } = await import('~/agents/catalog');
+          const matches = searchCatalog(items as Parameters<typeof searchCatalog>[0], query, limit);
+          const result = JSON.stringify({
+            query,
+            match_count: matches.length,
+            total_in_catalog: items.length,
+            items: matches,
+          });
+          history.push({ role: 'tool', tool_call_id: tc.id, content: result });
+          toolCallsExecuted.push({
+            name: 'search_catalog', args, ok: true, cost_usdc: '0',
+            ms: Date.now() - tcStart, response_excerpt: result.slice(0, 280), status: 200,
+          });
+        } catch (err: any) {
+          const errMsg = err.message || String(err);
+          history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: errMsg }) });
+          toolCallsExecuted.push({ name: 'search_catalog', args, ok: false, cost_usdc: '0', error: errMsg, ms: Date.now() - tcStart });
+        }
+        continue;
+      }
+
       if (tc.function.name === 'schedule_appointment') {
         try {
           const phone = c.get('axon:contact_phone' as never) as string | undefined;

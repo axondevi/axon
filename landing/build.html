@@ -481,6 +481,37 @@ Estacionamento: gratuito por 1h"></textarea>
             </div>
           </div>
 
+          <div class="field" id="catalog-field-wrap">
+            <label>Catálogo / Inventário <span class="info-tip" data-tip="Sobe um CSV ou JSON com sua lista de produtos/imóveis/carros. O agente usa como fonte da verdade — nunca inventa item que não está aqui. Colunas reconhecidas: name (obrigatório), price, region, description, image_url. Outras viram metadata.">?</span></label>
+            <div id="b-catalog-area" style="border:1.5px dashed var(--border);border-radius:10px;padding:18px;text-align:center;background:var(--bg-elev);transition:border-color 0.15s,background 0.15s;">
+              <div id="b-catalog-empty">
+                <div style="font-size:32px;opacity:0.5;margin-bottom:8px;">📋</div>
+                <div style="font-size:14px;color:var(--text);margin-bottom:6px;font-weight:600;">Nenhum catálogo carregado</div>
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Arraste um CSV ou JSON aqui, ou:</div>
+                <input type="file" id="b-catalog-file" accept=".csv,.json,text/csv,application/json" style="display:none;" />
+                <button type="button" id="b-catalog-pick-btn" style="background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">📁 Escolher arquivo</button>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:10px;">Máx 1MB · até 1000 itens</div>
+              </div>
+              <div id="b-catalog-loaded" style="display:none;text-align:left;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <div>
+                    <div style="font-size:14px;font-weight:600;color:var(--text);"><span id="b-catalog-count">0</span> itens carregados</div>
+                    <div style="font-size:11px;color:var(--text-dim);" id="b-catalog-fields"></div>
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <button type="button" id="b-catalog-replace-btn" style="background:transparent;color:var(--text-dim);border:1px solid var(--border);padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer;">🔄 Trocar</button>
+                    <button type="button" id="b-catalog-clear-btn" style="background:transparent;color:var(--danger);border:1px solid var(--danger);padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer;">🗑 Apagar</button>
+                  </div>
+                </div>
+                <div id="b-catalog-preview" style="font-size:11px;color:var(--text-dim);background:var(--bg-card);border-radius:6px;padding:8px 10px;font-family:'JetBrains Mono',monospace;max-height:120px;overflow-y:auto;"></div>
+              </div>
+              <div id="b-catalog-status" style="display:none;font-size:12px;margin-top:10px;padding:8px 12px;border-radius:6px;"></div>
+            </div>
+            <div class="hint">
+              Funciona pra qualquer negócio: <strong>imobiliária</strong> (imóveis com preço, bairro, fotos), <strong>concessionária</strong> (carros + FIPE + km), <strong>pet shop</strong> (produtos + estoque), etc. O agente usa o catálogo via tool <code>search_catalog</code> e nunca inventa item que não esteja aqui.
+            </div>
+          </div>
+
           <div class="field">
             <label>Ferramentas permitidas <span class="info-tip" data-tip="O que o agente pode fazer: consultar CNPJ, gerar imagem, buscar na web, etc. Cada ferramenta tem um custo aproximado por chamada.">?</span></label>
             <div class="tools-grid" id="tools-grid">Carregando…</div>
@@ -2248,6 +2279,13 @@ Estacionamento: gratuito por 1h"></textarea>
         document.getElementById('b-desc').value = formState.description || '';
         document.getElementById('b-prompt').value = formState.system_prompt;
         document.getElementById('b-business').value = formState.business_info || '';
+        // Catalog state — load current state from server when editing
+        // existing agent. New agents start blank.
+        if (id) {
+          loadCatalogState(id);
+        } else {
+          renderCatalogState({ item_count: 0 });
+        }
         renderPersonaBadge();
         document.getElementById('b-color').value = formState.primary_color;
         document.getElementById('b-public').value = String(formState.public);
@@ -2913,6 +2951,147 @@ Estacionamento: gratuito por 1h"></textarea>
           }, 200);
         } catch (e) {}
       }
+
+      // ── Catalog upload widget ───────────────────────────────────────
+      // Tied to /v1/agents/:id/catalog/{upload,GET,DELETE}. Reads
+      // server state on edit, lets owner upload a fresh CSV/JSON, or
+      // wipe it. Drag-drop is bound on the wrapper; click pickers fall
+      // through to the hidden <input type=file>.
+      async function loadCatalogState(agentId) {
+        try {
+          const r = await api(`/v1/agents/${agentId}/catalog`);
+          renderCatalogState(r);
+        } catch (e) {
+          renderCatalogState({ item_count: 0 });
+        }
+      }
+
+      function renderCatalogState(state) {
+        const empty = document.getElementById('b-catalog-empty');
+        const loaded = document.getElementById('b-catalog-loaded');
+        const status = document.getElementById('b-catalog-status');
+        if (status) status.style.display = 'none';
+        if (!state || !state.item_count) {
+          if (empty) empty.style.display = '';
+          if (loaded) loaded.style.display = 'none';
+          return;
+        }
+        if (empty) empty.style.display = 'none';
+        if (loaded) {
+          loaded.style.display = '';
+          document.getElementById('b-catalog-count').textContent = state.item_count;
+          const fields = state.field_map ? Object.entries(state.field_map).map(([k,v]) => `${k}=${v}`).join(' · ') : '';
+          document.getElementById('b-catalog-fields').textContent = fields;
+          const items = state.items || state.preview || [];
+          document.getElementById('b-catalog-preview').innerHTML = items.slice(0, 5).map((it) => {
+            const parts = [`<strong>${escapeHtml(it.name || '?')}</strong>`];
+            if (it.price !== undefined) parts.push(`R$${Number(it.price).toFixed(2)}`);
+            if (it.region) parts.push(escapeHtml(it.region));
+            return parts.join(' · ');
+          }).join('<br/>');
+        }
+      }
+
+      function showCatalogStatus(msg, kind) {
+        const el = document.getElementById('b-catalog-status');
+        if (!el) return;
+        const colors = {
+          ok: { bg: 'rgba(37,211,102,0.10)', fg: '#25d366', border: 'rgba(37,211,102,0.4)' },
+          err: { bg: 'rgba(255,95,87,0.10)', fg: '#ff5f57', border: 'rgba(255,95,87,0.4)' },
+          warn: { bg: 'rgba(255,214,10,0.10)', fg: '#ffd60a', border: 'rgba(255,214,10,0.4)' },
+        };
+        const c = colors[kind] || colors.ok;
+        el.style.cssText = `display:block;font-size:12px;margin-top:10px;padding:8px 12px;border-radius:6px;background:${c.bg};color:${c.fg};border:1px solid ${c.border};`;
+        el.innerHTML = msg;
+      }
+
+      async function uploadCatalogFile(file) {
+        if (!editingAgentId) {
+          showCatalogStatus('Salve o agente primeiro (sem catálogo) — depois volte aqui pra subir o arquivo.', 'warn');
+          return;
+        }
+        if (!file) return;
+        if (file.size > 1_000_000) {
+          showCatalogStatus(`Arquivo muito grande (${(file.size/1024/1024).toFixed(1)}MB). Máximo 1MB.`, 'err');
+          return;
+        }
+        showCatalogStatus(`⏳ Lendo ${escapeHtml(file.name)}…`, 'ok');
+        const form = new FormData();
+        form.append('file', file);
+        try {
+          const r = await fetch(BASE + '/v1/agents/' + editingAgentId + '/catalog/upload', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + KEY },
+            body: form,
+          });
+          const data = await r.json();
+          if (!r.ok) {
+            const warns = (data.warnings || []).map(w => `• ${escapeHtml(w)}`).join('<br/>');
+            showCatalogStatus(`<strong>Não consegui processar:</strong> ${escapeHtml(data.message || 'erro desconhecido')}${warns ? '<br/>' + warns : ''}`, 'err');
+            return;
+          }
+          renderCatalogState({
+            item_count: data.item_count,
+            items: data.preview,
+            field_map: data.field_map,
+          });
+          const warns = (data.warnings || []).filter(w => w).map(w => `• ${escapeHtml(w)}`).join('<br/>');
+          showCatalogStatus(`✅ <strong>${data.item_count} itens carregados.</strong> Mapeamento: ${Object.entries(data.field_map || {}).map(([k,v]) => `${k}=${v}`).join(' · ')}${warns ? '<br/><span style="color:#ffd60a">' + warns + '</span>' : ''}`, 'ok');
+        } catch (e) {
+          showCatalogStatus(`Falha de rede: ${escapeHtml(e.message || String(e))}`, 'err');
+        }
+      }
+
+      function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+      }
+
+      (function bindCatalogWidget() {
+        const area = document.getElementById('b-catalog-area');
+        const fileInput = document.getElementById('b-catalog-file');
+        const pickBtn = document.getElementById('b-catalog-pick-btn');
+        const replaceBtn = document.getElementById('b-catalog-replace-btn');
+        const clearBtn = document.getElementById('b-catalog-clear-btn');
+        if (!area || !fileInput) return;
+        const trigger = () => fileInput.click();
+        if (pickBtn) pickBtn.addEventListener('click', trigger);
+        if (replaceBtn) replaceBtn.addEventListener('click', trigger);
+        fileInput.addEventListener('change', (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) uploadCatalogFile(file);
+          e.target.value = ''; // allow re-uploading same filename
+        });
+        // Drag-drop on the entire area
+        ['dragenter', 'dragover'].forEach((ev) => {
+          area.addEventListener(ev, (e) => {
+            e.preventDefault();
+            area.style.borderColor = 'var(--accent)';
+            area.style.background = 'rgba(124,92,255,0.05)';
+          });
+        });
+        ['dragleave', 'drop'].forEach((ev) => {
+          area.addEventListener(ev, (e) => {
+            e.preventDefault();
+            area.style.borderColor = '';
+            area.style.background = '';
+          });
+        });
+        area.addEventListener('drop', (e) => {
+          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file) uploadCatalogFile(file);
+        });
+        if (clearBtn) clearBtn.addEventListener('click', async () => {
+          if (!editingAgentId) return;
+          if (!confirm('Apagar catálogo? O agente vai voltar a depender só do business_info.')) return;
+          try {
+            await api('/v1/agents/' + editingAgentId + '/catalog', { method: 'DELETE' });
+            renderCatalogState({ item_count: 0 });
+            showCatalogStatus('Catálogo apagado.', 'ok');
+          } catch (e) {
+            showCatalogStatus(`Falha ao apagar: ${escapeHtml(e.message || String(e))}`, 'err');
+          }
+        });
+      })();
 
       // ── Init ─────────────────────────────────────────────────────────
       if (!KEY) {
