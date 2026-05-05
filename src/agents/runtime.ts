@@ -42,6 +42,35 @@ interface ToolDef {
   buildRequest?: (args: any) => { params?: Record<string, unknown>; body?: unknown };
 }
 
+/**
+ * Tools every agent gets for free regardless of template. They cost
+ * nothing on their own (catalog is in-memory, photo is a URL forwarded
+ * to Evolution, PDF is rendered locally) so they're always-on. Source
+ * of truth for the universal-tool list — both the WhatsApp channel and
+ * the cache versioning import this so they can never drift apart.
+ */
+export const UNIVERSAL_TOOL_NAMES = ['search_catalog', 'send_listing_photo', 'send_catalog_pdf'] as const;
+
+/**
+ * Plain-text snapshot of the system rules that govern tool use. Hashed
+ * (with the universal-tool list) into the cache version key so any
+ * change to either invalidates stale cached responses on next deploy.
+ *
+ * Edit this when you change the rules text below in qualityRule — keep
+ * the two in sync. Mismatch is harmless (older cache hits keep coming
+ * through) but defeats the purpose.
+ */
+export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
+1. NUNCA invente dado pra preencher tool.
+2. NUNCA escreva o markup da tool no texto.
+2b. NUNCA escreva placeholders entre colchetes ([CATÁLOGO COMPLETO], [FOTO], [PDF], [ARQUIVO], [IMAGEM AQUI], [VEJA AS FOTOS], [LINK DO CATÁLOGO]). Mídia chega via tool, não via placeholder.
+3. Tool falhou ou retornou vazio? Diga ao cliente, não invente.
+4. Catálogo COMPLETO = send_catalog_pdf (sem args, pega do cadastro).
+4b. PDF de SUBCONJUNTO filtrado = search_catalog + generate_pdf (max 8 itens).
+5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
+v3 — anti-placeholder hardening + send_catalog_pdf intent routing.
+`;
+
 export const SERVER_TOOLS: Record<string, ToolDef> = {
   lookup_cnpj: {
     description: 'Look up a Brazilian company by CNPJ.',
@@ -766,6 +795,12 @@ interface RunAgentResult {
   /** Total wall-clock duration of runAgent() in ms — start to finish, including
    *  cache lookup, LLM calls, and tool calls. */
   latency_ms?: number;
+  /** Hash of the system rules + universal-tool list this turn ran on.
+   *  Logged + surfaced in the Brain panel so unexpected behavior can be
+   *  matched to a deploy ("ah, that ran on rules-vY"). Cache entries are
+   *  partitioned by this same key, so a deploy that changes the rules
+   *  invalidates stale FAQ hits automatically. */
+  rules_version?: string;
   /**
    * Images produced by tool calls. Two source flavors:
    *   - generate_image (Stability): base64 + mimetype
@@ -1008,6 +1043,7 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
 ## Regras de tool-use (NUNCA viole)
 1. **NUNCA invente dado pra preencher tool.** Se a tool precisa de CEP, CNPJ, modelo de carro, link, e o cliente NÃO disse — VOCÊ PERGUNTA antes. Não chama lookup_cep com "01001-000" só pra ter algo. Não chama lookup_fipe com "Civic" se cliente só falou "carro". Cada chamada custa dinheiro do dono — desperdício é proibido.
 2. **NUNCA escreva o markup da tool no texto.** Markup tipo \`<function=name>{...}</function>\` ou \`{"name": "...", "arguments": {...}}\` é INTERNO — sai pelo canal de tool_calls do LLM, NÃO no campo content. Se você se pegar querendo escrever isso no texto, RECOMECE a resposta sem o markup.
+2b. **NUNCA escreva placeholders entre colchetes** como \`[CATÁLOGO COMPLETO DE IMÓVEIS]\`, \`[FOTO]\`, \`[FOTO DA FACHADA]\`, \`[PDF]\`, \`[ARQUIVO]\`, \`[IMAGEM AQUI]\`, \`[VEJA AS FOTOS]\`, \`[LINK DO CATÁLOGO]\`. Isso é placeholder humano de quem ainda não construiu o sistema — não é como mídia funciona aqui. Mídia (foto/PDF/áudio) só chega pro cliente se você **CHAMA A TOOL** (\`send_listing_photo\`, \`send_catalog_pdf\`, \`generate_pdf\`). Se a tool não existe pra esse caso, descreve em texto natural ("posso te enviar o catálogo agora, segura aí") SEM colchetes — e CHAMA a tool no mesmo turno. Texto entre colchetes = você quebrando a ilusão e o cliente vai sentir que é bot mal feito.
 3. **Tool falhou ou retornou vazio?** Diz pro cliente honesto ("não achei o CEP, confirma os 8 dígitos?") em vez de inventar a resposta como se tivesse dado.
 4. **Catálogo COMPLETO = \`send_catalog_pdf\`.** Quando o cliente pede pra ver TUDO ("tem catálogo?", "me manda o catálogo", "manda a lista completa", "mostra tudo que vocês têm", "quais imóveis vocês têm", "quero ver os carros"), você chama \`send_catalog_pdf\` (sem argumentos — ele já pega do cadastro). É um PDF profissional com capa, fotos e todos os itens organizados em grade. NUNCA use \`generate_pdf\` (que é pra documentos avulsos) ou \`search_catalog\` + \`generate_pdf\` pra esse caso — tem ferramenta dedicada melhor.
 4b. **PDF de SUBCONJUNTO filtrado** (cliente quer um recorte, ex: "manda em PDF só as casas até 500 mil em Tabatinga"). Aí sim: \`search_catalog\` com a query + \`generate_pdf\` com \`sections\` (max 8 itens, formato sucinto). Esse caminho é exceção; o caso comum é o catálogo inteiro via \`send_catalog_pdf\`.
@@ -1015,7 +1051,7 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
 5. **Foto de item do catálogo = encadeamento obrigatório.** Quando o cliente pede "manda foto", "tem foto?", "me mostra a casa", "quero ver imagens", você FAZ DOIS PASSOS no MESMO turno:
    (i) chama \`search_catalog\` com a query (ex: "casa Martin de Sá") pra pegar o \`image_url\` real do item,
    (ii) chama \`send_listing_photo\` UMA VEZ por foto (max 3) passando o \`image_url\` retornado e um \`caption\` curto (nome + preço).
-   PROIBIDO escrever "*FOTOS*", "[FOTO DA FACHADA]", "vou enviar as fotos" sem chamar a tool. Sem image_url no item? Diz honesto: "esse não tem foto cadastrada, mas a descrição é X" em vez de fingir que vai enviar.
+   PROIBIDO escrever "*FOTOS*", "[FOTO DA FACHADA]", "[FOTO DO APARTAMENTO NO CENTRO]", "vou enviar as fotos", "Aqui está a foto:" como TEXTO sem chamar \`send_listing_photo\` no mesmo turno. Sem image_url no item? Diz honesto: "esse não tem foto cadastrada, mas a descrição é X" em vez de fingir que vai enviar.
 
 ## Formato de saída no WhatsApp (obrigatório)
 - **Bolhas curtas, separadas por \`||\`.** Resposta natural no zap = 2-3 bolhas de 1-2 frases cada. NUNCA mande um parágrafo de 5 linhas — fica robótico e o cliente bate o olho e some.
@@ -1134,6 +1170,10 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
         void storeInCache(agentId, lastUser.content, content, turnCost).catch(() => {});
       }
 
+      // Surface the rules version this turn ran on so the operator can match
+      // unexpected behavior to a deploy ("oh, that was running on rules-v Y").
+      const { currentRulesVersion } = await import('~/agents/knowledge-cache');
+      const rulesVersion = await currentRulesVersion();
       return {
         content,
         tool_calls_executed: toolCallsExecuted,
@@ -1143,6 +1183,7 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
         tools_offered: effectiveTools,
         provider: lastProvider,
         latency_ms: Date.now() - t0,
+        rules_version: rulesVersion,
         ...(generatedImages.length ? { images: generatedImages } : {}),
         ...(generatedPixPayments.length ? { pixPayments: generatedPixPayments } : {}),
         ...(generatedPdfs.length ? { pdfs: generatedPdfs } : {}),
