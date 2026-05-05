@@ -850,24 +850,86 @@ async function llmExtract(
   }
 }
 
+// Listing-style URL detector — used by both sitemap parser and HTML link
+// scanner so the same heuristics apply regardless of where the URL came
+// from. Path patterns cover BR real-estate, e-commerce, auto verticals.
+const LISTING_PATH_TOKENS =
+  /\/(imove(l|is)|imobiliari[ao]|propert(y|ies)|listing|anuncio|anuncios|produto|produtos|product|products|carro|carros|veiculo|veiculos|vehicle|vehicles|auto|moto|casa|apartamento|item|catalog|loja|loja-virtual|comprar|alugar|aluguel|locacao|venda|seminovos|usados|estoque)(\/|\?|-|_|=)/i;
+// Numeric id-style fallback for sites that put the id first (e.g.
+// /2122/imoveis/locacao-..., /detail/12345, /imovel/12345.html)
+const LISTING_ID_TOKEN = /\/\d{3,}\/|\/[a-z0-9-]*(\d{3,})(?:\.html?|\.php)?(?:\?|#|$)/i;
+const LISTING_SKIP_PATH =
+  /\/(login|cart|carrinho|checkout|cadastro|register|wp-(admin|login|content)|cdn-cgi|search|busca|filtro|page|pagina|tag|categoria|category|blog|sobre|contato|faq|sitemap|robots|favicon|atendimento|politica|termos|noticias|imprensa)(\/|\?|$)/i;
+
+function isLikelyListingUrl(u: URL): boolean {
+  if (LISTING_SKIP_PATH.test(u.pathname)) return false;
+  return LISTING_PATH_TOKENS.test(u.pathname) || LISTING_ID_TOKEN.test(u.pathname);
+}
+
 /**
- * Find candidate detail-page URLs from a listing/index page. Heuristics:
- *   - same origin only (don't crawl outbound links)
- *   - URL path matches typical listing patterns (/imovel/, /produto/, /carro/, /id=)
- *   - Skip pagination, filters, login/cart routes, mailto/tel/anchors
- *   - Skip image and asset URLs
+ * Try to read the site's sitemap.xml (or sitemap_index.xml + nested
+ * sitemaps) for the COMPLETE list of URLs. Sitemap is the source of
+ * truth — beats walking pagination + scraping links. Returns up to
+ * `max` listing-shaped URLs after filtering.
  */
-function extractListingUrls(html: string, baseUrl: string, max = 20): string[] {
+async function fetchSitemapUrls(baseUrl: string, max: number): Promise<string[]> {
+  const base = new URL(baseUrl);
+  const candidates = [
+    `${base.origin}/sitemap.xml`,
+    `${base.origin}/sitemap_index.xml`,
+    `${base.origin}/sitemap-index.xml`,
+  ];
+  const out = new Set<string>();
+  const visited = new Set<string>();
+
+  async function pull(url: string, depth = 0): Promise<void> {
+    if (depth > 2 || visited.has(url) || out.size >= max) return;
+    visited.add(url);
+    const r = await fetchHtmlBounded(url, 6_000, 1_500_000);
+    if (!r.ok) return;
+    // Parse <loc>...</loc> entries (works for both urlset and sitemapindex)
+    const locRe = /<loc>([^<]+)<\/loc>/gi;
+    let m: RegExpExecArray | null;
+    const nestedSitemaps: string[] = [];
+    while ((m = locRe.exec(r.html)) !== null) {
+      if (out.size >= max) break;
+      const loc = m[1].trim();
+      if (!loc) continue;
+      // If <loc> points at another .xml, it's a nested sitemap (index file)
+      if (/\.xml(?:\.gz)?(?:\?|#|$)/i.test(loc)) {
+        nestedSitemaps.push(loc);
+        continue;
+      }
+      let u: URL;
+      try { u = new URL(loc); } catch { continue; }
+      if (u.origin !== base.origin) continue;
+      // Strip the home/root URL itself and any path matching the input
+      if (u.pathname === '/' || u.pathname === '') continue;
+      if (u.href.replace(/[#?].*$/, '') === baseUrl.replace(/[#?].*$/, '')) continue;
+      if (!isLikelyListingUrl(u)) continue;
+      u.hash = '';
+      out.add(u.toString());
+    }
+    for (const ns of nestedSitemaps) {
+      if (out.size >= max) break;
+      await pull(ns, depth + 1);
+    }
+  }
+
+  for (const c of candidates) {
+    if (out.size >= max) break;
+    await pull(c);
+  }
+  return Array.from(out);
+}
+
+/**
+ * Find candidate detail-page URLs from a listing/index page. Used as
+ * fallback when sitemap.xml is missing/empty. Scans <a href> tags only.
+ */
+function extractListingUrls(html: string, baseUrl: string, max: number): string[] {
   const base = new URL(baseUrl);
   const out = new Set<string>();
-  // Common detail-page path tokens across verticals.
-  const LISTING_TOKENS =
-    /\/(imove(l|is)|imobiliari[ao]|propert(y|ies)|listing|anuncio|anuncios|produto|produtos|product|products|carro|carros|veiculo|veiculos|vehicle|vehicles|auto|moto|casa|apartamento|item|catalog|loja|loja-virtual|comprar|alugar|aluguel|venda|seminovos|usados|estoque)(\/|\?|-|_|=)/i;
-  // Numeric id-style fallback (e.g. /detail/12345, /imovel/12345.html)
-  const ID_TOKEN = /\/[a-z0-9-]*(\d{3,})(?:\.html?|\.php)?(?:\?|#|$)/i;
-  const SKIP =
-    /\/(login|cart|carrinho|checkout|cadastro|register|wp-(admin|login|content)|cdn-cgi|search|busca|filtro|page|pagina|tag|categoria|category|blog|sobre|contato|faq|sitemap|robots|favicon|atendimento|politica|termos)(\/|\?|$)/i;
-
   const re = /<a\b[^>]+href=["']([^"']+)["']/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
@@ -877,11 +939,8 @@ function extractListingUrls(html: string, baseUrl: string, max = 20): string[] {
     let u: URL;
     try { u = new URL(href, baseUrl); } catch { continue; }
     if (u.origin !== base.origin) continue;
-    if (SKIP.test(u.pathname)) continue;
-    // Don't pull the page back to itself (would re-crawl what we already have)
     if (u.href.replace(/[#?].*$/, '') === baseUrl.replace(/[#?].*$/, '')) continue;
-    if (LISTING_TOKENS.test(u.pathname) || ID_TOKEN.test(u.pathname)) {
-      // Strip URL fragments — same page in WhatsApp owner's view
+    if (isLikelyListingUrl(u)) {
       u.hash = '';
       out.add(u.toString());
       if (out.size >= max) break;
@@ -1229,14 +1288,28 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
 
   // ─── Deep crawl pass — fetch each item's detail page in parallel
   // for richer data: full description (m², quartos, amenidades), photo
-  // gallery (vs single cover photo), exact transaction type, structured
-  // attributes the home/list page didn't surface. Capped at 20 items
-  // to fit in a single sync request (~12s with concurrency 5).
-  const detailUrls = extractListingUrls(html, url, 20);
+  // gallery, exact transaction type, structured attributes the home/list
+  // page didn't surface.
+  //
+  // URL discovery: try sitemap.xml first (source of truth, sites with
+  // 100s of listings expose them all there). Fallback to scraping
+  // <a href> from the home page when sitemap is missing/empty.
+  // Capped at 50 items: 50 × ~1.5s avg with concurrency 8 ≈ 10-15s.
+  const SITE_CRAWL_CAP = Number(process.env.SITE_CRAWL_CAP) || 50;
+  let detailUrls = await fetchSitemapUrls(url, SITE_CRAWL_CAP);
+  let urlSource = 'sitemap';
+  if (detailUrls.length < 5) {
+    const fromHtml = extractListingUrls(html, url, SITE_CRAWL_CAP);
+    if (fromHtml.length > detailUrls.length) {
+      detailUrls = fromHtml;
+      urlSource = 'html';
+    }
+  }
+  log.info('site-importer.detail_urls', { source: urlSource, count: detailUrls.length });
   let deepCount = 0;
   if (detailUrls.length > 0) {
     const t0 = Date.now();
-    const deep = await deepCrawlDetailPages(detailUrls, 5);
+    const deep = await deepCrawlDetailPages(detailUrls, 8);
     deepCount = deep.items.length;
     log.info('site-importer.deep_crawl', {
       attempted: detailUrls.length,
