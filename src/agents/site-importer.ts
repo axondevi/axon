@@ -10,7 +10,7 @@
  *      visible text to Gemini Flash Lite asking for a JSON array of items.
  *      Catches sites built without schema markup.
  *
- * Cap: 30 items max, single page only (MVP). 10s fetch timeout.
+ * Cap: 30 items max, single page only (MVP). 30s fetch timeout.
  * No headless browser — sites that render listings purely via JS will
  * fall back to the LLM pass on the bare HTML, which often still works
  * because crawlers expect server-rendered content.
@@ -20,7 +20,7 @@
 import { log } from '~/lib/logger';
 import type { CatalogItem } from '~/agents/catalog';
 
-const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_TIMEOUT_MS = 30_000;
 const MAX_HTML_BYTES = 800_000; // ~800KB cap to protect Gemini context + memory
 const MAX_ITEMS = 30;
 const USER_AGENT =
@@ -939,7 +939,7 @@ async function fetchSitemapUrls(baseUrl: string, max: number): Promise<string[]>
   async function pull(url: string, depth = 0): Promise<void> {
     if (depth > 2 || visited.has(url) || out.size >= max) return;
     visited.add(url);
-    const r = await fetchHtmlBounded(url, 6_000, 1_500_000);
+    const r = await fetchHtmlBounded(url, 15_000, 1_500_000);
     if (!r.ok) return;
     // Parse <loc>...</loc> entries (works for both urlset and sitemapindex)
     const locRe = /<loc>([^<]+)<\/loc>/gi;
@@ -1157,7 +1157,7 @@ async function deepCrawlDetailPages(
     const batch = urls.slice(i, i + concurrency);
     const batchResults = await Promise.all(
       batch.map(async (u) => {
-        const fetched = await fetchHtmlBounded(u, 8_000, 600_000);
+        const fetched = await fetchHtmlBounded(u, 15_000, 600_000);
         if (!fetched.ok) return null;
         const text = htmlToVisibleText(fetched.html);
         if (text.length < 100) return null;
@@ -1249,7 +1249,7 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const hint = msg.includes('aborted')
-      ? 'Tempo esgotado (10s). O site pode estar lento ou bloqueando bots.'
+      ? `Tempo esgotado (${Math.round(FETCH_TIMEOUT_MS / 1000)}s). O site pode estar lento ou bloqueando bots.`
       : msg.includes('ENOTFOUND') || msg.includes('getaddrinfo')
         ? 'Domínio não encontrado. Confira a URL.'
         : `Falha ao acessar o site: ${msg.slice(0, 120)}`;
