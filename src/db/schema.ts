@@ -9,6 +9,7 @@ import {
   jsonb,
   integer,
   numeric,
+  varchar,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -353,10 +354,15 @@ export const agentCache = pgTable(
       .notNull()
       .default(0n),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    /** Hash of (system rules + universal tool list) at write time. Cached
+     *  responses with a stale rules_version are treated as misses so prompt
+     *  / tool changes don't get masked by stale FAQ entries. */
+    rulesVersion: varchar('rules_version', { length: 16 }),
   },
   (t) => ({
     agentIdx: index('agent_cache_agent_idx').on(t.agentId),
     lastHitIdx: index('agent_cache_lasthit_idx').on(t.lastHit),
+    rulesVersionIdx: index('agent_cache_rules_version_idx').on(t.rulesVersion),
   }),
 );
 

@@ -344,6 +344,15 @@ export async function ensureCriticalSchema() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_subscriptions_owner_idx" ON "agent_subscriptions"("owner_id")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_subscriptions_status_idx" ON "agent_subscriptions"("status")`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_subscriptions_period_end_idx" ON "agent_subscriptions"("current_period_end")`);
+
+  // 0026: agent_cache.rules_version — invalidates cached responses when the
+  // system prompt rules or universal-tool registry change. Without this, an
+  // FAQ cached before today's send_catalog_pdf rollout could re-serve a
+  // hallucinated "[CATÁLOGO COMPLETO]" reply forever (skipping the LLM).
+  // Nullable so old rows survive the migration; checkCache treats them as
+  // misses since their version doesn't match the current one.
+  await db.execute(sql`ALTER TABLE "agent_cache" ADD COLUMN IF NOT EXISTS "rules_version" varchar(16)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "agent_cache_rules_version_idx" ON "agent_cache" ("rules_version")`);
 }
 
 export async function ensureSystemRows() {

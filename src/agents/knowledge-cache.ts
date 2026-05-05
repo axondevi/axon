@@ -25,8 +25,39 @@
 
 import { db } from '~/db';
 import { agentCache } from '~/db/schema';
-import { eq, sql, desc } from 'drizzle-orm';
+import { and, eq, sql, desc } from 'drizzle-orm';
 import { upstreamKeyFor } from '~/config';
+import { createHash } from 'node:crypto';
+
+/**
+ * Hash of (system-rules text + universal tool registry) frozen at module
+ * load. Computed lazily so we don't pay the cost on import; cached as a
+ * module-scoped value once the first checkCache/storeInCache fires.
+ *
+ * When ANY of these change between deploys (new rule wording, new tool
+ * added/removed, rule re-numbering), the hash flips and every cached
+ * response from the old version is treated as a miss. Prevents stale
+ * FAQ entries from masking an LLM behavior fix.
+ */
+let cachedRulesVersion: string | null = null;
+async function getRulesVersion(): Promise<string> {
+  if (cachedRulesVersion) return cachedRulesVersion;
+  // Imported lazily so a circular import doesn't crash module init.
+  const { CORE_RULES_TEXT, UNIVERSAL_TOOL_NAMES } = await import('~/agents/runtime');
+  const sortedTools = [...UNIVERSAL_TOOL_NAMES].sort().join(',');
+  cachedRulesVersion = createHash('sha1')
+    .update(CORE_RULES_TEXT)
+    .update('|')
+    .update(sortedTools)
+    .digest('hex')
+    .slice(0, 12);
+  return cachedRulesVersion;
+}
+
+/** Exposed so logs / Brain panel can show the version a turn ran on. */
+export async function currentRulesVersion(): Promise<string> {
+  return getRulesVersion();
+}
 
 /**
  * Cosine similarity threshold above which we consider two questions
@@ -124,7 +155,12 @@ export async function checkCache(agentId: string, query: string): Promise<CacheR
     return { hit: false, reason: 'no_embedding_key' };
   }
 
-  // Fetch candidate entries: ordered by recent activity (popular AND fresh first)
+  // Only consider entries written under the CURRENT rules+tools version.
+  // Rows with a stale rules_version (or NULL from before this column was
+  // added) are skipped — they may encode a behavior the current prompt
+  // would no longer produce (e.g. "[CATÁLOGO COMPLETO]" placeholder
+  // hallucinations from before send_catalog_pdf existed).
+  const version = await getRulesVersion();
   const rows = await db
     .select({
       id: agentCache.id,
@@ -133,7 +169,7 @@ export async function checkCache(agentId: string, query: string): Promise<CacheR
       hits: agentCache.hits,
     })
     .from(agentCache)
-    .where(eq(agentCache.agentId, agentId))
+    .where(and(eq(agentCache.agentId, agentId), eq(agentCache.rulesVersion, version)))
     .orderBy(desc(agentCache.lastHit))
     .limit(MAX_ENTRIES_PER_AGENT);
 
@@ -188,12 +224,16 @@ export async function storeInCache(
   const emb = await generateEmbedding(queryNorm);
   if (!emb) return;
 
+  // Stamp the entry with the active rules version so future checkCache
+  // calls only match it while the rules are unchanged.
+  const version = await getRulesVersion();
   await db.insert(agentCache).values({
     agentId,
     queryText: queryNorm.slice(0, 1000),
     queryEmbedding: emb as unknown as object,
     responseText: response.slice(0, 4000),
     costSavedMicro: estimatedCostMicro,
+    rulesVersion: version,
   });
 
   // LRU eviction: if over limit, drop entries with fewest hits + oldest lastHit
