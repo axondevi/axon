@@ -1152,6 +1152,95 @@ app.get('/:id/catalog', async (c) => {
   });
 });
 
+// Catalog PDF — generates a cover-page + 2-col-grid PDF of the agent's
+// full catalog, with photos embedded. Cached by content hash in Supabase
+// Storage so a second call with the same catalog is instant. The agent
+// runtime calls this internally via the send_catalog_pdf tool, and the
+// dashboard calls it for the "Baixar PDF" button.
+//
+// Design: returning the bytes directly (instead of a presigned URL) keeps
+// the auth simple (uses the route's existing user-auth) and lets the
+// frontend trigger a download via a blob without a second round-trip.
+app.get('/:id/catalog/pdf', async (c) => {
+  const user = c.get('user') as { id: string };
+  const [a] = await db
+    .select()
+    .from(agents)
+    .where(whereAgentByIdOrSlug(c.req.param('id'), user.id))
+    .limit(1);
+  if (!a) throw Errors.notFound('Agent');
+  const items = Array.isArray(a.catalog) ? a.catalog as Record<string, unknown>[] : [];
+  if (items.length === 0) {
+    return c.json({ error: 'empty_catalog', message: 'Catálogo vazio. Importe ou cadastre itens antes de gerar o PDF.' }, 400);
+  }
+
+  // Hash the catalog payload + business info so we cache by content. Edit
+  // the catalog -> hash changes -> next call regenerates. Stable across
+  // requests for the same content so the second download is instant.
+  const { createHash } = await import('node:crypto');
+  const businessName = (a.name || 'Catálogo').slice(0, 100);
+  const businessContact = (a.businessInfo || '').split('\n')[0]?.slice(0, 200) || '';
+  const hashInput = JSON.stringify({ businessName, businessContact, items });
+  const hash = createHash('sha1').update(hashInput).digest('hex').slice(0, 16);
+  const storageKey = `catalogs/${a.id}/${hash}.pdf`;
+
+  // Try cache first.
+  const { isStorageConfigured, presignGet, putObject } = await import('~/storage/supabase-storage');
+  const cacheUsable = isStorageConfigured();
+  if (cacheUsable) {
+    const presigned = presignGet({ key: storageKey, expiresIn: 600 });
+    if (presigned.ok && presigned.url) {
+      // HEAD-check by attempting a conditional fetch — if the object doesn't
+      // exist, presignGet still returns a URL but the GET 404s. We use a
+      // tiny range request to avoid downloading the whole file just to test.
+      try {
+        const head = await fetch(presigned.url, { method: 'GET', headers: { range: 'bytes=0-15' } });
+        if (head.status === 200 || head.status === 206) {
+          return c.json({ ok: true, url: presigned.url, cached: true, hash, item_count: items.length });
+        }
+      } catch { /* fall through to regen */ }
+    }
+  }
+
+  // Cache miss — generate.
+  const { renderCatalogPdf } = await import('~/agents/pdf-renderer');
+  const t0 = Date.now();
+  const pdfBytes = await renderCatalogPdf({
+    businessName,
+    businessContact,
+    items: items.map((it) => ({
+      name: String((it as { name?: unknown }).name || ''),
+      price: typeof (it as { price?: unknown }).price === 'number' ? (it as { price: number }).price : null,
+      region: typeof (it as { region?: unknown }).region === 'string' ? (it as { region: string }).region : null,
+      description: typeof (it as { description?: unknown }).description === 'string' ? (it as { description: string }).description : null,
+      image_url: typeof (it as { image_url?: unknown }).image_url === 'string' ? (it as { image_url: string }).image_url : null,
+      url: typeof (it as { url?: unknown }).url === 'string' ? (it as { url: string }).url : null,
+    })),
+  });
+  const renderMs = Date.now() - t0;
+
+  // Persist to Supabase Storage (best effort — even on failure we still
+  // return the bytes so the operator gets the PDF; just no cache benefit).
+  if (cacheUsable) {
+    const put = await putObject({ key: storageKey, bytes: pdfBytes, mimeType: 'application/pdf' });
+    if (put.ok) {
+      const presigned = presignGet({ key: storageKey, expiresIn: 600 });
+      if (presigned.ok && presigned.url) {
+        return c.json({ ok: true, url: presigned.url, cached: false, hash, item_count: items.length, render_ms: renderMs });
+      }
+    }
+  }
+
+  // No storage / upload failed — stream the bytes directly so the dashboard
+  // can still download. The agent runtime takes a different path (uses the
+  // bytes via direct render-call), so this is operator-fallback only.
+  // Cast follows the same shape used by routes/voices.ts for binary blobs.
+  return c.body(pdfBytes as unknown as ArrayBuffer, 200, {
+    'content-type': 'application/pdf',
+    'content-disposition': `attachment; filename="catalogo-${a.slug || a.id}.pdf"`,
+  });
+});
+
 // Wipe catalog (owner can reset before re-uploading)
 app.delete('/:id/catalog', async (c) => {
   const user = c.get('user') as { id: string };
