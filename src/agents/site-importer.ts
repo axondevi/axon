@@ -613,29 +613,22 @@ function htmlToVisibleText(html: string): string {
 }
 
 /**
- * Call Gemini with automatic model fallback when the primary model is
- * rate-limited (429) or temporarily unavailable (503). The free tier has
- * separate quotas per model, so if flash-lite is exhausted we still have
- * flash and flash-8b to try. Keeps the import working through quota
- * pressure that's common on shared keys.
+ * Try Gemini with model fallback (429/503 → next model). Returns
+ * undefined when no key configured. Only retries on quota/overload
+ * errors; other 4xx is request-level and would fail again.
  */
-async function callGeminiJson(
-  apiKey: string,
+async function tryGemini(
   prompt: string,
   maxOutputTokens: number,
   timeoutMs: number,
-): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; text: string } | { ok: false; error: string } | undefined> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return undefined;
   const primary = process.env.GEMINI_EXTRACT_MODEL || 'gemini-2.5-flash-lite';
-  // Models in order of preference. First the configured primary, then
-  // siblings with separate per-day quotas.
   const chain = Array.from(new Set([primary, 'gemini-2.5-flash-lite', 'gemini-2.5-flash']));
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens,
-      responseMimeType: 'application/json',
-    },
+    generationConfig: { temperature: 0.1, maxOutputTokens, responseMimeType: 'application/json' },
   });
   let lastErr = '';
   for (const model of chain) {
@@ -647,21 +640,14 @@ async function callGeminiJson(
         { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ctrl.signal },
       );
       if (res.ok) {
-        const data = (await res.json()) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-        };
+        const data = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         return { ok: true, text };
       }
-      const errText = (await res.text()).slice(0, 200);
-      lastErr = `${model} → ${res.status}: ${errText}`;
-      // 429 (quota) and 503 (overload) are worth retrying with another
-      // model. 4xx other than 429 is a request problem — bail.
-      if (res.status !== 429 && res.status !== 503) {
-        return { ok: false, error: lastErr };
-      }
+      lastErr = `gemini/${model} → ${res.status}: ${(await res.text()).slice(0, 160)}`;
+      if (res.status !== 429 && res.status !== 503) return { ok: false, error: lastErr };
     } catch (err) {
-      lastErr = `${model} → ${err instanceof Error ? err.message : String(err)}`;
+      lastErr = `gemini/${model} → ${err instanceof Error ? err.message : String(err)}`;
     } finally {
       clearTimeout(timer);
     }
@@ -669,23 +655,100 @@ async function callGeminiJson(
   return { ok: false, error: lastErr || 'all gemini models failed' };
 }
 
+/**
+ * Try SiliconFlow (Qwen/DeepSeek aggregator). OpenAI-compatible API.
+ * Used as cross-vendor fallback when Gemini quota is exhausted —
+ * separate provider, separate quota, separate models. JSON mode via
+ * `response_format: { type: 'json_object' }` (Qwen3 supports this).
+ */
+async function trySiliconFlow(
+  prompt: string,
+  maxOutputTokens: number,
+  timeoutMs: number,
+): Promise<{ ok: true; text: string } | { ok: false; error: string } | undefined> {
+  const apiKey = process.env.SILICONFLOW_API_KEY;
+  if (!apiKey) return undefined;
+  // Qwen 2.5 7B is fast + cheap and handles JSON well; bigger models
+  // give marginal accuracy gains for structured extraction. Override via
+  // SILICONFLOW_EXTRACT_MODEL (e.g. Qwen/Qwen2.5-72B-Instruct,
+  // deepseek-ai/DeepSeek-V2.5, Qwen/Qwen3-30B-A3B).
+  const model = process.env.SILICONFLOW_EXTRACT_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch('https://api.siliconflow.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'You are a precise JSON extractor. Always respond with valid JSON only.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: maxOutputTokens,
+        response_format: { type: 'json_object' },
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      return { ok: false, error: `siliconflow/${model} → ${res.status}: ${(await res.text()).slice(0, 160)}` };
+    }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = data.choices?.[0]?.message?.content || '';
+    return { ok: true, text };
+  } catch (err) {
+    return { ok: false, error: `siliconflow/${model} → ${err instanceof Error ? err.message : String(err)}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Cross-vendor JSON extraction with provider fallback. Tries Gemini
+ * first (cheapest + JSON-mode tuned), then SiliconFlow (Qwen/DeepSeek)
+ * when Gemini's full chain is exhausted. Either provider can be
+ * disabled by omitting its API key. Returns the first successful text
+ * blob — caller still needs to JSON.parse it.
+ */
+async function callExtractionJson(
+  prompt: string,
+  maxOutputTokens: number,
+  timeoutMs: number,
+): Promise<{ ok: true; text: string; provider: string } | { ok: false; error: string }> {
+  const errors: string[] = [];
+  const gem = await tryGemini(prompt, maxOutputTokens, timeoutMs);
+  if (gem?.ok) return { ok: true, text: gem.text, provider: 'gemini' };
+  if (gem) errors.push(gem.error);
+  const sf = await trySiliconFlow(prompt, maxOutputTokens, timeoutMs);
+  if (sf?.ok) return { ok: true, text: sf.text, provider: 'siliconflow' };
+  if (sf) errors.push(sf.error);
+  return {
+    ok: false,
+    error: errors.length ? errors.join(' | ') : 'no extraction provider configured (set GEMINI_API_KEY or SILICONFLOW_API_KEY)',
+  };
+}
+
 async function llmExtract(
   visibleText: string,
   pageUrl: string,
   pageTitle?: string,
 ): Promise<{ items: CatalogItem[]; warnings: string[] }> {
-  const apiKey = process.env.GEMINI_API_KEY;
   const warnings: string[] = [];
-  if (!apiKey) {
-    return { items: [], warnings: ['GEMINI_API_KEY ausente — fallback indisponível'] };
+  if (!process.env.GEMINI_API_KEY && !process.env.SILICONFLOW_API_KEY) {
+    return { items: [], warnings: ['Nenhum extractor configurado — set GEMINI_API_KEY ou SILICONFLOW_API_KEY'] };
   }
 
+  // SiliconFlow expects a JSON object (not array) at top level when
+  // response_format=json_object is set, so wrap the array in an `items`
+  // key. The post-extract code already handles {items: [...]} shape via
+  // the recovery branch.
   const prompt = [
     'Você é um extrator de catálogo. Recebe o texto de UMA página de um site (imobiliária, loja, concessionária, restaurante, etc) e retorna os itens (imóveis, produtos, carros, pratos, serviços) listados ali.',
     `Página: ${pageTitle || '(sem título)'} — ${pageUrl}`,
     '',
     'Regras:',
-    '- Retorne APENAS um JSON array, sem markdown, sem explicação.',
+    '- Retorne APENAS um JSON object com a chave "items" contendo um array. Exemplo: {"items":[{...},{...}]}. Sem markdown, sem explicação.',
     '- Cada item tem: name (obrigatório), price (número em BRL ou null), region (string ou null), description (string curta, max 200 chars, ou null), image_url (string ou null), images (array de strings com TODAS as URLs de foto desse item, ou []), url (link para página de detalhes do item, ou null), type ("venda" | "aluguel" | null).',
     '- Se a página NÃO listar itens (ex: é um blog, contato, sobre), retorne [].',
     '- Máximo 30 itens. Se houver mais, pegue os 30 primeiros.',
@@ -700,9 +763,9 @@ async function llmExtract(
     '"""',
   ].join('\n');
 
-  const call = await callGeminiJson(apiKey, prompt, 4096, 30_000);
+  const call = await callExtractionJson(prompt, 4096, 60_000);
   if (!call.ok) {
-    warnings.push(`Gemini: ${call.error.slice(0, 200)}`);
+    warnings.push(`Extractor: ${call.error.slice(0, 600)}`);
     return { items: [], warnings };
   }
   try {
@@ -711,23 +774,27 @@ async function llmExtract(
     try {
       parsed = JSON.parse(text);
     } catch {
-      // Sometimes the model wraps the JSON in ```json fences despite the
-      // mime hint. Best-effort recovery.
-      const m = text.match(/\[[\s\S]*\]/);
+      // Recover JSON wrapped in fences or extra prose.
+      const m = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
       if (m) {
-        try {
-          parsed = JSON.parse(m[0]);
-        } catch {
-          warnings.push('Gemini retornou JSON inválido');
+        try { parsed = JSON.parse(m[0]); }
+        catch {
+          warnings.push(`${call.provider} retornou JSON inválido`);
           return { items: [], warnings };
         }
       } else {
-        warnings.push('Gemini retornou texto sem JSON');
+        warnings.push(`${call.provider} retornou texto sem JSON`);
         return { items: [], warnings };
       }
     }
+    // Accept either array (legacy Gemini format) or {items:[...]}
+    // (current uniform format) so model swaps don't require code changes.
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const obj = parsed as { items?: unknown };
+      if (Array.isArray(obj.items)) parsed = obj.items;
+    }
     if (!Array.isArray(parsed)) {
-      warnings.push('Gemini retornou objeto, esperava array');
+      warnings.push(`${call.provider} retornou objeto sem chave items`);
       return { items: [], warnings };
     }
     const items: CatalogItem[] = [];
@@ -888,8 +955,7 @@ async function llmExtractDetailPage(
   pageUrl: string,
   pageTitle?: string,
 ): Promise<CatalogItem | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (!process.env.GEMINI_API_KEY && !process.env.SILICONFLOW_API_KEY) return null;
   const prompt = [
     'Você está lendo a PÁGINA DE DETALHES de UM ÚNICO item (um imóvel, carro, produto, serviço) no site. Extraia toda a informação relevante.',
     `URL: ${pageUrl}`,
@@ -912,7 +978,7 @@ async function llmExtractDetailPage(
     '"""',
   ].join('\n');
 
-  const call = await callGeminiJson(apiKey, prompt, 2048, 20_000);
+  const call = await callExtractionJson(prompt, 2048, 35_000);
   if (!call.ok) return null;
   const text = call.text;
   let parsed: unknown;
