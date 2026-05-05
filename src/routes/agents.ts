@@ -1131,6 +1131,7 @@ app.post('/:id/catalog/import-url', async (c) => {
     warnings: result.warnings,
     business: result.business,
     business_info_text: result.business_info_text,
+    photo_stats: result.photo_stats,
   });
 });
 

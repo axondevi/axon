@@ -52,6 +52,9 @@ export interface ImportResult {
   business?: BusinessInfo;
   /** PT-BR formatted text block, ready to drop into agents.business_info. */
   business_info_text?: string;
+  /** Photo coverage stats — UI shows "30 itens · 87 fotos" so the operator
+   *  knows whether the import is healthy before saving. */
+  photo_stats?: { with_photos: number; total_photos: number };
 }
 
 function shortHash(s: string): string {
@@ -562,18 +565,27 @@ function isListingImageUrl(url: string): boolean {
   const lower = url.toLowerCase();
   if (lower.startsWith('data:')) return false;
   if (!/^https?:\/\//i.test(url)) return false;
-  // Common chrome / non-photo patterns
-  if (/(logo|sprite|icon|favicon|whatsapp|instagram|facebook|youtube|tiktok|placeholder|loading|spinner|tracking|pixel\.gif)/i.test(lower)) {
+  // Chrome / non-photo: logos, social icons, badges/seals/partners, trackers,
+  // empty-state placeholders. Tightened after seeing gallery/google.png and
+  // gallery/ssl.png leak through into a real-estate import.
+  if (/(logo|sprite|icon|favicon|whatsapp|instagram|facebook|youtube|tiktok|twitter|linkedin|pinterest|placeholder|loading|spinner|tracking|pixel\.gif|selo|badge|ssl[-_/.]|certificad|reclame[-_]?aqui|partners?|parceir|google\.(png|jpe?g|webp|svg)|facebook\.(png|jpe?g|webp|svg))/i.test(lower)) {
     return false;
   }
   // Path under common asset folders that don't host listing photos
-  if (/\/(icons?|svg|sprites?|tracking|analytics)\//i.test(lower)) return false;
-  // Allowed extensions — skip GIF (usually animations / loaders)
-  if (!/\.(jpe?g|png|webp)(?:\?|#|$)/i.test(lower)) return false;
-  return true;
+  if (/\/(icons?|svg|sprites?|tracking|analytics|badges?|partners?|brands?|selos?)\//i.test(lower)) return false;
+  // Allowed photo extensions. Modern CDNs (Cloudinary, Wix, Shopify, Imgix,
+  // BunnyCDN) frequently serve images with no extension and a query string.
+  // Accept those if the path looks image-shaped (ends with hash/id segment
+  // OR has an image-CDN host hint), and the negatives above already cleared.
+  const hasPhotoExt = /\.(jpe?g|png|webp|avif)(?:\?|#|$)/i.test(lower);
+  if (hasPhotoExt) return true;
+  const cdnHint = /(cloudinary|imgix|imagekit|cloudfront|bunnycdn|wix(static)?|shopify|squarespace|images\.|media\.|cdn\.|static\.|img\.|assets\.)/i.test(lower);
+  // Path "looks like" an image route: contains a hash-ish or numeric ID segment.
+  const looksLikePhotoPath = /\/(images?|photos?|media|uploads?|gallery|fotos?)\//i.test(lower) || /\/[a-f0-9]{12,}(?:\b|[?#/])/i.test(lower);
+  return cdnHint || looksLikePhotoPath;
 }
 
-function htmlToVisibleText(html: string): string {
+function htmlToVisibleText(html: string, baseUrl?: string): string {
   let s = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
@@ -581,22 +593,24 @@ function htmlToVisibleText(html: string): string {
     .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ');
   // Preserve <img src> as inline markers so the LLM can correlate
-  // photos with the listing they sit next to in the DOM. We try the
-  // common attributes that lazy-loaders use (data-src, data-lazy)
-  // before src, since modern sites set src= to a placeholder. Cap at
-  // 60 markers so we don't blow the prompt budget on icon-heavy pages.
+  // photos with the listing they sit next to in the DOM. Try common
+  // lazy-load attributes first (data-src, data-lazy) since modern sites
+  // set src= to a placeholder. When baseUrl is provided, relative URLs
+  // are resolved here so WordPress/Wix sites that emit /img/foo.jpg
+  // don't lose photos before the filter runs. Cap at 60 markers so we
+  // don't blow the prompt budget on icon-heavy pages.
   let imgCount = 0;
   s = s.replace(
     /<img\b[^>]*?(?:data-src|data-lazy(?:-src)?|data-original|src)=["']([^"']+)["'][^>]*>/gi,
     (_full, src: string) => {
       if (imgCount >= 60) return ' ';
-      // Resolve relative URLs would need baseUrl; we accept absolute only
-      // here and let the LLM include them verbatim. Relative ones get
-      // dropped — the post-LLM normalizer in llmExtract resolves with
-      // pageUrl just like JSON-LD images.
-      if (!isListingImageUrl(src)) return ' ';
+      let resolved = src;
+      if (!/^https?:\/\//i.test(src) && !src.startsWith('data:') && baseUrl) {
+        try { resolved = new URL(src, baseUrl).toString(); } catch { return ' '; }
+      }
+      if (!isListingImageUrl(resolved)) return ' ';
       imgCount++;
-      return ` [IMG: ${src}] `;
+      return ` [IMG: ${resolved}] `;
     },
   );
   s = s.replace(/<[^>]+>/g, ' ');
@@ -1091,7 +1105,7 @@ async function llmExtractDetailPage(
     '"""',
   ].join('\n');
 
-  const call = await callExtractionJson(prompt, 2048, 35_000);
+  const call = await callExtractionJson(prompt, 2048, 18_000);
   if (!call.ok) return null;
   const text = call.text;
   let parsed: unknown;
@@ -1141,35 +1155,60 @@ async function llmExtractDetailPage(
   }
 }
 
+/** Bucket a fetch error string into one of a small set of categories so
+ *  the deep-crawl log shows WHY pages failed (timeout? anti-bot? broken
+ *  links?) without leaking raw error text. */
+type DeepFailReason = 'timeout' | 'http_4xx' | 'http_5xx' | 'not_html' | 'too_short' | 'llm_empty' | 'network';
+function classifyFetchError(err: string): DeepFailReason {
+  if (/abort|timeout/i.test(err)) return 'timeout';
+  const m = err.match(/HTTP\s+(\d{3})/i);
+  if (m) {
+    const code = parseInt(m[1], 10);
+    if (code >= 400 && code < 500) return 'http_4xx';
+    if (code >= 500) return 'http_5xx';
+  }
+  if (/not HTML/i.test(err)) return 'not_html';
+  return 'network';
+}
+
 /**
  * Run detail-page extractions in parallel chunks. Concurrency 5 keeps
  * under most sites' soft rate-limits + Gemini's per-second cap, while
  * still finishing 20 items in ~12s. Returns whatever extracted
- * successfully — partial results are useful.
+ * successfully plus a breakdown of failure reasons — partial results
+ * are useful and the breakdown lets us audit why coverage was incomplete.
  */
 async function deepCrawlDetailPages(
   urls: string[],
   concurrency = 5,
-): Promise<{ items: CatalogItem[]; failed: number }> {
+): Promise<{ items: CatalogItem[]; failed: number; failReasons: Record<DeepFailReason, number> }> {
   const results: CatalogItem[] = [];
+  const failReasons: Record<DeepFailReason, number> = {
+    timeout: 0, http_4xx: 0, http_5xx: 0, not_html: 0, too_short: 0, llm_empty: 0, network: 0,
+  };
   let failed = 0;
   for (let i = 0; i < urls.length; i += concurrency) {
     const batch = urls.slice(i, i + concurrency);
     const batchResults = await Promise.all(
-      batch.map(async (u) => {
+      batch.map(async (u): Promise<CatalogItem | DeepFailReason> => {
         const fetched = await fetchHtmlBounded(u, 15_000, 600_000);
-        if (!fetched.ok) return null;
-        const text = htmlToVisibleText(fetched.html);
-        if (text.length < 100) return null;
-        return llmExtractDetailPage(text, u, fetched.title);
+        if (!fetched.ok) return classifyFetchError(fetched.error);
+        const text = htmlToVisibleText(fetched.html, u);
+        if (text.length < 100) return 'too_short';
+        const item = await llmExtractDetailPage(text, u, fetched.title);
+        return item ?? 'llm_empty';
       }),
     );
     for (const r of batchResults) {
-      if (r) results.push(r);
-      else failed++;
+      if (typeof r === 'string') {
+        failReasons[r] = (failReasons[r] ?? 0) + 1;
+        failed++;
+      } else {
+        results.push(r);
+      }
     }
   }
-  return { items: results, failed };
+  return { items: results, failed, failReasons };
 }
 
 export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult> {
@@ -1295,7 +1334,7 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
   }
 
   // Pass 2: LLM on visible text
-  const visibleText = htmlToVisibleText(html);
+  const visibleText = htmlToVisibleText(html, url);
   if (visibleText.length < 200) {
     return {
       ok: false,
@@ -1348,8 +1387,10 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
   // URL discovery: try sitemap.xml first (source of truth, sites with
   // 100s of listings expose them all there). Fallback to scraping
   // <a href> from the home page when sitemap is missing/empty.
-  // Capped at 50 items: 50 × ~1.5s avg with concurrency 8 ≈ 10-15s.
-  const SITE_CRAWL_CAP = Number(process.env.SITE_CRAWL_CAP) || 50;
+  // Capped at 30 items by default: at concurrency 8 with 15s fetch + 18s
+  // LLM worst-case, that's ~2 min ceiling on slow sites. SITE_CRAWL_CAP
+  // env can raise this for ops debugging without redeploying.
+  const SITE_CRAWL_CAP = Number(process.env.SITE_CRAWL_CAP) || 30;
   let detailUrls = await fetchSitemapUrls(url, SITE_CRAWL_CAP);
   let urlSource = 'sitemap';
   if (detailUrls.length < 5) {
@@ -1370,9 +1411,26 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
       success: deep.items.length,
       failed: deep.failed,
       ms: Date.now() - t0,
+      reasons: deep.failReasons,
     });
     if (deep.failed > 0) {
-      warnings.push(`Deep crawl: ${deep.failed} de ${detailUrls.length} páginas de detalhe falharam (timeout ou anti-bot).`);
+      // Surface the dominant failure reason in the user-facing warning so
+      // the operator knows whether to retry, change URL, or contact the site.
+      const top = (Object.entries(deep.failReasons) as [DeepFailReason, number][])
+        .filter(([, n]) => n > 0)
+        .sort((a, b) => b[1] - a[1])[0];
+      const reasonText = top
+        ? ({
+            timeout: 'timeout (site lento)',
+            http_4xx: 'erro 4xx (anti-bot ou link quebrado)',
+            http_5xx: 'erro 5xx (servidor instável)',
+            not_html: 'conteúdo não-HTML',
+            too_short: 'página muito pequena',
+            llm_empty: 'IA não extraiu',
+            network: 'erro de rede',
+          }[top[0]])
+        : 'falhas variadas';
+      warnings.push(`Deep crawl: ${deep.failed} de ${detailUrls.length} páginas falharam — predominante: ${reasonText}.`);
     }
     // Merge strategy: deep-crawled items REPLACE list-page versions when
     // their names overlap. Detail items are richer (full desc + gallery)
@@ -1408,12 +1466,24 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
     merged.push(...finalList);
   }
 
+  // Photo coverage — operator wants to know "did the import bring photos?"
+  // not just "how many items did we get". Items with no image_url are the
+  // ones the agent will struggle to send via WhatsApp.
+  let withPhotos = 0;
+  let totalPhotos = 0;
+  for (const it of merged) {
+    const n = Array.isArray(it.images) ? it.images.length : (it.image_url ? 1 : 0);
+    if (n > 0) withPhotos++;
+    totalPhotos += n;
+  }
   log.info('site-importer.success', {
     url,
     jsonld: jsonldItems.length,
     llm: llm.items.length,
     deep: deepCount,
     final: merged.length,
+    with_photos: withPhotos,
+    total_photos: totalPhotos,
     business_fields: Object.keys(business).length,
   });
   return {
@@ -1424,5 +1494,6 @@ export async function importCatalogFromUrl(rawUrl: string): Promise<ImportResult
     page_title: pageTitle,
     business,
     business_info_text: businessInfoText || undefined,
+    photo_stats: { with_photos: withPhotos, total_photos: totalPhotos },
   };
 }
