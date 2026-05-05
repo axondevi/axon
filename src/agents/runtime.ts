@@ -229,6 +229,12 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
     },
     // No buildRequest — intercepted in the runtime special-case below.
   },
+  send_catalog_pdf: {
+    description:
+      'Send the FULL catalog as a polished PDF (cover page + 2-col grid with photos) to the customer over WhatsApp. Use this when the customer asks for the WHOLE catalog — "tem catálogo?", "me manda o catálogo", "manda a lista completa", "mostra tudo que vocês têm", "quais imóveis vocês têm". DO NOT use for a single item — for one specific listing call send_listing_photo instead. Takes no arguments; the catalog comes from the agent\'s configuration. The PDF is delivered automatically; just confirm in PT-BR (e.g. "Pronto, te mandei o catálogo completo aqui 📄").',
+    parameters: { type: 'object', properties: {} },
+    // No buildRequest — intercepted in the runtime special-case below.
+  },
   generate_pix: {
     description:
       'Generate a Brazilian Pix payment for the customer to pay in-chat. Returns the QR code and copy-paste string. The QR is delivered automatically via WhatsApp; you only need to confirm to the customer. Use ONLY when the customer explicitly wants to pay (asked "como pago?", "quero comprar", etc).',
@@ -1003,10 +1009,9 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
 1. **NUNCA invente dado pra preencher tool.** Se a tool precisa de CEP, CNPJ, modelo de carro, link, e o cliente NÃO disse — VOCÊ PERGUNTA antes. Não chama lookup_cep com "01001-000" só pra ter algo. Não chama lookup_fipe com "Civic" se cliente só falou "carro". Cada chamada custa dinheiro do dono — desperdício é proibido.
 2. **NUNCA escreva o markup da tool no texto.** Markup tipo \`<function=name>{...}</function>\` ou \`{"name": "...", "arguments": {...}}\` é INTERNO — sai pelo canal de tool_calls do LLM, NÃO no campo content. Se você se pegar querendo escrever isso no texto, RECOMECE a resposta sem o markup.
 3. **Tool falhou ou retornou vazio?** Diz pro cliente honesto ("não achei o CEP, confirma os 8 dígitos?") em vez de inventar a resposta como se tivesse dado.
-4. **PDF de listagem / catálogo = encadeamento obrigatório.** Quando o cliente pede "manda em PDF", "me envia a listagem", "manda o catálogo", "tem como mandar isso bonitinho", você FAZ DOIS PASSOS no MESMO turno:
-   (i) chama \`search_catalog\` com a query do cliente (mesmo se já chamou em turno anterior — pega os itens fresh),
-   (ii) chama \`generate_pdf\` passando: \`title\` curto ("Imóveis selecionados", "Veículos disponíveis", "Catálogo Pet"), \`body\` resumindo (1 frase com quantidade + faixa de preço), e \`sections\` com UM bloco por item (heading = nome do item, content = preço + região + descrição curta + link se houver). Limita a 8 itens — PDF maior cansa.
-   NUNCA gere PDF de catálogo sem ter chamado \`search_catalog\` antes — você inventaria os itens. Se o catálogo voltar vazio, fala "ainda não temos itens cadastrados aqui, mas anota seu interesse e te aviso assim que entrar" em vez de gerar PDF vazio.
+4. **Catálogo COMPLETO = \`send_catalog_pdf\`.** Quando o cliente pede pra ver TUDO ("tem catálogo?", "me manda o catálogo", "manda a lista completa", "mostra tudo que vocês têm", "quais imóveis vocês têm", "quero ver os carros"), você chama \`send_catalog_pdf\` (sem argumentos — ele já pega do cadastro). É um PDF profissional com capa, fotos e todos os itens organizados em grade. NUNCA use \`generate_pdf\` (que é pra documentos avulsos) ou \`search_catalog\` + \`generate_pdf\` pra esse caso — tem ferramenta dedicada melhor.
+4b. **PDF de SUBCONJUNTO filtrado** (cliente quer um recorte, ex: "manda em PDF só as casas até 500 mil em Tabatinga"). Aí sim: \`search_catalog\` com a query + \`generate_pdf\` com \`sections\` (max 8 itens, formato sucinto). Esse caminho é exceção; o caso comum é o catálogo inteiro via \`send_catalog_pdf\`.
+   Se o catálogo estiver vazio em qualquer dos dois, fala "ainda não temos itens cadastrados aqui, mas anota seu interesse e te aviso assim que entrar" em vez de gerar PDF vazio.
 5. **Foto de item do catálogo = encadeamento obrigatório.** Quando o cliente pede "manda foto", "tem foto?", "me mostra a casa", "quero ver imagens", você FAZ DOIS PASSOS no MESMO turno:
    (i) chama \`search_catalog\` com a query (ex: "casa Martin de Sá") pra pegar o \`image_url\` real do item,
    (ii) chama \`send_listing_photo\` UMA VEZ por foto (max 3) passando o \`image_url\` retornado e um \`caption\` curto (nome + preço).
@@ -1312,6 +1317,76 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
           const errMsg = err?.message || String(err);
           history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: errMsg }) });
           toolCallsExecuted.push({ name: 'schedule_appointment', args, ok: false, cost_usdc: '0', error: errMsg });
+        }
+        continue;
+      }
+
+      // ─── Special-case: send_catalog_pdf ─────────────────────────────
+      // Renders the agent's full catalog as a polished PDF (cover + grid
+      // with photos) and stages it for delivery via the same WhatsApp
+      // sendMedia(document) path used by generate_pdf. No args — pulls
+      // straight from the agent row so the LLM can't hallucinate items.
+      if (tc.function.name === 'send_catalog_pdf') {
+        const tcStart = Date.now();
+        const errReply = (msg: string, code = 0) => {
+          history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: msg }) });
+          toolCallsExecuted.push({ name: 'send_catalog_pdf', args, ok: false, cost_usdc: '0', error: msg, ms: Date.now() - tcStart, status: code });
+        };
+        try {
+          if (!agentId) {
+            errReply('missing agent context — send_catalog_pdf can only run from a channel with an agent loaded');
+            continue;
+          }
+          const { db: dbMod } = await import('~/db');
+          const { agents: agentsTable } = await import('~/db/schema');
+          const { eq: eqOp } = await import('drizzle-orm');
+          const [agentRow] = await dbMod.select().from(agentsTable).where(eqOp(agentsTable.id, agentId)).limit(1);
+          if (!agentRow) {
+            errReply('agent not found');
+            continue;
+          }
+          const items = Array.isArray(agentRow.catalog) ? agentRow.catalog as Record<string, unknown>[] : [];
+          if (items.length === 0) {
+            errReply('catálogo vazio — não há itens para gerar PDF. Avise o cliente em PT-BR que ainda não há produtos cadastrados.');
+            continue;
+          }
+          const businessName = (agentRow.name || 'Catálogo').slice(0, 100);
+          const businessContact = (agentRow.businessInfo || '').split('\n')[0]?.slice(0, 200) || '';
+          const { renderCatalogPdf, suggestPdfFilename } = await import('~/agents/pdf-renderer');
+          const pdfBytes = await renderCatalogPdf({
+            businessName,
+            businessContact,
+            items: items.map((it) => ({
+              name: String((it as { name?: unknown }).name || ''),
+              price: typeof (it as { price?: unknown }).price === 'number' ? (it as { price: number }).price : null,
+              region: typeof (it as { region?: unknown }).region === 'string' ? (it as { region: string }).region : null,
+              description: typeof (it as { description?: unknown }).description === 'string' ? (it as { description: string }).description : null,
+              image_url: typeof (it as { image_url?: unknown }).image_url === 'string' ? (it as { image_url: string }).image_url : null,
+              url: typeof (it as { url?: unknown }).url === 'string' ? (it as { url: string }).url : null,
+            })),
+          });
+          const filename = suggestPdfFilename(`catalogo ${businessName}`);
+          generatedPdfs.push({
+            base64: pdfBytes.toString('base64'),
+            filename,
+            title: `Catálogo — ${businessName}`,
+            docType: 'outro_gerado',
+            excerpt: `${items.length} itens`,
+          });
+          history.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify({
+              ok: true,
+              filename,
+              item_count: items.length,
+              note: 'Catálogo PDF será entregue automaticamente. Confirme em PT-BR (ex: "Pronto, te mandei o catálogo completo aqui 📄").',
+            }),
+          });
+          toolCallsExecuted.push({ name: 'send_catalog_pdf', args, ok: true, cost_usdc: '0', ms: Date.now() - tcStart, status: 200 });
+        } catch (err: any) {
+          const errMsg = err?.message || String(err);
+          errReply(errMsg);
         }
         continue;
       }

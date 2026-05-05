@@ -1268,11 +1268,11 @@ async function processBufferedTurn(opts: {
     'crypto_price',
     'convert_currency',
   ];
-  // search_catalog + send_listing_photo are universal — both cost
-  // nothing on their own (catalog is in-memory, photo is just a URL
-  // forwarded to Evolution). Always-on so the LLM can chain them
-  // without the operator having to explicitly enable either.
-  const universalTools = ['search_catalog', 'send_listing_photo'];
+  // search_catalog + send_listing_photo + send_catalog_pdf are universal —
+  // they cost nothing on their own (catalog is in-memory, photo is just
+  // a URL forwarded to Evolution, PDF is rendered locally). Always-on so
+  // the LLM can chain them without the operator having to enable each.
+  const universalTools = ['search_catalog', 'send_listing_photo', 'send_catalog_pdf'];
   const effectiveTools = isOwner
     ? Array.from(new Set([...baseTools, ...ownerExtraTools, ...universalTools]))
     : Array.from(new Set([...baseTools, ...universalTools]));
