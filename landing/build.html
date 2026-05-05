@@ -3303,8 +3303,15 @@ Casa 3 quartos	2500	Mooca	Quintal grande
             : data.source;
           const bizCount = data.business ? Object.keys(data.business).filter((k) => data.business[k] && (!Array.isArray(data.business[k]) || data.business[k].length)).length : 0;
           const bizPart = bizCount ? ' + <strong>' + bizCount + ' dado(s) da empresa</strong>' : '';
+          // Photo coverage — surface "X de Y itens com foto" so the operator
+          // catches a no-photo import before saving (pure-text catalog can't
+          // be sent as a photo gallery on WhatsApp).
+          const ps = data.photo_stats || {};
+          const photoPart = (typeof ps.with_photos === 'number')
+            ? ` · <strong>${ps.with_photos}/${items.length} com foto</strong> (${ps.total_photos || 0} fotos)`
+            : '';
           showSiteProgress(
-            '✅ Achei <strong>' + items.length + ' itens</strong>' + bizPart + ' via ' + escapeHtml(sourceLabel) +
+            '✅ Achei <strong>' + items.length + ' itens</strong>' + bizPart + photoPart + ' via ' + escapeHtml(sourceLabel) +
             (data.page_title ? ' · <span style="opacity:0.7">' + escapeHtml(data.page_title) + '</span>' : ''),
             'ok'
           );
@@ -3390,26 +3397,50 @@ Casa 3 quartos	2500	Mooca	Quintal grande
       function renderSitePreview(items) {
         const el = document.getElementById('b-catalog-site-preview');
         if (!el) return;
-        const rows = items.slice(0, 10).map((it) => `
-          <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px 8px;font-weight:500;">${escapeHtml(it.name || '')}</td>
-            <td style="padding:6px 8px;color:var(--text-dim);">${it.price !== undefined && it.price !== null ? 'R$ ' + Number(it.price).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</td>
-            <td style="padding:6px 8px;color:var(--text-dim);">${escapeHtml(it.region || '—')}</td>
-            <td style="padding:6px 8px;color:var(--text-muted);font-size:11px;">${escapeHtml((it.description || '').slice(0, 80))}${it.description && it.description.length > 80 ? '…' : ''}</td>
-          </tr>
-        `).join('');
+        // Photo audit lets the operator spot a no-photo import before saving.
+        // Items with no image_url are highlighted; first photo renders as
+        // a 48x48 thumb (lazy-loaded); a "+N" badge surfaces extra gallery
+        // photos so the user knows how rich the import is.
+        const totalWithPhotos = items.reduce((n, it) => n + (it.image_url || (it.images && it.images.length) ? 1 : 0), 0);
+        const totalPhotos = items.reduce((n, it) => n + (Array.isArray(it.images) ? it.images.length : (it.image_url ? 1 : 0)), 0);
+        const rows = items.slice(0, 10).map((it) => {
+          const imgs = Array.isArray(it.images) ? it.images : [];
+          const cover = it.image_url || imgs[0] || '';
+          const extra = Math.max(0, imgs.length - 1);
+          const thumbCell = cover
+            ? `<div style="position:relative;width:48px;height:48px;border-radius:4px;overflow:hidden;background:var(--bg-elev);">
+                 <img loading="lazy" referrerpolicy="no-referrer" src="${escapeAttr(cover)}" alt="" onerror="this.style.display='none';this.parentNode.style.background='rgba(255,95,87,0.12)';this.parentNode.innerHTML='&#9888;';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.color='var(--warn)';this.parentNode.style.fontSize='14px';" style="width:100%;height:100%;object-fit:cover;display:block;" />
+                 ${extra > 0 ? `<div style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;">+${extra}</div>` : ''}
+               </div>`
+            : `<div style="width:48px;height:48px;border-radius:4px;background:rgba(255,193,7,0.12);display:flex;align-items:center;justify-content:center;color:var(--warn);font-size:11px;" title="Sem foto">∅</div>`;
+          const rowBg = cover ? '' : 'background:rgba(255,193,7,0.04);';
+          return `
+            <tr style="border-bottom:1px solid var(--border);${rowBg}">
+              <td style="padding:6px 8px;width:56px;">${thumbCell}</td>
+              <td style="padding:6px 8px;font-weight:500;">${escapeHtml(it.name || '')}</td>
+              <td style="padding:6px 8px;color:var(--text-dim);">${it.price !== undefined && it.price !== null ? 'R$ ' + Number(it.price).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</td>
+              <td style="padding:6px 8px;color:var(--text-dim);">${escapeHtml(it.region || '—')}</td>
+              <td style="padding:6px 8px;color:var(--text-muted);font-size:11px;">${escapeHtml((it.description || '').slice(0, 80))}${it.description && it.description.length > 80 ? '…' : ''}</td>
+            </tr>
+          `;
+        }).join('');
         const more = items.length > 10 ? `<div style="text-align:center;padding:8px;color:var(--text-muted);font-size:11px;">… e mais ${items.length - 10} itens</div>` : '';
         const businessCard = renderBusinessCard(pendingSiteBusiness);
         const existingBiz = (document.getElementById('b-business')?.value || '').trim();
         const bizWarn = (businessCard && existingBiz)
           ? '<div style="margin-bottom:8px;padding:8px 12px;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.3);border-radius:6px;font-size:11px;color:var(--text);">⚠️ Já existe info no campo "Informações importantes" — vai ser <strong>substituída</strong> se você marcar a checkbox acima.</div>'
           : '';
+        const photoSummary = `<span style="color:var(--text-muted);font-size:11px;">· ${totalWithPhotos}/${items.length} com foto · ${totalPhotos} fotos no total</span>`;
+        const photoWarn = (totalWithPhotos < items.length)
+          ? `<div style="margin-bottom:8px;padding:8px 12px;background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.3);border-radius:6px;font-size:11px;color:var(--text);">⚠️ <strong>${items.length - totalWithPhotos} ite${items.length - totalWithPhotos === 1 ? 'm' : 'ns'} sem foto</strong> — destacados em amarelo. O agente não consegue mandar foto desses no WhatsApp. Use "Revisar antes" pra adicionar manualmente.</div>`
+          : '';
         el.innerHTML = `
           ${businessCard}
           ${bizWarn}
+          ${photoWarn}
           <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);">
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card);font-size:12px;color:var(--text);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-              <span>📋 <strong>${items.length} itens</strong> prontos pra importar</span>
+              <span>📋 <strong>${items.length} itens</strong> prontos pra importar ${photoSummary}</span>
               <div style="display:flex;gap:6px;">
                 <button type="button" id="b-site-edit" style="background:var(--bg-elev);color:var(--text);border:1px solid var(--border);padding:6px 12px;border-radius:5px;font-size:11px;cursor:pointer;">✏️ Revisar antes</button>
                 <button type="button" id="b-site-save" style="background:var(--accent);color:white;border:none;padding:6px 14px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">💾 Salvar tudo</button>
@@ -3418,7 +3449,13 @@ Casa 3 quartos	2500	Mooca	Quintal grande
             <div style="overflow-x:auto;max-height:300px;overflow-y:auto;">
               <table style="width:100%;border-collapse:collapse;font-size:12px;">
                 <thead style="position:sticky;top:0;background:var(--bg-card);">
-                  <tr><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Nome</th><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Preço</th><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Região</th><th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Descrição</th></tr>
+                  <tr>
+                    <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Foto</th>
+                    <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Nome</th>
+                    <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Preço</th>
+                    <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Região</th>
+                    <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:500;font-size:11px;text-transform:uppercase;">Descrição</th>
+                  </tr>
                 </thead>
                 <tbody>${rows}</tbody>
               </table>
