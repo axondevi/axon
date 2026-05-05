@@ -494,7 +494,8 @@ Estacionamento: gratuito por 1h"></textarea>
                   📋 <strong><span id="b-catalog-count">0</span></strong> itens
                   <span id="b-catalog-fields" style="color:var(--text-muted);font-size:11px;margin-left:8px;"></span>
                 </div>
-                <div style="display:flex;gap:6px;">
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button type="button" id="b-catalog-pdf-btn" style="background:var(--bg-elev);color:var(--text);border:1px solid var(--accent);padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;display:none;">📄 Baixar PDF</button>
                   <a href="#" id="b-catalog-template-btn" style="font-size:11px;color:var(--accent-2);text-decoration:none;padding:5px 8px;">📥 Baixar template</a>
                   <button type="button" id="b-catalog-clear-btn" style="background:transparent;color:var(--danger);border:1px solid rgba(255,95,87,0.4);padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;">🗑 Apagar tudo</button>
                 </div>
@@ -3082,9 +3083,22 @@ Casa 3 quartos	2500	Mooca	Quintal grande
 
       function renderCatalogHeader(state) {
         const countEl = document.getElementById('b-catalog-count');
-        if (countEl) countEl.textContent = state?.item_count ?? catalogItems.length;
+        const count = state?.item_count ?? catalogItems.length;
+        if (countEl) countEl.textContent = count;
         const fieldsEl = document.getElementById('b-catalog-fields');
         if (fieldsEl) fieldsEl.textContent = catalogItems.length ? '· nome, preço, região, descrição, foto' : '';
+        // Show the "Baixar PDF" button only when there is a saved catalog —
+        // PDF generation pulls items from the DB, so showing it before save
+        // would produce an empty/stale PDF.
+        const pdfBtn = document.getElementById('b-catalog-pdf-btn');
+        if (pdfBtn) {
+          if (count > 0 && editingAgentId) {
+            pdfBtn.style.display = '';
+            pdfBtn.onclick = () => downloadCatalogPdf(editingAgentId, pdfBtn);
+          } else {
+            pdfBtn.style.display = 'none';
+          }
+        }
       }
 
       function renderCatalogTable() {
@@ -3554,12 +3568,20 @@ Casa 3 quartos	2500	Mooca	Quintal grande
           const parts = [data.item_count + ' itens'];
           if (wantBiz) parts.push(bizSaved ? 'dados da empresa' : 'dados FALHARAM');
           if (wantRename) parts.push(renameSaved ? 'nome do agente: ' + escapeHtml(newName) : 'rename FALHOU');
-          showSiteProgress('✅ <strong>' + parts.join(' + ') + ' salvos!</strong> O agente já está usando.', 'ok');
+          // After saving, surface a "Baixar PDF" CTA so the operator can
+          // immediately verify the catalog PDF that customers will receive.
+          // The button calls /catalog/pdf which generates + caches the file.
+          const pdfCta = ` <button type="button" id="b-site-pdf" style="margin-left:8px;background:var(--bg-elev);color:var(--text);border:1px solid var(--accent);padding:6px 14px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;">📄 Baixar catálogo PDF</button>`;
+          showSiteProgress('✅ <strong>' + parts.join(' + ') + ' salvos!</strong> O agente já está usando.' + pdfCta, 'ok');
+          const pdfBtn = document.getElementById('b-site-pdf');
+          if (pdfBtn) pdfBtn.addEventListener('click', () => downloadCatalogPdf(editingAgentId, pdfBtn));
           pendingSiteItems = null;
           pendingSiteBusiness = null;
           pendingSiteBusinessText = null;
           loadCatalogState(editingAgentId);
-          // Hide preview after save to make state crystal-clear
+          // Hide preview after save to make state crystal-clear (but keep
+          // the success bar with the PDF button up — moved to longer delay
+          // so the operator has time to click before it disappears).
           setTimeout(() => {
             const previewEl = document.getElementById('b-catalog-site-preview');
             if (previewEl) { previewEl.style.display = 'none'; previewEl.innerHTML = ''; }
@@ -3567,6 +3589,50 @@ Casa 3 quartos	2500	Mooca	Quintal grande
         } catch (e) {
           showSiteProgress('Falha de rede ao salvar: ' + escapeHtml(e.message || String(e)), 'err');
           if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar tudo'; }
+        }
+      }
+
+      // Trigger the catalog-PDF endpoint and either open the presigned URL
+      // (cached path) or stream the bytes (no-storage fallback). Lets the
+      // operator preview exactly what customers will receive on WhatsApp.
+      async function downloadCatalogPdf(agentId, btn) {
+        if (!agentId) return;
+        const orig = btn ? btn.textContent : null;
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Gerando PDF…'; }
+        try {
+          const headers = {};
+          if (KEY) headers['Authorization'] = 'Bearer ' + KEY;
+          const r = await fetch(BASE + '/v1/agents/' + agentId + '/catalog/pdf', { headers });
+          if (!r.ok) {
+            let msg = 'Falha ao gerar PDF.';
+            try { const j = await r.json(); if (j.message) msg = j.message; } catch (_) { /* not JSON */ }
+            alert(msg);
+            return;
+          }
+          const ctype = r.headers.get('content-type') || '';
+          if (/json/i.test(ctype)) {
+            const j = await r.json();
+            if (j && j.url) {
+              window.open(j.url, '_blank', 'noopener');
+              return;
+            }
+            alert('PDF gerado mas sem URL de download.');
+            return;
+          }
+          // Direct bytes — build a blob URL and trigger download.
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'catalogo.pdf';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 4000);
+        } catch (e) {
+          alert('Falha de rede: ' + (e.message || e));
+        } finally {
+          if (btn && orig) { btn.disabled = false; btn.textContent = orig; }
         }
       }
 
