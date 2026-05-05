@@ -656,6 +656,55 @@ async function tryGemini(
 }
 
 /**
+ * Try Groq (super-fast Llama/Qwen serverless). OpenAI-compatible.
+ * Tried right after Gemini because it's the fastest free-tier option
+ * (~2s for 14k char prompts). Free tier is generous (~14k req/day).
+ */
+async function tryGroq(
+  prompt: string,
+  maxOutputTokens: number,
+  timeoutMs: number,
+): Promise<{ ok: true; text: string } | { ok: false; error: string } | undefined> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return undefined;
+  // 70b is the only model on Groq's free tier with 32k context (others
+  // are 8k = our 14k-char prompt blows the limit). TPM cap is 6k/min so
+  // sequential deep-crawl calls will throttle — that's why this is the
+  // 2nd fallback (Gemini primary handles bulk; Groq backstops when
+  // Gemini quota exhausted).
+  const model = process.env.GROQ_EXTRACT_MODEL || 'llama-3.3-70b-versatile';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'You are a precise JSON extractor. Always respond with valid JSON only.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: maxOutputTokens,
+        response_format: { type: 'json_object' },
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      return { ok: false, error: `groq/${model} → ${res.status}: ${(await res.text()).slice(0, 160)}` };
+    }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = data.choices?.[0]?.message?.content || '';
+    return { ok: true, text };
+  } catch (err) {
+    return { ok: false, error: `groq/${model} → ${err instanceof Error ? err.message : String(err)}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Try SiliconFlow (Qwen/DeepSeek aggregator). OpenAI-compatible API.
  * Used as cross-vendor fallback when Gemini quota is exhausted —
  * separate provider, separate quota, separate models. JSON mode via
@@ -717,15 +766,20 @@ async function callExtractionJson(
   timeoutMs: number,
 ): Promise<{ ok: true; text: string; provider: string } | { ok: false; error: string }> {
   const errors: string[] = [];
+  // Order: Gemini (cheapest+JSON-tuned) → Groq (fastest backup) → SF
+  // (slowest but huge model variety). Stops at first success.
   const gem = await tryGemini(prompt, maxOutputTokens, timeoutMs);
   if (gem?.ok) return { ok: true, text: gem.text, provider: 'gemini' };
   if (gem) errors.push(gem.error);
+  const gq = await tryGroq(prompt, maxOutputTokens, timeoutMs);
+  if (gq?.ok) return { ok: true, text: gq.text, provider: 'groq' };
+  if (gq) errors.push(gq.error);
   const sf = await trySiliconFlow(prompt, maxOutputTokens, timeoutMs);
   if (sf?.ok) return { ok: true, text: sf.text, provider: 'siliconflow' };
   if (sf) errors.push(sf.error);
   return {
     ok: false,
-    error: errors.length ? errors.join(' | ') : 'no extraction provider configured (set GEMINI_API_KEY or SILICONFLOW_API_KEY)',
+    error: errors.length ? errors.join(' | ') : 'no extraction provider configured (set GEMINI_API_KEY, GROQ_API_KEY, or SILICONFLOW_API_KEY)',
   };
 }
 
@@ -735,8 +789,8 @@ async function llmExtract(
   pageTitle?: string,
 ): Promise<{ items: CatalogItem[]; warnings: string[] }> {
   const warnings: string[] = [];
-  if (!process.env.GEMINI_API_KEY && !process.env.SILICONFLOW_API_KEY) {
-    return { items: [], warnings: ['Nenhum extractor configurado — set GEMINI_API_KEY ou SILICONFLOW_API_KEY'] };
+  if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY && !process.env.SILICONFLOW_API_KEY) {
+    return { items: [], warnings: ['Nenhum extractor configurado — set GEMINI_API_KEY, GROQ_API_KEY ou SILICONFLOW_API_KEY'] };
   }
 
   // SiliconFlow expects a JSON object (not array) at top level when
@@ -1014,7 +1068,7 @@ async function llmExtractDetailPage(
   pageUrl: string,
   pageTitle?: string,
 ): Promise<CatalogItem | null> {
-  if (!process.env.GEMINI_API_KEY && !process.env.SILICONFLOW_API_KEY) return null;
+  if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY && !process.env.SILICONFLOW_API_KEY) return null;
   const prompt = [
     'Você está lendo a PÁGINA DE DETALHES de UM ÚNICO item (um imóvel, carro, produto, serviço) no site. Extraia toda a informação relevante.',
     `URL: ${pageUrl}`,
