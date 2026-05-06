@@ -36,6 +36,12 @@ export interface LLMRequest {
   /** Encourage the model to introduce new topics rather than retread
    *  the same content. 0–2 (OpenAI scale). */
   presence_penalty?: number;
+  /** OpenAI-shape tool_choice. Default 'auto' when tools are present.
+   *  Pass 'required' (or {type:'function', function:{name:'X'}}) when the
+   *  caller has DETECTED that the user clearly asked for media/action and
+   *  wants to prevent the LLM from answering text-only with a fake
+   *  delivery promise. Quietly ignored on providers that don't support it. */
+  tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
 }
 
 export interface LLMResponse {
@@ -209,7 +215,10 @@ export async function chatCompletionWithFallback(req: LLMRequest): Promise<LLMRe
     // gets the request without tools to keep it from emitting empty action.
     if (req.tools?.length && provider.supportsTools) {
       body.tools = req.tools;
-      body.tool_choice = 'auto';
+      // Default 'auto' lets the model decide; caller can override to
+      // 'required' when the user's message clearly asks for an action so
+      // the model can't just promise it in text and skip the call.
+      body.tool_choice = req.tool_choice ?? 'auto';
     }
 
     try {

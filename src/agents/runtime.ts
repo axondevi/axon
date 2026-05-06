@@ -1132,10 +1132,31 @@ EXEMPLO ERRADO (cliente: "tem catalogo? me manda em pdf"):
   // up; on a fresh rolling-window reset the cooldown clears. See
   // src/llm/fallback.ts for the exact cooldown logic.
 
+  // ─── Tool-choice intent detection ──────────────────────────────
+  // When the most recent user message clearly asks for the catalog or
+  // a photo, force tool_choice='required' on the LLM call so it can't
+  // answer with "te mandei o catálogo 📄" while skipping the actual
+  // tool call (the failure mode we caught end-to-end). Re-evaluated
+  // only at the start of the loop — once a tool fires and the model
+  // is composing the natural-language follow-up, 'auto' is fine again.
+  const lastUserMsgText = (() => {
+    const u = [...messages].reverse().find((m) => m.role === 'user');
+    return typeof u?.content === 'string' ? u.content : '';
+  })();
+  const CATALOG_INTENT = /\b(cat[aá]logo|cat[aá]logos|listagem|lista\s+(de|dos)?\s*(im[oó]ve|produto|carro|ve[ií]culo|item|itens|opc|opção|opções|servi[çc]o)|tem\s+(o\s+)?(cat[aá]logo|listagem|pdf)|me\s+(manda|mostra|envia)\s+(o\s+)?(cat[aá]logo|listagem|tudo|os?\s+im[oó]ve|todas?\s+as?\s+(opc|opç))|manda\s+(o\s+)?(cat[aá]logo|listagem|tudo|pdf)|mostra(?:r)?\s+(tudo|os?\s+im[oó]ve|todas?))/i;
+  const PHOTO_INTENT = /\b(foto|fotos|imagem|imagens|me\s+mostra(?:r)?\s+(a|o|as|os)|tem\s+foto|manda\s+(uma\s+)?foto)/i;
+  const forceToolCall = !!(lastUserMsgText && (CATALOG_INTENT.test(lastUserMsgText) || PHOTO_INTENT.test(lastUserMsgText)));
+
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    // 'required' only for the FIRST iteration on the detected intent.
+    // After tools fired (later iterations), we want the model free to
+    // produce the human-readable follow-up without being forced to
+    // call yet another tool just to satisfy the constraint.
+    const toolChoice = (forceToolCall && iter === 0 && tools.length > 0) ? 'required' as const : undefined;
     const llmResult = await chatCompletionWithFallback({
       messages: history as any,
       tools: tools.length ? tools : undefined,
+      tool_choice: toolChoice,
       max_tokens: 4096,
       // Higher temp + freq penalty = much less robotic repetition on
       // multi-turn WhatsApp threads. Picked these by stress-testing
