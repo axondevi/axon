@@ -37,10 +37,10 @@ export interface LLMRequest {
    *  the same content. 0–2 (OpenAI scale). */
   presence_penalty?: number;
   /** OpenAI-shape tool_choice. Default 'auto' when tools are present.
-   *  Pass 'required' (or {type:'function', function:{name:'X'}}) when the
-   *  caller has DETECTED that the user clearly asked for media/action and
-   *  wants to prevent the LLM from answering text-only with a fake
-   *  delivery promise. Quietly ignored on providers that don't support it. */
+   *  Stays as a hook on the request type (not currently set by callers) —
+   *  the agent runtime relies on prompt + good tool descriptions instead
+   *  of forcing a specific choice. Available if a future feature genuinely
+   *  needs to constrain the model's choice on a specific turn. */
   tool_choice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
 }
 

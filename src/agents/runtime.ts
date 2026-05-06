@@ -68,8 +68,9 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 4. Catálogo COMPLETO = send_catalog_pdf (sem args, pega do cadastro).
 4b. PDF de SUBCONJUNTO filtrado = search_catalog + generate_pdf (max 8 itens).
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
-v6 — runtime forces tool_choice='required' on catalog/photo intent regex so the LLM cannot answer text-only with a fake "te mandei" promise. Invalidates v5-era cached hallucinations.
-v5 — rule 2c: media phrase requires tool_call same turn (with examples).
+v7 — rule 2c rewritten as a concept ("mídia só sai quando a tool é chamada") instead of trigger-phrase list + few-shot. The literal CERTO/ERRADO examples were being copied verbatim by the LLM (it parroted "Pronto, te mandei o catálogo 📄" with no tool_call). Conceptual framing + the well-described tools should let the model choose correctly without a script.
+v6 — runtime tool_choice='required' regex (REVERTED — too brittle, agent should understand, not pattern-match).
+v5 — rule 2c with examples.
 v4 — TOOL_TO_AXON registry fix.
 `;
 
@@ -1012,22 +1013,6 @@ export async function runAgent(opts: {
   }
 
   const tools = buildToolsArray(effectiveTools);
-  // DEBUG: surface what actually got into the LLM tool array — catches a class
-  // of bug where universal tools are structurally present in allowedTools but
-  // the SERVER_TOOLS && TOOL_TO_AXON filter silently drops them. log is
-  // dynamic-imported here to match the existing pattern in this file.
-  try {
-    const { log } = await import('~/lib/logger');
-    log.info('agent.tools_built', {
-      agent_id: agentId,
-      allowed_count: allowedTools.length,
-      effective_count: effectiveTools.length,
-      tools_passed_filter: tools.map((t: { function?: { name?: string } }) => t.function?.name).filter(Boolean),
-      has_search_catalog: effectiveTools.includes('search_catalog'),
-      has_send_listing_photo: effectiveTools.includes('send_listing_photo'),
-      has_send_catalog_pdf: effectiveTools.includes('send_catalog_pdf'),
-    });
-  } catch { /* logging is best-effort */ }
   const toolList = effectiveTools
     .filter((t) => SERVER_TOOLS[t])
     .map((t) => `- ${t}: ${SERVER_TOOLS[t].description}`)
@@ -1073,18 +1058,9 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
 1. **NUNCA invente dado pra preencher tool.** Se a tool precisa de CEP, CNPJ, modelo de carro, link, e o cliente NÃO disse — VOCÊ PERGUNTA antes. Não chama lookup_cep com "01001-000" só pra ter algo. Não chama lookup_fipe com "Civic" se cliente só falou "carro". Cada chamada custa dinheiro do dono — desperdício é proibido.
 2. **NUNCA escreva o markup da tool no texto.** Markup tipo \`<function=name>{...}</function>\` ou \`{"name": "...", "arguments": {...}}\` é INTERNO — sai pelo canal de tool_calls do LLM, NÃO no campo content. Se você se pegar querendo escrever isso no texto, RECOMECE a resposta sem o markup.
 2b. **NUNCA escreva placeholders entre colchetes** como \`[CATÁLOGO COMPLETO DE IMÓVEIS]\`, \`[FOTO]\`, \`[FOTO DA FACHADA]\`, \`[PDF]\`, \`[ARQUIVO]\`, \`[IMAGEM AQUI]\`, \`[VEJA AS FOTOS]\`, \`[LINK DO CATÁLOGO]\`. Isso é placeholder humano de quem ainda não construiu o sistema — não é como mídia funciona aqui. Mídia (foto/PDF/áudio) só chega pro cliente se você **CHAMA A TOOL** (\`send_listing_photo\`, \`send_catalog_pdf\`, \`generate_pdf\`). Se a tool não existe pra esse caso, descreve em texto natural ("posso te enviar o catálogo agora, segura aí") SEM colchetes — e CHAMA a tool no mesmo turno. Texto entre colchetes = você quebrando a ilusão e o cliente vai sentir que é bot mal feito.
-2c. **REGRA DE OURO — entrega de mídia SEMPRE acompanha tool_call.**
-Se você escreveu na resposta qualquer uma destas frases (ou variação): "te mandei o catálogo", "aqui está o catálogo", "te enviei o PDF", "segue em anexo", "te mandei a foto", "aqui está a foto", "te mandei as imagens", "olha a foto" — então OBRIGATORIAMENTE você TEM QUE ter chamado a tool correspondente (\`send_catalog_pdf\` / \`send_listing_photo\` / \`generate_pdf\`) NESSE MESMO TURNO. **Texto sem tool_call = mentira pro cliente** (você diz que mandou mas não mandou nada — o cliente fica esperando uma mídia que nunca chega).
-Se você se pegar pensando "vou só dizer que mandei e o sistema entrega" — PARE. O sistema NÃO entrega nada se você não chamar a tool. CHAME A TOOL.
-Se você não tem certeza de qual tool chamar, ainda é melhor PERGUNTAR ("você prefere o catálogo inteiro ou um imóvel específico?") do que prometer entrega sem chamar.
-
-EXEMPLO CERTO (cliente: "tem catalogo? me manda em pdf"):
-  tool_calls: [send_catalog_pdf({})]
-  content: "Pronto, te mandei o catálogo completo aqui 📄. Se quiser eu filtro por região depois, é só me dizer."
-
-EXEMPLO ERRADO (cliente: "tem catalogo? me manda em pdf"):
-  tool_calls: []
-  content: "Pronto, te mandei o catálogo completo aqui 📄"   ← MENTIRA, nada saiu, cliente fica esperando.
+2c. **Mídia só sai quando a tool é chamada.**
+Quando o cliente quer receber algo (catálogo, foto, PDF, ficha), o sistema SÓ ENTREGA se você chamar a tool — \`send_catalog_pdf\` pro catálogo completo, \`send_listing_photo\` pra foto de item, \`generate_pdf\` pra documento avulso. Confirmar a entrega no texto ("pronto, te mandei", "olha aí", "segue em anexo") sem ter chamado a tool no mesmo turno significa que o cliente vai ficar esperando uma mídia que nunca chega — pior que negar, parece sacanagem.
+Use o critério: "se eu disser que enviei, alguém realmente tem que receber". Se a tool pra entregar isso existe, chame. Se não existe ou você não tem certeza, **pergunte ou ofereça** em vez de afirmar entrega ("posso te enviar o catálogo agora?", "te mostro um imóvel que parece encaixar?").
 3. **Tool falhou ou retornou vazio?** Diz pro cliente honesto ("não achei o CEP, confirma os 8 dígitos?") em vez de inventar a resposta como se tivesse dado.
 4. **Catálogo COMPLETO = \`send_catalog_pdf\`.** Quando o cliente pede pra ver TUDO ("tem catálogo?", "me manda o catálogo", "manda a lista completa", "mostra tudo que vocês têm", "quais imóveis vocês têm", "quero ver os carros"), você chama \`send_catalog_pdf\` (sem argumentos — ele já pega do cadastro). É um PDF profissional com capa, fotos e todos os itens organizados em grade. NUNCA use \`generate_pdf\` (que é pra documentos avulsos) ou \`search_catalog\` + \`generate_pdf\` pra esse caso — tem ferramenta dedicada melhor.
 4b. **PDF de SUBCONJUNTO filtrado** (cliente quer um recorte, ex: "manda em PDF só as casas até 500 mil em Tabatinga"). Aí sim: \`search_catalog\` com a query + \`generate_pdf\` com \`sections\` (max 8 itens, formato sucinto). Esse caminho é exceção; o caso comum é o catálogo inteiro via \`send_catalog_pdf\`.
@@ -1133,44 +1109,10 @@ EXEMPLO ERRADO (cliente: "tem catalogo? me manda em pdf"):
   // up; on a fresh rolling-window reset the cooldown clears. See
   // src/llm/fallback.ts for the exact cooldown logic.
 
-  // ─── Tool-choice intent detection ──────────────────────────────
-  // When the most recent user message clearly asks for the catalog or
-  // a photo, force tool_choice='required' on the LLM call so it can't
-  // answer with "te mandei o catálogo 📄" while skipping the actual
-  // tool call (the failure mode we caught end-to-end). Re-evaluated
-  // only at the start of the loop — once a tool fires and the model
-  // is composing the natural-language follow-up, 'auto' is fine again.
-  const lastUserMsgText = (() => {
-    const u = [...messages].reverse().find((m) => m.role === 'user');
-    return typeof u?.content === 'string' ? u.content : '';
-  })();
-  const CATALOG_INTENT = /\b(cat[aá]logo|cat[aá]logos|listagem|lista\s+(de|dos)?\s*(im[oó]ve|produto|carro|ve[ií]culo|item|itens|opc|opção|opções|servi[çc]o)|tem\s+(o\s+)?(cat[aá]logo|listagem|pdf)|me\s+(manda|mostra|envia)\s+(o\s+)?(cat[aá]logo|listagem|tudo|os?\s+im[oó]ve|todas?\s+as?\s+(opc|opç))|manda\s+(o\s+)?(cat[aá]logo|listagem|tudo|pdf)|mostra(?:r)?\s+(tudo|os?\s+im[oó]ve|todas?))/i;
-  const PHOTO_INTENT = /\b(foto|fotos|imagem|imagens|me\s+mostra(?:r)?\s+(a|o|as|os)|tem\s+foto|manda\s+(uma\s+)?foto)/i;
-  const forceToolCall = !!(lastUserMsgText && (CATALOG_INTENT.test(lastUserMsgText) || PHOTO_INTENT.test(lastUserMsgText)));
-
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    // 'required' only for the FIRST iteration on the detected intent.
-    // After tools fired (later iterations), we want the model free to
-    // produce the human-readable follow-up without being forced to
-    // call yet another tool just to satisfy the constraint.
-    const toolChoice = (forceToolCall && iter === 0 && tools.length > 0) ? 'required' as const : undefined;
-    if (iter === 0) {
-      try {
-        const { log } = await import('~/lib/logger');
-        log.info('agent.llm_call', {
-          agent_id: agentId,
-          iter,
-          tools_count: tools.length,
-          tool_choice: toolChoice ?? 'auto',
-          force_tool_call: forceToolCall,
-          last_user_excerpt: lastUserMsgText.slice(0, 100),
-        });
-      } catch { /* logging is best-effort */ }
-    }
     const llmResult = await chatCompletionWithFallback({
       messages: history as any,
       tools: tools.length ? tools : undefined,
-      tool_choice: toolChoice,
       max_tokens: 4096,
       // Higher temp + freq penalty = much less robotic repetition on
       // multi-turn WhatsApp threads. Picked these by stress-testing
