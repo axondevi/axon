@@ -68,8 +68,9 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 4. Catálogo COMPLETO = send_catalog_pdf (sem args, pega do cadastro).
 4b. PDF de SUBCONJUNTO filtrado = search_catalog + generate_pdf (max 8 itens).
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
-v5 — rule 2c: explicit "media phrase requires tool_call in same turn" with worked examples. End-to-end test confirmed the LLM was receiving send_catalog_pdf (verified via agent.tools_built log) but choosing to write "te mandei o catálogo 📄" without calling the tool. Few-shot CERTO vs ERRADO blocks force the contrast.
-v4 — special-case tools (search_catalog, send_listing_photo, send_catalog_pdf, generate_pdf, schedule_appointment) registered in TOOL_TO_AXON so they survive the buildToolsArray filter.
+v6 — runtime forces tool_choice='required' on catalog/photo intent regex so the LLM cannot answer text-only with a fake "te mandei" promise. Invalidates v5-era cached hallucinations.
+v5 — rule 2c: media phrase requires tool_call same turn (with examples).
+v4 — TOOL_TO_AXON registry fix.
 `;
 
 export const SERVER_TOOLS: Record<string, ToolDef> = {
