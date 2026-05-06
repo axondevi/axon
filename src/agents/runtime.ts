@@ -68,7 +68,7 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 4. Catálogo COMPLETO = send_catalog_pdf (sem args, pega do cadastro).
 4b. PDF de SUBCONJUNTO filtrado = search_catalog + generate_pdf (max 8 itens).
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
-v3 — anti-placeholder hardening + send_catalog_pdf intent routing.
+v4 — fix critical bug: special-case tools (search_catalog, send_listing_photo, send_catalog_pdf, generate_pdf, schedule_appointment) were being filtered out of the LLM's tool list because they weren't in TOOL_TO_AXON. They are now. Without this, every "manda foto" / "manda catálogo" / "search the inventory" turn was a hallucination because the model literally couldn't see the tool.
 `;
 
 export const SERVER_TOOLS: Record<string, ToolDef> = {

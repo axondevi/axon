@@ -78,8 +78,21 @@ export const TOOL_CATEGORIES: Record<string, string[]> = {
  * - generate_pix: payment is a flow that can be triggered mid-conversation
  *   ("pode mandar o Pix?"). Without keeping this always-on, the agent
  *   would need to reclassify after every customer turn.
+ * - search_catalog / send_listing_photo / send_catalog_pdf: the catalog
+ *   triad. If the LLM can't see these tools, it falls back to writing
+ *   "[CATÁLOGO COMPLETO]" / "[FOTO]" placeholders in plain text — exactly
+ *   the bug we hit in production. Adding ~750 tokens here is cheap relative
+ *   to that failure mode. Kept here in addition to TOOL_TO_AXON because
+ *   smart selection runs BEFORE buildToolsArray and can otherwise drop
+ *   them silently for turns that don't keyword-match.
  */
-const ALWAYS_ON: string[] = ['search_web', 'generate_pix'];
+const ALWAYS_ON: string[] = [
+  'search_web',
+  'generate_pix',
+  'search_catalog',
+  'send_listing_photo',
+  'send_catalog_pdf',
+];
 
 /**
  * Tool-level keyword patterns. Each entry: tool name → regex.

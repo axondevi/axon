@@ -1011,6 +1011,18 @@ export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
   translate_text:     { api: '__internal__', endpoint: 'translate_text' },
   detect_language:    { api: '__internal__', endpoint: 'detect_language' },
   summarize_url:      { api: '__internal__', endpoint: 'summarize_url' },
+  // Catalog + WhatsApp delivery tools — also pure-internal (no upstream API).
+  // CRITICAL: without these stubs, buildToolsArray's
+  // `SERVER_TOOLS[name] && TOOL_TO_AXON[name]` filter would drop them
+  // BEFORE the LLM sees the tools list, and the model would have no
+  // choice but to hallucinate "[CATÁLOGO COMPLETO]"-style placeholders
+  // (it can't call a tool it doesn't know exists). The runtime handles
+  // each via its own special-case branch.
+  search_catalog:       { api: '__internal__', endpoint: 'search_catalog' },
+  send_listing_photo:   { api: '__internal__', endpoint: 'send_listing_photo' },
+  send_catalog_pdf:     { api: '__internal__', endpoint: 'send_catalog_pdf' },
+  generate_pdf:         { api: '__internal__', endpoint: 'generate_pdf' },
+  schedule_appointment: { api: '__internal__', endpoint: 'schedule_appointment' },
 };
 
 /** Returns true if `(api, endpoint)` is the backing pair of a tool in `allowed`. */
