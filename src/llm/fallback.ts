@@ -78,20 +78,17 @@ interface ProviderConfig {
 /**
  * Provider order: best-tool-call to last-resort.
  *
- * Groq llama-3.3-70b: rock-solid tool calls, free tier with hard daily cap.
- * Gemini 2.5 Flash:   excellent tool calls, 1500 req/day free.
- * Cohere command-r-plus: generous free tier, BUT often emits empty action
- *                       when tools are present — last resort.
+ * Gemini 2.5 Flash:   PRIMARY. End-to-end testing showed Llama-3.x via Groq
+ *                     systematically refuses to call tools on PT-BR conversations
+ *                     (it would say "te mandei o catálogo 📄" and skip the
+ *                     send_catalog_pdf call). Gemini calls them reliably.
+ *                     1500 req/day free quota.
+ * Groq llama-3.3-70b: FALLBACK. Faster latency, hard daily token cap. Good for
+ *                     turns without tool calling, or when Gemini quota burns.
+ * Cohere command-r-plus: LAST RESORT. Generous free tier but often emits empty
+ *                     `acao` when tools are present. Text-only fallback.
  */
 const PROVIDERS: ProviderConfig[] = [
-  {
-    name: 'groq',
-    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    keySlug: 'groq',
-    model: 'llama-3.3-70b-versatile',
-    supportsTools: true,
-    supportsRepetitionPenalties: true,
-  },
   {
     name: 'gemini',
     endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
@@ -100,6 +97,14 @@ const PROVIDERS: ProviderConfig[] = [
     supportsTools: true,
     // Gemini's OAI-compat layer accepts the params but silently ignores
     // them. Sending is harmless. Keeping true so we don't have to gate.
+    supportsRepetitionPenalties: true,
+  },
+  {
+    name: 'groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    keySlug: 'groq',
+    model: 'llama-3.3-70b-versatile',
+    supportsTools: true,
     supportsRepetitionPenalties: true,
   },
   {
