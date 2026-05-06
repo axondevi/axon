@@ -1010,6 +1010,22 @@ export async function runAgent(opts: {
   }
 
   const tools = buildToolsArray(effectiveTools);
+  // DEBUG: surface what actually got into the LLM tool array — catches a class
+  // of bug where universal tools are structurally present in allowedTools but
+  // the SERVER_TOOLS && TOOL_TO_AXON filter silently drops them. log is
+  // dynamic-imported here to match the existing pattern in this file.
+  try {
+    const { log } = await import('~/lib/logger');
+    log.info('agent.tools_built', {
+      agent_id: agentId,
+      allowed_count: allowedTools.length,
+      effective_count: effectiveTools.length,
+      tools_passed_filter: tools.map((t: { function?: { name?: string } }) => t.function?.name).filter(Boolean),
+      has_search_catalog: effectiveTools.includes('search_catalog'),
+      has_send_listing_photo: effectiveTools.includes('send_listing_photo'),
+      has_send_catalog_pdf: effectiveTools.includes('send_catalog_pdf'),
+    });
+  } catch { /* logging is best-effort */ }
   const toolList = effectiveTools
     .filter((t) => SERVER_TOOLS[t])
     .map((t) => `- ${t}: ${SERVER_TOOLS[t].description}`)
