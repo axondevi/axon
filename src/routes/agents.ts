@@ -1174,13 +1174,16 @@ app.get('/:id/catalog/pdf', async (c) => {
     return c.json({ error: 'empty_catalog', message: 'Catálogo vazio. Importe ou cadastre itens antes de gerar o PDF.' }, 400);
   }
 
-  // Hash the catalog payload + business info so we cache by content. Edit
-  // the catalog -> hash changes -> next call regenerates. Stable across
-  // requests for the same content so the second download is instant.
+  // Hash the catalog payload + business info + renderer version so we cache
+  // by content. Edit the catalog or bump the renderer -> hash changes -> next
+  // call regenerates. Stable across requests for the same content so a
+  // second download is instant. Bump CATALOG_PDF_RENDERER_VERSION whenever
+  // the renderCatalogPdf layout changes so old cached PDFs are abandoned.
+  const CATALOG_PDF_RENDERER_VERSION = 'v2-2026-05-06';
   const { createHash } = await import('node:crypto');
   const businessName = (a.name || 'Catálogo').slice(0, 100);
   const businessContact = (a.businessInfo || '').split('\n')[0]?.slice(0, 200) || '';
-  const hashInput = JSON.stringify({ businessName, businessContact, items });
+  const hashInput = JSON.stringify({ renderer: CATALOG_PDF_RENDERER_VERSION, businessName, businessContact, items });
   const hash = createHash('sha1').update(hashInput).digest('hex').slice(0, 16);
   const storageKey = `catalogs/${a.id}/${hash}.pdf`;
 

@@ -275,14 +275,24 @@ async function prefetchItemImages(items: CatalogPdfItem[]): Promise<(Buffer | nu
 }
 
 /**
- * Render a multi-page catalog PDF with photos. Layout: cover page +
- * 2-column grid cards (photo on top, text below). Cards are sized so
- * 6 fit per A4 page; a 30-item catalog produces ~6 pages.
+ * Render a multi-page catalog PDF with photos.
  *
- * Photos are pre-fetched in parallel (concurrency 6, per-image timeout
- * 7s) to keep total render time under ~12s on slow upstreams. Items
- * whose photo fails to load render as text-only cards instead of failing
- * the whole document.
+ * Layout (rebuilt 2026-05-06 after first pass produced a broken cover and
+ * mis-clipped item photos):
+ *   - Cover page: solid accent color background, business name in white,
+ *     contact line, item count, generation date. No photo on cover —
+ *     using a sample item photo had been making the cover look like a
+ *     malformed first listing card.
+ *   - Item pages: 2 cards per row × 3 rows = 6 per page. Card has a
+ *     soft background, photo on top with `fit:[w,h]` (preserves aspect,
+ *     never overflows the box — `cover:` was unpredictable across pdfkit
+ *     versions and bled the image past the rounded corners), then text
+ *     block underneath.
+ *   - Footer on every page: "página N de M" centered.
+ *
+ * Photos pre-fetched concurrency=6 with 7s per-image timeout. Items that
+ * fail to load show a clean "sem foto" placeholder instead of breaking
+ * the page.
  */
 export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> {
   const items = input.items.slice(0, 50);
@@ -298,6 +308,8 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
           Producer: 'Axon Agent',
           Creator: 'Axon Agent',
         },
+        autoFirstPage: false,  // we manage pages manually so cover renders cleanly
+        bufferPages: true,     // required for bufferedPageRange + switchToPage at the end
       });
       const chunks: Uint8Array[] = [];
       doc.on('data', (chunk: Uint8Array | Buffer) => {
@@ -312,130 +324,187 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
       });
       doc.on('error', reject);
 
+      // Constants depend on page geometry — capture once on the first page.
+      doc.addPage();
       const pageW = doc.page.width;
       const pageH = doc.page.height;
       const usableW = pageW - 2 * PAGE_MARGIN;
+      const ACCENT = '#7c5cff';
 
       // ─── Cover page ────────────────────────────────────────
-      doc.font('Helvetica-Bold').fontSize(28).fillColor('#222222');
-      doc.text(input.businessName.slice(0, 100), PAGE_MARGIN, pageH / 2 - 80, {
+      // Solid accent panel covering the page so the cover reads as a real
+      // cover, not a malformed item card.
+      doc.save();
+      doc.rect(0, 0, pageW, pageH).fill(ACCENT);
+      doc.restore();
+
+      // Subtle "Catálogo" word at the top
+      doc.fillColor('#ffffffcc').font('Helvetica').fontSize(11);
+      doc.text('CATÁLOGO', PAGE_MARGIN, PAGE_MARGIN + 8, {
+        align: 'center', width: usableW, characterSpacing: 4,
+      });
+
+      // Business name — vertically centered, large, white.
+      const nameSize = input.businessName.length > 28 ? 30 : 38;
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(nameSize);
+      const nameY = pageH / 2 - 60;
+      doc.text(input.businessName.slice(0, 100), PAGE_MARGIN, nameY, {
         align: 'center', width: usableW,
       });
-      doc.moveDown(0.5);
-      doc.font('Helvetica').fontSize(13).fillColor('#666666');
-      doc.text('Catálogo de produtos e serviços', { align: 'center', width: usableW });
-      if (input.businessContact && input.businessContact.trim()) {
-        doc.moveDown(0.7);
-        doc.fontSize(11).fillColor('#888888');
-        doc.text(input.businessContact.trim().slice(0, 200), { align: 'center', width: usableW });
-      }
-      doc.moveDown(2);
-      doc.fontSize(11).fillColor('#444444');
-      doc.text(`${items.length} ite${items.length === 1 ? 'm' : 'ns'} disponíve${items.length === 1 ? 'l' : 'is'}`, {
-        align: 'center', width: usableW,
-      });
-      doc.moveDown(0.4);
-      doc.fontSize(9).fillColor('#999999');
+
+      // Item count chip
+      doc.fillColor('#ffffffee').font('Helvetica').fontSize(13);
       doc.text(
-        new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' }),
+        `${items.length} ite${items.length === 1 ? 'm' : 'ns'} disponíve${items.length === 1 ? 'l' : 'is'}`,
+        PAGE_MARGIN, nameY + nameSize + 18,
         { align: 'center', width: usableW },
       );
-      doc.fillColor('#000000');
+
+      // Contact line
+      if (input.businessContact && input.businessContact.trim()) {
+        doc.fillColor('#ffffffaa').font('Helvetica').fontSize(11);
+        doc.text(input.businessContact.trim().slice(0, 200), PAGE_MARGIN, pageH - PAGE_MARGIN - 60, {
+          align: 'center', width: usableW,
+        });
+      }
+
+      // Date footer on cover
+      doc.fillColor('#ffffff88').font('Helvetica').fontSize(9);
+      doc.text(
+        new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' }),
+        PAGE_MARGIN, pageH - PAGE_MARGIN - 30,
+        { align: 'center', width: usableW },
+      );
 
       // ─── Item cards (2-col grid) ───────────────────────────
-      // Cell geometry: 2 columns with a 16pt gap, 3 rows per page.
       const COLS = 2;
       const ROWS = 3;
       const COL_GAP = 16;
       const ROW_GAP = 20;
       const cellW = (usableW - COL_GAP * (COLS - 1)) / COLS;
-      const cellHeaderImgH = 140; // photo height
-      const cellTextH = 130;      // text block height
-      const cellH = cellHeaderImgH + cellTextH;
-      const gridTop = PAGE_MARGIN + 30; // room for "Página N" header
+      const photoBoxH = 140;
+      const textBoxH = 120;
+      const cellH = photoBoxH + textBoxH;
+      const gridTop = PAGE_MARGIN + 28;
       const cardsPerPage = COLS * ROWS;
+      const totalItemPages = Math.max(1, Math.ceil(items.length / cardsPerPage));
 
       for (let i = 0; i < items.length; i++) {
         const slot = i % cardsPerPage;
         if (slot === 0) {
           doc.addPage();
-          // Page header (small, top-right)
-          doc.font('Helvetica').fontSize(9).fillColor('#aaaaaa');
+          // Page header (small, top-right) with the business name as breadcrumb.
+          doc.fillColor('#999999').font('Helvetica').fontSize(9);
           doc.text(
-            `${input.businessName.slice(0, 60)}  ·  página ${Math.floor(i / cardsPerPage) + 2}`,
-            PAGE_MARGIN, PAGE_MARGIN - 10, { align: 'right', width: usableW },
+            input.businessName.slice(0, 60),
+            PAGE_MARGIN, PAGE_MARGIN - 12,
+            { align: 'left', width: usableW / 2 },
+          );
+          const pageNum = Math.floor(i / cardsPerPage) + 1;
+          doc.text(
+            `página ${pageNum} de ${totalItemPages}`,
+            PAGE_MARGIN + usableW / 2, PAGE_MARGIN - 12,
+            { align: 'right', width: usableW / 2 },
           );
           doc.fillColor('#000000');
         }
         const col = slot % COLS;
         const row = Math.floor(slot / COLS);
-        const x = PAGE_MARGIN + col * (cellW + COL_GAP);
-        const y = gridTop + row * (cellH + ROW_GAP);
+        const cardX = PAGE_MARGIN + col * (cellW + COL_GAP);
+        const cardY = gridTop + row * (cellH + ROW_GAP);
 
-        // Card background
+        // Card background — light fill + thin border
         doc.save();
-        doc.roundedRect(x, y, cellW, cellH, 6).fillAndStroke('#fafafa', '#e5e5e5');
+        doc.roundedRect(cardX, cardY, cellW, cellH, 6).fillAndStroke('#ffffff', '#e2e2e7');
         doc.restore();
 
-        // Photo (or placeholder)
+        // Photo region — fit (preserves aspect, never overflows). If no
+        // photo, show a clean placeholder block.
+        const photoX = cardX + 8;
+        const photoY = cardY + 8;
+        const photoBoxW = cellW - 16;
+        const photoBoxInnerH = photoBoxH - 16;
+
+        // Always paint the photo "frame" so cards are visually consistent
+        // whether or not the photo loaded.
+        doc.save();
+        doc.roundedRect(photoX, photoY, photoBoxW, photoBoxInnerH, 4).fillAndStroke('#f3f4f6', '#e2e2e7');
+        doc.restore();
+
         const photoBuf = photoBuffers[i];
-        const photoX = x + 8;
-        const photoY = y + 8;
-        const photoW = cellW - 16;
-        const photoH = cellHeaderImgH - 16;
         if (photoBuf) {
           try {
-            doc.save();
-            doc.roundedRect(photoX, photoY, photoW, photoH, 4).clip();
-            doc.image(photoBuf, photoX, photoY, { width: photoW, height: photoH, cover: [photoW, photoH] });
-            doc.restore();
+            // fit:[w,h] keeps the original aspect ratio AND never spills past
+            // the bounding box — exactly what we want, no clip needed.
+            doc.image(photoBuf, photoX, photoY, {
+              fit: [photoBoxW, photoBoxInnerH],
+              align: 'center',
+              valign: 'center',
+            });
           } catch {
-            // If pdfkit can't decode (rare — corrupt JPEG), draw the placeholder instead.
-            doc.save();
-            doc.roundedRect(photoX, photoY, photoW, photoH, 4).fillAndStroke('#f0f0f0', '#dddddd');
-            doc.fillColor('#aaaaaa').font('Helvetica').fontSize(9).text('sem foto', photoX, photoY + photoH / 2 - 6, { width: photoW, align: 'center' });
-            doc.restore();
+            // Corrupt/unsupported byte stream — frame already drawn, just
+            // overlay the "sem foto" caption.
+            doc.fillColor('#9ca3af').font('Helvetica').fontSize(9);
+            doc.text('sem foto', photoX, photoY + photoBoxInnerH / 2 - 5, {
+              width: photoBoxW, align: 'center',
+            });
           }
         } else {
-          doc.save();
-          doc.roundedRect(photoX, photoY, photoW, photoH, 4).fillAndStroke('#f0f0f0', '#dddddd');
-          doc.fillColor('#aaaaaa').font('Helvetica').fontSize(9).text('sem foto', photoX, photoY + photoH / 2 - 6, { width: photoW, align: 'center' });
-          doc.restore();
+          doc.fillColor('#9ca3af').font('Helvetica').fontSize(9);
+          doc.text('sem foto', photoX, photoY + photoBoxInnerH / 2 - 5, {
+            width: photoBoxW, align: 'center',
+          });
         }
         doc.fillColor('#000000');
 
-        // Text block — name (bold), price line, region, description.
-        const textX = x + 12;
-        const textY = y + cellHeaderImgH + 2;
+        // Text block — name (bold), price (accent), region (muted), description.
+        const textX = cardX + 12;
+        const textY = cardY + photoBoxH + 4;
         const textW = cellW - 24;
         const it = items[i];
-        doc.font('Helvetica-Bold').fontSize(11).fillColor('#222222');
-        doc.text((it.name || '').slice(0, 80), textX, textY, { width: textW, ellipsis: true, height: 28 });
-        const priceText = formatPrice(it.price);
+
+        doc.font('Helvetica-Bold').fontSize(11).fillColor('#1f2937');
+        doc.text((it.name || '').slice(0, 80), textX, textY, {
+          width: textW, height: 28, ellipsis: true,
+        });
+
+        doc.font('Helvetica-Bold').fontSize(12).fillColor(ACCENT);
+        doc.text(formatPrice(it.price), textX, textY + 30, { width: textW });
+
+        let textCursor = textY + 48;
         const region = (it.region || '').trim();
-        doc.font('Helvetica-Bold').fontSize(11).fillColor('#7c5cff');
-        doc.text(priceText, textX, textY + 28, { width: textW });
         if (region) {
-          doc.font('Helvetica').fontSize(9).fillColor('#777777');
-          doc.text(region.slice(0, 60), textX, textY + 44, { width: textW, ellipsis: true });
+          doc.font('Helvetica').fontSize(9).fillColor('#6b7280');
+          doc.text(region.slice(0, 60), textX, textCursor, {
+            width: textW, ellipsis: true,
+          });
+          textCursor += 14;
         }
         const desc = (it.description || '').trim();
         if (desc) {
-          doc.font('Helvetica').fontSize(8.5).fillColor('#444444');
-          doc.text(desc.slice(0, 220), textX, textY + (region ? 60 : 44), {
-            width: textW, height: 60, ellipsis: true, lineGap: 1,
+          doc.font('Helvetica').fontSize(8.5).fillColor('#4b5563');
+          doc.text(desc.slice(0, 220), textX, textCursor, {
+            width: textW, height: textY + textBoxH - textCursor - 6,
+            ellipsis: true, lineGap: 1,
           });
         }
       }
 
-      // ─── Footer on last page ────────────────────────────────
-      doc.font('Helvetica').fontSize(8).fillColor('#999999');
-      doc.text(
-        `Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
-        PAGE_MARGIN, pageH - PAGE_MARGIN - HEADER_GAP,
-        { align: 'center', width: usableW },
-      );
-      doc.fillColor('#000000');
+      // ─── Footer on every non-cover page ────────────────────
+      // Walk the buffered pages and stamp a generation timestamp at the
+      // bottom. We skip page 0 (the cover, which has its own footer).
+      const pageRange = doc.bufferedPageRange?.();
+      if (pageRange) {
+        const footerText = `Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
+        for (let p = pageRange.start + 1; p < pageRange.start + pageRange.count; p++) {
+          doc.switchToPage(p);
+          doc.fillColor('#9ca3af').font('Helvetica').fontSize(8);
+          doc.text(footerText, PAGE_MARGIN, pageH - PAGE_MARGIN - 16, {
+            align: 'center', width: usableW,
+          });
+        }
+        doc.fillColor('#000000');
+      }
 
       doc.end();
     } catch (err) {
