@@ -1126,6 +1126,19 @@ Use o critério: "se eu disser que enviei, alguém realmente tem que receber". S
     });
     lastProvider = llmResult.provider || lastProvider;
     const msg: ChatMessage = (llmResult.message as ChatMessage) ?? {};
+    // Log which provider answered + whether it emitted tool_calls. Lets us
+    // confirm Gemini is actually getting picked over Groq, and whether the
+    // provider-level tool-calling is firing as expected per turn.
+    try {
+      const { log } = await import('~/lib/logger');
+      log.info('agent.llm_response', {
+        agent_id: agentId,
+        provider: llmResult.provider,
+        iter,
+        had_tool_calls: Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0,
+        tool_calls_count: Array.isArray(msg.tool_calls) ? msg.tool_calls.length : 0,
+      });
+    } catch { /* logging is best-effort */ }
 
     history.push(msg);
 
