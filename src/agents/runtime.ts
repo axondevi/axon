@@ -1153,6 +1153,19 @@ EXEMPLO ERRADO (cliente: "tem catalogo? me manda em pdf"):
     // produce the human-readable follow-up without being forced to
     // call yet another tool just to satisfy the constraint.
     const toolChoice = (forceToolCall && iter === 0 && tools.length > 0) ? 'required' as const : undefined;
+    if (iter === 0) {
+      try {
+        const { log } = await import('~/lib/logger');
+        log.info('agent.llm_call', {
+          agent_id: agentId,
+          iter,
+          tools_count: tools.length,
+          tool_choice: toolChoice ?? 'auto',
+          force_tool_call: forceToolCall,
+          last_user_excerpt: lastUserMsgText.slice(0, 100),
+        });
+      } catch { /* logging is best-effort */ }
+    }
     const llmResult = await chatCompletionWithFallback({
       messages: history as any,
       tools: tools.length ? tools : undefined,
