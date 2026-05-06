@@ -250,7 +250,7 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
   },
   send_listing_photo: {
     description:
-      'Send a real photo of a catalog item (property, car, product) to the customer via WhatsApp. Use this when the customer asks for "fotos", "imagens", "foto da casa", "manda a foto" — or when showing items where you want the photo to land. ALWAYS call search_catalog first to get the actual image_url from the inventory. Maximum 3 photos per turn (avoids spam). Returns ok:true when queued. NEVER write "[FOTOS]" or "*FOTO*" placeholders in your reply — call this tool to deliver real photos.',
+      'Entrega a foto real de UM item do catálogo (imóvel, carro, produto) ao cliente via WhatsApp. Esta é a única forma do cliente receber a foto — falar "olha a foto" ou descrever a imagem em texto NÃO entrega nada. SEMPRE chame search_catalog primeiro para pegar o image_url real do item (não invente URL). Limite de 3 fotos por turno para evitar spam. Para mostrar o catálogo INTEIRO use send_catalog_pdf — esta tool é só para itens individuais. Após chamar, escreva uma legenda curta e natural em PT-BR.',
     parameters: {
       type: 'object',
       properties: {
@@ -263,7 +263,7 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
   },
   send_catalog_pdf: {
     description:
-      'Send the FULL catalog as a polished PDF (cover page + 2-col grid with photos) to the customer over WhatsApp. Use this when the customer asks for the WHOLE catalog — "tem catálogo?", "me manda o catálogo", "manda a lista completa", "mostra tudo que vocês têm", "quais imóveis vocês têm". DO NOT use for a single item — for one specific listing call send_listing_photo instead. Takes no arguments; the catalog comes from the agent\'s configuration. The PDF is delivered automatically; just confirm in PT-BR (e.g. "Pronto, te mandei o catálogo completo aqui 📄").',
+      'Entrega o catálogo COMPLETO ao cliente via WhatsApp como um arquivo PDF profissional (capa + grade de cards com foto, nome, preço, região e descrição de cada item). Esta é a ÚNICA maneira do cliente receber o catálogo — não há outro caminho automático; descrever no chat sem chamar esta função NÃO entrega nada, o cliente fica esperando. Use sempre que o cliente quer ver TUDO de uma vez (catálogo, listagem, relação, "tudo que vocês têm"), em qualquer reformulação. Não use para um único item específico — para isso use send_listing_photo. Não recebe argumentos: o catálogo vem do cadastro do agente. Após chamar, escreva uma confirmação curta e natural em PT-BR no campo content (sem inventar conteúdo do PDF).',
     parameters: { type: 'object', properties: {} },
     // No buildRequest — intercepted in the runtime special-case below.
   },
