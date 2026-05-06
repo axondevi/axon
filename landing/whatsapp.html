@@ -599,6 +599,7 @@
         // flows in.
         health: null,
         patches: [],
+        patchesSummary: null,
         openBrainIds: new Set(),
         // Memory card defaults to COLLAPSED so the chat (latest turns)
         // dominates the viewport. The operator can click the chevron to
@@ -1606,10 +1607,35 @@
       function renderPatchesCard() {
         const patches = state.patches || [];
         const pending = patches.filter(p => !p.already_applied);
-        if (pending.length === 0) return '';
+        const applied = patches.filter(p => p.already_applied && p.effectiveness);
+        if (pending.length === 0 && applied.length === 0) return '';
+
+        // Effectiveness chip — for already-applied patches, show whether the
+        // issue rate dropped after the last edit. Without this the owner
+        // never knows if "aplicar correção" actually did anything; with it
+        // they get an honest "fix worked" / "fix didn't help" / "ainda sem
+        // dados pra comparar" signal.
+        const trendChip = (eff) => {
+          if (!eff) return '';
+          if (eff.trend === 'better') return `<span style="color:var(--whatsapp,#25d366);font-size:11px;font-weight:600;" title="Antes: ${eff.before.pct}% (${eff.before.hits}/${eff.before.total} turnos) · Agora: ${eff.after.pct}%">↓ funcionou (${eff.before.pct}% → ${eff.after.pct}%)</span>`;
+          if (eff.trend === 'worse')  return `<span style="color:var(--danger,#ff5f57);font-size:11px;font-weight:600;" title="Antes: ${eff.before.pct}% · Agora: ${eff.after.pct}%">↑ piorou (${eff.before.pct}% → ${eff.after.pct}%)</span>`;
+          if (eff.trend === 'unchanged') return `<span style="color:var(--text-muted);font-size:11px;font-weight:600;" title="${eff.before.hits}/${eff.before.total} antes · ${eff.after.hits}/${eff.after.total} agora">≈ sem mudança (${eff.before.pct}% / ${eff.after.pct}%)</span>`;
+          return `<span style="color:var(--text-muted);font-size:11px;" title="Precisa de pelo menos 5 turnos antes E depois pra comparar">⏳ aguardando dados (${eff.after.total} turnos depois)</span>`;
+        };
+
+        const sum = state.patchesSummary;
+        const summaryLine = sum && (sum.before_total_turns > 0 || sum.after_total_turns > 0)
+          ? `<div style="font-size:11px;color:var(--text-muted);margin:4px 0 10px 0;">
+              Última mudança: ${sum.last_changed_at ? new Date(sum.last_changed_at).toLocaleString('pt-BR') : '?'} ·
+              ${sum.before_total_turns} turnos antes (${sum.before_total_issues} issues) ·
+              ${sum.after_total_turns} turnos depois (${sum.after_total_issues} issues)
+            </div>`
+          : '';
+
         return `
           <div class="patches-card">
-            <h3>🔧 Correções sugeridas (${pending.length}) <span class="info-tip" data-tip="O avaliador detectou padrões. Aplicar adiciona uma linha ao system_prompt do agente — você pode reverter editando o prompt no /build.">?</span></h3>
+            <h3>🔧 Correções ${pending.length ? `sugeridas (${pending.length})` : 'aplicadas'} <span class="info-tip" data-tip="O avaliador detectou padrões. Aplicar adiciona uma linha ao system_prompt do agente — você pode reverter editando o prompt no /build. O cache do agente é purgado automaticamente para que a mudança valha já no próximo turno.">?</span></h3>
+            ${summaryLine}
             ${pending.map((p, i) => `
               <div class="patch-item" id="patch-${i}">
                 <div class="patch-issue">⚠ ${escapeHtml(p.issue)} <span style="color:var(--text-muted);font-weight:400;">(${p.count}×)</span></div>
@@ -1619,6 +1645,17 @@
                 </div>
               </div>
             `).join('')}
+            ${applied.length ? `
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Correções já aplicadas (efeito desde a última mudança):</div>
+                ${applied.map(p => `
+                  <div class="patch-item" style="opacity:0.85;">
+                    <div class="patch-issue" style="color:var(--text-muted);">✓ ${escapeHtml(p.issue)}</div>
+                    <div style="margin-top:2px;">${trendChip(p.effectiveness)}</div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
           </div>
         `;
       }
@@ -1676,7 +1713,7 @@
 
       window.logout = () => {
         localStorage.removeItem(STORAGE_KEY);
-        state = { ...state, apiKey: '', agents: [], selectedAgentId: null, contacts: [], selectedPhone: null, memory: null, messages: [], whatsappConn: null, health: null, patches: [], openBrainIds: new Set() };
+        state = { ...state, apiKey: '', agents: [], selectedAgentId: null, contacts: [], selectedPhone: null, memory: null, messages: [], whatsappConn: null, health: null, patches: [], patchesSummary: null, openBrainIds: new Set() };
         stopRefresh();
         render();
       };
@@ -1771,6 +1808,13 @@
         state.whatsappConn = (conn.connected || conn.pending_pairing) ? conn : null;
         state.health = health;
         state.patches = patches?.patches || [];
+        // Top-level summary so the patches card can show "since last change:
+        // X turnos antes vs Y depois". Decoupled from the per-patch effectiveness
+        // so the header chip works even when no individual patch has enough
+        // evidence yet.
+        state.patchesSummary = patches
+          ? { ...(patches.summary || {}), last_changed_at: patches.last_changed_at }
+          : null;
         if (state.selectedPhone) await loadContactDetails();
       }
 

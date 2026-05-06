@@ -250,6 +250,36 @@ export async function storeInCache(
 }
 
 /**
+ * Invalidate every cache entry for an agent. Called when the owner changes
+ * anything that should affect agent behavior — system_prompt, allowed_tools,
+ * persona, business_info, catalog. Without this, applying a "correção
+ * aprendida" patch (or editing the prompt in /build) leaves stale cached
+ * responses firing for FAQ-shaped questions, so the fix appears to do
+ * nothing on the public-chat channel — destroying the owner's trust in
+ * the auto-fix system.
+ *
+ * Hard delete is fine: the LRU and rules-version logic both already
+ * tolerate "agent has zero cache rows". Next live turn rebuilds the
+ * cache organically with the new behavior baked in.
+ *
+ * Returns the number of rows dropped so callers can log it.
+ */
+export async function invalidateAgentCache(agentId: string): Promise<number> {
+  const result = await db
+    .delete(agentCache)
+    .where(eq(agentCache.agentId, agentId));
+  // Drizzle returns different shapes per driver — postgres-js gives us
+  // `count`, others give nothing useful. Best-effort number for logs.
+  const rowCount =
+    typeof (result as { rowCount?: number }).rowCount === 'number'
+      ? (result as { rowCount?: number }).rowCount!
+      : typeof (result as { count?: number }).count === 'number'
+        ? (result as { count?: number }).count!
+        : 0;
+  return rowCount;
+}
+
+/**
  * Aggregate stats for an agent's cache. Used by analytics dashboard.
  */
 export async function getCacheStats(agentId: string): Promise<{

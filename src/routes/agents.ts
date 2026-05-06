@@ -563,6 +563,42 @@ app.patch('/:id', async (c) => {
   // if the agent was transferred between the lookup at the top of this
   // handler and now, we never UPDATE someone else's row.
   await db.update(agents).set(update).where(and(eq(agents.id, id), eq(agents.ownerId, user.id)));
+
+  // ─── Cache invalidation ─────────────────────────────────────────────
+  // If the owner changed any field that drives behavior (prompt, tools,
+  // persona, business_info, catalog), drop every semantic-cache entry
+  // for this agent so the next public-chat turn rebuilds fresh under the
+  // new behavior. Without this, the cache happily replays answers that
+  // contradict the updated prompt — owner sees no change, blames the
+  // platform, churns. Cosmetic fields (name, color, welcome_message)
+  // don't trigger invalidation since they don't affect what the LLM
+  // generates for a given question.
+  const behaviorFieldsChanged =
+    update.systemPrompt !== undefined ||
+    update.allowedTools !== undefined ||
+    update.personaId !== undefined ||
+    update.businessInfo !== undefined ||
+    update.systemPromptB !== undefined;
+  if (behaviorFieldsChanged) {
+    try {
+      const { invalidateAgentCache } = await import('~/agents/knowledge-cache');
+      const dropped = await invalidateAgentCache(id);
+      const { log } = await import('~/lib/logger');
+      log.info('agent.cache_invalidated', {
+        agent_id: id,
+        owner_id: user.id,
+        rows_dropped: dropped,
+        reason: 'behavior_field_updated',
+      });
+    } catch (err) {
+      const { log } = await import('~/lib/logger');
+      log.warn('agent.cache_invalidate_failed', {
+        agent_id: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   return c.json({ ok: true });
 });
 
@@ -860,42 +896,99 @@ app.get('/:id/patches', async (c) => {
     .limit(1);
   if (!a) throw Errors.notFound('Agent');
 
-  // Reuse the same scan as /health but only surface issues that hit ≥3 times.
-  // Each one becomes a suggested patch the owner can accept.
+  // Pull last 400 assistant rows with timestamps so we can split before/after
+  // the agent's last update and report whether prior corrections actually
+  // moved the needle. Without this signal the owner clicks "Aplicar correção"
+  // and has no way to tell if it's working — they just see the same panel
+  // pretty soon after with the same issue, lose trust, churn.
   const rows = await db
-    .select({ meta: agentMessages.meta })
+    .select({ meta: agentMessages.meta, createdAt: agentMessages.createdAt })
     .from(agentMessages)
     .where(and(eq(agentMessages.agentId, a.id), eq(agentMessages.role, 'assistant')))
     .orderBy(desc(agentMessages.createdAt))
-    .limit(200);
+    .limit(400);
 
-  const counts = new Map<string, number>();
+  // Effectiveness window: agent.updatedAt is the most recent edit (any field,
+  // including patch apply). Splitting around it gives us a "before vs after
+  // last change" comparison. Imperfect — a cosmetic edit also bumps the
+  // timestamp — but for an SMB-scale agent the signal is strong enough to
+  // tell the owner if their last fix did anything.
+  const lastChangedAt = a.updatedAt instanceof Date ? a.updatedAt : new Date(a.updatedAt as unknown as string);
+  const beforeRows: Array<{ issues: string[] }> = [];
+  const afterRows: Array<{ issues: string[] }> = [];
+  // Count issues against BOTH windows; cap "before" at 200 turns so a long-
+  // history agent doesn't drown a small post-change sample.
+  const allCounts = new Map<string, number>();
   for (const r of rows) {
     const meta = r.meta as { eval?: { issues?: string[] } } | null;
-    if (!meta?.eval?.issues) continue;
-    for (const raw of meta.eval.issues) {
-      const k = String(raw).toLowerCase().replace(/\s+/g, ' ').trim();
-      if (!k) continue;
-      counts.set(k, (counts.get(k) || 0) + 1);
-    }
+    const issues = meta?.eval?.issues;
+    if (!Array.isArray(issues) || issues.length === 0) continue;
+    const cleaned = issues.map((s) => String(s).toLowerCase().replace(/\s+/g, ' ').trim()).filter(Boolean);
+    for (const k of cleaned) allCounts.set(k, (allCounts.get(k) || 0) + 1);
+    const ts = r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt as unknown as string);
+    if (ts >= lastChangedAt) afterRows.push({ issues: cleaned });
+    else if (beforeRows.length < 200) beforeRows.push({ issues: cleaned });
   }
 
-  // Map issue → suggested patch text. Keep it simple: turn the issue into
-  // an instruction. If the issue is already in the system_prompt verbatim,
-  // skip — owner already accepted it.
+  // Per-issue effectiveness: count occurrences before vs after the last edit.
+  // If after-rate is meaningfully lower, the patch worked. If equal/higher,
+  // it didn't — surface that so owner knows to try a different fix.
+  function computeRate(window: Array<{ issues: string[] }>, key: string): { hits: number; total: number; pct: number } {
+    let hits = 0;
+    for (const w of window) if (w.issues.includes(key)) hits++;
+    const total = window.length;
+    return { hits, total, pct: total > 0 ? Math.round((hits / total) * 1000) / 10 : 0 };
+  }
+
   const currentPrompt = a.systemPrompt || '';
-  const patches = Array.from(counts.entries())
+  const patches = Array.from(allCounts.entries())
     .filter(([, n]) => n >= 3)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([issue, count]) => ({
-      issue,
-      count,
-      patch_text: issueToPatchText(issue),
-      already_applied: currentPrompt.toLowerCase().includes(issueToPatchText(issue).toLowerCase().slice(0, 40)),
-    }));
+    .map(([issue, count]) => {
+      const patchText = issueToPatchText(issue);
+      const alreadyApplied = currentPrompt.toLowerCase().includes(patchText.toLowerCase().slice(0, 40));
+      const before = computeRate(beforeRows, issue);
+      const after = computeRate(afterRows, issue);
+      // Only meaningful if we have at least 5 turns in each window. With
+      // smaller samples the rate is too noisy to draw any conclusion.
+      const hasEvidence = before.total >= 5 && after.total >= 5;
+      const trend: 'better' | 'worse' | 'unchanged' | 'insufficient' = hasEvidence
+        ? after.pct < before.pct - 1
+          ? 'better'
+          : after.pct > before.pct + 1
+            ? 'worse'
+            : 'unchanged'
+        : 'insufficient';
+      return {
+        issue,
+        count,
+        patch_text: patchText,
+        already_applied: alreadyApplied,
+        // Effectiveness only matters for already-applied patches — for
+        // pending ones it's just baseline data the UI can ignore.
+        effectiveness: alreadyApplied
+          ? {
+              before: { hits: before.hits, total: before.total, pct: before.pct },
+              after: { hits: after.hits, total: after.total, pct: after.pct },
+              trend,
+            }
+          : null,
+      };
+    });
 
-  return c.json({ patches });
+  return c.json({
+    patches,
+    // Top-level summary so the UI can render a header card "since last
+    // change: X% issue rate (was Y%)" without iterating per-patch.
+    last_changed_at: lastChangedAt.toISOString(),
+    summary: {
+      before_total_turns: beforeRows.length,
+      after_total_turns: afterRows.length,
+      before_total_issues: beforeRows.reduce((acc, w) => acc + w.issues.length, 0),
+      after_total_issues: afterRows.reduce((acc, w) => acc + w.issues.length, 0),
+    },
+  });
 });
 
 app.post('/:id/patches/apply', async (c) => {
@@ -934,7 +1027,40 @@ app.post('/:id/patches/apply', async (c) => {
   }
 
   await db.update(agents).set({ systemPrompt: newPrompt, updatedAt: new Date() }).where(eq(agents.id, a.id));
-  return c.json({ ok: true, applied: true, system_prompt_length: newPrompt.length });
+
+  // Invalidate semantic cache for this agent — the patch changes future
+  // behavior, but cached responses written under the old prompt would
+  // happily replay the exact issue the patch is meant to fix. Owner
+  // would click "Aplicar correção", see the same broken reply come back
+  // on a chat-public turn, and lose all trust in the auto-fix loop.
+  // WhatsApp already runs with cache disabled so this is a public-chat
+  // guard; still cheap to call for both.
+  let cacheRowsDropped = 0;
+  try {
+    const { invalidateAgentCache } = await import('~/agents/knowledge-cache');
+    cacheRowsDropped = await invalidateAgentCache(a.id);
+    const { log } = await import('~/lib/logger');
+    log.info('agent.patch_applied', {
+      agent_id: a.id,
+      owner_id: user.id,
+      patch_text_excerpt: patchText.slice(0, 80),
+      cache_rows_dropped: cacheRowsDropped,
+      new_prompt_length: newPrompt.length,
+    });
+  } catch (err) {
+    const { log } = await import('~/lib/logger');
+    log.warn('agent.patch_cache_invalidate_failed', {
+      agent_id: a.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return c.json({
+    ok: true,
+    applied: true,
+    system_prompt_length: newPrompt.length,
+    cache_rows_dropped: cacheRowsDropped,
+  });
 });
 
 // ─── Catalog management ─────────────────────────────────────
@@ -1257,18 +1383,87 @@ app.delete('/:id/catalog', async (c) => {
   return c.json({ ok: true });
 });
 
-/** Turn a judge issue into a short imperative correction line. */
+/** Turn a judge issue into a short imperative correction line.
+ *
+ * The judge produces issues in PT-BR free-form, often in past tense
+ * ("não respondeu", "ignorou business_info", "respondeu sem usar tool",
+ * "alucinou preço") because it's describing what already happened. Our
+ * patch_text needs to be in IMPERATIVE form so the LLM reads it as a
+ * rule for future turns ("Sempre responda", "Considere business_info",
+ * "Use a tool antes de responder", "Não invente preço").
+ *
+ * This function does naive verb conjugation — it covers the common
+ * cases the judge actually produces (verified against ~1k assistant
+ * meta rows in prod). Misses fall through to "Atenção: " which is at
+ * least non-broken even if not pretty.
+ */
 function issueToPatchText(issue: string): string {
   const trimmed = issue.trim().replace(/\s+/g, ' ');
-  // Most issues already start with "não X" or "ignorou X" — flip into "Sempre X" / "Sempre confirmar X".
-  if (/^não\s+/i.test(trimmed)) {
-    return 'Sempre ' + trimmed.replace(/^não\s+/i, '').replace(/^.{1}/, (c) => c.toLowerCase());
+  if (!trimmed) return '';
+
+  // Past-tense → imperative mappings. Order matters: more-specific
+  // patterns first. Each entry is a tuple [matcher, builder] where
+  // builder receives the captured tail and returns the imperative form.
+  const conjugations: Array<[RegExp, (tail: string) => string]> = [
+    // "não respondeu …" / "não respondeu pergunta …" → "Sempre responda …"
+    [/^não\s+respondeu\b\s*(.*)$/i, (t) => 'Sempre responda ' + t.trim()],
+    [/^não\s+usou\b\s*(.*)$/i, (t) => 'Sempre use ' + t.trim()],
+    [/^não\s+chamou\b\s*(.*)$/i, (t) => 'Sempre chame ' + t.trim()],
+    [/^não\s+pediu\b\s*(.*)$/i, (t) => 'Sempre peça ' + t.trim()],
+    [/^não\s+confirmou\b\s*(.*)$/i, (t) => 'Sempre confirme ' + t.trim()],
+    [/^não\s+seguiu\b\s*(.*)$/i, (t) => 'Sempre siga ' + t.trim()],
+    [/^não\s+respeitou\b\s*(.*)$/i, (t) => 'Sempre respeite ' + t.trim()],
+    [/^não\s+considerou\b\s*(.*)$/i, (t) => 'Sempre considere ' + t.trim()],
+    [/^não\s+manteve\b\s*(.*)$/i, (t) => 'Sempre mantenha ' + t.trim()],
+    [/^não\s+verificou\b\s*(.*)$/i, (t) => 'Sempre verifique ' + t.trim()],
+    [/^não\s+deveria\s+ter\s+(\w+)\s*(.*)$/i, (t) => {
+      // "não deveria ter respondido sem tool" → "Sempre responda só com tool"
+      // Hard to invert cleanly; fall back to drop the negation.
+      return 'Sempre ' + t.trim();
+    }],
+    // "não X-INFINITIVE …" generic form (não responder, não usar, não chamar)
+    [/^não\s+([a-záéíóúãõç]+r)\b\s*(.*)$/i, (t) => 'Sempre ' + t.trim()],
+    // Generic "não X" (anything else after "não") — keep tail as-is, prefix with "Sempre"
+    [/^não\s+(.*)$/i, (t) => 'Sempre ' + t.trim()],
+
+    // "ignorou X" / "ignorar X" → "Considere X"
+    [/^ignor(?:ou|ar|ado)\b\s*(.*)$/i, (t) => 'Considere ' + t.trim()],
+
+    // "alucinou X" / "inventou X" → "Não invente X — use só dado real"
+    [/^(?:alucinou|inventou)\b\s*(.*)$/i, (t) =>
+      t.trim()
+        ? 'Não invente ' + t.trim() + ' — use só dado real (tool, business_info ou memória).'
+        : 'Não invente fato. Use só dado real (tool, business_info ou memória).'],
+
+    // "respondeu sem X" → "Não responda sem X"
+    [/^respondeu\s+sem\s+(.*)$/i, (t) => 'Não responda sem ' + t.trim()],
+
+    // "perguntou de novo X" → "Não repita pergunta sobre X"
+    [/^pergunt(?:ou|ar)\s+(?:de\s+novo|novamente)\s*(.*)$/i, (t) =>
+      t.trim() ? 'Não repita a pergunta sobre ' + t.trim() : 'Não repita perguntas que o cliente já respondeu.'],
+
+    // "repetiu X" → "Não repita X"
+    [/^repet(?:iu|ir)\s+(.*)$/i, (t) => 'Não repita ' + t.trim()],
+
+    // "deflectiu X" / "desviou de X" → "Responda X em vez de desviar"
+    [/^(?:deflectiu|desviou\s+de)\s+(.*)$/i, (t) => 'Responda ' + t.trim() + ' em vez de desviar.'],
+
+    // "usou tool errada" / "tool errada" → "Use a tool correta para a pergunta"
+    [/^(?:usou\s+)?tool\s+errada\b/i, () => 'Escolha a tool correta antes de responder — leia a descrição da tool.'],
+  ];
+
+  for (const [re, build] of conjugations) {
+    const m = trimmed.match(re);
+    if (m) {
+      const tail = (m[m.length - 1] as string | undefined)?.replace(/^[.,;:\s]+/, '') || '';
+      const out = build(tail).replace(/\s+/g, ' ').trim();
+      // Make sure the output isn't garbage (e.g. just "Sempre" with empty tail)
+      if (out.length > 8) return out.endsWith('.') ? out : out + '.';
+    }
   }
-  if (/^ignor(ou|ar)\s+/i.test(trimmed)) {
-    return 'Sempre considerar ' + trimmed.replace(/^ignor(ou|ar)\s+/i, '').replace(/^.{1}/, (c) => c.toLowerCase());
-  }
-  // Default: "Atenção: " + literal
-  return 'Atenção: ' + trimmed;
+
+  // Default: "Atenção: " + literal — non-broken even if not pretty.
+  return 'Atenção: ' + trimmed + (trimmed.endsWith('.') ? '' : '.');
 }
 
 // Knowledge Cache stats — owner-only

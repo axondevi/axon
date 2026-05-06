@@ -48,8 +48,23 @@ interface ToolDef {
  * to Evolution, PDF is rendered locally) so they're always-on. Source
  * of truth for the universal-tool list — both the WhatsApp channel and
  * the cache versioning import this so they can never drift apart.
+ *
+ * `generate_pdf` and `schedule_appointment` are universal because every
+ * business persona — clínica, vendedor, recepcionista, prestador de
+ * serviço — eventually needs to ship a comprovante / recibo / ficha or
+ * marcar um horário. Older agents created before these tools existed
+ * had them missing from their `allowed_tools` array, which silently
+ * crippled the WhatsApp UX (LLM promised "te mando o comprovante" with
+ * no way to actually deliver). Promoting them to universal closes that
+ * gap without requiring a per-agent migration.
  */
-export const UNIVERSAL_TOOL_NAMES = ['search_catalog', 'send_listing_photo', 'send_catalog_pdf'] as const;
+export const UNIVERSAL_TOOL_NAMES = [
+  'search_catalog',
+  'send_listing_photo',
+  'send_catalog_pdf',
+  'generate_pdf',
+  'schedule_appointment',
+] as const;
 
 /**
  * Plain-text snapshot of the system rules that govern tool use. Hashed
@@ -68,6 +83,9 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 4. Catálogo COMPLETO = send_catalog_pdf (sem args, pega do cadastro).
 4b. PDF de SUBCONJUNTO filtrado = search_catalog + generate_pdf (max 8 itens).
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
+6. Documento avulso (comprovante, recibo, ficha, atestado, declaração, contrato, receita) = generate_pdf — sai como anexo PDF nativo no WhatsApp.
+7. Agendamento confirmado (data + hora acordadas) = schedule_appointment — registra + dispara lembrete véspera.
+v8 — generate_pdf + schedule_appointment promovidos a UNIVERSAL_TOOL_NAMES + ALWAYS_ON no smart selector + keyword regex específicas. Antes o selector filtrava generate_pdf fora de todo turno cuja regex não casasse "PDF" literal — quebrava "manda um comprovante", "preciso de uma ficha", "me passa o recibo" silenciosamente. Mesma armadilha pro schedule_appointment ("marca pra terça"). Cache invalidado automaticamente via hash da lista universal.
 v7 — rule 2c rewritten as a concept ("mídia só sai quando a tool é chamada") instead of trigger-phrase list + few-shot. The literal CERTO/ERRADO examples were being copied verbatim by the LLM (it parroted "Pronto, te mandei o catálogo 📄" with no tool_call). Conceptual framing + the well-described tools should let the model choose correctly without a script.
 v6 — runtime tool_choice='required' regex (REVERTED — too brittle, agent should understand, not pattern-match).
 v5 — rule 2c with examples.
@@ -1069,6 +1087,15 @@ Use o critério: "se eu disser que enviei, alguém realmente tem que receber". S
    (i) chama \`search_catalog\` com a query (ex: "casa Martin de Sá") pra pegar o \`image_url\` real do item,
    (ii) chama \`send_listing_photo\` UMA VEZ por foto (max 3) passando o \`image_url\` retornado e um \`caption\` curto (nome + preço).
    PROIBIDO escrever "*FOTOS*", "[FOTO DA FACHADA]", "[FOTO DO APARTAMENTO NO CENTRO]", "vou enviar as fotos", "Aqui está a foto:" como TEXTO sem chamar \`send_listing_photo\` no mesmo turno. Sem image_url no item? Diz honesto: "esse não tem foto cadastrada, mas a descrição é X" em vez de fingir que vai enviar.
+
+6. **Documento avulso = \`generate_pdf\`.** Comprovante, recibo, ficha, atestado, declaração, contrato, receita, orientação, termo, laudo, orçamento — qualquer documento que o cliente peça ou que faça sentido emitir vai por aqui. O cliente recebe um PDF nativo no WhatsApp (bolha de download) e o documento fica salvo no histórico do contato.
+   - Args: \`title\` (ex: "Comprovante de Agendamento"), \`body\` (1º parágrafo, resumo de alta densidade), \`sections\` opcional (lista de heading+content pra dados estruturados — paciente/data/endereço/valor), \`doc_type_hint\` ajuda a categorizar.
+   - Conteúdo SEMPRE em PT-BR, com dados reais que você já tem (memória do contato, business_info, mensagens anteriores). Se faltar dado essencial (nome, valor, data) — PERGUNTE antes de emitir; documento errado é pior que documento inexistente.
+   - Após chamar a tool, confirme curto: "Pronto, te mandei o comprovante aqui 📄" — sem repetir o conteúdo do PDF no texto.
+
+7. **Agendamento confirmado = \`schedule_appointment\`.** Quando você e o cliente acertaram data + hora ("pode ser terça às 14h?" → "perfeito"), você chama \`schedule_appointment\` no MESMO turno em que confirma. Args: \`scheduled_for_iso\` (ISO 8601 com timezone -03:00), \`description\` (rótulo curto, ex: "Consulta com Dra. Elisa"), opcionais \`duration_minutes\` e \`location\`. O sistema dispara lembrete pro cliente um dia antes automaticamente. NUNCA confirme "marquei aqui" sem chamar a tool — vira agendamento fantasma.
+
+8. **Combinar \`generate_pdf\` com \`schedule_appointment\`.** Quando o cliente confirma horário, o fluxo natural é: chamar \`schedule_appointment\` + chamar \`generate_pdf\` no mesmo turno pra mandar o comprovante. Cliente sai com horário marcado + papel na mão.
 
 ## Formato de saída no WhatsApp (obrigatório)
 - **Bolhas curtas, separadas por \`||\`.** Resposta natural no zap = 2-3 bolhas de 1-2 frases cada. NUNCA mande um parágrafo de 5 linhas — fica robótico e o cliente bate o olho e some.

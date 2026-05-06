@@ -66,6 +66,11 @@ export const TOOL_CATEGORIES: Record<string, string[]> = {
   ],
   media: ['generate_image', 'embed_text'],
   payment: ['generate_pix'],
+  // Documents: PDF generation + appointment scheduling. Customers ask for
+  // these in plain language ("me manda um comprovante", "marca pra terça").
+  // Both also live in ALWAYS_ON, but keeping them in a category lets the
+  // LLM classifier route here when the keyword pass misses.
+  documents: ['generate_pdf', 'schedule_appointment'],
 };
 
 /**
@@ -85,6 +90,19 @@ export const TOOL_CATEGORIES: Record<string, string[]> = {
  *   to that failure mode. Kept here in addition to TOOL_TO_AXON because
  *   smart selection runs BEFORE buildToolsArray and can otherwise drop
  *   them silently for turns that don't keyword-match.
+ * - generate_pdf: same failure mode as the catalog tools — the system
+ *   prompt teaches the LLM to call it for filtered subsets ("manda só
+ *   as casas até 500 mil em PDF"), and customers naturally ask for
+ *   comprovante / recibo / ficha / atestado / contrato all the time.
+ *   Without always-on, the selector strips it for any turn whose
+ *   keywords didn't match the (narrow) PDF regex below, leaving the
+ *   LLM to either hallucinate "[PDF EM ANEXO]" or apologize that it
+ *   can't generate documents — both broken UX.
+ * - schedule_appointment: agendamento conversational — "marca pra
+ *   terça às 14h". Same problem: not in any category, not keyword-
+ *   matched outside narrow phrases, and the failure mode (silent
+ *   no-op + agent saying "marquei aqui" with nothing persisted) is
+ *   far worse than the ~250 tokens it costs.
  */
 const ALWAYS_ON: string[] = [
   'search_web',
@@ -92,6 +110,8 @@ const ALWAYS_ON: string[] = [
   'search_catalog',
   'send_listing_photo',
   'send_catalog_pdf',
+  'generate_pdf',
+  'schedule_appointment',
 ];
 
 /**
@@ -170,6 +190,21 @@ const TOOL_KEYWORDS: Record<string, RegExp> = {
 
   // Payment
   generate_pix:      /\b(?:gera|cri[ae])\s+(?:um\s+)?pix|cobr(?:ar|an[çc]a)|como\s+(?:eu\s+)?pago|forma\s+de\s+pagamento|quero\s+pagar/i,
+
+  // Documents — PDF generation
+  // Matches: "comprovante", "recibo", "ficha", "atestado", "declaração",
+  // "contrato", "receita", "orientação", "agendamento" (as a doc, not the
+  // appointment action), "em pdf", "manda em pdf", "documento". Also
+  // catches "PDF" standalone but only when paired with a verb to avoid
+  // false positives on the catalog triad which has its own keyword.
+  generate_pdf:      /\b(?:comprovante|recibo|ficha(?:\s+do\s+(?:cliente|paciente|cadastro))?|atestado|declara[çc][aã]o|contrato|or[çc]amento|receita\s+(?:m[eé]dica|virtual|prescri[çc][aã]o)|orienta[çc][aã]o\s+(?:pr[eé]|p[oó]s)|laudo|termo\s+(?:de|para))\b|(?:em|no|em\s+formato\s+de)\s+pdf|\bdocumento\s+(?:em|para|com)|\b(?:gera|fa[çc]a|crie?|preciso\s+(?:de|do)|me\s+manda|me\s+passa)\s+(?:um\s+|uma\s+)?(?:comprovante|recibo|ficha|atestado|contrato|pdf|documento)/i,
+
+  // Documents — appointment scheduling
+  // Distinct from "fazer agendamento" + send PDF — this fires when the
+  // customer is committing to a slot. "marca pra terça", "agenda às 14h",
+  // "consulta dia 5", "horário disponível dia X". Tight on purpose to
+  // not fire on every "que horas vocês abrem" question.
+  schedule_appointment: /\b(?:marca(?:r|\s+pra)|agendar?|reservar?|encaixar?)\s+(?:um[a]?\s+)?(?:hor[aá]rio|consulta|atendimento|visita|sess[aã]o|reuni[aã]o|encaixe|pra\s+(?:terça|quarta|quinta|sexta|s[aá]bado|domingo|segunda|amanh[aã]|hoje|próxim))|\b(?:dia|terça|quarta|quinta|sexta|s[aá]bado|segunda)\s+(?:que\s+vem|\d{1,2})\s+(?:[aà]s\s+)?\d{1,2}h?|tem\s+(?:hor[aá]rio|vaga)\s+(?:dispon[ií]vel|livre)/i,
 };
 
 /**
