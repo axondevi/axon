@@ -1631,7 +1631,13 @@ async function processBufferedTurn(opts: {
           // bracketed part leaves an orphaned colon + intro phrase like
           // "Aqui está o PDF:" with nothing after it — looks worse than
           // the placeholder did. Match colon at end of sentence.
-          .replace(/\b(?:aqui\s+(?:est[áa]|vai)\s+(?:o|a)|segue|olha)\s+(?:o\s+)?(?:pdf|cat[áa]logo|arquivo|documento|link|anexo)\s*:\s*$/gim, '')
+          // Drop dangling intro prefixes ("Aqui está o PDF:", "Segue a
+          // foto:", "Olha o catálogo:") whether they sit at end-of-line
+          // or are immediately followed by another newline. Without
+          // catching the newline case, stripping the bracket leaves
+          // "Aqui está a foto: \n\nresto da resposta" intact — orphan
+          // colon screams "bot quebrado" worse than the bracket did.
+          .replace(/\b(?:aqui\s+(?:est[áa]|vai)\s+(?:o|a)|segue|olha)\s+(?:o\s+|a\s+)?(?:pdf|cat[áa]logo|cat[áa]logo\s+completo|foto|fotos|imagem|imagens|arquivo|documento|link|anexo)\s*:\s*(?=$|\n)/gim, '')
           .replace(/\s{2,}/g, ' ')
           .trim();
         if (reply !== before && placeholderGuardTripped !== 'recovered' && placeholderGuardTripped !== 'auto_built_pdf') {
