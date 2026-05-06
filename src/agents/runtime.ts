@@ -85,6 +85,7 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
 6. Documento avulso (comprovante, recibo, ficha, atestado, declaração, contrato, receita) = generate_pdf — sai como anexo PDF nativo no WhatsApp.
 7. Agendamento confirmado (data + hora acordadas) = schedule_appointment — registra + dispara lembrete véspera.
+v10 — Recovery hardening: tool_choice='required' no retry de placeholder + auto-build de PDF do catálogo como rede final quando o LLM continua escrevendo "[PDF...]" mesmo após coaching. Caso real 5210/5211 em prod: imobiliária escreveu placeholder duas vezes seguidas (uma na primeira tentativa, outra no recovery) e o cliente recebeu "Aqui está o PDF: " sem PDF. Agora se LLM falhar duas vezes, eu mesmo invoco renderCatalogPdf direto com agent.catalog (zero LLM) — pelo menos algo real chega ao cliente. Cleanup do prefix "Aqui está o PDF:" também adicionado.
 v9 — REGRA #0 anti-colchete movida pro topo do qualityRule + output guard com auto-recovery em whatsapp.ts. Quando o LLM emite [PDF...] / [FOTO...] / [CATÁLOGO...] e nenhuma mídia foi produzida, re-invocamos runAgent com mensagem coaching explicita pra ele tentar de novo chamando a tool real. Strip do colchete como rede final. Caso real em prod 2026-05-06: agente de imobiliária escreveu "[PDF DA CASA EM PONTAL DE SANTA MARINA]" como texto após search_catalog, sem chamar generate_pdf. v8 não cobriu — modelo pequeno ignorando regra 2b no fim do prompt.
 v8 — generate_pdf + schedule_appointment promovidos a UNIVERSAL_TOOL_NAMES + ALWAYS_ON no smart selector + keyword regex específicas. Antes o selector filtrava generate_pdf fora de todo turno cuja regex não casasse "PDF" literal — quebrava "manda um comprovante", "preciso de uma ficha", "me passa o recibo" silenciosamente. Mesma armadilha pro schedule_appointment ("marca pra terça"). Cache invalidado automaticamente via hash da lista universal.
 v7 — rule 2c rewritten as a concept ("mídia só sai quando a tool é chamada") instead of trigger-phrase list + few-shot. The literal CERTO/ERRADO examples were being copied verbatim by the LLM (it parroted "Pronto, te mandei o catálogo 📄" with no tool_call). Conceptual framing + the well-described tools should let the model choose correctly without a script.
@@ -909,6 +910,12 @@ export async function runAgent(opts: {
   /** Optional persona id — when set, persona.prompt_fragment is prepended
    *  to the systemPrompt. Lazy-loaded once per call. */
   personaId?: string | null;
+  /** Optional tool_choice override. Defaults to 'auto' (LLM decides per
+   *  turn). Pass 'required' for recovery turns where the previous LLM
+   *  call failed — e.g. wrote "[PDF]" placeholder instead of calling
+   *  generate_pdf. Forcing a tool call on a known-failed retry is
+   *  recovery infrastructure, not intent-pattern-matching. */
+  toolChoice?: 'auto' | 'required' | 'none';
 }): Promise<RunAgentResult> {
   const { c, messages, ownerId, agentId, enableCache = true } = opts;
   // Universal tools (catalog triad) get added to EVERY run, regardless of
@@ -1141,9 +1148,16 @@ Use o critério: "se eu disser que enviei, alguém realmente tem que receber". S
   // src/llm/fallback.ts for the exact cooldown logic.
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    // tool_choice='required' is only honored on the FIRST iteration.
+    // After the LLM has called a tool and we feed back results, we want
+    // it to be free to write a final assistant text — forcing tool calls
+    // on every iteration would loop forever.
+    const effectiveToolChoice =
+      iter === 0 && opts.toolChoice && tools.length ? opts.toolChoice : undefined;
     const llmResult = await chatCompletionWithFallback({
       messages: history as any,
       tools: tools.length ? tools : undefined,
+      ...(effectiveToolChoice ? { tool_choice: effectiveToolChoice } : {}),
       max_tokens: 4096,
       // Higher temp + freq penalty = much less robotic repetition on
       // multi-turn WhatsApp threads. Picked these by stress-testing

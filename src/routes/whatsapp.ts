@@ -1465,7 +1465,13 @@ async function processBufferedTurn(opts: {
     const PLACEHOLDER_RE = /\[(?:[^\]]*\b(?:PDF|CAT[ÁA]LOGO|FOTO|FOTOS|ARQUIVO|DOCUMENTO|IMAGEM|FACHADA|LINK|VEJA|ANEXO)\b[^\]]*)\]/i;
     const placeholderHit = typeof reply === 'string' ? reply.match(PLACEHOLDER_RE) : null;
     const noMediaProduced = images.length === 0 && pdfs.length === 0;
-    let placeholderGuardTripped: 'recovered' | 'recovery_failed' | 'stripped_only' | null = null;
+    let placeholderGuardTripped:
+      | 'recovered'
+      | 'recovery_failed'
+      | 'stripped_only'
+      | 'auto_built_pdf'
+      | 'catalog_empty'
+      | null = null;
     if (placeholderHit && noMediaProduced) {
       log.warn('whatsapp.placeholder_detected', {
         agent_id: a.id,
@@ -1491,6 +1497,11 @@ async function processBufferedTurn(opts: {
         },
       ];
       try {
+        // Force tool_choice='required' on the recovery turn. The LLM
+        // already demonstrably failed by writing a placeholder, so on
+        // retry we don't trust it to "decide" again — we make it commit
+        // to calling SOME tool. This is recovery infrastructure, not
+        // intent-pattern matching: it only fires AFTER a known failure.
         const recoveredResult = await runAgent({
           c,
           systemPrompt: augmentedSystemPrompt,
@@ -1499,15 +1510,12 @@ async function processBufferedTurn(opts: {
           ownerId: runtimeAgent.ownerId,
           personaId: runtimeAgent.personaId,
           enableCache: false,
+          toolChoice: 'required',
         });
         const recoveredReply = recoveredResult.content;
         const recoveredHasMedia =
           (recoveredResult.images?.length || 0) > 0 ||
           (recoveredResult.pdfs?.length || 0) > 0;
-        // Only swap in the recovered turn if the LLM either produced
-        // media this time OR at least dropped the placeholder. If it
-        // wrote a placeholder AGAIN, fall through to the normal output
-        // guard which will at least clean it visually.
         const recoveredHasPlaceholder = recoveredReply
           ? PLACEHOLDER_RE.test(recoveredReply)
           : false;
@@ -1518,9 +1526,6 @@ async function processBufferedTurn(opts: {
           images = recoveredResult.images || images;
           pdfs = recoveredResult.pdfs || pdfs;
           pixPayments = recoveredResult.pixPayments || pixPayments;
-          // Merge tool_calls so the brain panel shows BOTH attempts —
-          // the failed first turn + the successful recovery. Helps the
-          // operator see what happened.
           (result.tool_calls_executed || []).push(
             ...(recoveredResult.tool_calls_executed || []),
           );
@@ -1541,18 +1546,103 @@ async function processBufferedTurn(opts: {
         });
         placeholderGuardTripped = 'recovery_failed';
       }
+
+      // ─── HARD FALLBACK: auto-build the PDF when LLM keeps failing ──
+      // If the recovery still didn't produce a PDF and the placeholder
+      // was clearly a PDF promise, just build the catalog PDF ourselves.
+      // send_catalog_pdf is the universal tool that takes no args (pulls
+      // straight from agent.catalog), so we can invoke it directly with
+      // zero LLM involvement. Worst case: customer asked for "PDF de uma
+      // casa específica" and gets the full catalog — which still
+      // includes that casa, plus more. Far better than "Aqui está o PDF:"
+      // followed by no actual PDF, which is what was happening in prod.
+      const placeholderWasPdf = /\b(?:PDF|CAT[ÁA]LOGO|ARQUIVO|DOCUMENTO|ANEXO)\b/i.test(placeholderHit[0]);
+      if (placeholderWasPdf && pdfs.length === 0 && images.length === 0) {
+        try {
+          const { renderCatalogPdf, suggestPdfFilename } = await import('~/agents/pdf-renderer');
+          const items = Array.isArray((runtimeAgent as { catalog?: unknown }).catalog)
+            ? ((runtimeAgent as { catalog: Record<string, unknown>[] }).catalog)
+            : [];
+          if (items.length > 0) {
+            const businessName = (runtimeAgent.name || 'Catálogo').slice(0, 100);
+            const businessContact = ((runtimeAgent as { businessInfo?: string }).businessInfo || '')
+              .split('\n')[0]
+              ?.slice(0, 200) || '';
+            const pdfBytes = await renderCatalogPdf({
+              businessName,
+              businessContact,
+              items: items.map((it) => ({
+                name: String((it as { name?: unknown }).name || ''),
+                price: typeof (it as { price?: unknown }).price === 'number' ? (it as { price: number }).price : null,
+                region: typeof (it as { region?: unknown }).region === 'string' ? (it as { region: string }).region : null,
+                description: typeof (it as { description?: unknown }).description === 'string' ? (it as { description: string }).description : null,
+                image_url: typeof (it as { image_url?: unknown }).image_url === 'string' ? (it as { image_url: string }).image_url : null,
+                url: typeof (it as { url?: unknown }).url === 'string' ? (it as { url: string }).url : null,
+              })),
+            });
+            const filename = suggestPdfFilename(`catalogo ${businessName}`);
+            pdfs = [
+              {
+                base64: pdfBytes.toString('base64'),
+                filename,
+                title: `Catálogo — ${businessName}`,
+                docType: 'outro_gerado',
+                excerpt: `${items.length} itens`,
+              },
+            ];
+            // Replace the (broken) reply with a coherent confirmation
+            // matching the auto-built PDF — no more "Aqui está o PDF:"
+            // hanging without an attachment.
+            reply = `Pronto, te mandei o catálogo completo em PDF — ${items.length} ite${items.length === 1 ? 'm' : 'ns'} com fotos e detalhes 📄`;
+            log.info('whatsapp.placeholder_auto_built_catalog_pdf', {
+              agent_id: a.id,
+              phone: inbound.phone,
+              item_count: items.length,
+            });
+            placeholderGuardTripped = 'auto_built_pdf';
+          } else {
+            // Catalog empty — the agent literally has nothing to ship.
+            // Honest reply beats a fake placeholder. No PDF generated.
+            reply =
+              'Ainda não tenho catálogo cadastrado em PDF aqui — assim que entrar, te aviso. ' +
+              'Enquanto isso posso te passar info de imóveis um por um, ou te encaminhar pro atendente humano. Qual prefere?';
+            log.warn('whatsapp.placeholder_catalog_empty', { agent_id: a.id });
+            placeholderGuardTripped = 'catalog_empty';
+          }
+        } catch (err) {
+          log.warn('whatsapp.placeholder_auto_build_failed', {
+            agent_id: a.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       // Strip any remaining placeholder text in the reply (whether
       // recovery succeeded or not) so the customer never sees the
-      // bracket form. Done after recovery in case the recovered reply
-      // also has a placeholder we missed.
+      // bracket form. Done after recovery+auto-build in case the final
+      // reply STILL has a placeholder somewhere.
       if (typeof reply === 'string') {
         const before = reply;
-        reply = reply.replace(/\[[^\]]*\b(?:PDF|CAT[ÁA]LOGO|FOTO|FOTOS|ARQUIVO|DOCUMENTO|IMAGEM|FACHADA|LINK|VEJA|ANEXO)\b[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
-        if (reply !== before && placeholderGuardTripped !== 'recovered') {
+        reply = reply
+          .replace(/\[[^\]]*\b(?:PDF|CAT[ÁA]LOGO|FOTO|FOTOS|ARQUIVO|DOCUMENTO|IMAGEM|FACHADA|LINK|VEJA|ANEXO)\b[^\]]*\]/gi, '')
+          // Also clean up dangling "Aqui está o PDF:" / "Segue o
+          // catálogo:" / "Olha o link:" prefixes that the LLM emits
+          // alongside placeholders. Without this, stripping just the
+          // bracketed part leaves an orphaned colon + intro phrase like
+          // "Aqui está o PDF:" with nothing after it — looks worse than
+          // the placeholder did. Match colon at end of sentence.
+          .replace(/\b(?:aqui\s+(?:est[áa]|vai)\s+(?:o|a)|segue|olha)\s+(?:o\s+)?(?:pdf|cat[áa]logo|arquivo|documento|link|anexo)\s*:\s*$/gim, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        if (reply !== before && placeholderGuardTripped !== 'recovered' && placeholderGuardTripped !== 'auto_built_pdf') {
           placeholderGuardTripped = 'stripped_only';
         }
         if (reply.length === 0) {
-          reply = 'Pronto, te mandei aqui 📄';
+          // If we ended up empty AND we built a PDF auto, just confirm.
+          // Otherwise short apology + soft re-prompt.
+          reply = pdfs.length > 0
+            ? 'Pronto, te mandei aqui 📄'
+            : 'Hmm, deixa eu reformular. Pode me dar mais um detalhe sobre o que precisa?';
         }
       }
     }
