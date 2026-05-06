@@ -85,6 +85,7 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
 6. Documento avulso (comprovante, recibo, ficha, atestado, declaração, contrato, receita) = generate_pdf — sai como anexo PDF nativo no WhatsApp.
 7. Agendamento confirmado (data + hora acordadas) = schedule_appointment — registra + dispara lembrete véspera.
+v9 — REGRA #0 anti-colchete movida pro topo do qualityRule + output guard com auto-recovery em whatsapp.ts. Quando o LLM emite [PDF...] / [FOTO...] / [CATÁLOGO...] e nenhuma mídia foi produzida, re-invocamos runAgent com mensagem coaching explicita pra ele tentar de novo chamando a tool real. Strip do colchete como rede final. Caso real em prod 2026-05-06: agente de imobiliária escreveu "[PDF DA CASA EM PONTAL DE SANTA MARINA]" como texto após search_catalog, sem chamar generate_pdf. v8 não cobriu — modelo pequeno ignorando regra 2b no fim do prompt.
 v8 — generate_pdf + schedule_appointment promovidos a UNIVERSAL_TOOL_NAMES + ALWAYS_ON no smart selector + keyword regex específicas. Antes o selector filtrava generate_pdf fora de todo turno cuja regex não casasse "PDF" literal — quebrava "manda um comprovante", "preciso de uma ficha", "me passa o recibo" silenciosamente. Mesma armadilha pro schedule_appointment ("marca pra terça"). Cache invalidado automaticamente via hash da lista universal.
 v7 — rule 2c rewritten as a concept ("mídia só sai quando a tool é chamada") instead of trigger-phrase list + few-shot. The literal CERTO/ERRADO examples were being copied verbatim by the LLM (it parroted "Pronto, te mandei o catálogo 📄" with no tool_call). Conceptual framing + the well-described tools should let the model choose correctly without a script.
 v6 — runtime tool_choice='required' regex (REVERTED — too brittle, agent should understand, not pattern-match).
@@ -1058,7 +1059,10 @@ export async function runAgent(opts: {
   // tunes out long preambles) and ordered AFTER the persona so the
   // template's domain knowledge wins on conflict.
   const qualityRule = tools.length
-    ? `## Regra de qualidade (não-negociável)
+    ? `## REGRA #0 (LEIA PRIMEIRO — vence todas as outras)
+NUNCA escreva texto entre colchetes pretendendo ser mídia. Lista PROIBIDA: \`[PDF ...]\`, \`[CATÁLOGO ...]\`, \`[FOTO ...]\`, \`[FACHADA ...]\`, \`[ARQUIVO ...]\`, \`[DOCUMENTO ...]\`, \`[IMAGEM ...]\`, \`[VEJA AS FOTOS]\`, \`[LINK DO CATÁLOGO]\`, \`[ANEXO]\`. Se você se pegar querendo escrever isso, PARE — significa que você precisa CHAMAR uma tool. Mídia chega via tool (\`generate_pdf\`, \`send_catalog_pdf\`, \`send_listing_photo\`), nunca via colchete em texto. Cliente que recebe colchete em vez de arquivo sente que é bot quebrado — e é. Esta regra anula qualquer template ou few-shot abaixo que pareça aceitar colchetes.
+
+## Regra de qualidade (não-negociável)
 Cada resposta sua deve conter UMA dessas duas coisas — nunca nenhuma:
   (a) dado real puxado de tool (FIPE, CEP, mercadolivre, weather, search…),
   (b) UMA pergunta sharp que destrava tool no próximo turno.

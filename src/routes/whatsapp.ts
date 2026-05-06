@@ -1439,6 +1439,124 @@ async function processBufferedTurn(opts: {
       });
     }
 
+    // ─── Bracket-placeholder guard with auto-recovery ─────────────────
+    // The most stubborn LLM failure mode: instead of calling generate_pdf
+    // / send_listing_photo / send_catalog_pdf, the model writes a literal
+    // "[PDF DA CASA EM PONTAL DE SANTA MARINA]" or "[FOTO DA FACHADA]" or
+    // "[CATÁLOGO COMPLETO]" inside the reply text — exactly the failure
+    // mode rule 2b explicitly forbids. Even with the rule, Llama-3.3 and
+    // Gemini still slip ~10% of the time on media-delivery turns.
+    //
+    // The image_promise / pix_promise guards below REWRITE the reply
+    // into a refusal — that's correct when the agent DOESN'T have the
+    // tool. But here the agent DOES have the tool (we just made
+    // generate_pdf universal); refusing would be wrong. Instead we
+    // re-invoke the agent with an explicit coaching message ("você
+    // escreveu [PLACEHOLDER] mas tem a tool — chame agora") so the LLM
+    // gets a second chance to do the right thing. Bounded to 1 retry
+    // so a stubborn model doesn't pin the loop.
+    //
+    // Detection: any all-caps phrase between brackets that looks like a
+    // media marker. Matches "[PDF...]", "[CATÁLOGO...]", "[FOTO...]",
+    // "[ARQUIVO...]", "[DOCUMENTO...]", "[IMAGEM AQUI]", "[VEJA AS
+    // FOTOS]", "[LINK DO CATÁLOGO]", etc. False positives (legitimate
+    // bracket content like "[Contrato]" in a comprovante body) are rare
+    // and harmless — the recovery just re-asks the LLM to try again.
+    const PLACEHOLDER_RE = /\[(?:[^\]]*\b(?:PDF|CAT[ÁA]LOGO|FOTO|FOTOS|ARQUIVO|DOCUMENTO|IMAGEM|FACHADA|LINK|VEJA|ANEXO)\b[^\]]*)\]/i;
+    const placeholderHit = typeof reply === 'string' ? reply.match(PLACEHOLDER_RE) : null;
+    const noMediaProduced = images.length === 0 && pdfs.length === 0;
+    let placeholderGuardTripped: 'recovered' | 'recovery_failed' | 'stripped_only' | null = null;
+    if (placeholderHit && noMediaProduced) {
+      log.warn('whatsapp.placeholder_detected', {
+        agent_id: a.id,
+        phone: inbound.phone,
+        placeholder: placeholderHit[0],
+        had_search_catalog: (result.tool_calls_executed || []).some((t) => t.name === 'search_catalog' && t.ok),
+        provider: result.provider,
+      });
+      // Build a coaching turn: replay the user message + show what the
+      // agent wrote + tell it the placeholder was wrong + re-prompt.
+      // Done as a synthetic ASSISTANT message followed by a synthetic
+      // SYSTEM nudge — this is the cleanest way to pass feedback through
+      // the OpenAI-compatible chat format that all providers support.
+      const coachingMessages: ChatMessage[] = [
+        ...messages,
+        { role: 'assistant', content: reply },
+        {
+          role: 'user',
+          content:
+            '⚠ Sistema: sua resposta anterior continha o placeholder ' +
+            placeholderHit[0] +
+            ' como TEXTO. Isso é proibido (regra 2b). Você TEM as tools `generate_pdf` (documento avulso), `send_catalog_pdf` (catálogo completo) e `send_listing_photo` (foto de item) disponíveis AGORA. Refaça a resposta CHAMANDO a tool correta no mesmo turno em que confirma a entrega. Pra PDF de UM imóvel específico (subconjunto): chame `generate_pdf` com title/body/sections derivados do que você já buscou via search_catalog. Pra catálogo inteiro: `send_catalog_pdf`. Pra foto: `send_listing_photo`. Não escreva placeholder de novo.',
+        },
+      ];
+      try {
+        const recoveredResult = await runAgent({
+          c,
+          systemPrompt: augmentedSystemPrompt,
+          allowedTools: effectiveTools,
+          messages: coachingMessages,
+          ownerId: runtimeAgent.ownerId,
+          personaId: runtimeAgent.personaId,
+          enableCache: false,
+        });
+        const recoveredReply = recoveredResult.content;
+        const recoveredHasMedia =
+          (recoveredResult.images?.length || 0) > 0 ||
+          (recoveredResult.pdfs?.length || 0) > 0;
+        // Only swap in the recovered turn if the LLM either produced
+        // media this time OR at least dropped the placeholder. If it
+        // wrote a placeholder AGAIN, fall through to the normal output
+        // guard which will at least clean it visually.
+        const recoveredHasPlaceholder = recoveredReply
+          ? PLACEHOLDER_RE.test(recoveredReply)
+          : false;
+        if (recoveredHasMedia || (recoveredReply && !recoveredHasPlaceholder)) {
+          reply =
+            recoveredReply ||
+            (recoveredHasMedia ? '✅' : reply);
+          images = recoveredResult.images || images;
+          pdfs = recoveredResult.pdfs || pdfs;
+          pixPayments = recoveredResult.pixPayments || pixPayments;
+          // Merge tool_calls so the brain panel shows BOTH attempts —
+          // the failed first turn + the successful recovery. Helps the
+          // operator see what happened.
+          (result.tool_calls_executed || []).push(
+            ...(recoveredResult.tool_calls_executed || []),
+          );
+          log.info('whatsapp.placeholder_recovered', {
+            agent_id: a.id,
+            phone: inbound.phone,
+            recovered_with_media: recoveredHasMedia,
+            recovery_provider: recoveredResult.provider,
+          });
+          placeholderGuardTripped = 'recovered';
+        } else {
+          placeholderGuardTripped = 'recovery_failed';
+        }
+      } catch (err) {
+        log.warn('whatsapp.placeholder_recovery_failed', {
+          agent_id: a.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        placeholderGuardTripped = 'recovery_failed';
+      }
+      // Strip any remaining placeholder text in the reply (whether
+      // recovery succeeded or not) so the customer never sees the
+      // bracket form. Done after recovery in case the recovered reply
+      // also has a placeholder we missed.
+      if (typeof reply === 'string') {
+        const before = reply;
+        reply = reply.replace(/\[[^\]]*\b(?:PDF|CAT[ÁA]LOGO|FOTO|FOTOS|ARQUIVO|DOCUMENTO|IMAGEM|FACHADA|LINK|VEJA|ANEXO)\b[^\]]*\]/gi, '').replace(/\s{2,}/g, ' ').trim();
+        if (reply !== before && placeholderGuardTripped !== 'recovered') {
+          placeholderGuardTripped = 'stripped_only';
+        }
+        if (reply.length === 0) {
+          reply = 'Pronto, te mandei aqui 📄';
+        }
+      }
+    }
+
     // Subscription usage: each runAgent success counts as one billable
     // turn. PDFs are tracked separately because they have their own
     // overage rate (different from raw turns). Fire-and-forget — never
@@ -1514,6 +1632,12 @@ async function processBufferedTurn(opts: {
         reply = 'Pra fechar o pagamento por Pix, peço pra você combinar diretamente com nosso atendente — ele te manda o QR ou a chave certinha. Posso te ajudar com mais alguma coisa enquanto isso?';
         guardRewrites.push('pix_promise');
       }
+    }
+    // Surface the placeholder guard outcome too — the operator wants to
+    // see when the LLM tried to fake a media delivery and whether the
+    // recovery loop saved the turn.
+    if (placeholderGuardTripped) {
+      guardRewrites.push('placeholder_' + placeholderGuardTripped);
     }
 
     // ─── Build reasoning trace for the brain UI + judge ────────────
