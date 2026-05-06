@@ -100,6 +100,17 @@ const PROVIDERS: ProviderConfig[] = [
     supportsRepetitionPenalties: true,
   },
   {
+    // Same key, separate per-day quota at Google. When the primary Flash
+    // hits 1500/day, Flash-Lite still answers — keeps the agent off the
+    // text-only Cohere fallback for as long as possible.
+    name: 'gemini-lite',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    keySlug: 'gemini',
+    model: 'gemini-2.5-flash-lite',
+    supportsTools: true,
+    supportsRepetitionPenalties: true,
+  },
+  {
     name: 'groq',
     endpoint: 'https://api.groq.com/openai/v1/chat/completions',
     keySlug: 'groq',
