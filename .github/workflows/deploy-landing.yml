@@ -35,7 +35,7 @@ jobs:
       # executable file: bun". The GitHub runner image doesn't ship Bun by
       # default. Setup Node + pin the action to npm.
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
