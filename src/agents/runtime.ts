@@ -888,7 +888,18 @@ export async function runAgent(opts: {
    *  to the systemPrompt. Lazy-loaded once per call. */
   personaId?: string | null;
 }): Promise<RunAgentResult> {
-  const { c, allowedTools, messages, ownerId, agentId, enableCache = true } = opts;
+  const { c, messages, ownerId, agentId, enableCache = true } = opts;
+  // Universal tools (catalog triad) get added to EVERY run, regardless of
+  // what the caller passed. Done here so /run/:slug/chat, the WhatsApp
+  // webhook, and any future entry point all share the same baseline. The
+  // previous setup added these only in whatsapp.ts, which meant the
+  // /chat path ran with an empty tools array on agents that hadn't been
+  // explicitly configured — and the LLM hallucinated "[CATÁLOGO COMPLETO]"
+  // because it had no tool to call.
+  const allowedTools = Array.from(new Set([
+    ...(Array.isArray(opts.allowedTools) ? opts.allowedTools : []),
+    ...UNIVERSAL_TOOL_NAMES,
+  ]));
   let { systemPrompt } = opts;
   const t0 = Date.now();
 
