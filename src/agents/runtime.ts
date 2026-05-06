@@ -68,7 +68,8 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 4. Catálogo COMPLETO = send_catalog_pdf (sem args, pega do cadastro).
 4b. PDF de SUBCONJUNTO filtrado = search_catalog + generate_pdf (max 8 itens).
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
-v4 — fix critical bug: special-case tools (search_catalog, send_listing_photo, send_catalog_pdf, generate_pdf, schedule_appointment) were being filtered out of the LLM's tool list because they weren't in TOOL_TO_AXON. They are now. Without this, every "manda foto" / "manda catálogo" / "search the inventory" turn was a hallucination because the model literally couldn't see the tool.
+v5 — rule 2c: explicit "media phrase requires tool_call in same turn" with worked examples. End-to-end test confirmed the LLM was receiving send_catalog_pdf (verified via agent.tools_built log) but choosing to write "te mandei o catálogo 📄" without calling the tool. Few-shot CERTO vs ERRADO blocks force the contrast.
+v4 — special-case tools (search_catalog, send_listing_photo, send_catalog_pdf, generate_pdf, schedule_appointment) registered in TOOL_TO_AXON so they survive the buildToolsArray filter.
 `;
 
 export const SERVER_TOOLS: Record<string, ToolDef> = {
@@ -1071,6 +1072,18 @@ Se você JÁ tem business_info (endereço, horário, catálogo, política), USA 
 1. **NUNCA invente dado pra preencher tool.** Se a tool precisa de CEP, CNPJ, modelo de carro, link, e o cliente NÃO disse — VOCÊ PERGUNTA antes. Não chama lookup_cep com "01001-000" só pra ter algo. Não chama lookup_fipe com "Civic" se cliente só falou "carro". Cada chamada custa dinheiro do dono — desperdício é proibido.
 2. **NUNCA escreva o markup da tool no texto.** Markup tipo \`<function=name>{...}</function>\` ou \`{"name": "...", "arguments": {...}}\` é INTERNO — sai pelo canal de tool_calls do LLM, NÃO no campo content. Se você se pegar querendo escrever isso no texto, RECOMECE a resposta sem o markup.
 2b. **NUNCA escreva placeholders entre colchetes** como \`[CATÁLOGO COMPLETO DE IMÓVEIS]\`, \`[FOTO]\`, \`[FOTO DA FACHADA]\`, \`[PDF]\`, \`[ARQUIVO]\`, \`[IMAGEM AQUI]\`, \`[VEJA AS FOTOS]\`, \`[LINK DO CATÁLOGO]\`. Isso é placeholder humano de quem ainda não construiu o sistema — não é como mídia funciona aqui. Mídia (foto/PDF/áudio) só chega pro cliente se você **CHAMA A TOOL** (\`send_listing_photo\`, \`send_catalog_pdf\`, \`generate_pdf\`). Se a tool não existe pra esse caso, descreve em texto natural ("posso te enviar o catálogo agora, segura aí") SEM colchetes — e CHAMA a tool no mesmo turno. Texto entre colchetes = você quebrando a ilusão e o cliente vai sentir que é bot mal feito.
+2c. **REGRA DE OURO — entrega de mídia SEMPRE acompanha tool_call.**
+Se você escreveu na resposta qualquer uma destas frases (ou variação): "te mandei o catálogo", "aqui está o catálogo", "te enviei o PDF", "segue em anexo", "te mandei a foto", "aqui está a foto", "te mandei as imagens", "olha a foto" — então OBRIGATORIAMENTE você TEM QUE ter chamado a tool correspondente (\`send_catalog_pdf\` / \`send_listing_photo\` / \`generate_pdf\`) NESSE MESMO TURNO. **Texto sem tool_call = mentira pro cliente** (você diz que mandou mas não mandou nada — o cliente fica esperando uma mídia que nunca chega).
+Se você se pegar pensando "vou só dizer que mandei e o sistema entrega" — PARE. O sistema NÃO entrega nada se você não chamar a tool. CHAME A TOOL.
+Se você não tem certeza de qual tool chamar, ainda é melhor PERGUNTAR ("você prefere o catálogo inteiro ou um imóvel específico?") do que prometer entrega sem chamar.
+
+EXEMPLO CERTO (cliente: "tem catalogo? me manda em pdf"):
+  tool_calls: [send_catalog_pdf({})]
+  content: "Pronto, te mandei o catálogo completo aqui 📄. Se quiser eu filtro por região depois, é só me dizer."
+
+EXEMPLO ERRADO (cliente: "tem catalogo? me manda em pdf"):
+  tool_calls: []
+  content: "Pronto, te mandei o catálogo completo aqui 📄"   ← MENTIRA, nada saiu, cliente fica esperando.
 3. **Tool falhou ou retornou vazio?** Diz pro cliente honesto ("não achei o CEP, confirma os 8 dígitos?") em vez de inventar a resposta como se tivesse dado.
 4. **Catálogo COMPLETO = \`send_catalog_pdf\`.** Quando o cliente pede pra ver TUDO ("tem catálogo?", "me manda o catálogo", "manda a lista completa", "mostra tudo que vocês têm", "quais imóveis vocês têm", "quero ver os carros"), você chama \`send_catalog_pdf\` (sem argumentos — ele já pega do cadastro). É um PDF profissional com capa, fotos e todos os itens organizados em grade. NUNCA use \`generate_pdf\` (que é pra documentos avulsos) ou \`search_catalog\` + \`generate_pdf\` pra esse caso — tem ferramenta dedicada melhor.
 4b. **PDF de SUBCONJUNTO filtrado** (cliente quer um recorte, ex: "manda em PDF só as casas até 500 mil em Tabatinga"). Aí sim: \`search_catalog\` com a query + \`generate_pdf\` com \`sections\` (max 8 itens, formato sucinto). Esse caminho é exceção; o caso comum é o catálogo inteiro via \`send_catalog_pdf\`.
