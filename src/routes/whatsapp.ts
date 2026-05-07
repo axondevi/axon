@@ -2009,8 +2009,18 @@ async function processBufferedTurn(opts: {
   // then upload+index in the document vault with direction='outbound'
   // so the owner sees it in the same dashboard panel as inbound docs.
   // The agent's text reply confirms ("Pronto, te mandei aí 📄").
+  //
+  // Failure mode tracking: previously sendOurMedia silently swallowed
+  // errors (`.catch(() => ({ ok: false }))`), so a PDF that built
+  // successfully but failed to ship looked identical in logs to a
+  // PDF that arrived. Customer saw "Pronto, te mandei o catálogo"
+  // text but never got the document. Now: log every outcome with
+  // size + error, and fall back to text saying we couldn't deliver.
+  const pdfDeliveryFailures: Array<{ filename: string; error: string; sizeKb: number }> = [];
   for (const pdf of pdfs) {
-    await sendOurMedia({
+    const sizeKb = Math.round((pdf.base64.length * 0.75) / 1024);  // base64 → bytes → KB
+    const t0 = Date.now();
+    const result = await sendOurMedia({
       instanceUrl: conn.instanceUrl,
       instanceName: conn.instanceName,
       apiKey,
@@ -2022,6 +2032,27 @@ async function processBufferedTurn(opts: {
       caption: pdf.title.slice(0, 200),
       delayMs: 800,
     });
+    const ms = Date.now() - t0;
+    if (result && (result as { ok?: boolean }).ok) {
+      log.info('whatsapp.pdf.delivered', {
+        agent_id: a.id,
+        phone: inbound.phone,
+        filename: pdf.filename,
+        size_kb: sizeKb,
+        ms,
+      });
+    } else {
+      const errStr = (result as { error?: string })?.error || 'unknown_send_failure';
+      log.error('whatsapp.pdf.send_failed', {
+        agent_id: a.id,
+        phone: inbound.phone,
+        filename: pdf.filename,
+        size_kb: sizeKb,
+        ms,
+        error: errStr,
+      });
+      pdfDeliveryFailures.push({ filename: pdf.filename, error: errStr, sizeKb });
+    }
     // Persist to vault asynchronously — don't block subsequent sends.
     if (memory) {
       void (async () => {
@@ -2047,6 +2078,25 @@ async function processBufferedTurn(opts: {
       })();
     }
     await new Promise((r) => setTimeout(r, 600));
+  }
+
+  // If every PDF we tried to deliver failed AND the reply had been
+  // pre-templated as a "te mandei" confirmation, swap it for an honest
+  // failure message. Prevents the catastrophic UX where customer sees
+  // "Pronto, te mandei o catálogo" but no PDF ever arrives — the most
+  // confusing failure mode of the bot.
+  if (pdfs.length > 0 && pdfDeliveryFailures.length === pdfs.length) {
+    const sizeNote = pdfDeliveryFailures[0].sizeKb > 5_000
+      ? ' (o arquivo ficou pesado demais — vou tentar reduzir)'
+      : '';
+    reply =
+      `Tive um problema técnico pra te enviar o PDF agora${sizeNote}. ` +
+      'Posso te passar as opções em texto aqui mesmo, ou no nosso site. Qualquer coisa só me avisar.';
+    log.warn('whatsapp.pdf.all_failed_swapped_reply', {
+      agent_id: a.id,
+      attempted: pdfs.length,
+      first_error: pdfDeliveryFailures[0]?.error,
+    });
   }
 
   // ─── Reply mode: voice in → voice out (mirror customer's preference) ─

@@ -380,9 +380,18 @@ function formatPrice(p: number | null | undefined): string {
 }
 
 /** Pre-fetch all images concurrently with a hard total budget. Returns
- *  a parallel array of buffer-or-null aligned with `items`. Bounded by
- *  concurrency and per-image timeout so a 30-item catalog never adds
- *  more than ~10s to PDF generation. */
+ *  a parallel array of buffer-or-null aligned with `items`.
+ *
+ *  Per-image cap reduced from 800KB → 300KB after a 21-item catalog
+ *  produced a ~6MB PDF that Evolution silently dropped (body too big
+ *  for the WhatsApp media endpoint). 300KB × 80 items max = 24MB cap
+ *  on raw photo data + ~1MB PDF chrome → still under WhatsApp's
+ *  100MB document limit AND under the 5-7MB Evolution-side body limit
+ *  observed in prod. Photos that exceed the cap mid-stream are
+ *  truncated by fetchImageBuffer; truncated JPEGs render as broken
+ *  images so PDFKit's `try { doc.image(...) } catch` swallows them
+ *  and the card falls back to "sem foto" — better than dropping the
+ *  whole PDF. */
 async function prefetchItemImages(items: CatalogPdfItem[]): Promise<(Buffer | null)[]> {
   const out: (Buffer | null)[] = new Array(items.length).fill(null);
   const concurrency = 6;
@@ -392,7 +401,7 @@ async function prefetchItemImages(items: CatalogPdfItem[]): Promise<(Buffer | nu
       batch.map(async (it, j) => {
         const url = (it.image_url || '').trim();
         if (!url || !/^https?:\/\//i.test(url)) return;
-        const fetched = await fetchImageBuffer(url, 7_000, 800_000);
+        const fetched = await fetchImageBuffer(url, 7_000, 300_000);
         if (fetched) out[i + j] = fetched.bytes;
       }),
     );
