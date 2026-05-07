@@ -284,6 +284,12 @@ export async function ensureCriticalSchema() {
   // so existing rows retain their semantics.
   await db.execute(sql`ALTER TABLE "contact_documents" ADD COLUMN IF NOT EXISTS "direction" text NOT NULL DEFAULT 'inbound'`);
 
+  // 0028: agents.catalog_imported_at — timestamp of last catalog import
+  // (POST /catalog/upload or /catalog/import). Surfaced in the dashboard
+  // ("atualizado há 3h") so the owner can see staleness at a glance and
+  // re-import when needed. NULL = never imported.
+  await db.execute(sql`ALTER TABLE "agents" ADD COLUMN IF NOT EXISTS "catalog_imported_at" timestamp`);
+
   // 0027: users.api_key_encrypted + users.supabase_user_id — first part
   // lets us return the API key to a Supabase-authenticated user across
   // sessions (instead of rotating on every email login); second is the

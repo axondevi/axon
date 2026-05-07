@@ -1134,9 +1134,14 @@ app.post('/:id/catalog/upload', async (c) => {
     if (cleaned.length === 0) {
       return c.json({ error: 'bad_request', message: 'nenhum item com nome preenchido' }, 400);
     }
+    const now = new Date();
     await db
       .update(agents)
-      .set({ catalog: cleaned as unknown as Record<string, unknown>, updatedAt: new Date() })
+      .set({
+        catalog: cleaned as unknown as Record<string, unknown>,
+        catalogImportedAt: now,
+        updatedAt: now,
+      })
       .where(eq(agents.id, a.id));
     return c.json({
       ok: true,
@@ -1169,9 +1174,14 @@ app.post('/:id/catalog/upload', async (c) => {
     }, 400);
   }
 
+  const importNow = new Date();
   await db
     .update(agents)
-    .set({ catalog: result.items as unknown as Record<string, unknown>, updatedAt: new Date() })
+    .set({
+      catalog: result.items as unknown as Record<string, unknown>,
+      catalogImportedAt: importNow,
+      updatedAt: importNow,
+    })
     .where(eq(agents.id, a.id));
 
   return c.json({
@@ -1232,9 +1242,11 @@ app.post('/:id/catalog/import-url', async (c) => {
     // when explicitly requested via save_business=true (default true
     // for backwards-compat with the simpler {save:true} flow but the
     // UI is smart enough to ask first).
-    const update: { catalog: unknown; updatedAt: Date; businessInfo?: string } = {
+    const importTs = new Date();
+    const update: { catalog: unknown; updatedAt: Date; businessInfo?: string; catalogImportedAt: Date } = {
       catalog: result.items as unknown as Record<string, unknown>,
-      updatedAt: new Date(),
+      catalogImportedAt: importTs,
+      updatedAt: importTs,
     };
     const wantBiz = body.save_business !== false;
     if (wantBiz && result.business_info_text) {

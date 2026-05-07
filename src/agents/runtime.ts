@@ -62,6 +62,8 @@ export const UNIVERSAL_TOOL_NAMES = [
   'search_catalog',
   'send_listing_photo',
   'send_catalog_pdf',
+  'send_brochure_pdf',
+  'send_filtered_pdf',
   'generate_pdf',
   'schedule_appointment',
 ] as const;
@@ -85,6 +87,7 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
 6. Documento avulso (comprovante, recibo, ficha, atestado, declaração, contrato, receita) = generate_pdf — sai como anexo PDF nativo no WhatsApp.
 7. Agendamento confirmado (data + hora acordadas) = schedule_appointment — registra + dispara lembrete véspera.
+v12 — Wave 1+2+3 do catálogo de imobiliária. (1) MAX_ITEMS 30→200 no site-importer (catálogo cobre 90% das imobiliárias SMB sem cap). (2) CatalogItem estendido com tipologia/area_m2/vagas/suites/amenidades/status_obra/neighborhood_info/plantas. Importer extrai esses campos do detail page quando presentes. (3) Duas tools/renderers novos: send_brochure_pdf (panfleto sofisticado de 1 imóvel — capa edge-to-edge, specs chips, lazer, bairro, plantas, galeria, contato) e send_filtered_pdf (subset 3-8 itens curado pelo filtro do cliente). Universal_tool_names + always_on cobrem ambos. Regras 9/10 do prompt explicam quando usar cada uma. Coluna catalog_imported_at pra exibir freshness no painel.
 v11 — Catálogo PDF reorganizado em seções (venda/aluguel/outros) + sub-grupos por tipo de imóvel (casa/apto/terreno/sítio/sala/cobertura/kitnet) com REF/CÓD prominente em cada card. Capa agora tem sumário ("X imóveis · Y para venda · Z para aluguel · breakdown por tipo") + instrução "como pedir mais detalhes" + URL do site. Footer em toda página com URL+pageN. Nova regra 9 do prompt: quando cliente referenciar item ("essa", "aquela", "código IM-V-A1B2"), agente chama search_catalog e responde com URL do anúncio (campo url do item). Resolve o pedido da imobiliária: cliente vê PDF organizado, aponta o que quer, agente manda link direto.
 v10 — Recovery hardening: tool_choice='required' no retry de placeholder + auto-build de PDF do catálogo como rede final quando o LLM continua escrevendo "[PDF...]" mesmo após coaching. Caso real 5210/5211 em prod: imobiliária escreveu placeholder duas vezes seguidas (uma na primeira tentativa, outra no recovery) e o cliente recebeu "Aqui está o PDF: " sem PDF. Agora se LLM falhar duas vezes, eu mesmo invoco renderCatalogPdf direto com agent.catalog (zero LLM) — pelo menos algo real chega ao cliente. Cleanup do prefix "Aqui está o PDF:" também adicionado.
 v9 — REGRA #0 anti-colchete movida pro topo do qualityRule + output guard com auto-recovery em whatsapp.ts. Quando o LLM emite [PDF...] / [FOTO...] / [CATÁLOGO...] e nenhuma mídia foi produzida, re-invocamos runAgent com mensagem coaching explicita pra ele tentar de novo chamando a tool real. Strip do colchete como rede final. Caso real em prod 2026-05-06: agente de imobiliária escreveu "[PDF DA CASA EM PONTAL DE SANTA MARINA]" como texto após search_catalog, sem chamar generate_pdf. v8 não cobriu — modelo pequeno ignorando regra 2b no fim do prompt.
@@ -376,6 +379,43 @@ export const SERVER_TOOLS: Record<string, ToolDef> = {
       required: ['title', 'body'],
     },
     // No buildRequest — handled in the runtime special-case (renderPdf).
+  },
+  send_brochure_pdf: {
+    description:
+      'Entrega uma BROCHURA SOFISTICADA de um único imóvel ao cliente — capa edge-to-edge com foto, especificações (tipologia, área, vagas, suítes), lazer, info de bairro, plantas (se houver), galeria de fotos, página de contato. Use quando o cliente quer o panfleto completo de UM imóvel específico ("manda os detalhes daquele apartamento", "tem brochura?", "panfleto desse aqui", "manda mais info do código X"). Antes de chamar, RODE search_catalog pra pegar o ID/REF do item exato. Não invente o código.',
+    parameters: {
+      type: 'object',
+      properties: {
+        item_id: {
+          type: 'string',
+          description: 'O id do item retornado por search_catalog (campo .id). Esse é o identificador interno — NÃO o REF visível no PDF (IM-V-XXXX) — embora os 6 últimos chars do id formem o REF.',
+        },
+      },
+      required: ['item_id'],
+    },
+  },
+  send_filtered_pdf: {
+    description:
+      'Entrega um PDF curado com 3-8 imóveis selecionados conforme filtro do cliente ("manda em PDF as casas até R$ 500k em Tabatinga"). Capa "Seleção · <descrição>" + breve nota personalizada + grid agrupado. Antes de chamar, RODE search_catalog com o filtro pra obter os items reais. Use APENAS quando o cliente pediu um RECORTE específico — pra catálogo INTEIRO use send_catalog_pdf.',
+    parameters: {
+      type: 'object',
+      properties: {
+        selection_label: {
+          type: 'string',
+          description: 'Descrição curta do que foi filtrado (vai pra capa). Ex: "Casas até R$ 500k em Tabatinga", "Aptos para aluguel no Centro", "Imóveis até 200m²". Max 80 chars.',
+        },
+        item_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array com os ids dos itens (do search_catalog) que devem entrar. 3-8 itens. Não invente, use só os ids retornados.',
+        },
+        personal_note: {
+          type: 'string',
+          description: 'Opcional. Nota curta personalizada (max 200 chars) na capa, ex: "Olá Mariana, separei essas pensando no que você falou — qualquer dúvida me chama."',
+        },
+      },
+      required: ['selection_label', 'item_ids'],
+    },
   },
 
   // ─── Brazilian financial data ─────────────────────────────────
@@ -1112,8 +1152,14 @@ Use o critério: "se eu disser que enviei, alguém realmente tem que receber". S
 9. **Cliente referenciou item após receber catálogo/PDF.** Quando ele disser coisas como "essa", "aquela", "esse aqui", "o segundo", "a terceira casa", "código IM-V-A1B2", "REF 1234", "aquele apartamento", "o de Tabatinga" — significa que ele tá apontando pra um item específico que JÁ apareceu na conversa (no PDF que você mandou ou nas mensagens anteriores). PROTOCOLO:
    (i) chame \`search_catalog\` com a melhor query que extrair do contexto — pode ser o código (ex: "IM-V-A1B2"), o nome ("casa pontal santa marina"), a região, ou características que o cliente mencionou ("aquela com 4 quartos");
    (ii) na resposta, **mande o link do anúncio** (campo \`url\` do item) — esse link é o destino pro cliente ver detalhes, fotos, ou enviar mensagem pelo site;
-   (iii) opcionalmente chame também \`send_listing_photo\` pra mostrar a foto principal do item.
+   (iii) **se o cliente quer aprofundar nesse imóvel ("manda mais detalhes", "tem brochura?", "mais info", "panfleto") chame \`send_brochure_pdf\` com o item_id retornado** — vai um PDF sofisticado com tudo (foto grande, especificações, lazer, bairro, plantas, galeria);
+   (iv) opcionalmente chame também \`send_listing_photo\` pra mostrar a foto principal do item.
    Formato da resposta: "Esse aqui é o [nome curto]. Link com tudo: [url]". Se o item não tem url cadastrado, fale honesto ("não tenho link direto desse, mas as informações são: ...") em vez de inventar URL. Se a busca não acha, pergunte qual código exato ou bairro pra estreitar.
+
+10. **Cliente quer recorte filtrado em PDF** ("manda em PDF as casas até 500k em Tabatinga", "preciso só dos aptos pra alugar no Centro em PDF", "me passa um PDF com 3 opções de cobertura"). PROTOCOLO:
+    (i) chame \`search_catalog\` com a query do filtro pra obter os items reais (max 8 ids);
+    (ii) chame \`send_filtered_pdf\` passando os \`item_ids\` retornados, um \`selection_label\` curto descrevendo o recorte ("Casas até R$ 500k em Tabatinga"), e opcionalmente um \`personal_note\` ("Olá Mariana, separei essas pensando no que você falou").
+    Diferença essencial: \`send_catalog_pdf\` = catálogo INTEIRO; \`send_filtered_pdf\` = RECORTE de 3-8 itens; \`send_brochure_pdf\` = UM imóvel sofisticado. Escolha pelo escopo do pedido.
 
 ## Formato de saída no WhatsApp (obrigatório)
 - **Bolhas curtas, separadas por \`||\`.** Resposta natural no zap = 2-3 bolhas de 1-2 frases cada. NUNCA mande um parágrafo de 5 linhas — fica robótico e o cliente bate o olho e some.
@@ -1524,6 +1570,186 @@ Use o critério: "se eu disser que enviei, alguém realmente tem que receber". S
         } catch (err: any) {
           const errMsg = err?.message || String(err);
           errReply(errMsg);
+        }
+        continue;
+      }
+
+      // ─── Special-case: send_brochure_pdf ──────────────────────────
+      // Single-listing sophistication. Deep-dive PDF with cover photo
+      // edge-to-edge, specs chips, lazer, neighborhood, plantas (when
+      // present), gallery, back-cover with contact. Looks like a real
+      // launch brochure — what closes the deal once the customer says
+      // "essa daqui me interessa".
+      if (tc.function.name === 'send_brochure_pdf') {
+        const tcStart = Date.now();
+        const errReply = (msg: string, code = 0) => {
+          history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: msg }) });
+          toolCallsExecuted.push({ name: 'send_brochure_pdf', args, ok: false, cost_usdc: '0', error: msg, ms: Date.now() - tcStart, status: code });
+        };
+        try {
+          const itemId = String(args.item_id || '').trim();
+          if (!itemId) {
+            errReply('item_id obrigatório — chame search_catalog primeiro pra obter o id real do item.');
+            continue;
+          }
+          const catalog = (c.get('axon:catalog' as never) as Array<Record<string, unknown>> | undefined) || [];
+          const item = Array.isArray(catalog)
+            ? catalog.find((it) => String((it as { id?: unknown }).id || '') === itemId)
+            : null;
+          if (!item) {
+            errReply(`item_id "${itemId}" não encontrado no catálogo. Rode search_catalog antes pra pegar o id correto.`);
+            continue;
+          }
+          if (!agentId) {
+            errReply('missing agent context');
+            continue;
+          }
+          const { db: dbMod } = await import('~/db');
+          const { agents: agentsTable } = await import('~/db/schema');
+          const { eq: eqOp } = await import('drizzle-orm');
+          const [agentRow] = await dbMod.select().from(agentsTable).where(eqOp(agentsTable.id, agentId)).limit(1);
+          const businessName = (agentRow?.name || 'Imóvel').slice(0, 100);
+          const businessInfoStr = agentRow?.businessInfo || '';
+          const businessContact = businessInfoStr.split('\n')[0]?.slice(0, 200) || '';
+          const siteMatch = businessInfoStr.match(/https?:\/\/[^\s)]+/i);
+          const siteUrl = siteMatch ? siteMatch[0] : undefined;
+          const it = item as Record<string, unknown>;
+          // Build the same REF the catalog PDF uses so the customer's
+          // "manda IM-V-A1B2C3" matches what they saw before.
+          const txnPrefix = it.type === 'venda' ? 'IM-V' : it.type === 'aluguel' ? 'IM-A' : 'IM';
+          const idClean = String(it.id || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          const ref = idClean.length >= 4
+            ? `${txnPrefix}-${idClean.slice(-6)}`
+            : `${txnPrefix}-${idClean.padStart(4, '0')}`;
+          const { renderBrochurePdf, suggestPdfFilename } = await import('~/agents/pdf-renderer');
+          const pdfBytes = await renderBrochurePdf({
+            ref,
+            businessName,
+            businessContact,
+            siteUrl,
+            item: {
+              id: typeof it.id === 'string' ? it.id : undefined,
+              name: String(it.name || ''),
+              price: typeof it.price === 'number' ? it.price : null,
+              region: typeof it.region === 'string' ? it.region : null,
+              description: typeof it.description === 'string' ? it.description : null,
+              image_url: typeof it.image_url === 'string' ? it.image_url : null,
+              images: Array.isArray(it.images) ? (it.images as string[]).filter((u) => typeof u === 'string') : [],
+              url: typeof it.url === 'string' ? it.url : null,
+              type: it.type === 'venda' || it.type === 'aluguel' ? (it.type as 'venda' | 'aluguel') : null,
+              tipologia: typeof it.tipologia === 'string' ? it.tipologia : undefined,
+              area_m2: typeof it.area_m2 === 'number' ? it.area_m2 : undefined,
+              vagas: typeof it.vagas === 'number' ? it.vagas : undefined,
+              suites: typeof it.suites === 'number' ? it.suites : undefined,
+              amenidades: Array.isArray(it.amenidades) ? (it.amenidades as string[]).filter((a) => typeof a === 'string') : undefined,
+              status_obra: it.status_obra === 'pronto' || it.status_obra === 'construcao' || it.status_obra === 'lancamento' || it.status_obra === 'usado' ? it.status_obra : null,
+              neighborhood_info: typeof it.neighborhood_info === 'string' ? it.neighborhood_info : undefined,
+              plantas: Array.isArray(it.plantas) ? (it.plantas as string[]).filter((u) => typeof u === 'string') : undefined,
+            },
+          });
+          const filename = suggestPdfFilename(`brochura ${String(it.name || '').slice(0, 40)}`);
+          generatedPdfs.push({
+            base64: pdfBytes.toString('base64'),
+            filename,
+            title: `Brochura — ${String(it.name || 'imóvel')}`,
+            docType: 'outro_gerado',
+            excerpt: `Brochura ${ref} · ${it.name || ''}`.slice(0, 500),
+          });
+          history.push({
+            role: 'tool', tool_call_id: tc.id,
+            content: JSON.stringify({
+              ok: true, filename, ref,
+              note: `Brochura PDF de "${it.name}" entregue. Confirme em PT-BR — ex: "Pronto, te mandei a brochura completa do ${ref} 📄. Qualquer dúvida me chama."`,
+            }),
+          });
+          toolCallsExecuted.push({ name: 'send_brochure_pdf', args, ok: true, cost_usdc: '0', ms: Date.now() - tcStart, status: 200 });
+        } catch (err: any) {
+          errReply(err?.message || String(err));
+        }
+        continue;
+      }
+
+      // ─── Special-case: send_filtered_pdf ──────────────────────────
+      // Curated subset: 3-8 imóveis selecionados conforme o filtro do
+      // cliente. Reuses renderFilteredPdf which delegates to renderCatalogPdf
+      // with a swapped cover label.
+      if (tc.function.name === 'send_filtered_pdf') {
+        const tcStart = Date.now();
+        const errReply = (msg: string, code = 0) => {
+          history.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: msg }) });
+          toolCallsExecuted.push({ name: 'send_filtered_pdf', args, ok: false, cost_usdc: '0', error: msg, ms: Date.now() - tcStart, status: code });
+        };
+        try {
+          const label = String(args.selection_label || '').trim();
+          if (!label) {
+            errReply('selection_label obrigatório (ex: "Casas até R$ 500k em Tabatinga").');
+            continue;
+          }
+          const ids: string[] = Array.isArray(args.item_ids)
+            ? (args.item_ids as unknown[]).map((x) => String(x).trim()).filter(Boolean).slice(0, 8)
+            : [];
+          if (ids.length === 0) {
+            errReply('item_ids obrigatório — chame search_catalog primeiro e passe os 3-8 ids.');
+            continue;
+          }
+          const catalog = (c.get('axon:catalog' as never) as Array<Record<string, unknown>> | undefined) || [];
+          const matched = ids
+            .map((id) => catalog.find((it) => String((it as { id?: unknown }).id || '') === id))
+            .filter((x): x is Record<string, unknown> => !!x);
+          if (matched.length === 0) {
+            errReply('Nenhum item_id bateu com o catálogo. Rode search_catalog e use só os ids retornados.');
+            continue;
+          }
+          if (!agentId) {
+            errReply('missing agent context');
+            continue;
+          }
+          const { db: dbMod } = await import('~/db');
+          const { agents: agentsTable } = await import('~/db/schema');
+          const { eq: eqOp } = await import('drizzle-orm');
+          const [agentRow] = await dbMod.select().from(agentsTable).where(eqOp(agentsTable.id, agentId)).limit(1);
+          const businessName = (agentRow?.name || 'Catálogo').slice(0, 100);
+          const businessInfoStr = agentRow?.businessInfo || '';
+          const businessContact = businessInfoStr.split('\n')[0]?.slice(0, 200) || '';
+          const siteMatch = businessInfoStr.match(/https?:\/\/[^\s)]+/i);
+          const siteUrl = siteMatch ? siteMatch[0] : undefined;
+          const note = String(args.personal_note || '').trim().slice(0, 200);
+          const { renderFilteredPdf, suggestPdfFilename } = await import('~/agents/pdf-renderer');
+          const pdfBytes = await renderFilteredPdf({
+            businessName,
+            businessContact,
+            siteUrl,
+            selectionLabel: label,
+            personalNote: note || undefined,
+            items: matched.map((it) => ({
+              id: typeof it.id === 'string' ? it.id : undefined,
+              name: String(it.name || ''),
+              price: typeof it.price === 'number' ? it.price : null,
+              region: typeof it.region === 'string' ? it.region : null,
+              description: typeof it.description === 'string' ? it.description : null,
+              image_url: typeof it.image_url === 'string' ? it.image_url : null,
+              url: typeof it.url === 'string' ? it.url : null,
+              type: it.type === 'venda' || it.type === 'aluguel' ? (it.type as 'venda' | 'aluguel') : null,
+            })),
+          });
+          const filename = suggestPdfFilename(`selecao ${label}`);
+          generatedPdfs.push({
+            base64: pdfBytes.toString('base64'),
+            filename,
+            title: `Seleção — ${label}`,
+            docType: 'outro_gerado',
+            excerpt: `${matched.length} itens · ${label}`.slice(0, 500),
+          });
+          history.push({
+            role: 'tool', tool_call_id: tc.id,
+            content: JSON.stringify({
+              ok: true, filename, item_count: matched.length,
+              note: `Seleção "${label}" com ${matched.length} ite${matched.length === 1 ? 'm' : 'ns'} entregue. Confirme em PT-BR — ex: "Pronto, te mandei a seleção 📄."`,
+            }),
+          });
+          toolCallsExecuted.push({ name: 'send_filtered_pdf', args, ok: true, cost_usdc: '0', ms: Date.now() - tcStart, status: 200 });
+        } catch (err: any) {
+          errReply(err?.message || String(err));
         }
         continue;
       }

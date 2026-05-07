@@ -110,6 +110,8 @@ const ALWAYS_ON: string[] = [
   'search_catalog',
   'send_listing_photo',
   'send_catalog_pdf',
+  'send_brochure_pdf',
+  'send_filtered_pdf',
   'generate_pdf',
   'schedule_appointment',
 ];

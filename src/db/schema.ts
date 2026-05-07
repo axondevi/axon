@@ -278,6 +278,11 @@ export const agents = pgTable(
     // injection + search_catalog tool look for; everything else is
     // metadata available via the tool.
     catalog: jsonb('catalog'),
+    /** When the catalog was last imported / refreshed. Surfaced in the
+     *  /build dashboard ("atualizado há 3h") + Brain panel so the owner
+     *  knows when to re-import. Updated on POST /catalog/upload and
+     *  POST /catalog/import. NULL = never imported. */
+    catalogImportedAt: timestamp('catalog_imported_at'),
     // Per-agent voice override + global voice toggle. When voiceEnabled
     // is false, the runtime never calls TTS regardless of persona/audio
     // mirroring. When voiceIdOverride is set, it wins over the persona's

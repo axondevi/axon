@@ -1021,6 +1021,8 @@ export const TOOL_TO_AXON: Record<string, { api: string; endpoint: string }> = {
   search_catalog:       { api: '__internal__', endpoint: 'search_catalog' },
   send_listing_photo:   { api: '__internal__', endpoint: 'send_listing_photo' },
   send_catalog_pdf:     { api: '__internal__', endpoint: 'send_catalog_pdf' },
+  send_brochure_pdf:    { api: '__internal__', endpoint: 'send_brochure_pdf' },
+  send_filtered_pdf:    { api: '__internal__', endpoint: 'send_filtered_pdf' },
   generate_pdf:         { api: '__internal__', endpoint: 'generate_pdf' },
   schedule_appointment: { api: '__internal__', endpoint: 'schedule_appointment' },
 };

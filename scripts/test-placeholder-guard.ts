@@ -146,6 +146,68 @@ try {
 }
 
 // ─── 4. End-to-end: stubborn LLM scenario ─────────────────────────
+// ─── 3.5. Brochure PDF + Filtered PDF ─────────────────────────────
+console.log('\n═══ 3.5. Brochure + Filtered PDFs ═══\n');
+try {
+  const { renderBrochurePdf, renderFilteredPdf } = await import('~/agents/pdf-renderer');
+
+  // Brochure: a sophisticated single-listing PDF
+  const t1 = Date.now();
+  const brochureBytes = await renderBrochurePdf({
+    ref: 'IM-V-A1B2C3',
+    businessName: 'Imobiliária em Caraguatatuba',
+    businessContact: '+55 12 9XXXX-XXXX · contato@imobiliariacaragua.com.br',
+    siteUrl: 'https://imobiliariacaragua.com.br',
+    item: {
+      id: 'a1b2c3',
+      name: 'Apartamento Residencial Vista Mar',
+      price: 980000,
+      region: 'Praia das Palmeiras, Caraguatatuba',
+      description: 'Apartamento 3 dormitórios sendo 1 suíte master, sala ampla com sacada gourmet integrada à cozinha. Vista frontal pro mar, andar alto, sol da manhã. 2 vagas de garagem.',
+      image_url: null,
+      url: 'https://imobiliariacaragua.com.br/apto-vista-mar',
+      type: 'venda',
+      tipologia: '3 dormitórios',
+      area_m2: 110,
+      vagas: 2,
+      suites: 1,
+      amenidades: ['Piscina adulto e infantil', 'Academia', 'Salão de festas', 'Churrasqueira gourmet', 'Playground', 'Portaria 24h', 'Elevador', 'Vaga visitante'],
+      status_obra: 'pronto',
+      neighborhood_info: 'Praia das Palmeiras é um dos bairros mais valorizados de Caraguatatuba. Comércio completo a pé, escolas particulares (Objetivo, Nova Geração) num raio de 1km, supermercado Zaffari na esquina, e a praia a 200 metros do prédio. Acesso direto à Tamoios em 5 minutos.',
+      plantas: [],
+    },
+  });
+  const t1ms = Date.now() - t1;
+  const ok1 = brochureBytes.slice(0, 4).toString('ascii') === '%PDF';
+  console.log(`${ok1 ? '✅' : '❌'} Brochure: ${brochureBytes.length} bytes · header=%PDF · ${t1ms}ms`);
+  if (ok1) {
+    const path = `/tmp/brochura-${Date.now()}.pdf`;
+    await Bun.write(path, brochureBytes);
+    console.log(`   wrote: ${path}`);
+  }
+
+  // Filtered: 3-item curated subset
+  const t2 = Date.now();
+  const filteredBytes = await renderFilteredPdf({
+    businessName: 'Imobiliária em Caraguatatuba',
+    businessContact: '+55 12 9XXXX-XXXX',
+    siteUrl: 'https://imobiliariacaragua.com.br',
+    selectionLabel: 'Casas até R$ 1MM em Pontal de Santa Marina',
+    personalNote: 'Olá Mariana, separei essas pensando no que você falou — qualquer dúvida me chama.',
+    items: sampleCatalog.filter((c: any) => c.type === 'venda' && c.region.includes('Pontal')) as any,
+  });
+  const t2ms = Date.now() - t2;
+  const ok2 = filteredBytes.slice(0, 4).toString('ascii') === '%PDF';
+  console.log(`${ok2 ? '✅' : '❌'} Filtered: ${filteredBytes.length} bytes · ${t2ms}ms`);
+  if (ok2) {
+    const path = `/tmp/filtered-${Date.now()}.pdf`;
+    await Bun.write(path, filteredBytes);
+    console.log(`   wrote: ${path}`);
+  }
+} catch (err) {
+  console.log(`❌ brochure/filtered render error: ${err instanceof Error ? err.message : String(err)}`);
+}
+
 console.log('\n═══ 4. End-to-end — stubborn LLM scenario ═══\n');
 console.log('Cenário: LLM escreveu placeholder duas vezes (1ª tentativa + recovery).');
 console.log('Pipeline esperada:');

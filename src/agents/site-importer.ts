@@ -22,7 +22,13 @@ import type { CatalogItem } from '~/agents/catalog';
 
 const FETCH_TIMEOUT_MS = 30_000;
 const MAX_HTML_BYTES = 800_000; // ~800KB cap to protect Gemini context + memory
-const MAX_ITEMS = 30;
+// Bumped 30 → 200 so large real-estate / e-commerce sites have realistic
+// coverage. Below 200 a 100-listing imobiliária only shipped the first
+// 30 — agent told customers "não tenho" while the listing was on the
+// site. The deep-crawl pipeline already throttles + chunks Gemini calls
+// (concurrency=2, ~1.5s sleep between batches per importer logic) so the
+// quota cost scales linearly without spiking.
+const MAX_ITEMS = 200;
 const USER_AGENT =
   'Mozilla/5.0 (compatible; AxonCatalogBot/1.0; +https://nexusinovation.com.br)';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
@@ -1096,6 +1102,17 @@ async function llmExtractDetailPage(
     '- description: descrição completa, até 600 chars (m², quartos, banheiros, vagas, amenidades, condição, etc).',
     '- image_url: a foto de capa (a primeira do gallery).',
     '- images: array com TODAS as URLs de fotos do item (cap 6). Use marcadores [IMG: <url>] que aparecem no texto. Use URLs EXATAS, não invente.',
+    // Brochure-grade fields. Optional — emit null when not stated. Used
+    // by the new send_brochure_pdf tool to render a richer single-item
+    // PDF (capa edge-to-edge, tipologia chips, lazer, status_obra).
+    '- tipologia: string curta tipo "2 quartos", "3 dormitórios + suíte", "studio" (null se não disser).',
+    '- area_m2: número, área útil em m² (null se não disser).',
+    '- vagas: integer, número de vagas de garagem (null se não disser).',
+    '- suites: integer, suítes (null se não disser).',
+    '- amenidades: array de strings curtas (max 12) — piscina, churrasqueira, academia, salão de festas, playground, portaria 24h, elevador, varanda gourmet, etc. [] se não disser.',
+    '- status_obra: "pronto" | "construcao" | "lancamento" | "usado" | null. "pronto" se está pronto/entregue, "construcao" se obra em andamento, "lancamento" se planta/breve lançamento, "usado" se imóvel pré-existente. null se não der pra saber.',
+    '- neighborhood_info: free-text até 400 chars sobre o bairro (escolas, mercados, transporte, distância da praia, vibe). null se a página não falar do bairro.',
+    '- plantas: array de URLs de imagens de planta baixa (max 3). Use marcadores [IMG: <url>] cujo alt/contexto cite "planta", "tipologia", "blueprint". [] se não tiver.',
     '',
     'Se a página NÃO é detalhe de um item (é blog, contato, listagem), retorne null.',
     '',
@@ -1148,6 +1165,48 @@ async function llmExtractDetailPage(
         item.images = dedup;
         if (!item.image_url) item.image_url = dedup[0];
       }
+    }
+    // ─── Brochure-grade fields ─────────────────────────────────────
+    const tipologia = strFromAny(r.tipologia, 60);
+    if (tipologia) item.tipologia = tipologia;
+    if (typeof r.area_m2 === 'number' && isFinite(r.area_m2 as number) && (r.area_m2 as number) > 0) {
+      item.area_m2 = r.area_m2 as number;
+    } else if (typeof r.area_m2 === 'string') {
+      const n = parseFloat((r.area_m2 as string).replace(',', '.'));
+      if (isFinite(n) && n > 0) item.area_m2 = n;
+    }
+    if (typeof r.vagas === 'number' && Number.isFinite(r.vagas as number)) {
+      item.vagas = Math.max(0, Math.floor(r.vagas as number));
+    } else if (typeof r.vagas === 'string') {
+      const n = parseInt((r.vagas as string).replace(/\D/g, ''), 10);
+      if (Number.isFinite(n)) item.vagas = Math.max(0, n);
+    }
+    if (typeof r.suites === 'number' && Number.isFinite(r.suites as number)) {
+      item.suites = Math.max(0, Math.floor(r.suites as number));
+    } else if (typeof r.suites === 'string') {
+      const n = parseInt((r.suites as string).replace(/\D/g, ''), 10);
+      if (Number.isFinite(n)) item.suites = Math.max(0, n);
+    }
+    if (Array.isArray(r.amenidades)) {
+      const cleaned = (r.amenidades as unknown[])
+        .map((a) => strFromAny(a, 50))
+        .filter((a): a is string => !!a)
+        .slice(0, 12);
+      if (cleaned.length) item.amenidades = Array.from(new Set(cleaned));
+    }
+    const statusRaw = strFromAny(r.status_obra);
+    if (statusRaw === 'pronto' || statusRaw === 'construcao' || statusRaw === 'lancamento' || statusRaw === 'usado') {
+      item.status_obra = statusRaw;
+    }
+    const nbhd = strFromAny(r.neighborhood_info, 400);
+    if (nbhd) item.neighborhood_info = nbhd;
+    if (Array.isArray(r.plantas)) {
+      const list = (r.plantas as unknown[])
+        .map(resolve)
+        .filter((u): u is string => !!u && /^https?:/i.test(u))
+        .slice(0, 3);
+      const dedup = Array.from(new Set(list));
+      if (dedup.length) item.plantas = dedup;
     }
     return item;
   } catch {

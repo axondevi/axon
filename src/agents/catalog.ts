@@ -42,6 +42,38 @@ export interface CatalogItem {
    *  'venda' = for sale, 'aluguel' = for rent. Optional — most
    *  pure-product catalogs (e-commerce, restaurants) won't set it. */
   type?: 'venda' | 'aluguel';
+  // ─── Brochure-grade fields (real-estate sophistication) ──────────
+  // All optional so non-real-estate catalogs (e-commerce, restaurants)
+  // work without extra noise. The brochure renderer composes whatever
+  // is present — missing fields just don't render their row. Importer
+  // tries to extract from the listing's detail page; owner can also
+  // edit any of these in /build.
+  /** Bedroom count, e.g. "2 quartos" / "3Q" / "studio". Free-form
+   *  string so "1 dormitório + sala" passes through. */
+  tipologia?: string;
+  /** Useful area in square meters (number, no unit). Painted as "X m²"
+   *  on the brochure. */
+  area_m2?: number;
+  /** Number of parking spots (integer). */
+  vagas?: number;
+  /** Suite count (integer). Different from total bedrooms. */
+  suites?: number;
+  /** Building / unit amenities. Brochure renders these as a chip row
+   *  with icons (piscina, churrasqueira, academia, salão, etc). Up
+   *  to ~12 entries shown; rest truncated. */
+  amenidades?: string[];
+  /** Construction status. Drives a status pill on the brochure cover.
+   *  'pronto' = ready to move in, 'construcao' = under construction,
+   *  'lancamento' = launch / planned, 'usado' = pre-owned. */
+  status_obra?: 'pronto' | 'construcao' | 'lancamento' | 'usado' | null;
+  /** Free-form neighborhood profile shown on the brochure's "Sobre o
+   *  bairro" page. Kept loose — owner can write what matters most for
+   *  THIS specific listing's audience (família vs investidor vs
+   *  veranista) instead of a one-size template. */
+  neighborhood_info?: string;
+  /** Floor-plan URLs. Brochure renders the first 3 on a "Plantas"
+   *  page when present — common for lançamento brochures. */
+  plantas?: string[];
   meta?: Record<string, string>;
 }
 

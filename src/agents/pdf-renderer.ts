@@ -183,6 +183,10 @@ export interface CatalogPdfItem {
   region?: string | null;
   description?: string | null;
   image_url?: string | null;
+  /** Full photo gallery — populated by the importer for detail pages
+   *  with multiple shots. Brochure renderer uses these for the "Galeria"
+   *  page. Catalog grid renderer uses only image_url. */
+  images?: string[];
   url?: string | null;
   /** Real-estate / multi-modal catalogs: 'venda' (for sale) | 'aluguel'
    *  (for rent). Used to split the PDF into sections so the customer
@@ -804,5 +808,444 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
     } catch (err) {
       reject(err);
     }
+  });
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Brochure PDF — single-listing sophistication.
+//
+// Used by the send_brochure_pdf tool when a customer wants the deep
+// dive on one specific item ("manda a brochura desse apartamento",
+// "preciso ver os detalhes desse imóvel", "panfleto desse aqui"). The
+// layout mirrors what real-estate launch brochures look like (Cyrela /
+// MRV / Tegra style) so the customer perceives the listing as serious
+// and the platform as polished.
+//
+// Pages:
+//   1. Cover — full-bleed cover photo, gradient overlay, big name +
+//      price + REF + status pill (lançamento / pronto / construção).
+//   2. Specs — tipologia chips (quartos, área, vagas, suítes), big
+//      description block.
+//   3. Lazer/amenidades — chip grid + a short tagline.
+//   4. Sobre o bairro — neighborhood_info text + region tag.
+//   5. Plantas (only if item has plantas[]) — up to 3 floor plans.
+//   6. Galeria — full grid of remaining photos.
+//   7. Contato/back-cover — accent panel + business + URL + REF.
+//
+// Sections without data SKIP entirely — owner with bare-bones catalog
+// gets a 3-page brochure (cover + galeria + contato) instead of a
+// padded one with empty sections.
+// ───────────────────────────────────────────────────────────────────
+
+export interface BrochurePdfInput {
+  item: CatalogPdfItem & {
+    tipologia?: string;
+    area_m2?: number;
+    vagas?: number;
+    suites?: number;
+    amenidades?: string[];
+    status_obra?: 'pronto' | 'construcao' | 'lancamento' | 'usado' | null;
+    neighborhood_info?: string;
+    plantas?: string[];
+  };
+  /** REF code shown on the cover and on every page footer. Caller
+   *  builds it (whatsapp/runtime) so the same code in the PDF matches
+   *  what the customer sees in the catalog PDF. */
+  ref?: string;
+  /** Owner-side context for cover + back-cover. */
+  businessName: string;
+  businessContact?: string;
+  siteUrl?: string;
+}
+
+const STATUS_LABELS: Record<NonNullable<NonNullable<BrochurePdfInput['item']['status_obra']>>, { label: string; color: string }> = {
+  lancamento: { label: 'LANÇAMENTO', color: '#16a34a' },
+  construcao: { label: 'EM CONSTRUÇÃO', color: '#f59e0b' },
+  pronto: { label: 'PRONTO PRA MORAR', color: '#0ea5e9' },
+  usado: { label: 'IMÓVEL USADO', color: '#6366f1' },
+};
+
+/** Fetch + decode an image — reuses fetchImageBuffer from above. Returns
+ *  Buffer or null. Used both for cover and for gallery shots. */
+async function fetchSingleImage(url: string | undefined | null): Promise<Buffer | null> {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  const r = await fetchImageBuffer(url, 7_000, 1_500_000);
+  return r ? r.bytes : null;
+}
+
+export async function renderBrochurePdf(input: BrochurePdfInput): Promise<Buffer> {
+  const { item } = input;
+  const allImages = Array.from(new Set([
+    ...(item.image_url ? [item.image_url] : []),
+    ...(item.images || []),
+  ]));
+  const coverUrl = item.image_url || allImages[0] || null;
+  const galleryUrls = allImages.filter((u) => u !== coverUrl).slice(0, 8);
+  const [coverBuf, plantaBufs, galleryBufs] = await Promise.all([
+    fetchSingleImage(coverUrl),
+    Promise.all((item.plantas || []).slice(0, 3).map(fetchSingleImage)),
+    Promise.all(galleryUrls.map(fetchSingleImage)),
+  ]);
+
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: PAGE_MARGIN,
+        info: {
+          Title: item.name.slice(0, 100),
+          Producer: 'Axon Agent',
+          Creator: 'Axon Agent',
+        },
+        autoFirstPage: false,
+        bufferPages: true,
+      });
+      const chunks: Uint8Array[] = [];
+      doc.on('data', (chunk: Uint8Array | Buffer) => {
+        chunks.push(chunk instanceof Buffer ? new Uint8Array(chunk) : chunk);
+      });
+      doc.on('end', () => {
+        const total = chunks.reduce((sum, c) => sum + c.length, 0);
+        const out = Buffer.alloc(total);
+        let offset = 0;
+        for (const c of chunks) { out.set(c, offset); offset += c.length; }
+        resolve(out);
+      });
+      doc.on('error', reject);
+
+      const ACCENT = '#7c5cff';
+
+      doc.addPage();
+      const pageW = doc.page.width;
+      const pageH = doc.page.height;
+      const usableW = pageW - 2 * PAGE_MARGIN;
+
+      // ─── 1. COVER PAGE (full-bleed image, gradient, big text) ───
+      if (coverBuf) {
+        try {
+          doc.image(coverBuf, 0, 0, { cover: [pageW, pageH] });
+        } catch {
+          doc.save().rect(0, 0, pageW, pageH).fill(ACCENT).restore();
+        }
+      } else {
+        doc.save().rect(0, 0, pageW, pageH).fill(ACCENT).restore();
+      }
+      const overlayHeight = pageH * 0.55;
+      const overlayTop = pageH - overlayHeight;
+      doc.save();
+      const bands = 14;
+      for (let i = 0; i < bands; i++) {
+        const alpha = 0.05 + (i / bands) * 0.55;
+        doc.opacity(alpha).rect(0, overlayTop + (overlayHeight / bands) * i, pageW, overlayHeight / bands + 1).fill('#000000');
+      }
+      doc.opacity(1);
+      doc.restore();
+
+      if (item.status_obra && STATUS_LABELS[item.status_obra]) {
+        const meta = STATUS_LABELS[item.status_obra];
+        doc.font('Helvetica-Bold').fontSize(9);
+        const labelW = doc.widthOfString(meta.label) + 18;
+        doc.save();
+        doc.roundedRect(PAGE_MARGIN, PAGE_MARGIN, labelW, 22, 4).fill(meta.color);
+        doc.restore();
+        doc.fillColor('#ffffff').text(meta.label, PAGE_MARGIN, PAGE_MARGIN + 6, {
+          width: labelW, align: 'center', characterSpacing: 1.5,
+        });
+        doc.fillColor('#000000');
+      }
+
+      if (input.ref) {
+        doc.font('Helvetica-Bold').fontSize(10);
+        const refW = doc.widthOfString(input.ref) + 16;
+        const refX = pageW - PAGE_MARGIN - refW;
+        doc.save();
+        doc.roundedRect(refX, PAGE_MARGIN, refW, 22, 4).fill(ACCENT);
+        doc.restore();
+        doc.fillColor('#ffffff').text(input.ref, refX, PAGE_MARGIN + 6, {
+          width: refW, align: 'center',
+        });
+        doc.fillColor('#000000');
+      }
+
+      const titleY = pageH - 200;
+      doc.fillColor('#ffffff').font('Helvetica-Bold');
+      const nameSize = item.name.length > 40 ? 22 : item.name.length > 25 ? 28 : 32;
+      doc.fontSize(nameSize);
+      doc.text(item.name, PAGE_MARGIN, titleY, {
+        width: usableW, align: 'left',
+      });
+
+      if (item.region) {
+        doc.font('Helvetica').fontSize(13).fillColor('#ffffffcc');
+        doc.text(item.region, PAGE_MARGIN, titleY + nameSize + 8, {
+          width: usableW, align: 'left',
+        });
+      }
+
+      const priceLabel = item.type === 'aluguel'
+        ? `${formatPrice(item.price)}/mês`
+        : formatPrice(item.price);
+      doc.fillColor(ACCENT).font('Helvetica-Bold').fontSize(26);
+      doc.text(priceLabel, PAGE_MARGIN, pageH - 90, {
+        width: usableW, align: 'left',
+      });
+
+      doc.fillColor('#ffffffaa').font('Helvetica').fontSize(9);
+      doc.text(input.businessName, PAGE_MARGIN, pageH - 30, {
+        width: usableW, align: 'right',
+      });
+
+      // ─── 2. SPECS PAGE ────────────────────────────────────────────
+      const hasSpecs = item.tipologia || item.area_m2 || item.vagas || item.suites || item.description;
+      if (hasSpecs) {
+        doc.addPage();
+        doc.fillColor('#1f2937').font('Helvetica-Bold').fontSize(20);
+        doc.text('Sobre o imóvel', PAGE_MARGIN, PAGE_MARGIN, { width: usableW });
+        doc.strokeColor(ACCENT).lineWidth(2)
+          .moveTo(PAGE_MARGIN, PAGE_MARGIN + 28).lineTo(PAGE_MARGIN + 60, PAGE_MARGIN + 28).stroke();
+
+        const specs: Array<{ label: string; value: string }> = [];
+        if (item.tipologia) specs.push({ label: 'Tipologia', value: item.tipologia });
+        if (item.area_m2) specs.push({ label: 'Área útil', value: `${item.area_m2} m²` });
+        if (typeof item.vagas === 'number') specs.push({ label: 'Vagas', value: String(item.vagas) });
+        if (typeof item.suites === 'number') specs.push({ label: 'Suítes', value: String(item.suites) });
+
+        if (specs.length) {
+          const cols = Math.min(specs.length, 4);
+          const chipW = (usableW - 16 * (cols - 1)) / cols;
+          const chipH = 80;
+          const chipsTop = PAGE_MARGIN + 50;
+          for (let i = 0; i < specs.length && i < cols; i++) {
+            const x = PAGE_MARGIN + i * (chipW + 16);
+            doc.save();
+            doc.roundedRect(x, chipsTop, chipW, chipH, 8).fillAndStroke('#f9fafb', '#e2e2e7');
+            doc.restore();
+            doc.fillColor('#6b7280').font('Helvetica').fontSize(9);
+            doc.text(specs[i].label.toUpperCase(), x + 12, chipsTop + 12, {
+              width: chipW - 24, characterSpacing: 1.5,
+            });
+            doc.fillColor('#1f2937').font('Helvetica-Bold').fontSize(20);
+            doc.text(specs[i].value, x + 12, chipsTop + 32, { width: chipW - 24, ellipsis: true });
+          }
+          doc.fillColor('#000000');
+        }
+
+        const descTop = PAGE_MARGIN + 50 + (specs.length ? 100 : 0);
+        if (item.description) {
+          doc.fillColor('#374151').font('Helvetica').fontSize(11);
+          doc.text(item.description, PAGE_MARGIN, descTop, {
+            width: usableW, lineGap: 4, align: 'left',
+          });
+        }
+      }
+
+      // ─── 3. LAZER ────────────────────────────────────────────────
+      if (item.amenidades && item.amenidades.length > 0) {
+        doc.addPage();
+        doc.fillColor('#1f2937').font('Helvetica-Bold').fontSize(20);
+        doc.text('Lazer e infraestrutura', PAGE_MARGIN, PAGE_MARGIN, { width: usableW });
+        doc.strokeColor(ACCENT).lineWidth(2)
+          .moveTo(PAGE_MARGIN, PAGE_MARGIN + 28).lineTo(PAGE_MARGIN + 60, PAGE_MARGIN + 28).stroke();
+        doc.fillColor('#6b7280').font('Helvetica').fontSize(11);
+        doc.text('Tudo que tá disponível no condomínio / unidade.', PAGE_MARGIN, PAGE_MARGIN + 42, { width: usableW });
+
+        const amns = item.amenidades.slice(0, 12);
+        const cols = 3;
+        const colW = (usableW - 16 * (cols - 1)) / cols;
+        const rowH = 38;
+        const startY = PAGE_MARGIN + 80;
+        for (let i = 0; i < amns.length; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const x = PAGE_MARGIN + col * (colW + 16);
+          const y = startY + row * (rowH + 12);
+          doc.save();
+          doc.roundedRect(x, y, colW, rowH, rowH / 2).fillAndStroke('#f3f4f6', '#e2e2e7');
+          doc.restore();
+          doc.save().fillColor(ACCENT).circle(x + 18, y + rowH / 2, 4).fill().restore();
+          doc.fillColor('#1f2937').font('Helvetica').fontSize(10);
+          doc.text(amns[i].slice(0, 50), x + 30, y + rowH / 2 - 6, {
+            width: colW - 36, ellipsis: true,
+          });
+        }
+        doc.fillColor('#000000');
+      }
+
+      // ─── 4. SOBRE O BAIRRO ────────────────────────────────────────
+      if (item.neighborhood_info || item.region) {
+        doc.addPage();
+        doc.fillColor('#1f2937').font('Helvetica-Bold').fontSize(20);
+        doc.text('Sobre o bairro', PAGE_MARGIN, PAGE_MARGIN, { width: usableW });
+        doc.strokeColor(ACCENT).lineWidth(2)
+          .moveTo(PAGE_MARGIN, PAGE_MARGIN + 28).lineTo(PAGE_MARGIN + 60, PAGE_MARGIN + 28).stroke();
+        if (item.region) {
+          doc.fillColor(ACCENT).font('Helvetica-Bold').fontSize(13);
+          doc.text(item.region, PAGE_MARGIN, PAGE_MARGIN + 42, { width: usableW });
+        }
+        if (item.neighborhood_info) {
+          doc.fillColor('#374151').font('Helvetica').fontSize(11);
+          doc.text(item.neighborhood_info, PAGE_MARGIN, PAGE_MARGIN + 70, {
+            width: usableW, lineGap: 4, align: 'left',
+          });
+        } else {
+          doc.fillColor('#6b7280').font('Helvetica-Oblique').fontSize(10);
+          doc.text(
+            'Pra mais detalhes sobre escolas, mercados, transporte e distância da praia, fale com a gente — temos a info atualizada da região.',
+            PAGE_MARGIN, PAGE_MARGIN + 70,
+            { width: usableW, lineGap: 4 },
+          );
+        }
+      }
+
+      // ─── 5. PLANTAS ────────────────────────────────────────────────
+      const validPlantaBufs = plantaBufs.filter((b): b is Buffer => !!b);
+      if (validPlantaBufs.length > 0) {
+        doc.addPage();
+        doc.fillColor('#1f2937').font('Helvetica-Bold').fontSize(20);
+        doc.text('Plantas', PAGE_MARGIN, PAGE_MARGIN, { width: usableW });
+        doc.strokeColor(ACCENT).lineWidth(2)
+          .moveTo(PAGE_MARGIN, PAGE_MARGIN + 28).lineTo(PAGE_MARGIN + 60, PAGE_MARGIN + 28).stroke();
+        const plantaH = (pageH - PAGE_MARGIN * 2 - 60) / Math.min(validPlantaBufs.length, 3);
+        for (let i = 0; i < validPlantaBufs.length && i < 3; i++) {
+          try {
+            doc.image(validPlantaBufs[i], PAGE_MARGIN, PAGE_MARGIN + 50 + i * plantaH, {
+              fit: [usableW, plantaH - 10],
+              align: 'center', valign: 'center',
+            });
+          } catch { /* ignore corrupt */ }
+        }
+      }
+
+      // ─── 6. GALERIA ────────────────────────────────────────────────
+      const validGallery = galleryBufs.filter((b): b is Buffer => !!b);
+      if (validGallery.length > 0) {
+        doc.addPage();
+        doc.fillColor('#1f2937').font('Helvetica-Bold').fontSize(20);
+        doc.text('Galeria', PAGE_MARGIN, PAGE_MARGIN, { width: usableW });
+        doc.strokeColor(ACCENT).lineWidth(2)
+          .moveTo(PAGE_MARGIN, PAGE_MARGIN + 28).lineTo(PAGE_MARGIN + 60, PAGE_MARGIN + 28).stroke();
+        const cols = 2;
+        const gap = 12;
+        const cellW = (usableW - gap * (cols - 1)) / cols;
+        const cellH = (pageH - PAGE_MARGIN * 2 - 60) / 3 - gap;
+        for (let i = 0; i < validGallery.length && i < 6; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const x = PAGE_MARGIN + col * (cellW + gap);
+          const y = PAGE_MARGIN + 50 + row * (cellH + gap);
+          doc.save();
+          doc.roundedRect(x, y, cellW, cellH, 4).fillAndStroke('#f3f4f6', '#e2e2e7');
+          doc.restore();
+          try {
+            doc.image(validGallery[i], x, y, {
+              fit: [cellW, cellH], align: 'center', valign: 'center',
+            });
+          } catch { /* ignore */ }
+        }
+      }
+
+      // ─── 7. CONTATO / BACK COVER ──────────────────────────────────
+      doc.addPage();
+      doc.save();
+      doc.rect(0, 0, pageW, pageH).fill(ACCENT);
+      doc.restore();
+      doc.fillColor('#ffffffcc').font('Helvetica').fontSize(11);
+      doc.text('FALE COM A GENTE', PAGE_MARGIN, pageH / 2 - 80, {
+        width: usableW, align: 'center', characterSpacing: 4,
+      });
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(28);
+      doc.text(input.businessName, PAGE_MARGIN, pageH / 2 - 50, {
+        width: usableW, align: 'center',
+      });
+      const contactLines: string[] = [];
+      if (input.businessContact) contactLines.push(input.businessContact);
+      if (input.siteUrl) contactLines.push(input.siteUrl);
+      if (item.url && item.url !== input.siteUrl) contactLines.push(item.url);
+      doc.fillColor('#ffffffee').font('Helvetica').fontSize(13);
+      doc.text(contactLines.join('\n'), PAGE_MARGIN, pageH / 2 + 10, {
+        width: usableW, align: 'center', lineGap: 6,
+      });
+      doc.fillColor('#ffffff88').font('Helvetica').fontSize(9);
+      if (input.ref) {
+        doc.text(`REF ${input.ref}`, PAGE_MARGIN, pageH - PAGE_MARGIN - 30, {
+          width: usableW, align: 'center',
+        });
+      }
+      doc.text(
+        new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' }),
+        PAGE_MARGIN, pageH - PAGE_MARGIN - 14,
+        { width: usableW, align: 'center' },
+      );
+
+      // ─── Footer on every interior page (not cover, not back cover) ─
+      const pageRange = doc.bufferedPageRange?.();
+      if (pageRange && pageRange.count > 2) {
+        const totalPages = pageRange.count;
+        for (let p = pageRange.start + 1; p < pageRange.start + pageRange.count - 1; p++) {
+          doc.switchToPage(p);
+          doc.fillColor('#9ca3af').font('Helvetica').fontSize(8);
+          doc.text(input.businessName.slice(0, 60), PAGE_MARGIN, pageH - PAGE_MARGIN - 14, {
+            width: usableW / 2, align: 'left',
+          });
+          doc.text(
+            input.ref ? `${input.ref}  ·  ${p - pageRange.start + 1}/${totalPages}` : `${p - pageRange.start + 1}/${totalPages}`,
+            PAGE_MARGIN + usableW / 2, pageH - PAGE_MARGIN - 14,
+            { width: usableW / 2, align: 'right' },
+          );
+        }
+        doc.fillColor('#000000');
+      }
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Filtered-subset PDF — "seleção pra você".
+//
+// Used when the customer asks for a curated cut ("manda em PDF as
+// casas até 500k em Tabatinga"). Reuses renderCatalogPdf's section
+// machinery; the cover label swap puts "Seleção · <descrição>" in the
+// big-text spot instead of the generic business name.
+// ───────────────────────────────────────────────────────────────────
+
+export interface FilteredPdfInput extends CatalogPdfInput {
+  /** Description of what the cut means — appears on the cover so the
+   *  customer remembers WHY this list was sent. e.g. "Casas até R$
+   *  500k em Tabatinga". Caller composes this from the search query. */
+  selectionLabel: string;
+  /** Optional personal note from the agent — shown in italic on the
+   *  cover. e.g. "Olá Mariana, separei essas pensando no que você
+   *  falou — qualquer dúvida me chama." */
+  personalNote?: string;
+}
+
+export async function renderFilteredPdf(input: FilteredPdfInput): Promise<Buffer> {
+  // Cap a curated cut at 8 — beyond that it stops feeling "selecionado"
+  // and becomes a small catalog. Owners can always send the full one
+  // via send_catalog_pdf instead.
+  const items = input.items.slice(0, 8);
+  if (items.length === 0) {
+    return renderPdf({
+      title: input.selectionLabel,
+      body:
+        'Não encontrei itens dentro desse filtro no momento. Posso te avisar assim que entrar algo novo, ' +
+        'ou ajustar a busca pra outro bairro / faixa de preço — me chama no chat que a gente combina.',
+      businessName: input.businessName,
+    });
+  }
+  const compositeContact = input.businessContact
+    ? `${input.businessName}   ·   ${input.businessContact}`
+    : input.businessName;
+  return renderCatalogPdf({
+    businessName: `Seleção · ${input.selectionLabel.slice(0, 80)}`,
+    businessContact: input.personalNote
+      ? `${input.personalNote.slice(0, 200)}\n${compositeContact}`
+      : compositeContact,
+    siteUrl: input.siteUrl,
+    items,
   });
 }
