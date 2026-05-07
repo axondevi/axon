@@ -369,6 +369,35 @@ export function searchCatalog(items: CatalogItem[], query: string, limit = 10): 
   if (!query || !Array.isArray(items)) return [];
   const q = query.toLowerCase().trim();
   if (!q) return [];
+
+  // ─── REF code fast path ────────────────────────────────────────
+  // Customer messages from the catalog PDF look like "Tem link dessa
+  // IM-A-LDJK6X". The REF format is "IM-{V|A}?-XXXXXX" where the last
+  // 6 alphanum chars are derived from the item.id (uppercased). When
+  // we see that exact pattern in the query, look up by id-last-6
+  // first — exact match wins and short-circuits scoring. Without
+  // this, the agent would hallucinate URLs like
+  // "/imoveis/IM-A-LDJK6X" that don't exist on the actual site.
+  const refMatch = query.toUpperCase().match(/\bIM-(?:[VA]-)?([A-Z0-9]{4,8})\b/);
+  if (refMatch) {
+    const tail = refMatch[1];
+    for (const item of items) {
+      const idClean = String(item.id || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (idClean.endsWith(tail) || idClean === tail) {
+        return [item];  // exact REF hit — return only the matching item
+      }
+    }
+    // No REF match; fall through to substring scoring (maybe the
+    // customer typed the code wrong, give them best-effort).
+  }
+
+  // Also try direct id match (full UUID or short hash) so callers
+  // that already have the canonical id (the brochure tool, internal
+  // links) get a clean hit without rebuilding the REF.
+  for (const item of items) {
+    if (item.id && item.id.toLowerCase() === q) return [item];
+  }
+
   const scored: Array<{ item: CatalogItem; score: number }> = [];
   for (const item of items) {
     let score = 0;

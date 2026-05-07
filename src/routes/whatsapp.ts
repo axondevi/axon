@@ -1679,12 +1679,27 @@ async function processBufferedTurn(opts: {
             });
             placeholderGuardTripped = 'auto_built_pdf';
           } else {
-            // Catalog empty — the agent literally has nothing to ship.
-            // Honest reply beats a fake placeholder. No PDF generated.
+            // Catalog empty — last-resort fallback. Works for ANY
+            // agent type (clinic / restaurant / e-commerce / real
+            // estate / service), since we have no idea what kind of
+            // PDF the LLM was meant to produce when both the tool
+            // call AND the coaching retry failed. Generic phrasing
+            // is better than the previous real-estate-specific
+            // "ainda não tenho catálogo cadastrado de imóveis" which
+            // confused clinic agents asking for atestado/receita.
+            const evidenceForReply = placeholderHit
+              ? placeholderHit[0]
+              : pdfClaimMatch
+                ? pdfClaimMatch.noun
+                : 'documento';
             reply =
-              'Ainda não tenho catálogo cadastrado em PDF aqui — assim que entrar, te aviso. ' +
-              'Enquanto isso posso te passar info de imóveis um por um, ou te encaminhar pro atendente humano. Qual prefere?';
-            log.warn('whatsapp.placeholder_catalog_empty', { agent_id: a.id });
+              `Tive um problema técnico pra montar o ${evidenceForReply.toLowerCase()} agora. ` +
+              'Pode me confirmar exatamente o que você precisa que eu reorganizo? ' +
+              'Ou se preferir, te passo as info aqui no chat ou encaminho pro atendente humano.';
+            log.warn('whatsapp.placeholder_no_catalog_generic_fallback', {
+              agent_id: a.id,
+              evidence: evidenceForReply,
+            });
             placeholderGuardTripped = 'catalog_empty';
           }
         } catch (err) {
@@ -1759,6 +1774,116 @@ async function processBufferedTurn(opts: {
     const userJustSentPhoto = /^\s*\[CLIENTE ENVIOU (UMA )?FOTO/i.test(mergedText);
 
     const guardRewrites: string[] = [];
+
+    // ─── Anti-hallucinated-URL guard ───────────────────────────────
+    // Production case 5217: customer sent "Tem link dessa IM-A-LDJK6X"
+    // (a REF code from the catalog PDF). The agent replied with
+    // "Link com mais informações: https://www.imobiliariachagas.com.br
+    // /imoveis/IM-A-LDJK6X" — a URL it CONSTRUCTED by inserting the REF
+    // code into a path pattern. The URL doesn't exist on the actual
+    // site. Customer trusted it, clicked, got 404.
+    //
+    // Detection: scan the reply for http(s) URLs. For each, check if
+    // the SAME URL appears in any tool's response_excerpt (truncated
+    // to 280 chars by runtime, but enough to catch most quotes) OR
+    // in business_info / catalog (which means the agent had a real
+    // source for it). If a URL isn't in any of those, it's almost
+    // certainly hallucinated — strip it and log.
+    if (typeof reply === 'string') {
+      // Trim trailing punctuation (.,;:!?) that the URL regex catches
+      // when the URL ends a sentence — without this, the grounded
+      // comparison fails on the trailing dot mismatch.
+      const cleanUrl = (u: string) => u.replace(/[.,;:!?]+$/, '');
+      const urlsInReply = (reply.match(/https?:\/\/[^\s)<>"'`,]+/g) || []).map(cleanUrl);
+      if (urlsInReply.length > 0) {
+        const grounded = new Set<string>();
+        // Tool response excerpts (truncated to 280 chars but usually
+        // contain item.url for catalog lookups).
+        for (const t of result.tool_calls_executed || []) {
+          const exc = (t.response_excerpt || '') + ' ' + JSON.stringify(t.args || {});
+          const ms = exc.match(/https?:\/\/[^\s)<>"'`,]+/g);
+          if (ms) for (const m of ms) grounded.add(cleanUrl(m));
+        }
+        // Anything in agent.businessInfo or its derived siteUrl is
+        // legitimate (the owner put it there).
+        const businessInfoStr = (runtimeAgent as { businessInfo?: string }).businessInfo || '';
+        const businessUrls = businessInfoStr.match(/https?:\/\/[^\s)<>"'`,]+/g) || [];
+        for (const u of businessUrls) grounded.add(cleanUrl(u));
+        // Catalog item.url fields — the agent's source of truth.
+        const catalog = Array.isArray((runtimeAgent as { catalog?: unknown }).catalog)
+          ? ((runtimeAgent as { catalog: Record<string, unknown>[] }).catalog)
+          : [];
+        for (const it of catalog) {
+          const u = typeof (it as { url?: unknown }).url === 'string' ? (it as { url: string }).url : null;
+          if (u) grounded.add(cleanUrl(u));
+        }
+
+        // Helper: a URL is "grounded" if exact match OR if the host
+        // of the reply URL matches a grounded host (e.g. agent
+        // mentioned bit.ly while catalog has fullsite.com — different
+        // hosts, treated as hallucinated).
+        const groundedHosts = new Set<string>();
+        for (const u of grounded) {
+          try { groundedHosts.add(new URL(u).host.toLowerCase()); } catch { /* ignore */ }
+        }
+        const hallucinatedUrls: string[] = [];
+        for (const replyUrl of urlsInReply) {
+          if (grounded.has(replyUrl)) continue;
+          // Same-host match: agent might have extended a real path
+          // (e.g. https://chagas.com.br/casa-X when the grounded URL
+          // is https://chagas.com.br/casa-Y). For a real-estate agent
+          // we WANT to catch this — host match without path match means
+          // the LLM constructed a path. Treat as hallucinated.
+          let host: string | null = null;
+          try { host = new URL(replyUrl).host.toLowerCase(); } catch { /* invalid */ }
+          if (host && groundedHosts.has(host) && !grounded.has(replyUrl)) {
+            hallucinatedUrls.push(replyUrl);
+          } else if (!host || !groundedHosts.has(host)) {
+            hallucinatedUrls.push(replyUrl);
+          }
+        }
+        if (hallucinatedUrls.length > 0) {
+          log.warn('whatsapp.hallucinated_url_detected', {
+            agent_id: a.id,
+            phone: inbound.phone,
+            urls: hallucinatedUrls.slice(0, 4),
+            grounded_count: grounded.size,
+            grounded_hosts: Array.from(groundedHosts).slice(0, 4),
+          });
+          // Strip + replace with honest text. We don't know the right
+          // URL, so we tell the customer to ask for it specifically OR
+          // we direct them to the business's main site (if known).
+          let cleaned = reply;
+          for (const u of hallucinatedUrls) {
+            cleaned = cleaned.split(u).join('').replace(/\s{2,}/g, ' ').trim();
+          }
+          // Drop dangling "Link com mais informações:" / "Veja em:" /
+          // "Acesse:" prefixes left behind after the URL is removed.
+          cleaned = cleaned
+            .replace(/\b(?:link\s+(?:com\s+mais\s+informa[çc][ãa]o(?:es)?|do\s+an[úu]ncio|do\s+im[óo]vel|completo|aqui|abaixo)|veja\s+em|acesse|saiba\s+mais\s+em|confira\s+em)\s*[:\-—]?\s*(?=$|[.\n])/gim, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+          // If a real business site exists, append it as a non-misleading
+          // pointer so the customer still has somewhere to go.
+          const bizSiteMatch = businessInfoStr.match(/https?:\/\/[^\s)<>"'`,]+/);
+          if (bizSiteMatch) {
+            cleaned = cleaned.endsWith('.') || cleaned.endsWith('?') || cleaned.endsWith('!')
+              ? `${cleaned} Pra mais detalhes: ${bizSiteMatch[0]}`
+              : `${cleaned}. Pra mais detalhes: ${bizSiteMatch[0]}`;
+          }
+          // Edge case: stripping left the reply too short / empty —
+          // fall back to a coherent honest message.
+          if (cleaned.length < 30) {
+            cleaned = bizSiteMatch
+              ? `Tô confirmando o link exato desse imóvel — pra adiantar, o site é ${bizSiteMatch[0]}.`
+              : 'Deixa eu confirmar o link exato desse imóvel e te mando em seguida.';
+          }
+          reply = cleaned;
+          guardRewrites.push('hallucinated_url');
+        }
+      }
+    }
+
     if (!effectiveTools.includes('generate_image') && images.length === 0 && !userJustSentPhoto) {
       // Aggressive detection: any verb conjugation of gerar/criar/fazer/
       // desenhar/enviar/mandar/produzir/montar in proximity to an image
