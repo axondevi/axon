@@ -1794,7 +1794,11 @@ async function processBufferedTurn(opts: {
       // when the URL ends a sentence — without this, the grounded
       // comparison fails on the trailing dot mismatch.
       const cleanUrl = (u: string) => u.replace(/[.,;:!?]+$/, '');
-      const urlsInReply = (reply.match(/https?:\/\/[^\s)<>"'`,]+/g) || []).map(cleanUrl);
+      // Also catch scheme-less URLs ("www.site.com/path") that the LLM
+      // sometimes writes informally — these slipped past the original
+      // regex and showed up as "br/" fragments after the cleanup pass.
+      const URL_RE = /(?:https?:\/\/|www\.)[^\s)<>"'`,]+/g;
+      const urlsInReply = (reply.match(URL_RE) || []).map(cleanUrl);
       if (urlsInReply.length > 0) {
         const grounded = new Set<string>();
         // Tool response excerpts (truncated to 280 chars but usually
@@ -1855,12 +1859,54 @@ async function processBufferedTurn(opts: {
           // we direct them to the business's main site (if known).
           let cleaned = reply;
           for (const u of hallucinatedUrls) {
-            cleaned = cleaned.split(u).join('').replace(/\s{2,}/g, ' ').trim();
+            cleaned = cleaned.split(u).join('');
           }
-          // Drop dangling "Link com mais informações:" / "Veja em:" /
-          // "Acesse:" prefixes left behind after the URL is removed.
+          // ─── Sentence-level cleanup ─────────────────────────────────
+          // Production case 5217 follow-up: stripping just the URL left
+          // shrapnel like "Link com mais detalhes: . Posso agendar..." —
+          // the prefix regex below missed "detalhes" and the residual
+          // colon/period combos looked broken to the customer. Now we
+          // operate sentence-by-sentence: any sentence whose ONLY meaty
+          // content was the now-removed URL gets dropped entirely.
+          const isLinkPromiseSentence = /\b(?:link\b|site\b|url\b|acesse\b|veja\s+(?:em|aqui|aí|abaixo)|olha\s+(?:o|a)\s+(?:an[úu]ncio|im[óo]vel|link)|confira\s+em|saiba\s+mais\s+em|clica\s+(?:em|no\s+link|aqui)|an[úu]ncio\s+(?:aqui|aí))\b/i;
+          // Sentence is "mostly a URL host fragment" — like "www.x.com/"
+          // or "site.com.br/path" or just "chagas.com.br" with no
+          // narrative content. Used to detect orphan URL fragments
+          // that escaped the URL regex.
+          const isMostlyHostFragment = (s: string): boolean => {
+            const stripped = s.replace(/[\s.,;:\-—!?]+/g, '');
+            if (stripped.length < 5) return false;
+            // Domain-like pattern: anything ending in a TLD with optional
+            // path. Length check ensures we don't false-positive on
+            // "Aqui." → just one short word.
+            return /^(?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,})+(?:\/\S*)?\/?$/i.test(s.trim());
+          };
+          const sentences = cleaned.split(/(?<=[.!?])\s+/);
+          const kept: string[] = [];
+          for (const raw of sentences) {
+            const s = raw.trim();
+            if (!s) continue;
+            const stripped = s
+              .replace(/\b(?:link|site|url|acesse|veja|confira|olha|an[úu]ncio)\s*(?:com|de|do|da|para|aqui|abaixo|aí|o|a)?\s*(?:mais\s+)?(?:informa[çc][ãa]o(?:es)?|detalhes?|info|pre[çc]o|valor|do\s+(?:an[úu]ncio|im[óo]vel)|completo)?\s*[:\-—]?\s*/gi, '')
+              .replace(/[\s.,;:\-—]+/g, '')
+              .trim();
+            // Sentence with a link-promise phrase + nothing meaty → drop.
+            if (isLinkPromiseSentence.test(s) && stripped.length < 4) continue;
+            // Drop orphan TLD fragments (br/, com/, com.br/, www.x.com/)
+            // that the URL regex didn't catch.
+            if (/^(?:[a-z]{2,4}\/?\s*)$/i.test(s)) continue;
+            if (isMostlyHostFragment(s)) continue;
+            kept.push(s);
+          }
+          cleaned = kept.join(' ').replace(/\s{2,}/g, ' ').trim();
+          // Drop dangling intro phrases ("Link com mais detalhes:") that
+          // SURVIVED sentence-level cleanup because they had a tail (e.g.
+          // "Link com mais detalhes: . Posso agendar..." kept after period).
           cleaned = cleaned
-            .replace(/\b(?:link\s+(?:com\s+mais\s+informa[çc][ãa]o(?:es)?|do\s+an[úu]ncio|do\s+im[óo]vel|completo|aqui|abaixo)|veja\s+em|acesse|saiba\s+mais\s+em|confira\s+em)\s*[:\-—]?\s*(?=$|[.\n])/gim, '')
+            .replace(/\b(?:link\s+(?:com\s+mais\s+(?:informa[çc][ãa]o(?:es)?|detalhes?|info)|do\s+an[úu]ncio|do\s+im[óo]vel|completo|aqui|abaixo)|veja\s+em|acesse|saiba\s+mais\s+em|confira\s+em)\s*[:\-—]?\s*(?:[.,]\s*)?(?=$|[A-ZÁÉÍÓÚÂÊÔÃÕÇ]|\n)/gim, '')
+            // Strip orphan TLD fragments anywhere ("... ? br/" tail)
+            .replace(/\s+(?:com|com\.br|net|org|br)\/+\s*$/gi, '')
+            .replace(/\s+(?:com|com\.br|net|org|br)\/+\s+/gi, ' ')
             .replace(/\s{2,}/g, ' ')
             .trim();
           // If a real business site exists, append it as a non-misleading
@@ -1880,6 +1926,101 @@ async function processBufferedTurn(opts: {
           }
           reply = cleaned;
           guardRewrites.push('hallucinated_url');
+        }
+      }
+    }
+
+    // ─── Descriptor-mismatch guard ────────────────────────────────
+    // Production case 5217: agent said "O imóvel IM-A-LDJK6X é um
+    // sobrado em condomínio fechado no bairro Tabatinga" — the
+    // ACTUAL item is a commercial property. The LLM read the item
+    // from search_catalog but paraphrased the type using its
+    // training knowledge ("Tabatinga = bairro residencial → sobrado")
+    // instead of using the literal item.name / item.description.
+    //
+    // Detection: enumerate property descriptors (sobrado, apartamento,
+    // terreno, comercial, etc) in the reply. For each, check if it
+    // ALSO appears in any search_catalog tool excerpt. If a descriptor
+    // is in the reply but NOT in the grounded text, the LLM made it
+    // up. Strip + replace with neutral "imóvel".
+    if (typeof reply === 'string') {
+      const searchExcerpts = (result.tool_calls_executed || [])
+        .filter((t) => t.name === 'search_catalog' && t.ok)
+        .map((t) => (t.response_excerpt || '') + ' ' + JSON.stringify(t.args || {}))
+        .join(' ')
+        .toLowerCase();
+      // Only run when a search_catalog actually returned data — if no
+      // search ran, we have no ground truth to compare against.
+      if (searchExcerpts.length > 0) {
+        // High-signal descriptors that the LLM tends to invent. Order
+        // matters: longer/more-specific phrases first so multi-word
+        // matches replace cleanly.
+        const DESCRIPTORS = [
+          'condom[íi]nio\\s+fechado',
+          'sala\\s+comercial',
+          'galp[ãa]o',
+          'cobertura',
+          'duplex',
+          'triplex',
+          'kitnet',
+          'studio',
+          'st[úu]dio',
+          'sobrado',
+          'apartamento',
+          'apto',
+          'terreno',
+          'lote',
+          's[íi]tio',
+          'ch[áa]cara',
+          'fazenda',
+          'flat',
+          'comercial',
+          'casa(?:\\s+t[ée]rrea)?',
+        ];
+        const mismatched: string[] = [];
+        let cleaned = reply;
+        for (const pat of DESCRIPTORS) {
+          const re = new RegExp(`\\b${pat}\\b`, 'iu');
+          if (re.test(reply.toLowerCase()) && !re.test(searchExcerpts)) {
+            mismatched.push(pat.replace(/\\.+?\\b/g, '').replace(/[\\\(?:|\\)+\?]/g, ''));
+            // Replace "um/uma/o/a/esse/essa <descriptor>" → "<article> imóvel"
+            // (preserves article + gender). Then strip dangling
+            // "em condomínio fechado" if it was the only thing said.
+            const reReplace = new RegExp(`\\b${pat}\\b`, 'giu');
+            cleaned = cleaned.replace(reReplace, 'imóvel');
+          }
+        }
+        if (mismatched.length > 0) {
+          // Collapse repeated "imóvel" tokens from chained replacements.
+          // Production case had "sobrado em condomínio fechado" — both
+          // descriptors got replaced individually, leaving "imóvel em
+          // imóvel" which reads broken. Sweep multiple patterns until
+          // stable.
+          let prev = '';
+          while (prev !== cleaned) {
+            prev = cleaned;
+            cleaned = cleaned
+              .replace(/\bim[óo]vel\s+(?:em|de|do|da)\s+im[óo]vel\b/gi, 'imóvel')
+              .replace(/\bim[óo]vel\s+im[óo]vel\b/gi, 'imóvel')
+              // Strip dangling qualifiers ("imóvel em condomínio fechado"
+              // when condomínio got neutralized to imóvel earlier).
+              .replace(/\bim[óo]vel\s+em\s+condom[íi]nio\s+fechado\b/gi, 'imóvel')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+          }
+          // Append a soft disclaimer so the customer knows we're
+          // confirming — better than silently rewriting.
+          if (!/confirmando|confirmar|verificando/i.test(cleaned)) {
+            cleaned = cleaned.replace(/[.?!]?\s*$/, '. Tô confirmando os detalhes exatos com a equipe.');
+          }
+          log.warn('whatsapp.descriptor_mismatch', {
+            agent_id: a.id,
+            phone: inbound.phone,
+            mismatched: mismatched.slice(0, 6),
+            grounded_excerpt: searchExcerpts.slice(0, 200),
+          });
+          reply = cleaned;
+          guardRewrites.push('descriptor_mismatch');
         }
       }
     }
