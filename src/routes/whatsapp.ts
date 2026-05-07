@@ -1473,6 +1473,54 @@ async function processBufferedTurn(opts: {
     // and harmless — the recovery just re-asks the LLM to try again.
     const PLACEHOLDER_RE = /\[(?:[^\]]*\b(?:PDF|CAT[ÁA]LOGO|FOTO|FOTOS|ARQUIVO|DOCUMENTO|IMAGEM|FACHADA|LINK|VEJA|ANEXO)\b[^\]]*)\]/i;
     const placeholderHit = typeof reply === 'string' ? reply.match(PLACEHOLDER_RE) : null;
+
+    // ─── PDF-claim guard (lying text, no bracket) ─────────────────────
+    // Production case 5215: agent replied "Olá, aqui está o catálogo
+    // completo em PDF — 21 itens com fotos e detalhes 📄" but actually
+    // called send_listing_photo (the WRONG tool, max 3 photos) instead
+    // of send_catalog_pdf. No bracket placeholder — the LLM phrased
+    // the lie naturally — so the bracket guard didn't catch it. Result:
+    // customer asked for catalog, got nothing, agent claimed delivery.
+    //
+    // This pattern catches "aqui está / te mandei / segue / olha + o
+    // (catálogo|pdf|arquivo|brochura|documento|seleção)" claims when
+    // NO PDF tool was actually called this turn (search_catalog +
+    // send_listing_photo doesn't count). When it fires, we run the
+    // SAME recovery+auto-build path as the placeholder guard.
+    // `\b` in JS regex is ASCII-only even with the `u` flag — "está\b"
+    // fails because á isn't a \w char. So we drop the trailing \b on
+    // the intro pattern (PT-BR endings like está, fará, sairá would
+    // never match it). Leading \b stays fine (all alternatives start
+    // with ASCII letters). The noun pattern sits in trailing position
+    // most of the time and gives the second-half boundary anyway.
+    const PDF_CLAIM_INTRO = /\b(?:aqui\s+(?:est[áa]|vai)|te\s+mandei|te\s+mando|segue(?:\s+(?:em\s+anexo|aí|abaixo|aqui))?|olha\s+(?:o|a|aí|aqui)|j[áa]\s+te\s+(?:mandei|enviei)|enviei\s+(?:o|a)?)/i;
+    const PDF_CLAIM_NOUN = /\b(?:cat[áa]logo|pdf|arquivo|documento|brochura|panfleto|sele[çc][ãa]o|comprovante|recibo|ficha|receita|orienta[çc][ãa]o|contrato|atestado|laudo|or[çc]amento|termo)\b/i;
+    const pdfToolNames = new Set(['send_catalog_pdf', 'send_brochure_pdf', 'send_filtered_pdf', 'generate_pdf']);
+    const pdfToolCalledOk = (result.tool_calls_executed || []).some(
+      (t) => pdfToolNames.has(t.name) && t.ok,
+    );
+    // The LLM may have used the user's word ("manda pdf") in a question
+    // back to the customer ("você quer o pdf?") — that's not a claim.
+    // Filter to lines that combine intro + noun in the SAME sentence.
+    let pdfClaimMatch: { full: string; intro: string; noun: string } | null = null;
+    if (typeof reply === 'string' && !pdfToolCalledOk) {
+      const sentences = reply.split(/[.!?\n]+/);
+      for (const s of sentences) {
+        const introM = s.match(PDF_CLAIM_INTRO);
+        const nounM = s.match(PDF_CLAIM_NOUN);
+        if (introM && nounM) {
+          // Skip explicit refusals/questions ("não posso te enviar PDF",
+          // "quer o catálogo?", "você prefere PDF?").
+          const isQuestion = /\?\s*$/.test(s);
+          const isRefusal = /\bn[ãa]o\s+(posso|consigo|tenho|gero)\b/i.test(s);
+          if (!isQuestion && !isRefusal) {
+            pdfClaimMatch = { full: s.trim().slice(0, 200), intro: introM[0], noun: nounM[0] };
+            break;
+          }
+        }
+      }
+    }
+
     const noMediaProduced = images.length === 0 && pdfs.length === 0;
     let placeholderGuardTripped:
       | 'recovered'
@@ -1481,29 +1529,36 @@ async function processBufferedTurn(opts: {
       | 'auto_built_pdf'
       | 'catalog_empty'
       | null = null;
-    if (placeholderHit && noMediaProduced) {
-      log.warn('whatsapp.placeholder_detected', {
+    if ((placeholderHit || pdfClaimMatch) && noMediaProduced) {
+      const detectionKind = placeholderHit ? 'bracket_placeholder' : 'pdf_claim';
+      const detectionEvidence = placeholderHit
+        ? placeholderHit[0]
+        : pdfClaimMatch!.full;
+      log.warn('whatsapp.pdf_lie_detected', {
         agent_id: a.id,
         phone: inbound.phone,
-        placeholder: placeholderHit[0],
+        kind: detectionKind,
+        evidence: detectionEvidence,
+        tools_called: (result.tool_calls_executed || []).map((t) => `${t.name}${t.ok ? '' : '(err)'}`).slice(0, 8),
         had_search_catalog: (result.tool_calls_executed || []).some((t) => t.name === 'search_catalog' && t.ok),
         provider: result.provider,
       });
-      // Build a coaching turn: replay the user message + show what the
-      // agent wrote + tell it the placeholder was wrong + re-prompt.
-      // Done as a synthetic ASSISTANT message followed by a synthetic
-      // SYSTEM nudge — this is the cleanest way to pass feedback through
-      // the OpenAI-compatible chat format that all providers support.
+      // Build a coaching turn. Different message depending on which
+      // failure mode tripped — bracket placeholder vs lying-text claim
+      // need different framing so the LLM understands what was wrong.
+      const coachingContent = placeholderHit
+        ? '⚠ Sistema: sua resposta anterior continha o placeholder ' +
+          placeholderHit[0] +
+          ' como TEXTO. Isso é proibido (regra 2b). Você TEM as tools `generate_pdf` (documento avulso), `send_catalog_pdf` (catálogo completo), `send_brochure_pdf` (brochura de 1 imóvel), `send_filtered_pdf` (recorte) e `send_listing_photo` (foto de item) disponíveis AGORA. Refaça a resposta CHAMANDO a tool correta no mesmo turno em que confirma a entrega. Não escreva placeholder de novo.'
+        : '⚠ Sistema: sua resposta anterior afirmou "' +
+          pdfClaimMatch!.full +
+          '" mas você NÃO chamou nenhuma tool de PDF — chamou ' +
+          ((result.tool_calls_executed || []).map((t) => t.name).slice(0, 6).join(', ') || 'nenhuma tool') +
+          '. Cliente vai esperar um arquivo que nunca chega — pior UX possível. Pra entregar o catálogo COMPLETO chame `send_catalog_pdf` (sem args, pega do cadastro). Pra UM imóvel sofisticado chame `send_brochure_pdf(item_id)`. Pra recorte filtrado (3-8 itens) chame `send_filtered_pdf`. send_listing_photo é SÓ pra fotos individuais (max 3), NÃO substitui o catálogo. Refaça a resposta agora chamando a tool de PDF correta.';
       const coachingMessages: ChatMessage[] = [
         ...messages,
         { role: 'assistant', content: reply },
-        {
-          role: 'user',
-          content:
-            '⚠ Sistema: sua resposta anterior continha o placeholder ' +
-            placeholderHit[0] +
-            ' como TEXTO. Isso é proibido (regra 2b). Você TEM as tools `generate_pdf` (documento avulso), `send_catalog_pdf` (catálogo completo) e `send_listing_photo` (foto de item) disponíveis AGORA. Refaça a resposta CHAMANDO a tool correta no mesmo turno em que confirma a entrega. Pra PDF de UM imóvel específico (subconjunto): chame `generate_pdf` com title/body/sections derivados do que você já buscou via search_catalog. Pra catálogo inteiro: `send_catalog_pdf`. Pra foto: `send_listing_photo`. Não escreva placeholder de novo.',
-        },
+        { role: 'user', content: coachingContent },
       ];
       try {
         // Force tool_choice='required' on the recovery turn. The LLM
@@ -1566,7 +1621,12 @@ async function processBufferedTurn(opts: {
       // casa específica" and gets the full catalog — which still
       // includes that casa, plus more. Far better than "Aqui está o PDF:"
       // followed by no actual PDF, which is what was happening in prod.
-      const placeholderWasPdf = /\b(?:PDF|CAT[ÁA]LOGO|ARQUIVO|DOCUMENTO|ANEXO)\b/i.test(placeholderHit[0]);
+      // PDF intent if EITHER the bracket placeholder mentioned PDF/catálogo
+      // OR the lying-text claim used a PDF noun. Both paths land in the
+      // same auto-build fallback below.
+      const placeholderWasPdf = placeholderHit
+        ? /\b(?:PDF|CAT[ÁA]LOGO|ARQUIVO|DOCUMENTO|ANEXO|BROCHURA)\b/i.test(placeholderHit[0])
+        : true;  // pdfClaimMatch already required PDF_CLAIM_NOUN to fire
       if (placeholderWasPdf && pdfs.length === 0 && images.length === 0) {
         try {
           const { renderCatalogPdf, suggestPdfFilename } = await import('~/agents/pdf-renderer');
