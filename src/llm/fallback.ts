@@ -119,6 +119,21 @@ const PROVIDERS: ProviderConfig[] = [
     supportsRepetitionPenalties: true,
   },
   {
+    // 4th tool-capable provider — Qwen 72B via SiliconFlow's OAI-compatible
+    // endpoint. Added 2026-05-07 after production case 5219 showed the
+    // cascade falling through to Cohere (text-only) when all 3 primaries
+    // were rate-limited. Cohere with tools STRIPPED inevitably hallucinates
+    // URLs/types on tool-needed turns. Qwen handles tool calling well and
+    // the SiliconFlow free tier is generous enough to act as a real safety
+    // net. Set SILICONFLOW_API_KEY in env to enable.
+    name: 'siliconflow-qwen',
+    endpoint: 'https://api.siliconflow.com/v1/chat/completions',
+    keySlug: 'siliconflow',
+    model: 'Qwen/Qwen2.5-72B-Instruct',
+    supportsTools: true,
+    supportsRepetitionPenalties: true,
+  },
+  {
     name: 'cohere',
     endpoint: 'https://api.cohere.com/compatibility/v1/chat/completions',
     keySlug: 'cohere',
@@ -193,16 +208,21 @@ export async function chatCompletionWithFallback(req: LLMRequest): Promise<LLMRe
     candidates.push(...anyConfigured);
   }
 
-  // Last-resort tier: if the user wants tools but the only provider left
-  // standing is text-only (Cohere), push it onto the cascade tail with
-  // tools STRIPPED. The agent will respond as best it can without tool
-  // access — degraded but not dead. Better than 500.
-  if (wantsTools) {
-    const textOnlySurvivors = PROVIDERS.filter(
-      (p) => upstreamKeyFor(p.keySlug) && !p.supportsTools && !isCooled(p.name) && !candidates.includes(p),
-    );
-    candidates.push(...textOnlySurvivors);
-  }
+  // ─── Last-resort tier removed (was: text-only Cohere fallback) ───
+  // Production case 5219: Gemini + Gemini-Lite + Groq all rate-limited,
+  // fallback hit Cohere which has supportsTools=false. Tools were
+  // STRIPPED, LLM had nothing to call, inevitably hallucinated URL
+  // ("https://site.com/imoveis/IM-A-LDJK6X") AND property type
+  // ("sobrado em condomínio fechado" for an actually-commercial item).
+  // Customer saw the lie, trusted it, found the URL was 404. Catastrophic
+  // UX worse than a clean 500.
+  //
+  // New policy: when the request needs tools, only run on tool-capable
+  // providers. If all are cooled, throw — caller (whatsapp.ts) catches
+  // and emits an honest "tive lentidão técnica, me chama em alguns
+  // segundos" message instead of a fabricated reply. Cohere is still
+  // used for text-only requests (no tools array passed) where there's
+  // nothing to fabricate.
 
   let lastError = '';
   for (const provider of candidates) {

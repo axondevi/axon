@@ -155,6 +155,7 @@ const UPSTREAM_KEY_ALIASES: Record<string, string[]> = {
   STABILITY: ['STABILITY_API_KEY'],
   CARTESIA: ['CARTESIA_API_KEY'],
   ASSEMBLYAI: ['ASSEMBLYAI_API_KEY'],
+  SILICONFLOW: ['SILICONFLOW_API_KEY'],
 };
 
 export function upstreamKeyFor(slug: string): string | undefined {
