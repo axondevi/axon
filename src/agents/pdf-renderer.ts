@@ -510,34 +510,103 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
       const usableW = pageW - 2 * PAGE_MARGIN;
       const ACCENT = '#7c5cff';
 
-      // ─── Cover page ────────────────────────────────────────
+      // ─── Cover page (rewritten 2026-05-07 to fix overlapping text) ─
+      // Old layout used absolute Y coordinates derived from font size,
+      // which broke when the business name wrapped to a 2nd line — the
+      // summary line landed ON TOP of the wrapped name. New layout
+      // measures each block with heightOfString and stacks vertically
+      // with explicit gaps. Hero photo (first item with image_url)
+      // replaces the flat color panel — looks editorial, not chapado.
+      // Hero photo top half, info+CTA on bottom half over a dark band.
+
+      // Try to grab a photo for the hero. Use the first item that has
+      // both type=venda AND a high-quality image, fallback to any image.
+      const heroItem = items.find((it) => it.type === 'venda' && it.image_url) || items.find((it) => it.image_url);
+      const heroIdx = heroItem ? items.indexOf(heroItem) : -1;
+      const heroBuf = heroIdx >= 0 ? photoBuffers[heroIdx] : null;
+
+      // Top 60% = hero photo (or solid color fallback). Bottom 40% =
+      // info panel with dark band over hero for legibility.
+      const heroH = pageH * 0.55;
+
+      if (heroBuf) {
+        try {
+          // cover: stretches to fill while keeping aspect ratio (some
+          // pixels clipped). Looks like a brochure cover, not a thumb.
+          doc.image(heroBuf, 0, 0, { cover: [pageW, heroH] });
+        } catch {
+          doc.save().rect(0, 0, pageW, heroH).fill(ACCENT).restore();
+        }
+      } else {
+        doc.save().rect(0, 0, pageW, heroH).fill(ACCENT).restore();
+      }
+
+      // Subtle gradient at the bottom of the hero so text on top of it
+      // (the small CATÁLOGO label) stays legible regardless of photo.
       doc.save();
-      doc.rect(0, 0, pageW, pageH).fill(ACCENT);
+      const heroBands = 8;
+      for (let i = 0; i < heroBands; i++) {
+        const alpha = 0.05 + (i / heroBands) * 0.35;
+        doc.opacity(alpha)
+          .rect(0, heroH - 80 + (80 / heroBands) * i, pageW, 80 / heroBands + 1)
+          .fill('#000000');
+      }
+      doc.opacity(1);
       doc.restore();
 
-      doc.fillColor('#ffffffcc').font('Helvetica').fontSize(11);
-      doc.text('CATÁLOGO', PAGE_MARGIN, PAGE_MARGIN + 8, {
-        align: 'center', width: usableW, characterSpacing: 4,
+      // Bottom panel — dark accent so cover text is high-contrast
+      const panelTop = heroH;
+      doc.save();
+      doc.rect(0, panelTop, pageW, pageH - panelTop).fill('#0f1729');
+      doc.restore();
+
+      // Top-left small CATÁLOGO label, on hero photo
+      doc.fillColor('#ffffffcc').font('Helvetica-Bold').fontSize(10);
+      doc.text('CATÁLOGO', PAGE_MARGIN, PAGE_MARGIN + 4, {
+        width: usableW, align: 'left', characterSpacing: 4,
       });
 
-      const nameSize = input.businessName.length > 28 ? 30 : 38;
-      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(nameSize);
-      const nameY = pageH / 2 - 100;
-      doc.text(input.businessName.slice(0, 100), PAGE_MARGIN, nameY, {
-        align: 'center', width: usableW,
-      });
+      // ─── Dynamic stacking on the bottom panel ──────────────────────
+      // Strategy: start at panelTop + 28px padding, render each block,
+      // measure its actual height (heightOfString accounts for word wrap),
+      // advance the cursor by that + a fixed gap. NEVER use static
+      // offsets — that's what caused the overlap in the first place.
+      let cursorY = panelTop + 28;
+      const PADDING_X = 36;
+      const innerW = pageW - PADDING_X * 2;
 
-      // Summary line — "X imóveis · Y para venda · Z para aluguel"
+      // Block 1: business name. Adaptive font: shrink if name is long
+      // so it stays on at most 2 lines, never collides with stats.
+      const rawName = input.businessName.slice(0, 100);
+      // Pick a font size that gives a single line when possible. Width
+      // budget = innerW; measure widths at descending sizes.
+      const candidateSizes = [34, 30, 26, 22];
+      let chosenNameSize = candidateSizes[0];
+      doc.font('Helvetica-Bold');
+      for (const sz of candidateSizes) {
+        doc.fontSize(sz);
+        const w = doc.widthOfString(rawName);
+        if (w <= innerW * 0.95) { chosenNameSize = sz; break; }
+        chosenNameSize = sz;  // smallest tried so far
+      }
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(chosenNameSize);
+      const nameH = doc.heightOfString(rawName, { width: innerW, align: 'center' });
+      doc.text(rawName, PADDING_X, cursorY, { width: innerW, align: 'center' });
+      cursorY += nameH + 18;  // explicit gap so nothing overlaps
+
+      // Block 2: summary line (X items · Y venda · Z aluguel)
       const summaryParts: string[] = [];
       summaryParts.push(`${items.length} ite${items.length === 1 ? 'm' : 'ns'}`);
       if (buckets.venda.length) summaryParts.push(`${buckets.venda.length} para venda`);
       if (buckets.aluguel.length) summaryParts.push(`${buckets.aluguel.length} para aluguel`);
-      doc.fillColor('#ffffffee').font('Helvetica').fontSize(13);
-      doc.text(summaryParts.join(' · '), PAGE_MARGIN, nameY + nameSize + 18, {
-        align: 'center', width: usableW,
-      });
+      const summaryText = summaryParts.join(' · ');
+      doc.fillColor('#a5b4fc').font('Helvetica-Bold').fontSize(13);
+      const summaryH = doc.heightOfString(summaryText, { width: innerW, align: 'center' });
+      doc.text(summaryText, PADDING_X, cursorY, { width: innerW, align: 'center' });
+      cursorY += summaryH + 8;
 
-      // Property-kind breakdown — small chip line so customer sees what's inside
+      // Block 3: kind breakdown (16 casas · 12 aptos · ...). Optional
+      // — only renders if at least one kind is present.
       const kindCounts = new Map<PropertyKind, number>();
       for (const it of items) {
         const k = detectPropertyKind(it);
@@ -548,39 +617,47 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
         .map((k) => `${kindCounts.get(k)} ${PROPERTY_KIND_LABELS[k].toLowerCase()}`)
         .join(' · ');
       if (kindLine) {
-        doc.fillColor('#ffffffaa').font('Helvetica').fontSize(11);
-        doc.text(kindLine, PAGE_MARGIN, nameY + nameSize + 44, {
-          align: 'center', width: usableW,
-        });
+        doc.fillColor('#94a3b8').font('Helvetica').fontSize(10);
+        const kindH = doc.heightOfString(kindLine, { width: innerW, align: 'center' });
+        doc.text(kindLine, PADDING_X, cursorY, { width: innerW, align: 'center' });
+        cursorY += kindH + 24;
+      } else {
+        cursorY += 16;
       }
 
-      // "Como pedir mais detalhes" — instruction tying the REF system
-      // back to the customer's behavior. Tells them HOW to use this PDF.
-      doc.fillColor('#ffffffcc').font('Helvetica-Bold').fontSize(11);
-      doc.text('Como pedir mais detalhes', PAGE_MARGIN, pageH - PAGE_MARGIN - 130, {
-        align: 'center', width: usableW,
-      });
-      doc.fillColor('#ffffffaa').font('Helvetica').fontSize(10);
-      doc.text(
-        'Anotou o código no canto superior direito de cada anúncio? Manda o código aqui no WhatsApp (ex: "quero saber mais sobre IM-V-A1B2") que te passo o link direto, fotos e detalhes.',
-        PAGE_MARGIN + 24,
-        pageH - PAGE_MARGIN - 110,
-        { align: 'center', width: usableW - 48, lineGap: 1 },
-      );
+      // Block 4: "Como pedir mais detalhes" — short CTA card
+      // Only render if there's room. Approx height = 60px.
+      const ctaText = 'Como pedir mais detalhes:';
+      const ctaBody = 'Cada anúncio tem um código (ex. IM-V-A1B2) no canto da foto. Manda o código aqui no WhatsApp e te passo o link direto, fotos e detalhes.';
+      doc.font('Helvetica').fontSize(9);
+      const ctaBodyH = doc.heightOfString(ctaBody, { width: innerW, align: 'center', lineGap: 2 });
+      const ctaTotalH = 18 + 6 + ctaBodyH;  // title + gap + body
+      // Footer needs ~50px reserved for contact + date.
+      const footerReserve = 60;
+      const ctaFitsAbove = cursorY + ctaTotalH < pageH - footerReserve;
+      if (ctaFitsAbove) {
+        doc.fillColor('#fbbf24').font('Helvetica-Bold').fontSize(10);
+        doc.text(ctaText, PADDING_X, cursorY, { width: innerW, align: 'center', characterSpacing: 1.5 });
+        cursorY += 18;
+        doc.fillColor('#cbd5e1').font('Helvetica').fontSize(9);
+        doc.text(ctaBody, PADDING_X, cursorY, { width: innerW, align: 'center', lineGap: 2 });
+        cursorY += ctaBodyH + 18;
+      }
 
-      // Contact + site URL footer on cover
+      // Block 5: Footer line — contact + site (anchored to bottom, so
+      // never collides with the variable-height blocks above).
       const contactLines: string[] = [];
       if (input.businessContact && input.businessContact.trim()) {
         contactLines.push(input.businessContact.trim().slice(0, 200));
       }
       if (siteUrl) contactLines.push(siteUrl);
       if (contactLines.length) {
-        doc.fillColor('#ffffffaa').font('Helvetica').fontSize(11);
-        doc.text(contactLines.join('   ·   '), PAGE_MARGIN, pageH - PAGE_MARGIN - 50, {
-          align: 'center', width: usableW,
+        doc.fillColor('#94a3b8').font('Helvetica').fontSize(10);
+        doc.text(contactLines.join('   ·   '), PADDING_X, pageH - PAGE_MARGIN - 32, {
+          width: innerW, align: 'center', ellipsis: true,
         });
       }
-      doc.fillColor('#ffffff88').font('Helvetica').fontSize(9);
+      doc.fillColor('#64748b').font('Helvetica').fontSize(8);
       doc.text(
         new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' }),
         PAGE_MARGIN, pageH - PAGE_MARGIN - 28,

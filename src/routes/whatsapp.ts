@@ -1400,6 +1400,15 @@ async function processBufferedTurn(opts: {
       allowedTools: effectiveTools,
       messages,
       ownerId: runtimeAgent.ownerId,
+      // CRITICAL: agentId MUST flow through. Without it, every special-
+      // case tool that does `if (!agentId) errReply('missing agent
+      // context')` (send_catalog_pdf, send_brochure_pdf,
+      // send_filtered_pdf, schedule_appointment) hits the error branch
+      // and silently returns to the LLM as a tool failure. Customer
+      // ends up with a text reply that promised a PDF but never got
+      // one. Bug pre-existed but only surfaced now that brochure +
+      // filtered don't have an auto-build fallback like catalog does.
+      agentId: runtimeAgent.id,
       personaId: runtimeAgent.personaId,
       enableCache: false,
     });
@@ -1508,6 +1517,7 @@ async function processBufferedTurn(opts: {
           allowedTools: effectiveTools,
           messages: coachingMessages,
           ownerId: runtimeAgent.ownerId,
+          agentId: runtimeAgent.id,
           personaId: runtimeAgent.personaId,
           enableCache: false,
           toolChoice: 'required',
