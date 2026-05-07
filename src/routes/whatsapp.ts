@@ -1565,20 +1565,28 @@ async function processBufferedTurn(opts: {
             : [];
           if (items.length > 0) {
             const businessName = (runtimeAgent.name || 'Catálogo').slice(0, 100);
-            const businessContact = ((runtimeAgent as { businessInfo?: string }).businessInfo || '')
-              .split('\n')[0]
-              ?.slice(0, 200) || '';
+            const businessInfoStr = (runtimeAgent as { businessInfo?: string }).businessInfo || '';
+            const businessContact = businessInfoStr.split('\n')[0]?.slice(0, 200) || '';
+            const siteMatch = businessInfoStr.match(/https?:\/\/[^\s)]+/i);
+            const siteUrl = siteMatch ? siteMatch[0] : undefined;
             const pdfBytes = await renderCatalogPdf({
               businessName,
               businessContact,
-              items: items.map((it) => ({
-                name: String((it as { name?: unknown }).name || ''),
-                price: typeof (it as { price?: unknown }).price === 'number' ? (it as { price: number }).price : null,
-                region: typeof (it as { region?: unknown }).region === 'string' ? (it as { region: string }).region : null,
-                description: typeof (it as { description?: unknown }).description === 'string' ? (it as { description: string }).description : null,
-                image_url: typeof (it as { image_url?: unknown }).image_url === 'string' ? (it as { image_url: string }).image_url : null,
-                url: typeof (it as { url?: unknown }).url === 'string' ? (it as { url: string }).url : null,
-              })),
+              siteUrl,
+              items: items.map((it) => {
+                const r = it as Record<string, unknown>;
+                const t = typeof r.type === 'string' ? r.type : null;
+                return {
+                  id: typeof r.id === 'string' ? r.id : undefined,
+                  name: String(r.name || ''),
+                  price: typeof r.price === 'number' ? r.price : null,
+                  region: typeof r.region === 'string' ? r.region : null,
+                  description: typeof r.description === 'string' ? r.description : null,
+                  image_url: typeof r.image_url === 'string' ? r.image_url : null,
+                  url: typeof r.url === 'string' ? r.url : null,
+                  type: t === 'venda' || t === 'aluguel' ? t : null,
+                };
+              }),
             });
             const filename = suggestPdfFilename(`catalogo ${businessName}`);
             pdfs = [

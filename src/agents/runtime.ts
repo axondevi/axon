@@ -85,6 +85,7 @@ export const CORE_RULES_TEXT = `## Regras de tool-use (NUNCA viole)
 5. Foto de item = search_catalog + send_listing_photo (max 3, com image_url real).
 6. Documento avulso (comprovante, recibo, ficha, atestado, declaração, contrato, receita) = generate_pdf — sai como anexo PDF nativo no WhatsApp.
 7. Agendamento confirmado (data + hora acordadas) = schedule_appointment — registra + dispara lembrete véspera.
+v11 — Catálogo PDF reorganizado em seções (venda/aluguel/outros) + sub-grupos por tipo de imóvel (casa/apto/terreno/sítio/sala/cobertura/kitnet) com REF/CÓD prominente em cada card. Capa agora tem sumário ("X imóveis · Y para venda · Z para aluguel · breakdown por tipo") + instrução "como pedir mais detalhes" + URL do site. Footer em toda página com URL+pageN. Nova regra 9 do prompt: quando cliente referenciar item ("essa", "aquela", "código IM-V-A1B2"), agente chama search_catalog e responde com URL do anúncio (campo url do item). Resolve o pedido da imobiliária: cliente vê PDF organizado, aponta o que quer, agente manda link direto.
 v10 — Recovery hardening: tool_choice='required' no retry de placeholder + auto-build de PDF do catálogo como rede final quando o LLM continua escrevendo "[PDF...]" mesmo após coaching. Caso real 5210/5211 em prod: imobiliária escreveu placeholder duas vezes seguidas (uma na primeira tentativa, outra no recovery) e o cliente recebeu "Aqui está o PDF: " sem PDF. Agora se LLM falhar duas vezes, eu mesmo invoco renderCatalogPdf direto com agent.catalog (zero LLM) — pelo menos algo real chega ao cliente. Cleanup do prefix "Aqui está o PDF:" também adicionado.
 v9 — REGRA #0 anti-colchete movida pro topo do qualityRule + output guard com auto-recovery em whatsapp.ts. Quando o LLM emite [PDF...] / [FOTO...] / [CATÁLOGO...] e nenhuma mídia foi produzida, re-invocamos runAgent com mensagem coaching explicita pra ele tentar de novo chamando a tool real. Strip do colchete como rede final. Caso real em prod 2026-05-06: agente de imobiliária escreveu "[PDF DA CASA EM PONTAL DE SANTA MARINA]" como texto após search_catalog, sem chamar generate_pdf. v8 não cobriu — modelo pequeno ignorando regra 2b no fim do prompt.
 v8 — generate_pdf + schedule_appointment promovidos a UNIVERSAL_TOOL_NAMES + ALWAYS_ON no smart selector + keyword regex específicas. Antes o selector filtrava generate_pdf fora de todo turno cuja regex não casasse "PDF" literal — quebrava "manda um comprovante", "preciso de uma ficha", "me passa o recibo" silenciosamente. Mesma armadilha pro schedule_appointment ("marca pra terça"). Cache invalidado automaticamente via hash da lista universal.
@@ -1108,6 +1109,12 @@ Use o critério: "se eu disser que enviei, alguém realmente tem que receber". S
 
 8. **Combinar \`generate_pdf\` com \`schedule_appointment\`.** Quando o cliente confirma horário, o fluxo natural é: chamar \`schedule_appointment\` + chamar \`generate_pdf\` no mesmo turno pra mandar o comprovante. Cliente sai com horário marcado + papel na mão.
 
+9. **Cliente referenciou item após receber catálogo/PDF.** Quando ele disser coisas como "essa", "aquela", "esse aqui", "o segundo", "a terceira casa", "código IM-V-A1B2", "REF 1234", "aquele apartamento", "o de Tabatinga" — significa que ele tá apontando pra um item específico que JÁ apareceu na conversa (no PDF que você mandou ou nas mensagens anteriores). PROTOCOLO:
+   (i) chame \`search_catalog\` com a melhor query que extrair do contexto — pode ser o código (ex: "IM-V-A1B2"), o nome ("casa pontal santa marina"), a região, ou características que o cliente mencionou ("aquela com 4 quartos");
+   (ii) na resposta, **mande o link do anúncio** (campo \`url\` do item) — esse link é o destino pro cliente ver detalhes, fotos, ou enviar mensagem pelo site;
+   (iii) opcionalmente chame também \`send_listing_photo\` pra mostrar a foto principal do item.
+   Formato da resposta: "Esse aqui é o [nome curto]. Link com tudo: [url]". Se o item não tem url cadastrado, fale honesto ("não tenho link direto desse, mas as informações são: ...") em vez de inventar URL. Se a busca não acha, pergunte qual código exato ou bairro pra estreitar.
+
 ## Formato de saída no WhatsApp (obrigatório)
 - **Bolhas curtas, separadas por \`||\`.** Resposta natural no zap = 2-3 bolhas de 1-2 frases cada. NUNCA mande um parágrafo de 5 linhas — fica robótico e o cliente bate o olho e some.
 - Exemplo CERTO: \`Boa noite! 👋 || Pra te ajudar a achar o imóvel certo, qual cidade ou bairro?\`
@@ -1467,19 +1474,33 @@ Use o critério: "se eu disser que enviei, alguém realmente tem que receber". S
             continue;
           }
           const businessName = (agentRow.name || 'Catálogo').slice(0, 100);
+          // First non-empty line of business_info → contact chip on cover.
+          // Look for a URL anywhere in business_info → site URL on cover
+          // and on every page footer. Both are best-effort; renderer also
+          // falls back to the origin of the first item.url when site is
+          // unset.
           const businessContact = (agentRow.businessInfo || '').split('\n')[0]?.slice(0, 200) || '';
+          const siteMatch = (agentRow.businessInfo || '').match(/https?:\/\/[^\s)]+/i);
+          const siteUrl = siteMatch ? siteMatch[0] : undefined;
           const { renderCatalogPdf, suggestPdfFilename } = await import('~/agents/pdf-renderer');
           const pdfBytes = await renderCatalogPdf({
             businessName,
             businessContact,
-            items: items.map((it) => ({
-              name: String((it as { name?: unknown }).name || ''),
-              price: typeof (it as { price?: unknown }).price === 'number' ? (it as { price: number }).price : null,
-              region: typeof (it as { region?: unknown }).region === 'string' ? (it as { region: string }).region : null,
-              description: typeof (it as { description?: unknown }).description === 'string' ? (it as { description: string }).description : null,
-              image_url: typeof (it as { image_url?: unknown }).image_url === 'string' ? (it as { image_url: string }).image_url : null,
-              url: typeof (it as { url?: unknown }).url === 'string' ? (it as { url: string }).url : null,
-            })),
+            siteUrl,
+            items: items.map((it) => {
+              const r = it as Record<string, unknown>;
+              const t = typeof r.type === 'string' ? r.type : null;
+              return {
+                id: typeof r.id === 'string' ? r.id : undefined,
+                name: String(r.name || ''),
+                price: typeof r.price === 'number' ? r.price : null,
+                region: typeof r.region === 'string' ? r.region : null,
+                description: typeof r.description === 'string' ? r.description : null,
+                image_url: typeof r.image_url === 'string' ? r.image_url : null,
+                url: typeof r.url === 'string' ? r.url : null,
+                type: t === 'venda' || t === 'aluguel' ? t : null,
+              };
+            }),
           });
           const filename = suggestPdfFilename(`catalogo ${businessName}`);
           generatedPdfs.push({

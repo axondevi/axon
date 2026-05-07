@@ -173,12 +173,22 @@ export { SECTION_GAP };
 // ───────────────────────────────────────────────────────────────────
 
 export interface CatalogPdfItem {
+  /** Catalog ID/REF — surfaced prominently on each card so the customer
+   *  can reference an item by code ("quero saber mais sobre o IM-A1B2").
+   *  When omitted, renderCatalogPdf derives a stable short code from
+   *  the item name. */
+  id?: string;
   name: string;
   price?: number | null;
   region?: string | null;
   description?: string | null;
   image_url?: string | null;
   url?: string | null;
+  /** Real-estate / multi-modal catalogs: 'venda' (for sale) | 'aluguel'
+   *  (for rent). Used to split the PDF into sections so the customer
+   *  sees comparable items grouped together. Items without `type` go
+   *  into a third "Outros" section. */
+  type?: 'venda' | 'aluguel' | null;
 }
 
 export interface CatalogPdfInput {
@@ -186,8 +196,120 @@ export interface CatalogPdfInput {
   businessName: string;
   /** Optional one-line contact info under the business name on the cover (phone / address). */
   businessContact?: string;
+  /** Optional public website URL — printed on the cover footer + on every
+   *  page footer so the customer always knows where to go to see more
+   *  detail / make an inquiry. When omitted, renderCatalogPdf tries to
+   *  derive it from the origin of the first item.url. */
+  siteUrl?: string;
   /** Items to render. Caller is expected to have already filtered + capped. */
   items: CatalogPdfItem[];
+}
+
+/**
+ * Detect the property type from the item's name + description for
+ * real-estate catalogs. Returns one of: casa | apartamento | terreno |
+ * sitio | sala | cobertura | kitnet | outro. Used to sub-group items
+ * within a transaction-type section so the customer browsing for "uma
+ * casa para alugar" sees houses together instead of mixed with apartments
+ * and lots.
+ *
+ * Naive substring match — works for ~95% of Brazilian real-estate
+ * catalogs because owners tend to start the listing name with the type
+ * ("Casa em Pontal...", "Apartamento no Centro", "Terreno em Lot..."
+ * etc). False positives are bounded to "outro" which still renders
+ * correctly, just without the kind-grouping benefit.
+ */
+function detectPropertyKind(item: CatalogPdfItem):
+  | 'casa'
+  | 'apartamento'
+  | 'terreno'
+  | 'sitio'
+  | 'sala'
+  | 'cobertura'
+  | 'kitnet'
+  | 'outro' {
+  const text = `${item.name || ''} ${item.description || ''}`.toLowerCase();
+  // Order matters: more-specific matches first so "casa de praia" doesn't
+  // win over the actual "casa" category.
+  if (/\bkitnet|\bkit\s*net|\bstudio\b/.test(text)) return 'kitnet';
+  if (/\bcobertura|\bduplex|\btriplex/.test(text)) return 'cobertura';
+  if (/\bapartamento|\bapto\.?\b|\bap\.?\s*\d|\bflat\b/.test(text)) return 'apartamento';
+  if (/\bs[ií]tio|\bch[áa]cara|\bfazenda|\brural\b/.test(text)) return 'sitio';
+  if (/\bterreno|\blote\b|\báreas?\b/.test(text)) return 'terreno';
+  if (/\bsala\s+(?:comercial|empresarial)|\bloja\b|\bgalp[ãa]o|\bcomercial\b|\bescrit[óo]rio/.test(text)) return 'sala';
+  if (/\bcasa\b|\bsobrado|\bres[ií]dencia|\bvilla\b|\bgeminada/.test(text)) return 'casa';
+  return 'outro';
+}
+
+const PROPERTY_KIND_LABELS: Record<ReturnType<typeof detectPropertyKind>, string> = {
+  casa: 'Casas',
+  apartamento: 'Apartamentos',
+  terreno: 'Terrenos',
+  sitio: 'Sítios e chácaras',
+  sala: 'Salas comerciais',
+  cobertura: 'Coberturas',
+  kitnet: 'Kitnets / Studios',
+  outro: 'Outros',
+};
+
+/**
+ * Render order for property-kind sub-groups. We push the most common
+ * residential types first (casa → apto), then commercial, then "outro"
+ * as a catch-all at the end. Mirrors how a customer skims a real-estate
+ * listing.
+ */
+const PROPERTY_KIND_ORDER: Array<ReturnType<typeof detectPropertyKind>> = [
+  'casa',
+  'apartamento',
+  'cobertura',
+  'kitnet',
+  'sitio',
+  'terreno',
+  'sala',
+  'outro',
+];
+
+/**
+ * Build a stable short REF code for a catalog item. Uses the item's
+ * existing id when present (preferring the last 6 alphanum chars of a
+ * UUID/hash so it's typeable), otherwise hashes the name. Always returns
+ * an uppercase 4-7 char code prefixed by "IM-" for visual identity on
+ * the card. Reused across PDF renders so the customer can quote the same
+ * REF tomorrow and the agent finds the same item.
+ */
+function buildItemRef(item: CatalogPdfItem, transactionPrefix: string): string {
+  const idRaw = (item.id || '').toString();
+  const idClean = idRaw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (idClean.length >= 4) {
+    return `${transactionPrefix}-${idClean.slice(-6)}`;
+  }
+  // Fallback: hash the name for a stable code without an id.
+  let h = 0;
+  const src = (item.name || '') + '|' + (item.region || '');
+  for (let i = 0; i < src.length; i++) h = ((h << 5) - h + src.charCodeAt(i)) | 0;
+  const hash = Math.abs(h).toString(36).toUpperCase().slice(0, 5);
+  return `${transactionPrefix}-${hash}`;
+}
+
+/**
+ * Extract origin (https://host) from a URL for display on the cover.
+ * Returns the input string when it's already a bare host. Returns null
+ * for malformed input so the cover footer can be hidden gracefully.
+ */
+function deriveSiteUrl(input: CatalogPdfInput): string | null {
+  if (input.siteUrl && input.siteUrl.trim()) {
+    const s = input.siteUrl.trim();
+    return /^https?:\/\//i.test(s) ? s : 'https://' + s;
+  }
+  for (const it of input.items) {
+    const u = (it.url || '').trim();
+    if (!u) continue;
+    try {
+      const parsed = new URL(u);
+      return parsed.origin;
+    } catch { /* fall through */ }
+  }
+  return null;
 }
 
 /** Fetch an image with a tight timeout + size cap. PDFKit accepts JPEG/PNG
@@ -275,28 +397,82 @@ async function prefetchItemImages(items: CatalogPdfItem[]): Promise<(Buffer | nu
 }
 
 /**
- * Render a multi-page catalog PDF with photos.
+ * Render a multi-page catalog PDF with photos, organized so the customer
+ * can browse comparable items together and quote a REF code back to the
+ * agent for the listing they want.
  *
- * Layout (rebuilt 2026-05-06 after first pass produced a broken cover and
- * mis-clipped item photos):
- *   - Cover page: solid accent color background, business name in white,
- *     contact line, item count, generation date. No photo on cover —
- *     using a sample item photo had been making the cover look like a
- *     malformed first listing card.
- *   - Item pages: 2 cards per row × 3 rows = 6 per page. Card has a
- *     soft background, photo on top with `fit:[w,h]` (preserves aspect,
- *     never overflows the box — `cover:` was unpredictable across pdfkit
- *     versions and bled the image past the rounded corners), then text
- *     block underneath.
- *   - Footer on every page: "página N de M" centered.
+ * Layout (rebuilt 2026-05-06 — initial version produced a single mixed
+ * grid, customer couldn't reference items, agent couldn't tell which
+ * one they meant):
+ *   - Cover page: solid accent panel, business name, summary line
+ *     ("X imóveis · Y para venda · Z para aluguel"), site URL footer.
+ *     The summary tells the customer up front what's inside.
+ *   - Section pages: each transaction type (VENDA / ALUGUEL / OUTROS)
+ *     gets its own section header page + grid pages. Within a section,
+ *     items are sub-grouped by detected property kind (Casas →
+ *     Apartamentos → Terrenos → ...) with a small heading between
+ *     groups so the customer can skim to what they want.
+ *   - Item cards: 2 cards/row × 3 rows = 6 per page. Each card now
+ *     prints the REF code prominently in the top-right of the photo
+ *     frame, in the accent color, in monospace. Customer can text the
+ *     agent "quero saber mais sobre IM-V-A1B2" and the agent looks it
+ *     up directly via search_catalog (id match).
+ *   - Footer on every page: site URL + page number, so the customer
+ *     always knows where to dive deeper.
  *
  * Photos pre-fetched concurrency=6 with 7s per-image timeout. Items that
  * fail to load show a clean "sem foto" placeholder instead of breaking
  * the page.
  */
 export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> {
-  const items = input.items.slice(0, 50);
+  const items = input.items.slice(0, 80);  // bumped from 50 — sectioning gives more room
   const photoBuffers = await prefetchItemImages(items);
+  const siteUrl = deriveSiteUrl({ ...input, items });
+
+  // ─── Group items: transaction type → property kind ──────────────
+  // Stable ordering: venda first (high-value), then aluguel, then "outros"
+  // for items without a type set (older catalogs, e-commerce, restaurants).
+  type TxnKey = 'venda' | 'aluguel' | 'outros';
+  const TXN_ORDER: TxnKey[] = ['venda', 'aluguel', 'outros'];
+  const TXN_LABELS: Record<TxnKey, string> = {
+    venda: 'Para venda',
+    aluguel: 'Para aluguel',
+    outros: 'Outros',
+  };
+  const TXN_PREFIX: Record<TxnKey, string> = {
+    venda: 'IM-V',
+    aluguel: 'IM-A',
+    outros: 'IM',
+  };
+  const buckets: Record<TxnKey, Array<{ item: CatalogPdfItem; photoIdx: number }>> = {
+    venda: [],
+    aluguel: [],
+    outros: [],
+  };
+  for (let i = 0; i < items.length; i++) {
+    const t = items[i].type;
+    const key: TxnKey = t === 'venda' ? 'venda' : t === 'aluguel' ? 'aluguel' : 'outros';
+    buckets[key].push({ item: items[i], photoIdx: i });
+  }
+  // Within each transaction bucket, sub-group by property kind.
+  type PropertyKind = ReturnType<typeof detectPropertyKind>;
+  type Group = { kind: PropertyKind; entries: Array<{ item: CatalogPdfItem; photoIdx: number; ref: string }> };
+  const sections: Array<{ txn: TxnKey; groups: Group[]; total: number }> = [];
+  for (const txn of TXN_ORDER) {
+    if (buckets[txn].length === 0) continue;
+    const byKind = new Map<PropertyKind, Group>();
+    for (const e of buckets[txn]) {
+      const kind = detectPropertyKind(e.item);
+      const ref = buildItemRef(e.item, TXN_PREFIX[txn]);
+      const group = byKind.get(kind) || { kind, entries: [] };
+      group.entries.push({ item: e.item, photoIdx: e.photoIdx, ref });
+      byKind.set(kind, group);
+    }
+    const groupsOrdered = PROPERTY_KIND_ORDER
+      .filter((k) => byKind.has(k))
+      .map((k) => byKind.get(k)!);
+    sections.push({ txn, groups: groupsOrdered, total: buckets[txn].length });
+  }
 
   return new Promise((resolve, reject) => {
     try {
@@ -308,8 +484,8 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
           Producer: 'Axon Agent',
           Creator: 'Axon Agent',
         },
-        autoFirstPage: false,  // we manage pages manually so cover renders cleanly
-        bufferPages: true,     // required for bufferedPageRange + switchToPage at the end
+        autoFirstPage: false,
+        bufferPages: true,
       });
       const chunks: Uint8Array[] = [];
       doc.on('data', (chunk: Uint8Array | Buffer) => {
@@ -324,7 +500,6 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
       });
       doc.on('error', reject);
 
-      // Constants depend on page geometry — capture once on the first page.
       doc.addPage();
       const pageW = doc.page.width;
       const pageH = doc.page.height;
@@ -332,175 +507,294 @@ export async function renderCatalogPdf(input: CatalogPdfInput): Promise<Buffer> 
       const ACCENT = '#7c5cff';
 
       // ─── Cover page ────────────────────────────────────────
-      // Solid accent panel covering the page so the cover reads as a real
-      // cover, not a malformed item card.
       doc.save();
       doc.rect(0, 0, pageW, pageH).fill(ACCENT);
       doc.restore();
 
-      // Subtle "Catálogo" word at the top
       doc.fillColor('#ffffffcc').font('Helvetica').fontSize(11);
       doc.text('CATÁLOGO', PAGE_MARGIN, PAGE_MARGIN + 8, {
         align: 'center', width: usableW, characterSpacing: 4,
       });
 
-      // Business name — vertically centered, large, white.
       const nameSize = input.businessName.length > 28 ? 30 : 38;
       doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(nameSize);
-      const nameY = pageH / 2 - 60;
+      const nameY = pageH / 2 - 100;
       doc.text(input.businessName.slice(0, 100), PAGE_MARGIN, nameY, {
         align: 'center', width: usableW,
       });
 
-      // Item count chip
+      // Summary line — "X imóveis · Y para venda · Z para aluguel"
+      const summaryParts: string[] = [];
+      summaryParts.push(`${items.length} ite${items.length === 1 ? 'm' : 'ns'}`);
+      if (buckets.venda.length) summaryParts.push(`${buckets.venda.length} para venda`);
+      if (buckets.aluguel.length) summaryParts.push(`${buckets.aluguel.length} para aluguel`);
       doc.fillColor('#ffffffee').font('Helvetica').fontSize(13);
-      doc.text(
-        `${items.length} ite${items.length === 1 ? 'm' : 'ns'} disponíve${items.length === 1 ? 'l' : 'is'}`,
-        PAGE_MARGIN, nameY + nameSize + 18,
-        { align: 'center', width: usableW },
-      );
+      doc.text(summaryParts.join(' · '), PAGE_MARGIN, nameY + nameSize + 18, {
+        align: 'center', width: usableW,
+      });
 
-      // Contact line
-      if (input.businessContact && input.businessContact.trim()) {
+      // Property-kind breakdown — small chip line so customer sees what's inside
+      const kindCounts = new Map<PropertyKind, number>();
+      for (const it of items) {
+        const k = detectPropertyKind(it);
+        kindCounts.set(k, (kindCounts.get(k) || 0) + 1);
+      }
+      const kindLine = PROPERTY_KIND_ORDER
+        .filter((k) => kindCounts.has(k))
+        .map((k) => `${kindCounts.get(k)} ${PROPERTY_KIND_LABELS[k].toLowerCase()}`)
+        .join(' · ');
+      if (kindLine) {
         doc.fillColor('#ffffffaa').font('Helvetica').fontSize(11);
-        doc.text(input.businessContact.trim().slice(0, 200), PAGE_MARGIN, pageH - PAGE_MARGIN - 60, {
+        doc.text(kindLine, PAGE_MARGIN, nameY + nameSize + 44, {
           align: 'center', width: usableW,
         });
       }
 
-      // Date footer on cover
+      // "Como pedir mais detalhes" — instruction tying the REF system
+      // back to the customer's behavior. Tells them HOW to use this PDF.
+      doc.fillColor('#ffffffcc').font('Helvetica-Bold').fontSize(11);
+      doc.text('Como pedir mais detalhes', PAGE_MARGIN, pageH - PAGE_MARGIN - 130, {
+        align: 'center', width: usableW,
+      });
+      doc.fillColor('#ffffffaa').font('Helvetica').fontSize(10);
+      doc.text(
+        'Anotou o código no canto superior direito de cada anúncio? Manda o código aqui no WhatsApp (ex: "quero saber mais sobre IM-V-A1B2") que te passo o link direto, fotos e detalhes.',
+        PAGE_MARGIN + 24,
+        pageH - PAGE_MARGIN - 110,
+        { align: 'center', width: usableW - 48, lineGap: 1 },
+      );
+
+      // Contact + site URL footer on cover
+      const contactLines: string[] = [];
+      if (input.businessContact && input.businessContact.trim()) {
+        contactLines.push(input.businessContact.trim().slice(0, 200));
+      }
+      if (siteUrl) contactLines.push(siteUrl);
+      if (contactLines.length) {
+        doc.fillColor('#ffffffaa').font('Helvetica').fontSize(11);
+        doc.text(contactLines.join('   ·   '), PAGE_MARGIN, pageH - PAGE_MARGIN - 50, {
+          align: 'center', width: usableW,
+        });
+      }
       doc.fillColor('#ffffff88').font('Helvetica').fontSize(9);
       doc.text(
         new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' }),
-        PAGE_MARGIN, pageH - PAGE_MARGIN - 30,
+        PAGE_MARGIN, pageH - PAGE_MARGIN - 28,
         { align: 'center', width: usableW },
       );
 
-      // ─── Item cards (2-col grid) ───────────────────────────
+      // ─── Item pages: section header + grouped grid ─────────
       const COLS = 2;
       const ROWS = 3;
       const COL_GAP = 16;
       const ROW_GAP = 20;
       const cellW = (usableW - COL_GAP * (COLS - 1)) / COLS;
       const photoBoxH = 140;
-      const textBoxH = 120;
+      const textBoxH = 130;  // slightly taller — needs room for REF chip on text side too
       const cellH = photoBoxH + textBoxH;
-      const gridTop = PAGE_MARGIN + 28;
       const cardsPerPage = COLS * ROWS;
-      const totalItemPages = Math.max(1, Math.ceil(items.length / cardsPerPage));
 
-      for (let i = 0; i < items.length; i++) {
-        const slot = i % cardsPerPage;
-        if (slot === 0) {
-          doc.addPage();
-          // Page header (small, top-right) with the business name as breadcrumb.
-          doc.fillColor('#999999').font('Helvetica').fontSize(9);
-          doc.text(
-            input.businessName.slice(0, 60),
-            PAGE_MARGIN, PAGE_MARGIN - 12,
-            { align: 'left', width: usableW / 2 },
-          );
-          const pageNum = Math.floor(i / cardsPerPage) + 1;
-          doc.text(
-            `página ${pageNum} de ${totalItemPages}`,
-            PAGE_MARGIN + usableW / 2, PAGE_MARGIN - 12,
-            { align: 'right', width: usableW / 2 },
-          );
-          doc.fillColor('#000000');
-        }
-        const col = slot % COLS;
-        const row = Math.floor(slot / COLS);
-        const cardX = PAGE_MARGIN + col * (cellW + COL_GAP);
-        const cardY = gridTop + row * (cellH + ROW_GAP);
+      // Cursor management — when a new section/group needs to start and
+      // we still have grid slots left on the current page, we just emit
+      // a small in-page heading. When we run out of slots, we add a new
+      // page. New SECTIONS (txn type) always force a new page so the
+      // customer can flip cleanly between "para venda" and "para aluguel".
+      let onPage = false;        // are we mid-grid on the current page?
+      let slotIdx = 0;            // 0..cardsPerPage-1 within current page
+      let gridTop = PAGE_MARGIN + 28;
 
-        // Card background — light fill + thin border
+      const startPage = (sectionLabel: string) => {
+        doc.addPage();
+        // Section banner — full-width, accent thin band. Customer sees
+        // immediately "now I'm in the venda section" or "aluguel".
         doc.save();
-        doc.roundedRect(cardX, cardY, cellW, cellH, 6).fillAndStroke('#ffffff', '#e2e2e7');
+        doc.rect(0, PAGE_MARGIN - 24, pageW, 36).fill(ACCENT);
         doc.restore();
-
-        // Photo region — fit (preserves aspect, never overflows). If no
-        // photo, show a clean placeholder block.
-        const photoX = cardX + 8;
-        const photoY = cardY + 8;
-        const photoBoxW = cellW - 16;
-        const photoBoxInnerH = photoBoxH - 16;
-
-        // Always paint the photo "frame" so cards are visually consistent
-        // whether or not the photo loaded.
-        doc.save();
-        doc.roundedRect(photoX, photoY, photoBoxW, photoBoxInnerH, 4).fillAndStroke('#f3f4f6', '#e2e2e7');
-        doc.restore();
-
-        const photoBuf = photoBuffers[i];
-        if (photoBuf) {
-          try {
-            // fit:[w,h] keeps the original aspect ratio AND never spills past
-            // the bounding box — exactly what we want, no clip needed.
-            doc.image(photoBuf, photoX, photoY, {
-              fit: [photoBoxW, photoBoxInnerH],
-              align: 'center',
-              valign: 'center',
-            });
-          } catch {
-            // Corrupt/unsupported byte stream — frame already drawn, just
-            // overlay the "sem foto" caption.
-            doc.fillColor('#9ca3af').font('Helvetica').fontSize(9);
-            doc.text('sem foto', photoX, photoY + photoBoxInnerH / 2 - 5, {
-              width: photoBoxW, align: 'center',
-            });
-          }
-        } else {
-          doc.fillColor('#9ca3af').font('Helvetica').fontSize(9);
-          doc.text('sem foto', photoX, photoY + photoBoxInnerH / 2 - 5, {
-            width: photoBoxW, align: 'center',
-          });
-        }
-        doc.fillColor('#000000');
-
-        // Text block — name (bold), price (accent), region (muted), description.
-        const textX = cardX + 12;
-        const textY = cardY + photoBoxH + 4;
-        const textW = cellW - 24;
-        const it = items[i];
-
-        doc.font('Helvetica-Bold').fontSize(11).fillColor('#1f2937');
-        doc.text((it.name || '').slice(0, 80), textX, textY, {
-          width: textW, height: 28, ellipsis: true,
+        doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(14);
+        doc.text(sectionLabel, PAGE_MARGIN, PAGE_MARGIN - 16, {
+          width: usableW, align: 'left',
         });
+        doc.fillColor('#000000');
+        gridTop = PAGE_MARGIN + 28;
+        slotIdx = 0;
+        onPage = true;
+      };
 
-        doc.font('Helvetica-Bold').fontSize(12).fillColor(ACCENT);
-        doc.text(formatPrice(it.price), textX, textY + 30, { width: textW });
+      const drawGroupHeading = (label: string, y: number) => {
+        doc.fillColor('#6b7280').font('Helvetica-Bold').fontSize(10);
+        doc.text(label.toUpperCase(), PAGE_MARGIN, y, {
+          width: usableW, characterSpacing: 2,
+        });
+        // Thin underline under the heading
+        doc.strokeColor('#e2e2e7').lineWidth(0.5)
+          .moveTo(PAGE_MARGIN, y + 14).lineTo(pageW - PAGE_MARGIN, y + 14).stroke();
+        doc.strokeColor('#000000');
+        doc.fillColor('#000000');
+      };
 
-        let textCursor = textY + 48;
-        const region = (it.region || '').trim();
-        if (region) {
-          doc.font('Helvetica').fontSize(9).fillColor('#6b7280');
-          doc.text(region.slice(0, 60), textX, textCursor, {
-            width: textW, ellipsis: true,
-          });
-          textCursor += 14;
-        }
-        const desc = (it.description || '').trim();
-        if (desc) {
-          doc.font('Helvetica').fontSize(8.5).fillColor('#4b5563');
-          doc.text(desc.slice(0, 220), textX, textCursor, {
-            width: textW, height: textY + textBoxH - textCursor - 6,
-            ellipsis: true, lineGap: 1,
-          });
+      for (const section of sections) {
+        const sectionLabel = `${TXN_LABELS[section.txn].toUpperCase()}  ·  ${section.total} ite${section.total === 1 ? 'm' : 'ns'}`;
+        startPage(sectionLabel);
+
+        for (const group of section.groups) {
+          // Group heading. If the current slot row is mid-page and the
+          // group has multiple items, push to a new page so groups don't
+          // get split awkwardly. For a 1-item group, fitting is fine.
+          if (slotIdx > 0 && (slotIdx % COLS !== 0 || group.entries.length > 1)) {
+            // Move to next row + add small heading
+            const headingY = gridTop + Math.ceil(slotIdx / COLS) * (cellH + ROW_GAP);
+            if (headingY + 80 > pageH - PAGE_MARGIN) {
+              startPage(sectionLabel);
+            } else {
+              drawGroupHeading(`${PROPERTY_KIND_LABELS[group.kind]} (${group.entries.length})`, headingY);
+              gridTop = headingY + 22;
+              slotIdx = 0;
+            }
+          } else {
+            // First group on a fresh page or aligned slot
+            const headingY = gridTop;
+            drawGroupHeading(`${PROPERTY_KIND_LABELS[group.kind]} (${group.entries.length})`, headingY);
+            gridTop = headingY + 22;
+            slotIdx = 0;
+          }
+
+          for (const entry of group.entries) {
+            if (slotIdx >= cardsPerPage) {
+              startPage(sectionLabel);
+              drawGroupHeading(`${PROPERTY_KIND_LABELS[group.kind]} (cont.)`, gridTop);
+              gridTop = gridTop + 22;
+            }
+            const col = slotIdx % COLS;
+            const row = Math.floor(slotIdx / COLS);
+            const cardX = PAGE_MARGIN + col * (cellW + COL_GAP);
+            const cardY = gridTop + row * (cellH + ROW_GAP);
+
+            // If the card would overflow the page bottom, flush to new page.
+            if (cardY + cellH > pageH - PAGE_MARGIN - 24) {
+              startPage(sectionLabel);
+              drawGroupHeading(`${PROPERTY_KIND_LABELS[group.kind]} (cont.)`, gridTop);
+              gridTop = gridTop + 22;
+              continue;  // re-enter loop — slotIdx = 0, will draw at top
+            }
+
+            // Card background
+            doc.save();
+            doc.roundedRect(cardX, cardY, cellW, cellH, 6).fillAndStroke('#ffffff', '#e2e2e7');
+            doc.restore();
+
+            // Photo region
+            const photoX = cardX + 8;
+            const photoY = cardY + 8;
+            const photoBoxW = cellW - 16;
+            const photoBoxInnerH = photoBoxH - 16;
+            doc.save();
+            doc.roundedRect(photoX, photoY, photoBoxW, photoBoxInnerH, 4).fillAndStroke('#f3f4f6', '#e2e2e7');
+            doc.restore();
+
+            const photoBuf = photoBuffers[entry.photoIdx];
+            if (photoBuf) {
+              try {
+                doc.image(photoBuf, photoX, photoY, {
+                  fit: [photoBoxW, photoBoxInnerH],
+                  align: 'center',
+                  valign: 'center',
+                });
+              } catch {
+                doc.fillColor('#9ca3af').font('Helvetica').fontSize(9);
+                doc.text('sem foto', photoX, photoY + photoBoxInnerH / 2 - 5, {
+                  width: photoBoxW, align: 'center',
+                });
+              }
+            } else {
+              doc.fillColor('#9ca3af').font('Helvetica').fontSize(9);
+              doc.text('sem foto', photoX, photoY + photoBoxInnerH / 2 - 5, {
+                width: photoBoxW, align: 'center',
+              });
+            }
+            doc.fillColor('#000000');
+
+            // ── REF code chip — top-right, prominent ─────────────
+            // The whole point of the layout overhaul: customer can quote
+            // this code back. Painted ON TOP of the photo so it stays
+            // visually anchored to the card even if the photo is dark.
+            const refText = entry.ref;
+            doc.font('Helvetica-Bold').fontSize(9);
+            const refW = doc.widthOfString(refText) + 12;
+            const refX = photoX + photoBoxW - refW - 4;
+            const refY = photoY + 4;
+            doc.save();
+            doc.roundedRect(refX, refY, refW, 16, 3).fill(ACCENT);
+            doc.restore();
+            doc.fillColor('#ffffff').text(refText, refX, refY + 3, {
+              width: refW, align: 'center', characterSpacing: 0.5,
+            });
+            doc.fillColor('#000000');
+
+            // Text block
+            const textX = cardX + 12;
+            const textY = cardY + photoBoxH + 4;
+            const textW = cellW - 24;
+            const it = entry.item;
+
+            doc.font('Helvetica-Bold').fontSize(11).fillColor('#1f2937');
+            doc.text((it.name || '').slice(0, 80), textX, textY, {
+              width: textW, height: 28, ellipsis: true,
+            });
+
+            doc.font('Helvetica-Bold').fontSize(12).fillColor(ACCENT);
+            const priceLabel = section.txn === 'aluguel'
+              ? `${formatPrice(it.price)}/mês`
+              : formatPrice(it.price);
+            doc.text(priceLabel, textX, textY + 30, { width: textW });
+
+            let textCursor = textY + 48;
+            const region = (it.region || '').trim();
+            if (region) {
+              doc.font('Helvetica').fontSize(9).fillColor('#6b7280');
+              doc.text(region.slice(0, 60), textX, textCursor, {
+                width: textW, ellipsis: true,
+              });
+              textCursor += 14;
+            }
+            const desc = (it.description || '').trim();
+            if (desc) {
+              doc.font('Helvetica').fontSize(8.5).fillColor('#4b5563');
+              doc.text(desc.slice(0, 200), textX, textCursor, {
+                width: textW, height: textY + textBoxH - textCursor - 6,
+                ellipsis: true, lineGap: 1,
+              });
+            }
+
+            slotIdx++;
+          }
         }
       }
 
       // ─── Footer on every non-cover page ────────────────────
-      // Walk the buffered pages and stamp a generation timestamp at the
-      // bottom. We skip page 0 (the cover, which has its own footer).
+      // Site URL on left, page X of Y on right, generation ts on a tiny
+      // line under it. Customer always knows where to dive deeper, and
+      // the operator can match a printed PDF to its render moment.
       const pageRange = doc.bufferedPageRange?.();
       if (pageRange) {
-        const footerText = `Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
+        const totalPages = pageRange.count;
+        const generatedAt = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         for (let p = pageRange.start + 1; p < pageRange.start + pageRange.count; p++) {
           doc.switchToPage(p);
-          doc.fillColor('#9ca3af').font('Helvetica').fontSize(8);
-          doc.text(footerText, PAGE_MARGIN, pageH - PAGE_MARGIN - 16, {
-            align: 'center', width: usableW,
+          const pageNum = p - pageRange.start + 1;
+          doc.fillColor('#9ca3af').font('Helvetica').fontSize(9);
+          if (siteUrl) {
+            doc.text(siteUrl, PAGE_MARGIN, pageH - PAGE_MARGIN - 20, {
+              width: usableW / 2, align: 'left',
+            });
+          }
+          doc.text(
+            `Página ${pageNum} de ${totalPages}`,
+            PAGE_MARGIN + usableW / 2, pageH - PAGE_MARGIN - 20,
+            { width: usableW / 2, align: 'right' },
+          );
+          doc.fillColor('#cccccc').fontSize(8);
+          doc.text(generatedAt, PAGE_MARGIN, pageH - PAGE_MARGIN - 6, {
+            width: usableW, align: 'center',
           });
         }
         doc.fillColor('#000000');

@@ -106,38 +106,29 @@ for (const [before, mustNotContain] of stripCases) {
 // ─── 3. renderCatalogPdf with real-estate catalog ─────────────────
 console.log('═══ 3. Auto-build renderCatalogPdf ═══\n');
 const sampleCatalog = [
-  {
-    name: 'Casa em Pontal de Santa Marina',
-    price: 1500000,
-    region: 'Pontal de Santa Marina, Caraguatatuba',
-    description: 'Casa de alto padrão com 4 quartos, 3 banheiros, sala ampla e cozinha gourmet. Vista para o mar.',
-    image_url: null,
-    url: null,
-  },
-  {
-    name: 'Terreno em Lot. Estância Mineira',
-    price: 150000,
-    region: 'Estância Mineira, Caraguatatuba',
-    description: 'Terreno 500m² localizado em bairro tranquilo, próximo à natureza.',
-    image_url: null,
-    url: null,
-  },
-  {
-    name: 'Apartamento no Centro',
-    price: 480000,
-    region: 'Centro, Caraguatatuba',
-    description: 'Apto 3 dormitórios sendo 1 suíte. Sacada com churrasqueira, 2 vagas de garagem.',
-    image_url: null,
-    url: null,
-  },
+  // VENDA — várias casas
+  { id: 'a1b2c3', name: 'Casa em Pontal de Santa Marina', price: 1500000, region: 'Pontal de Santa Marina, Caraguatatuba', description: 'Casa de alto padrão com 4 quartos, 3 banheiros, sala ampla e cozinha gourmet. Vista para o mar.', image_url: null, url: 'https://imobiliariacaragua.com.br/casa-pontal', type: 'venda' },
+  { id: 'd4e5f6', name: 'Casa Térrea no Indaiá', price: 690000, region: 'Indaiá, Caraguatatuba', description: '3 quartos, edícula, quintal grande, ideal pra família.', image_url: null, url: 'https://imobiliariacaragua.com.br/casa-indaia', type: 'venda' },
+  { id: 'g7h8i9', name: 'Sobrado em Massaguaçu', price: 980000, region: 'Massaguaçu, Caraguatatuba', description: 'Sobrado 5 dormitórios, suíte master com hidromassagem, piscina.', image_url: null, url: 'https://imobiliariacaragua.com.br/sobrado-massaguacu', type: 'venda' },
+  // VENDA — apto
+  { id: 'j0k1l2', name: 'Apartamento no Centro', price: 480000, region: 'Centro, Caraguatatuba', description: 'Apto 3 dormitórios sendo 1 suíte. Sacada com churrasqueira, 2 vagas de garagem.', image_url: null, url: 'https://imobiliariacaragua.com.br/apto-centro', type: 'venda' },
+  { id: 'm3n4o5', name: 'Cobertura Duplex Vista Mar', price: 1850000, region: 'Praia das Palmeiras, Caraguatatuba', description: 'Cobertura 4 suítes, churrasqueira, jacuzzi, vista 180° pro mar.', image_url: null, url: 'https://imobiliariacaragua.com.br/cobertura', type: 'venda' },
+  // VENDA — terreno
+  { id: 'p6q7r8', name: 'Terreno em Lot. Estância Mineira', price: 150000, region: 'Estância Mineira, Caraguatatuba', description: 'Terreno 500m² localizado em bairro tranquilo, próximo à natureza.', image_url: null, url: 'https://imobiliariacaragua.com.br/terreno-em', type: 'venda' },
+  // ALUGUEL
+  { id: 's9t0u1', name: 'Casa em Pontal de Santa Marina (temporada)', price: 850, region: 'Pontal de Santa Marina, Caraguatatuba', description: 'Casa para temporada, 3 quartos, 8 pessoas, 2 quadras da praia.', image_url: null, url: 'https://imobiliariacaragua.com.br/temporada-pontal', type: 'aluguel' },
+  { id: 'v2w3x4', name: 'Apto Mobiliado Centro', price: 2200, region: 'Centro, Caraguatatuba', description: 'Apto 2 dormitórios mobiliado, 1 vaga, contrato 30 meses.', image_url: null, url: 'https://imobiliariacaragua.com.br/apto-mobil', type: 'aluguel' },
+  { id: 'y5z6a7', name: 'Kitnet próximo à UFSP', price: 1100, region: 'Massaguaçu, Caraguatatuba', description: 'Kitnet mobiliada, ideal pra estudante, próxima ao campus.', image_url: null, url: 'https://imobiliariacaragua.com.br/kitnet-ufsp', type: 'aluguel' },
+  { id: 'b8c9d0', name: 'Sala Comercial Centro', price: 3500, region: 'Centro, Caraguatatuba', description: 'Sala comercial 80m², andar alto, vaga de garagem.', image_url: null, url: 'https://imobiliariacaragua.com.br/sala-com', type: 'aluguel' },
 ];
 
 try {
   const t0 = Date.now();
   const buf = await renderCatalogPdf({
     businessName: 'Imobiliária em Caraguatatuba',
-    businessContact: '+55 12 9XXXX-XXXX',
-    items: sampleCatalog,
+    businessContact: '+55 12 9XXXX-XXXX · contato@imobiliariacaragua.com.br',
+    siteUrl: 'https://imobiliariacaragua.com.br',
+    items: sampleCatalog as any,
   });
   const ms = Date.now() - t0;
   const head = buf.slice(0, 4).toString('ascii');
